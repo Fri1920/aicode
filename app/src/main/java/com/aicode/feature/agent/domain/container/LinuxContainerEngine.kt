@@ -27,14 +27,14 @@ import java.util.concurrent.atomic.AtomicBoolean
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/** 流式执行命令时产生的事件，供终端逐行实时渲染。 */
-sealed interface CommandEvent {
-    /** 一行标准输出/错误（stderr 已合并到 stdout）。 */
-    data class Line(val text: String) : CommandEvent
-    /** 命令结束，附退出码（兜底 shell 无法取到时为 null）。 */
-    data class Exit(val code: Int?) : CommandEvent
-}
-
+/**
+ * 本地 PRoot 容器命令执行后端，实现 [CommandEngine]。
+ *
+ * 原有逻辑零变化——仅加 `: CommandEngine` 并给公开方法补 `override`。
+ * [CommandEvent] 与 [CommandResult] 已提升为顶层类型（见 [CommandEngine.kt]），
+ * 本类不再自行定义。PRoot 专属方法（[startStdioProcess]/[buildProotInvocation]/
+ * [incPromptInFlight] 等）不属于接口，仅供本地 MCP stdio / 凭据 helper / 终端 PTY 使用。
+ */
 /**
  * 一次 PRoot 调用的完整描述：可执行文件 + 参数列表 + 环境变量。
  *
@@ -70,10 +70,10 @@ data class ProotInvocation(
 class LinuxContainerEngine @Inject constructor(
     private val containerInstaller: ContainerInstaller,
     private val containerSettingsRepository: com.aicode.feature.settings.data.repository.ContainerSettingsRepository
-) {
+) : CommandEngine {
     /** 容器初始化的实时进度，供所有入口（终端页/AI/后台终端/MCP）共享同一份状态。 */
     private val _initProgress = MutableStateFlow<ContainerInitState>(ContainerInitState.Idle)
-    val initProgress: StateFlow<ContainerInitState> = _initProgress.asStateFlow()
+    override val initProgress: StateFlow<ContainerInitState> = _initProgress.asStateFlow()
 
     /** 串行化 ensureInstalled，避免多入口并发触发重复解压/配置；后到者等待后看到就绪直接置 Ready。 */
     private val initMutex = Mutex()
@@ -163,10 +163,10 @@ class LinuxContainerEngine @Inject constructor(
      * 超时后强制终止子进程并在末尾追加一行超时提示，[CommandEvent.Exit] 退出码记为 null。
      * 由于 readLine 是阻塞读，单靠协程超时无法打断，这里用独立看门狗 destroy 进程来解除阻塞。
      */
-    fun runCommandStream(
+    override fun runCommandStream(
         command: String,
-        projectPath: String? = null,
-        timeoutMs: Long = DEFAULT_TIMEOUT_MS
+        projectPath: String?,
+        timeoutMs: Long
     ): Flow<CommandEvent> = flow {
         // 懒安装：首次执行命令时解压 rootfs/proot 并配置基础包（python3/git/pip/node/npm/rg）
         ensureInstalled()
@@ -256,10 +256,10 @@ class LinuxContainerEngine @Inject constructor(
      * [timeoutMs] 为命令最长执行时间（毫秒），默认 [DEFAULT_TIMEOUT_MS]，上限 [MAX_TIMEOUT_MS]。
      * 超时后强制终止子进程，返回已收集到的部分输出并在末尾追加超时提示。
      */
-    suspend fun runCommandSync(
+    override suspend fun runCommandSync(
         command: String,
-        projectPath: String? = null,
-        timeoutMs: Long = DEFAULT_TIMEOUT_MS
+        projectPath: String?,
+        timeoutMs: Long
     ): String = withContext(Dispatchers.IO) {
         // 懒安装：首次执行命令时解压 rootfs/proot 并配置基础包（python3/git/rg）
         ensureInstalled()
@@ -270,18 +270,15 @@ class LinuxContainerEngine @Inject constructor(
      * 同 [runCommandSync]，但一并返回退出码（超时/异常时为 null）。供需要据退出码判成败的调用方
      * 使用——如 git 写操作：git 非零退出码并非进程崩溃，[runCommandSync] 仅返回文本会让上层误报成功。
      */
-    suspend fun runCommandSyncWithExit(
+    override suspend fun runCommandSyncWithExit(
         command: String,
-        projectPath: String? = null,
-        timeoutMs: Long = DEFAULT_TIMEOUT_MS
+        projectPath: String?,
+        timeoutMs: Long
     ): CommandResult = withContext(Dispatchers.IO) {
         ensureInstalled()
         val r = execCaptured(command, projectPath, timeoutMs)
         CommandResult(r.output, r.exitCode)
     }
-
-    /** 一次容器内执行的结果：限幅后的完整输出 + 退出码（超时/异常时为 null）。 */
-    data class CommandResult(val output: String, val exitCode: Int?)
 
     /** 一次容器内执行的内部结果：限幅后的完整输出 + 退出码（超时/异常时为 null）。 */
     private data class ExecResult(val output: String, val exitCode: Int?)
@@ -292,10 +289,10 @@ class LinuxContainerEngine @Inject constructor(
      * 供只读工具做性能增强使用：例如 search 可优先用 rg，但不能因为一次自动批准的搜索
      * 隐式初始化容器或联网安装环境。未就绪时返回 null，让调用方走纯宿主 fallback。
      */
-    suspend fun runCommandSyncIfReady(
+    override suspend fun runCommandSyncIfReady(
         command: String,
-        projectPath: String? = null,
-        timeoutMs: Long = DEFAULT_TIMEOUT_MS
+        projectPath: String?,
+        timeoutMs: Long
     ): CommandResult? {
         if (!containerInstaller.isInstalledFor(currentProfile) || !isProvisioned()) return null
         val result = execCaptured(command, projectPath, timeoutMs)
@@ -491,13 +488,13 @@ class LinuxContainerEngine @Inject constructor(
     }
 
     /** 容器是否已安装就绪（按当前 profile）。 */
-    fun isContainerInstalled(): Boolean = containerInstaller.isInstalledFor(currentProfile)
+    override fun isContainerInstalled(): Boolean = containerInstaller.isInstalledFor(currentProfile)
 
     /**
      * 基础包是否已配置完成（按当前 profile）。自定义镜像不 provision，视为已就绪——
      * 所需工具由用户自行在容器内安装，不依赖本流程。
      */
-    fun isProvisioned(): Boolean {
+    override fun isProvisioned(): Boolean {
         if (!currentProfile.isBuiltin) return true
         val marker = provisionMarker
         return marker.exists() && marker.readText().trim() == PROVISION_VERSION
@@ -509,7 +506,7 @@ class LinuxContainerEngine @Inject constructor(
      *
      * 内置分支与改动前逐字等价。自定义镜像的 shell 路径由用户负责——若不存在，proot 会报错由用户看到。
      */
-    fun defaultShell(): String {
+    override fun defaultShell(): String {
         val profile = currentProfile
         if (!profile.isBuiltin) return profile.shellPath?.takeIf { it.isNotBlank() } ?: "/bin/sh"
         return if (isProvisioned()) "/bin/bash" else "/bin/sh"
@@ -523,7 +520,7 @@ class LinuxContainerEngine @Inject constructor(
      * 用 [initMutex] 串行化：多入口并发时只让第一个真正解压/配置，其余等待后看到就绪直接置 [ContainerInitState.Ready]。
      * 全程通过 [initProgress] 上报阶段进度，供 UI 实时展示。
      */
-    suspend fun ensureInstalled() = initMutex.withLock {
+    override suspend fun ensureInstalled() = initMutex.withLock {
         val profile = currentProfile
         // 每次启动或执行命令前确保提取最新的内置文档
         containerInstaller.extractDocs()

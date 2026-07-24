@@ -5,6 +5,9 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.aicode.core.util.FileLogger
+import com.aicode.feature.agent.domain.container.RemoteSshConnection
+import com.aicode.feature.settings.data.repository.ExecutionMode
+import com.aicode.feature.settings.data.repository.ExecutionModeHolder
 import com.aicode.feature.workspace.domain.model.Workspace
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
@@ -28,7 +31,9 @@ private val Context.workspaceDataStore by preferencesDataStore(name = "workspace
  */
 @Singleton
 class WorkspaceRepository @Inject constructor(
-    @param:ApplicationContext private val context: Context
+    @param:ApplicationContext private val context: Context,
+    private val executionModeHolder: ExecutionModeHolder,
+    private val remoteSshConnection: RemoteSshConnection
 ) {
     private companion object {
         const val TAG = "WorkspaceRepository"
@@ -125,8 +130,16 @@ class WorkspaceRepository @Inject constructor(
         FileLogger.i(TAG, "删除工作区: $name")
     }
 
-    /** 当前工作区的绝对路径，供 projectRoot / 命令执行目录使用；无选中时回退到项目根目录。 */
-    fun currentPath(): String = _current.value?.path ?: projectsRoot.absolutePath
+    /** 当前工作区的路径，供 projectRoot / 命令执行目录使用。
+     * 本地模式返回宿主工作区绝对路径；远程模式返回配置的 remoteWorkspacePath（命令在远程服务器执行时 cd 到此）。
+     * 无选中工作区时本地回退到项目根目录，远程回退到配置的 remoteWorkspacePath。 */
+    fun currentPath(): String {
+        if (executionModeHolder.currentMode() == ExecutionMode.REMOTE_SSH) {
+            return remoteSshConnection.config?.remoteWorkspacePath
+                ?.takeIf { it.isNotBlank() } ?: "/"
+        }
+        return _current.value?.path ?: projectsRoot.absolutePath
+    }
 
     /** 仅保留字母数字、下划线、连字符、点和空格，去掉路径分隔符等危险字符。 */
     private fun sanitize(raw: String): String =

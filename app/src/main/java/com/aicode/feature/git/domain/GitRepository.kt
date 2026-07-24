@@ -1,7 +1,7 @@
 package com.aicode.feature.git.domain
 
 import com.aicode.core.util.FileLogger
-import com.aicode.feature.agent.domain.container.LinuxContainerEngine
+import com.aicode.feature.agent.domain.container.CommandEngine
 import com.aicode.feature.git.domain.model.GitBranch
 import com.aicode.feature.git.domain.model.GitCommit
 import com.aicode.feature.git.domain.model.GitFileChange
@@ -30,7 +30,7 @@ private const val TAG = "GitRepository"
  */
 @Singleton
 class GitRepository @Inject constructor(
-    private val engine: LinuxContainerEngine,
+    private val engine: CommandEngine,
     private val workspaceRepository: WorkspaceRepository
 ) {
     private companion object {

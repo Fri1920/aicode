@@ -10,7 +10,7 @@ import com.aicode.feature.agent.domain.tool.ToolCapability
 import com.aicode.feature.agent.domain.tool.ToolPermissionPolicy
 import com.aicode.feature.agent.domain.tool.ToolResult
 import com.aicode.feature.agent.domain.tool.ToolStreamEvent
-import com.aicode.feature.terminal.domain.TerminalSessionManager
+import com.aicode.feature.terminal.domain.TerminalSessionProvider
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -49,7 +49,7 @@ private fun JsonElement.asPlainString(): String? =
  * send 动作按输入内容匹配，key/read/close 按整工具匹配。
  */
 class TerminalSessionTool @Inject constructor(
-    private val sessionManager: TerminalSessionManager
+    private val sessionManager: TerminalSessionProvider
 ) : AgentTool(), StreamingAgentTool {
     private companion object {
         const val TAG = "TerminalSessionTool"

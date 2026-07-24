@@ -19,6 +19,9 @@ import com.aicode.feature.settings.data.remote.ModelMetadataService
 import com.aicode.feature.settings.data.remote.ModelTestResult
 import com.aicode.feature.settings.data.repository.AppThemeMode
 import com.aicode.feature.settings.data.repository.ContainerSettingsRepository
+import com.aicode.feature.settings.data.repository.ExecutionMode
+import com.aicode.feature.settings.data.repository.ExecutionModeHolder
+import com.aicode.feature.settings.data.repository.ExecutionModeRepository
 import com.aicode.feature.settings.data.repository.KeepaliveSettingsRepository
 import com.aicode.feature.settings.data.repository.LogSettingsRepository
 import com.aicode.feature.settings.data.repository.ThemeSettingsRepository
@@ -72,7 +75,9 @@ class SettingsViewModel @Inject constructor(
     private val permissionRulesRepository: PermissionRulesRepository,
     private val visionModelSettingsRepository: VisionModelSettingsRepository,
     private val containerSettingsRepository: ContainerSettingsRepository,
-    private val containerInstaller: ContainerInstaller
+    private val containerInstaller: ContainerInstaller,
+    private val executionModeRepository: ExecutionModeRepository,
+    private val executionModeHolder: ExecutionModeHolder
 ) : ViewModel() {
     private companion object {
         const val MAX_LOG_LINES = 1200
@@ -142,6 +147,14 @@ class SettingsViewModel @Inject constructor(
         .map { listOf(ContainerProfile.BUILTIN_ALPINE) + it }
         .stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.Eagerly, listOf(ContainerProfile.BUILTIN_ALPINE))
 
+    /** 当前执行模式（本地 PRoot / 远程 SSH）。 */
+    private val _executionMode = MutableStateFlow(ExecutionMode.LOCAL_PROOT)
+    val executionMode: StateFlow<ExecutionMode> = _executionMode.asStateFlow()
+
+    /** 远程 SSH 连接配置。 */
+    private val _remoteConnection = MutableStateFlow<com.aicode.feature.settings.data.repository.RemoteConnectionSettings?>(null)
+    val remoteConnection: StateFlow<com.aicode.feature.settings.data.repository.RemoteConnectionSettings?> = _remoteConnection.asStateFlow()
+
     init {
         viewModelScope.launch {
             // 启动即保证有激活提供商（若库中存在却无激活项），避免主页模型胶囊因 activeProvider=null 消失。
@@ -202,6 +215,18 @@ class SettingsViewModel @Inject constructor(
             launch {
                 containerSettingsRepository.customProfilesFlow.collectLatest {
                     _customProfiles.value = it
+                }
+            }
+
+            launch {
+                executionModeRepository.executionModeFlow.collectLatest {
+                    _executionMode.value = it
+                }
+            }
+
+            launch {
+                executionModeRepository.remoteConnectionFlow.collectLatest {
+                    _remoteConnection.value = it
                 }
             }
 
@@ -364,6 +389,21 @@ class SettingsViewModel @Inject constructor(
     fun setActiveContainerProfile(id: String) {
         viewModelScope.launch {
             containerSettingsRepository.setActiveProfile(id)
+        }
+    }
+
+    /** 切换执行模式（本地 PRoot / 远程 SSH）。委托层每次调用读 holder，切换即时生效，无需重启。 */
+    fun setExecutionMode(mode: ExecutionMode) {
+        viewModelScope.launch {
+            executionModeRepository.setExecutionMode(mode)
+            executionModeHolder.setMode(mode)
+        }
+    }
+
+    /** 保存远程 SSH 连接配置。 */
+    fun setRemoteConnection(settings: com.aicode.feature.settings.data.repository.RemoteConnectionSettings) {
+        viewModelScope.launch {
+            executionModeRepository.setRemoteConnection(settings)
         }
     }
 

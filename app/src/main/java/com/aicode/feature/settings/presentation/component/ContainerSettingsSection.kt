@@ -58,7 +58,11 @@ internal fun ContainerSection(
     onSaveCustom: (ContainerProfile) -> Unit,
     onEditCustom: (ContainerProfile) -> Unit,
     onDeleteCustom: (ContainerProfile) -> Unit,
-    onSwitchConfirmed: () -> Unit = {}
+    onSwitchConfirmed: () -> Unit = {},
+    executionMode: com.aicode.feature.settings.data.repository.ExecutionMode = com.aicode.feature.settings.data.repository.ExecutionMode.LOCAL_PROOT,
+    remoteConnection: com.aicode.feature.settings.data.repository.RemoteConnectionSettings? = null,
+    onExecutionModeChange: (com.aicode.feature.settings.data.repository.ExecutionMode) -> Unit = {},
+    onRemoteConnectionChange: (com.aicode.feature.settings.data.repository.RemoteConnectionSettings) -> Unit = {}
 ) {
     var showAddDialog by remember { mutableStateOf(false) }
     var editingProfile by remember { mutableStateOf<ContainerProfile?>(null) }
@@ -70,6 +74,15 @@ internal fun ContainerSection(
         contentPadding = PaddingValues(Spacing.lg),
         verticalArrangement = Arrangement.spacedBy(Spacing.md)
     ) {
+        item {
+            ExecutionModeSection(
+                mode = executionMode,
+                remoteConnection = remoteConnection,
+                onModeChange = onExecutionModeChange,
+                onRemoteConnectionChange = onRemoteConnectionChange
+            )
+        }
+
         item {
             Text(
                 text = "选择一个容器镜像。自定义镜像只保证能起 shell 执行命令，不自动安装工具——所需软件请自行在容器内配置。",

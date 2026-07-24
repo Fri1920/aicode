@@ -1,8 +1,8 @@
 package com.aicode.feature.agent.domain.tool.container
 
 import com.aicode.feature.agent.domain.container.BoundedOutput
+import com.aicode.feature.agent.domain.container.CommandEngine
 import com.aicode.feature.agent.domain.container.CommandEvent
-import com.aicode.feature.agent.domain.container.LinuxContainerEngine
 import com.aicode.core.util.FileLogger
 import com.aicode.feature.agent.domain.tool.AgentTool
 import com.aicode.feature.agent.domain.tool.ParameterType
@@ -34,7 +34,7 @@ import javax.inject.Inject
  * [execute] 作为非流式兜底保留，最终聚合结果两者一致（喂回模型不变）。
  */
 class ExecuteCommandTool @Inject constructor(
-    private val containerEngine: LinuxContainerEngine,
+    private val commandEngine: CommandEngine,
     private val workspaceRepository: WorkspaceRepository
 ) : AgentTool(), StreamingAgentTool {
     private companion object {
@@ -48,7 +48,7 @@ class ExecuteCommandTool @Inject constructor(
     }
 
     override val name = "Bash"
-    override val description = "在独立的 Linux 容器环境中执行 Shell 命令。支持 npm、git 等绝大多数终端操作。对于耗时任务（如安装大量依赖、启动服务器等），请不要在此命令末尾加 '&' 挂后台，而是强烈建议改用 `terminal` 工具（action=\"start\"）来创建常驻终端页面，这样才能方便后续查看实时输出结果和管理进程。"
+    override val description = "在当前执行环境（本地 Linux 容器或远程 SSH 服务器）中执行 Shell 命令。支持 npm、git 等绝大多数终端操作。对于耗时任务（如安装大量依赖、启动服务器等），请不要在此命令末尾加 '&' 挂后台，而是强烈建议改用 `terminal` 工具（action=\"start\"）来创建常驻终端页面，这样才能方便后续查看实时输出结果和管理进程。"
     override val permissionPolicy = ToolPermissionPolicy.ASK
     override val capabilities = setOf(ToolCapability.EXECUTE_COMMANDS)
 
@@ -85,7 +85,7 @@ class ExecuteCommandTool @Inject constructor(
             toolName = name,
             title = "确认执行命令",
             summary = command,
-            details = "将在当前工作区的 Linux 容器中执行。\n超时：${timeoutSeconds} 秒",
+            details = "将在当前执行环境中执行。\n超时：${timeoutSeconds} 秒",
             argsPreview = argsPreview
         )
     }
@@ -99,7 +99,7 @@ class ExecuteCommandTool @Inject constructor(
             val workdir = workspaceRepository.currentPath()
             val timeoutMs = resolveTimeoutMs(args)
             FileLogger.d(TAG, "execute_command (timeout=${timeoutMs}ms): $command")
-            val output = containerEngine.runCommandSync(command, workdir, timeoutMs)
+            val output = commandEngine.runCommandSync(command, workdir, timeoutMs)
             FileLogger.v(TAG, "execute_command 完成，输出 ${output.length} 字符")
             ToolResult.Success(JsonPrimitive(output))
         } catch (e: CancellationException) {
@@ -131,7 +131,7 @@ class ExecuteCommandTool @Inject constructor(
             val workdir = workspaceRepository.currentPath()
             val timeoutMs = resolveTimeoutMs(args)
             FileLogger.d(TAG, "execute_command(流式, timeout=${timeoutMs}ms): $command")
-            containerEngine.runCommandStream(command, workdir, timeoutMs).collect { event ->
+            commandEngine.runCommandStream(command, workdir, timeoutMs).collect { event ->
                 when (event) {
                     is CommandEvent.Line -> {
                         accumulated.append(event.text)
