@@ -212,7 +212,11 @@ class RemoteSshEngine @Inject constructor(
         }
     }
 
-    /** 拼接 cd 到 projectPath 再执行 command 的完整命令；projectPath 为 null 则直接执行。 */
-    private fun buildCdCommand(command: String, projectPath: String?): String =
-        if (projectPath != null) "cd $projectPath 2>/dev/null; $command" else command
+    /** 拼接 cd 到 projectPath 再执行 command 的完整命令；projectPath 为 null 则直接执行。
+     *  优先 cd 到 /workspace（符号链接），让 AI 执行 pwd 时看到 /workspace 而非真实路径。
+     *  /workspace 不存在（符号链接未建成非 root）时 fallback 到 projectPath。 */
+    private fun buildCdCommand(command: String, projectPath: String?): String {
+        if (projectPath == null) return command
+        return "cd /workspace 2>/dev/null || cd '$projectPath' 2>/dev/null; $command"
+    }
 }

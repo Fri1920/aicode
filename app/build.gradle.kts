@@ -232,8 +232,8 @@ dependencies {
     // Termux 开源终端组件：terminal-emulator 负责 VT100/ANSI 解析与 PTY（自带 native .so），
     // terminal-view 是渲染用的 Android View。经 JitPack 分发（com.github.<user>.<repo> 坐标形式），
     // 避免自行实现终端模拟器。
-    implementation("com.github.termux.termux-app:terminal-emulator:v0.118.0")
-    implementation("com.github.termux.termux-app:terminal-view:v0.118.0")
+    implementation(project(":terminal-emulator"))
+    implementation(project(":terminal-view"))
 
     // Material Icons
     implementation("androidx.compose.material:material-icons-core")

@@ -5,18 +5,15 @@ import kotlinx.coroutines.flow.SharedFlow
 /**
  * 终端会话后端抽象：把"终端会话在哪运行"从硬编码的本地 Termux PTY 解耦。
  *
- * [TerminalSessionTool]（AI 的 terminal 工具）依赖本接口而非 [TerminalSessionManager]，
- * 由 DI 按当前执行模式注入对应实现：
+ * [TerminalSessionTool]（AI 的 terminal 工具）依赖本接口而非具体实现，
+ * 由 DI 委托层按当前执行模式转发到对应实现：
  * - [TerminalSessionManager]：本地 Termux PTY（fork proot 进程）；
  * - `RemoteTerminalSessionManager`：远程 SSH shell channel。
- *
- * [TerminalViewModel] 暂时继续直接依赖 [TerminalSessionManager]（终端 UI 的远程适配
- * 改动量大，后续单独处理）。
  */
 interface TerminalSessionProvider {
 
     /** 后台命令结束时 emit 的事件，供 ViewModel 订阅后通知 AI。 */
-    val tabFinishedEvents: SharedFlow<TerminalSessionManager.TabFinishedEvent>
+    val tabFinishedEvents: SharedFlow<TabFinishedEvent>
 
     /** 把一条命令挂后台跑（如 `npm run dev`），返回唯一 tabId。 */
     suspend fun startBackgroundCommand(
@@ -39,7 +36,7 @@ interface TerminalSessionProvider {
     fun getTabOutput(id: String): String?
 
     /** 列出全部标签的摘要。 */
-    fun listTabs(): List<TerminalSessionManager.TabInfo>
+    fun listTabs(): List<TabInfo>
 
     /** 关闭并销毁标签。返回是否成功。 */
     fun closeTab(id: String): Boolean

@@ -2,9 +2,12 @@ package com.aicode.feature.workspace.domain
 
 import com.aicode.core.util.FileLogger
 import com.aicode.feature.agent.domain.container.RemoteSshConnection
+import com.aicode.feature.workspace.data.repository.WorkspaceRepository
 import com.aicode.feature.workspace.domain.WorkspacePathMapper.Companion.CONTAINER_ROOT
-import net.schmizz.sshj.sftp.FileMode
+import kotlinx.coroutines.runBlocking
+import java.io.BufferedReader
 import java.io.File
+import java.io.InputStreamReader
 import java.nio.file.FileAlreadyExistsException
 import java.nio.file.NoSuchFileException
 import javax.inject.Inject
@@ -12,191 +15,227 @@ import javax.inject.Inject
 private const val TAG = "RemoteSftpFileAccess"
 
 /**
- * [FileAccessProvider] 的远程 SFTP 实现：用 sshj SFTP channel 读写远程文件。
+ * [FileAccessProvider] 的远程实现：用 SSH exec channel 执行命令读写远程文件。
+ *
+ * **不用 SFTP**：sshj 0.38.0 的 SFTP 实现有长期未修的 Buffer 溢出 bug（issue #461），
+ * 在 Android 上必现 `ArrayIndexOutOfBoundsException: dstPos=-4`，且崩溃会拖垮整个 SSH transport。
+ * exec channel 不走 SFTPEngine，无此问题。`Bash` 工具已验证 exec 可靠。
  *
  * 路径映射：AI 给的 `/workspace/...` 映射到 [RemoteSshConnection.config] 的 `remoteWorkspacePath` + 相对路径。
  * 其它绝对路径（如 `/etc/...`）直接作为远程绝对路径使用。
  *
- * 共享 [RemoteSshConnection] 的 SSH 连接（与 [RemoteSshEngine] 复用同一 SSHClient）。
- * [copyToLocal] 通过 SFTP 下载到本地缓存目录，供 [ViewImageTool] 等需要本地文件路径的工具使用。
+ * 文本文件用 `cat`/重定向读写，二进制文件用 `base64` 中转。
  */
 class RemoteSftpFileAccess @Inject constructor(
     private val connection: RemoteSshConnection,
-    @Suppress("unused") private val pathMapper: WorkspacePathMapper
+    private val workspaceRepository: WorkspaceRepository
 ) : FileAccessProvider {
 
-    /** 把 AI 路径映射到远程服务器上的真实路径。 */
-    private fun toRemotePath(path: String): String {
+    /** 当前选中工作区在远程服务器上的真实路径（如 /data/.../test/111）。 */
+    private fun currentWorkspaceRoot(): String {
         val cfg = connection.config ?: throw IllegalStateException("SSH 未连接")
-        val p = path.trim().let { if (it.startsWith("~/")) "/home/${cfg.username}/" + it.removePrefix("~/") else it }
+        // currentPath() 远程模式返回选中工作区的远程绝对路径；未选中时回退到 remoteWorkspacePath
+        val path = workspaceRepository.currentPath()
+        return if (path.isNotBlank() && path != "/") path else cfg.remoteWorkspacePath.trimEnd('/')
+    }
+
+    /** 把 AI 路径映射到远程服务器上的真实路径。
+     *  /workspace 映射到当前选中工作区（与本地模式 WorkspacePathMapper 行为一致），
+     *  其它绝对路径直接作为远程绝对路径使用。 */
+    private fun toRemotePath(path: String): String {
+        val root = currentWorkspaceRoot().trimEnd('/')
+        val p = path.trim().let { if (it.startsWith("~/")) "/home/${connection.config?.username}/" + it.removePrefix("~/") else it }
         return when {
-            p == CONTAINER_ROOT || p == "$CONTAINER_ROOT/" -> cfg.remoteWorkspacePath.trimEnd('/')
+            p == CONTAINER_ROOT || p == "$CONTAINER_ROOT/" -> root
             p.startsWith("$CONTAINER_ROOT/") ->
-                cfg.remoteWorkspacePath.trimEnd('/') + "/" + p.removePrefix("$CONTAINER_ROOT/")
+                root + "/" + p.removePrefix("$CONTAINER_ROOT/")
             p.startsWith("/") -> p
-            else -> cfg.remoteWorkspacePath.trimEnd('/') + "/" + p
+            else -> root + "/" + p
         }
     }
 
     /** 把远程路径还原为 AI 视角的容器路径（回显用）。 */
     private fun toDisplayPathFromRemote(remotePath: String): String {
-        val cfg = connection.config ?: return remotePath
-        val ws = cfg.remoteWorkspacePath.trimEnd('/')
+        val root = currentWorkspaceRoot().trimEnd('/')
         return when {
-            remotePath == ws -> CONTAINER_ROOT
-            remotePath.startsWith("$ws/") -> CONTAINER_ROOT + "/" + remotePath.removePrefix("$ws/")
+            remotePath == root -> CONTAINER_ROOT
+            remotePath.startsWith("$root/") -> CONTAINER_ROOT + "/" + remotePath.removePrefix("$root/")
             else -> remotePath
+        }
+    }
+
+    /** 单引号转义：远程路径含单引号时用 `'\''` 绕过，保证 shell 命令安全。 */
+    private fun shellQuote(s: String): String = "'" + s.replace("'", "'\\''") + "'"
+
+    /** 同步执行远程命令并返回完整 stdout。失败时抛异常。 */
+    private fun execSync(command: String): String = runBlocking {
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            val session = connection.startExecSession(command)
+            try {
+                val reader = BufferedReader(InputStreamReader(session.inputStream))
+                val output = reader.readText()
+                // readText 读到流结束，但 exitStatus 可能还没就绪——close 后才保证有值
+                runCatching { session.close() }
+                val exitCode = session.exitStatus
+                if (exitCode != null && exitCode != 0) {
+                    FileLogger.w(TAG, "命令退出码=$exitCode: $command")
+                }
+                output
+            } catch (e: Exception) {
+                runCatching { session.close() }
+                throw e
+            }
+        }
+    }
+
+    /** 同步执行远程命令，返回退出码（不抛异常）。 */
+    private fun execExitCode(command: String): Int = runBlocking {
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            val session = connection.startExecSession(command)
+            try {
+                BufferedReader(InputStreamReader(session.inputStream)).readText()
+                runCatching { session.close() }
+                session.exitStatus ?: -1
+            } catch (e: Exception) {
+                runCatching { session.close() }
+                FileLogger.w(TAG, "命令执行异常: $command", e)
+                -1
+            }
         }
     }
 
     override fun readFile(path: String): String {
         val remote = toRemotePath(path)
-        val tempFile = File.createTempFile("aicode_remote_", ".txt").apply { deleteOnExit() }
-        try {
-            val sftp = connection.getSftpClientBlocking()
-            sftp.get(remote, tempFile.absolutePath)
-            return tempFile.readText()
-        } catch (e: Exception) {
-            FileLogger.e(TAG, "SFTP readFile 失败: $remote", e)
-            throw NoSuchFileException(File(remote))
-        } finally {
-            tempFile.delete()
-        }
+        return runCatching { execSync("cat ${shellQuote(remote)}") }
+            .getOrElse {
+                FileLogger.e(TAG, "readFile 失败: $remote", it)
+                throw NoSuchFileException(File(remote))
+            }
     }
 
     override fun readLines(path: String): Sequence<String> {
         val remote = toRemotePath(path)
-        val sftp = connection.getSftpClientBlocking()
-        val tempFile = File.createTempFile("aicode_remote_", ".tmp").apply { deleteOnExit() }
-        runCatching {
-            sftp.get(remote, tempFile.absolutePath)
-        }.getOrElse {
-            tempFile.delete()
-            throw NoSuchFileException(File(remote))
-        }
-        return tempFile.bufferedReader().useLines { it.toList() }.asSequence()
-            .also { tempFile.delete() }
+        return runCatching { execSync("cat ${shellQuote(remote)}") }
+            .getOrElse { throw NoSuchFileException(File(remote)) }
+            .lines().asSequence()
     }
 
     override fun writeFile(path: String, content: String, overwrite: Boolean) {
         val remote = toRemotePath(path)
-        val sftp = connection.getSftpClientBlocking()
         if (exists(path) && !overwrite) throw FileAlreadyExistsException(File(remote))
-        val tempFile = File.createTempFile("aicode_upload_", ".tmp").apply { deleteOnExit() }
-        try {
-            tempFile.writeText(content)
-            runCatching { sftp.mkdirs(remote.substringBeforeLast('/')) }
-            sftp.put(tempFile.absolutePath, remote)
-        } finally {
-            tempFile.delete()
-        }
+        // 确保父目录存在
+        val parent = remote.substringBeforeLast('/', "")
+        if (parent.isNotEmpty()) execExitCode("mkdir -p ${shellQuote(parent)}")
+        // 用 printf 写入：内容经 shellQuote 转义后作为单行命令参数，不依赖 here-doc
+        val redirect = if (overwrite) ">" else ">>"
+        val exit = execExitCode("printf %s ${shellQuote(content)} $redirect ${shellQuote(remote)}")
+        if (exit != 0) FileLogger.w(TAG, "writeFile 退出码=$exit: $remote")
     }
 
     override fun exists(path: String): Boolean {
         val remote = toRemotePath(path)
-        val sftp = connection.getSftpClientBlocking()
-        return runCatching { sftp.statExistence(remote) != null }.getOrDefault(false)
+        return execExitCode("test -e ${shellQuote(remote)}") == 0
     }
 
     override fun isDirectory(path: String): Boolean {
         val remote = toRemotePath(path)
-        val sftp = connection.getSftpClientBlocking()
-        return runCatching {
-            sftp.statExistence(remote)?.type == FileMode.Type.DIRECTORY
-        }.getOrDefault(false)
+        return execExitCode("test -d ${shellQuote(remote)}") == 0
     }
 
     override fun isFile(path: String): Boolean {
         val remote = toRemotePath(path)
-        val sftp = connection.getSftpClientBlocking()
-        return runCatching {
-            val attrs = sftp.statExistence(remote) ?: return false
-            attrs.type != FileMode.Type.DIRECTORY
-        }.getOrDefault(false)
+        return execExitCode("test -f ${shellQuote(remote)}") == 0
     }
 
     override fun fileSize(path: String): Long {
         val remote = toRemotePath(path)
-        val sftp = connection.getSftpClientBlocking()
-        return runCatching { sftp.statExistence(remote)?.size ?: 0L }.getOrDefault(0L)
+        return runCatching {
+            execSync("stat -c %s ${shellQuote(remote)} 2>/dev/null").trim().toLongOrNull() ?: 0L
+        }.getOrDefault(0L)
     }
 
     override fun lastModified(path: String): Long {
         val remote = toRemotePath(path)
-        val sftp = connection.getSftpClientBlocking()
         return runCatching {
-            (sftp.statExistence(remote)?.mtime ?: 0L) * 1000L
+            // stat -c %Y 返回 epoch 秒，转毫秒
+            (execSync("stat -c %Y ${shellQuote(remote)} 2>/dev/null").trim().toLongOrNull() ?: 0L) * 1000L
         }.getOrDefault(0L)
     }
 
     override fun permissions(path: String): String {
         val remote = toRemotePath(path)
-        val sftp = connection.getSftpClientBlocking()
         return runCatching {
-            sftp.statExistence(remote) ?: return "---"
-            "rwx"
+            // stat -c %A 返回符号权限如 -rwxr-xr-x，取后 9 位
+            val sym = execSync("stat -c %A ${shellQuote(remote)} 2>/dev/null").trim()
+            sym.takeLast(9).takeIf { it.length == 9 } ?: "---"
         }.getOrDefault("---")
     }
 
     override fun listFiles(path: String): List<FileEntry> {
         val remote = toRemotePath(path)
-        val sftp = connection.getSftpClientBlocking()
         return runCatching {
-            sftp.ls(remote).map { resource ->
+            // 用 stat 一次性输出 name|type|size|mtime|perms，避免多次 exec
+            // %n=文件名 %F=类型 %s=大小 %Y=mtime %A=权限
+            val output = execSync(
+                "stat -c '%n|%F|%s|%Y|%A' ${shellQuote(remote)}/* 2>/dev/null"
+            )
+            if (output.isBlank()) return emptyList()
+            output.lines().mapNotNull { line ->
+                val parts = line.split("|")
+                if (parts.size < 5) return@mapNotNull null
+                val name = parts[0].substringAfterLast('/')
+                if (name.isBlank()) return@mapNotNull null
                 FileEntry(
-                    name = resource.name,
-                    isDirectory = resource.attributes.type == FileMode.Type.DIRECTORY,
-                    size = resource.attributes.size,
-                    lastModified = resource.attributes.mtime * 1000L,
+                    name = name,
+                    isDirectory = parts[1].contains("directory", ignoreCase = true),
+                    size = parts[2].toLongOrNull() ?: 0L,
+                    lastModified = (parts[3].toLongOrNull() ?: 0L) * 1000L,
                     localFile = null,
-                    permissions = "rwx"
+                    permissions = parts[4].takeLast(9).ifBlank { "---" }
                 )
             }
-        }.getOrDefault(emptyList())
+        }.getOrElse {
+            FileLogger.w(TAG, "listFiles 失败: $remote", it)
+            emptyList()
+        }
     }
 
     override fun readBytes(path: String): ByteArray {
         val remote = toRemotePath(path)
-        val tempFile = File.createTempFile("aicode_remote_", ".bin").apply { deleteOnExit() }
-        try {
-            val sftp = connection.getSftpClientBlocking()
-            sftp.get(remote, tempFile.absolutePath)
-            return tempFile.readBytes()
-        } catch (e: Exception) {
-            FileLogger.e(TAG, "SFTP readBytes 失败: $remote", e)
+        return runCatching {
+            // 二进制用 base64 中转
+            val b64 = execSync("base64 ${shellQuote(remote)} 2>/dev/null")
+            java.util.Base64.getMimeDecoder().decode(b64)
+        }.getOrElse {
+            FileLogger.e(TAG, "readBytes 失败: $remote", it)
             throw NoSuchFileException(File(remote))
-        } finally {
-            tempFile.delete()
         }
     }
 
     override fun copyToLocal(path: String): File {
         val remote = toRemotePath(path)
         val tempFile = File.createTempFile("aicode_remote_", ".copy").apply { deleteOnExit() }
-        try {
-            val sftp = connection.getSftpClientBlocking()
-            sftp.get(remote, tempFile.absolutePath)
-            return tempFile
-        } catch (e: Exception) {
+        return runCatching {
+            // base64 解码到本地临时文件
+            val b64 = execSync("base64 ${shellQuote(remote)} 2>/dev/null")
+            tempFile.writeBytes(java.util.Base64.getMimeDecoder().decode(b64))
+            tempFile
+        }.getOrElse {
             tempFile.delete()
-            FileLogger.e(TAG, "SFTP copyToLocal 失败: $remote", e)
+            FileLogger.e(TAG, "copyToLocal 失败: $remote", it)
             throw NoSuchFileException(File(remote))
         }
     }
 
     override fun delete(path: String) {
         val remote = toRemotePath(path)
-        val sftp = connection.getSftpClientBlocking()
-        runCatching {
-            val attrs = sftp.statExistence(remote) ?: return
-            if (attrs.type == FileMode.Type.DIRECTORY) sftp.rmdir(remote) else sftp.rm(remote)
-        }
+        // -r 递归删目录，-f 忽略不存在
+        execExitCode("rm -rf ${shellQuote(remote)}")
     }
 
     override fun mkdirs(path: String) {
         val remote = toRemotePath(path)
-        val sftp = connection.getSftpClientBlocking()
-        runCatching { sftp.mkdirs(remote) }
+        execExitCode("mkdir -p ${shellQuote(remote)}")
     }
 
     override fun parentPath(path: String): String? {

@@ -18,7 +18,7 @@ import com.aicode.feature.agent.domain.model.CodeChange
 import com.aicode.feature.agent.domain.model.WorkflowStatus
 import com.aicode.feature.agent.domain.permission.PermissionChoice
 import com.aicode.feature.agent.domain.workflow.AgentWorkflow
-import com.aicode.feature.terminal.domain.TerminalSessionManager
+import com.aicode.feature.terminal.domain.TabFinishedEvent
 import com.aicode.feature.agent.domain.workflow.AgentEvent
 import com.aicode.feature.agent.domain.tool.ToolPermissionManager
 import com.aicode.feature.agent.domain.tool.ToolRegistry
@@ -316,7 +316,7 @@ class AIAgentViewModel @Inject constructor(
      * executeAgentRequestStream 统一 persist 这条 user 消息，workflow 的 InitRequest 追加的同一条
      * UserMessage 即是它，避免重复落库或出现空占位消息。
      */
-    private fun handleBackgroundCommandFinished(event: TerminalSessionManager.TabFinishedEvent) {
+    private fun handleBackgroundCommandFinished(event: TabFinishedEvent) {
         // 按事件携带的来源会话路由，而非用户当前所在会话：后台命令可能在用户已切到别的会话后才结束。
         val sessionId = event.sourceSessionId ?: return
         viewModelScope.launch {

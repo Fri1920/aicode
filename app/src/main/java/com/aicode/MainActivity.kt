@@ -185,7 +185,9 @@ fun AppNavigation() {
     // 侧边栏需要的数据。
     val currentWorkspace by workspaceViewModel.current.collectAsStateWithLifecycle()
     androidx.compose.runtime.LaunchedEffect(currentWorkspace) {
-        agentViewModel.setWorkspace(currentWorkspace?.path ?: "")
+        // 远程模式连接未就绪时 currentWorkspace 为 null，不触发 setWorkspace，避免空路径点燃 session 加载
+        val path = currentWorkspace?.path ?: return@LaunchedEffect
+        agentViewModel.setWorkspace(path)
     }
 
     val sessions by agentViewModel.sessions.collectAsStateWithLifecycle()

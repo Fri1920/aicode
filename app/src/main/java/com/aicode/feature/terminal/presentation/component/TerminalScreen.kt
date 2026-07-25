@@ -50,7 +50,9 @@ import androidx.compose.ui.viewinterop.AndroidView
 import com.aicode.core.theme.Spacing
 import com.aicode.core.ui.rememberImeBottomInset
 import com.aicode.feature.agent.domain.container.ContainerInitState
+import com.aicode.feature.terminal.domain.RunState
 import com.aicode.feature.terminal.domain.TerminalSessionManager
+import com.aicode.feature.terminal.domain.TerminalTab
 import com.aicode.feature.terminal.presentation.TerminalViewModel
 import com.termux.view.TerminalView
 import compose.icons.FeatherIcons
@@ -155,7 +157,7 @@ fun TerminalScreen(
 /** 可横滑的标签栏：每个标签显示状态点 + 标题 + 关闭；末尾「+」新建。 */
 @Composable
 private fun TabBar(
-    tabs: List<TerminalSessionManager.TerminalTab>,
+    tabs: List<TerminalTab>,
     activeTabId: String?,
     onSelect: (String) -> Unit,
     onClose: (String) -> Unit,
@@ -200,7 +202,7 @@ private fun TabBar(
 
 @Composable
 private fun TabChip(
-    tab: TerminalSessionManager.TerminalTab,
+    tab: TerminalTab,
     selected: Boolean,
     onClick: () -> Unit,
     onClose: () -> Unit
@@ -209,7 +211,7 @@ private fun TabChip(
     val fg = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
     val borderColor = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant
     // 状态点：运行中=绿，已结束=灰；后台标签用主题三级色提示。
-    val running = tab.runState is TerminalSessionManager.RunState.Running
+    val running = tab.runState is RunState.Running
     val dot = when {
         !running -> MaterialTheme.colorScheme.outline
         tab.isBackground -> MaterialTheme.colorScheme.tertiary
@@ -257,7 +259,7 @@ private fun TabChip(
 
 /** Termux TerminalView 的 Compose 包装：渲染与输入全部由该开源组件负责。 */
 @Composable
-private fun TerminalSurface(tab: TerminalSessionManager.TerminalTab, viewModel: TerminalViewModel) {
+private fun TerminalSurface(tab: TerminalTab, viewModel: TerminalViewModel) {
     AndroidView(
         modifier = Modifier
             .fillMaxSize()

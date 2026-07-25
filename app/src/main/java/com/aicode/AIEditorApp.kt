@@ -64,6 +64,10 @@ class AIEditorApp : Application() {
     @Inject
     lateinit var remoteSshConnection: com.aicode.feature.agent.domain.container.RemoteSshConnection
 
+    /** 工作区仓库：SSH 重连成功后重新加载工作区。 */
+    @Inject
+    lateinit var workspaceRepository: com.aicode.feature.workspace.data.repository.WorkspaceRepository
+
     /** 长驻作用域：持续把持久化的日志等级同步到 FileLogger。 */
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
@@ -116,6 +120,11 @@ class AIEditorApp : Application() {
                             )
                         )
                     }.onFailure { FileLogger.e(TAG, "启动时 SSH 连接失败，将在首次命令时重试", it) }
+                }
+                // 启动 SSH 连接监督：定期探活、断线自动重连、重连成功后重新加载工作区。
+                remoteSshConnection.startSupervisor(appScope) {
+                    runCatching { workspaceRepository.initialize() }
+                        .onFailure { FileLogger.w(TAG, "SSH 重连后重新加载工作区失败", it) }
                 }
             }
         }

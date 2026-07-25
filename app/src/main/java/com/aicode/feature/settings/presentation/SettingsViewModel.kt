@@ -4,8 +4,10 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.aicode.core.util.FileLogger
 import com.aicode.core.util.LogLevel
+import com.aicode.feature.agent.domain.container.ConnectionState
 import com.aicode.feature.agent.domain.container.ContainerInstaller
 import com.aicode.feature.agent.domain.container.ContainerProfile
+import com.aicode.feature.agent.domain.container.RemoteSshConnection
 import com.aicode.feature.agent.domain.container.RootfsSource
 import com.aicode.feature.agent.domain.mcp.McpConfigRepository
 import com.aicode.feature.agent.domain.mcp.McpManager
@@ -77,7 +79,8 @@ class SettingsViewModel @Inject constructor(
     private val containerSettingsRepository: ContainerSettingsRepository,
     private val containerInstaller: ContainerInstaller,
     private val executionModeRepository: ExecutionModeRepository,
-    private val executionModeHolder: ExecutionModeHolder
+    private val executionModeHolder: ExecutionModeHolder,
+    private val remoteSshConnection: RemoteSshConnection
 ) : ViewModel() {
     private companion object {
         const val MAX_LOG_LINES = 1200
@@ -154,6 +157,9 @@ class SettingsViewModel @Inject constructor(
     /** 远程 SSH 连接配置。 */
     private val _remoteConnection = MutableStateFlow<com.aicode.feature.settings.data.repository.RemoteConnectionSettings?>(null)
     val remoteConnection: StateFlow<com.aicode.feature.settings.data.repository.RemoteConnectionSettings?> = _remoteConnection.asStateFlow()
+
+    /** 远程 SSH 连接状态，供 UI 显示指示器。 */
+    val connectionState: StateFlow<ConnectionState> = remoteSshConnection.connectionState
 
     init {
         viewModelScope.launch {

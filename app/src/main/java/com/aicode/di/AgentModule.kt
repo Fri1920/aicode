@@ -43,6 +43,8 @@ import com.aicode.feature.agent.domain.permission.ToolPermissionPolicyEngine
 import com.aicode.feature.agent.domain.tool.ToolRegistry
 import com.aicode.feature.agent.domain.tool.ToolOutputStore
 import com.aicode.feature.settings.data.remote.ModelMetadataService
+import com.aicode.feature.terminal.domain.DelegatingTerminalSessionProvider
+import com.aicode.feature.terminal.domain.RemoteTerminalSessionManager
 import com.aicode.feature.terminal.domain.TerminalSessionManager
 import com.aicode.feature.terminal.domain.TerminalSessionProvider
 import com.aicode.feature.workspace.domain.FileAccessProvider
@@ -208,15 +210,22 @@ object AgentModule {
 
     @Provides
     @Singleton
-    fun provideTerminalSessionProvider(terminalSessionManager: TerminalSessionManager): TerminalSessionProvider =
-        terminalSessionManager
+    fun provideTerminalSessionProvider(delegate: DelegatingTerminalSessionProvider): TerminalSessionProvider = delegate
+
+    @Provides
+    @Singleton
+    fun provideDelegatingTerminalSessionProvider(
+        modeHolder: com.aicode.feature.settings.data.repository.ExecutionModeHolder,
+        local: TerminalSessionManager,
+        remote: com.aicode.feature.terminal.domain.RemoteTerminalSessionManager
+    ): DelegatingTerminalSessionProvider = DelegatingTerminalSessionProvider(modeHolder, local, remote)
 
     @Provides
     @Singleton
     fun provideRemoteSftpFileAccess(
         connection: RemoteSshConnection,
-        pathMapper: com.aicode.feature.workspace.domain.WorkspacePathMapper
-    ): RemoteSftpFileAccess = RemoteSftpFileAccess(connection, pathMapper)
+        workspaceRepository: com.aicode.feature.workspace.data.repository.WorkspaceRepository
+    ): RemoteSftpFileAccess = RemoteSftpFileAccess(connection, workspaceRepository)
 
     @Provides
     @Singleton

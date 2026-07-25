@@ -49,48 +49,6 @@ class TerminalSessionManager @Inject constructor(
         const val DEFAULT_ROWS = 24
     }
 
-    /** 标签运行状态。Finished 保留在列表里不移除，供用户/AI 回看输出。 */
-    sealed interface RunState {
-        data object Running : RunState
-        data class Finished(val exitCode: Int) : RunState
-    }
-
-    /** 后台命令结束时 emit 的事件，供 ViewModel 订阅后通知 AI。 */
-    data class TabFinishedEvent(
-        val tabId: String,
-        val command: String?,
-        val exitCode: Int,
-        /** 发起该后台命令的会话 id；回调据此路由回原会话，而非用户当前所在会话。 */
-        val sourceSessionId: String?
-    )
-
-    /**
-     * 一个终端标签：会话 + 渲染视图 + 元数据。
-     *
-     * [view] 由 Compose 在创建 [TerminalView] 后回填；切换标签时复用同一会话、重新挂载视图。
-     * [client] 的 viewProvider 始终读 [view]，故无论视图如何重建都能把输出刷到当前挂载的视图。
-     */
-    class TerminalTab(
-        val id: String,
-        title: String,
-        val session: TerminalSession,
-        val isBackground: Boolean,
-        val command: String?,
-        val notifyOnExit: Boolean = false,
-        /** 发起该后台命令的会话 id；交互标签为 null。回调据此路由回原会话。 */
-        val sourceSessionId: String? = null,
-        runState: RunState
-    ) {
-        var title: String = title
-            internal set
-
-        @Volatile
-        var view: TerminalView? = null
-
-        var runState: RunState = runState
-            internal set
-    }
-
     private val _tabs = MutableStateFlow<List<TerminalTab>>(emptyList())
     val tabs: StateFlow<List<TerminalTab>> = _tabs.asStateFlow()
 
@@ -246,14 +204,6 @@ class TerminalSessionManager @Inject constructor(
             command = it.command
         )
     }
-
-    data class TabInfo(
-        val id: String,
-        val title: String,
-        val isBackground: Boolean,
-        val running: Boolean,
-        val command: String?
-    )
 
     /** 切换当前标签。 */
     fun activate(id: String) {
