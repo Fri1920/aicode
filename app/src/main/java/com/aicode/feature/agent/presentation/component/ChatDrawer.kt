@@ -24,11 +24,17 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -38,7 +44,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.aicode.core.theme.Radius
 import com.aicode.core.theme.Spacing
@@ -59,10 +67,13 @@ fun ChatDrawerContent(
     onSelect: (ChatSession) -> Unit,
     onCreate: () -> Unit,
     onDelete: (ChatSession) -> Unit,
+    onRename: (ChatSession, String) -> Unit,
     onNavigateToSettings: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     var pendingDelete by remember { mutableStateOf<ChatSession?>(null) }
+    var pendingRename by remember { mutableStateOf<ChatSession?>(null) }
+    var menuSession by remember { mutableStateOf<ChatSession?>(null) }
     val listState = rememberLazyListState()
 
     LaunchedEffect(currentSessionId, sessions) {
@@ -135,7 +146,7 @@ fun ChatDrawerContent(
                             selected = session.id == currentSessionId,
                             isExecuting = isExecuting,
                             onClick = { onSelect(session) },
-                            onDelete = { pendingDelete = session }
+                            onLongClick = { menuSession = session }
                         )
                     }
                 }
@@ -184,5 +195,133 @@ fun ChatDrawerContent(
                 TextButton(onClick = { pendingDelete = null }) { Text("取消") }
             }
         )
+    }
+
+    menuSession?.let { session ->
+        SessionActionSheet(
+            session = session,
+            onRename = {
+                menuSession = null
+                pendingRename = session
+            },
+            onDelete = {
+                menuSession = null
+                pendingDelete = session
+            },
+            onDismiss = { menuSession = null }
+        )
+    }
+
+    pendingRename?.let { session ->
+        var renameText by remember(session.id) { mutableStateOf(session.title) }
+        AlertDialog(
+            onDismissRequest = { pendingRename = null },
+            title = { Text("重命名会话") },
+            text = {
+                OutlinedTextField(
+                    value = renameText,
+                    onValueChange = { renameText = it },
+                    singleLine = true,
+                    label = { Text("会话名") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        onRename(session, renameText)
+                        pendingRename = null
+                    },
+                    enabled = renameText.isNotBlank() && renameText != session.title
+                ) { Text("重命名") }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingRename = null }) { Text("取消") }
+            }
+        )
+    }
+}
+
+/**
+ * 会话行长按弹出的功能菜单：重命名 / 删除。底部 sheet 样式参照 git 分支的 RefActionSheet。
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SessionActionSheet(
+    session: ChatSession,
+    onRename: () -> Unit,
+    onDelete: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    val sheetState = rememberModalBottomSheetState()
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = MaterialTheme.colorScheme.surface
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = Spacing.xl)
+        ) {
+            Text(
+                text = session.title,
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier
+                    .padding(horizontal = Spacing.lg)
+                    .padding(bottom = Spacing.md)
+            )
+            Surface(onClick = {
+                onDismiss()
+                onRename()
+            }, color = Color.Transparent) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = Spacing.lg, vertical = Spacing.md),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = FeatherIcons.Edit2,
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp),
+                        tint = MaterialTheme.colorScheme.onSurface
+                    )
+                    Spacer(Modifier.width(Spacing.lg))
+                    Text(
+                        text = "重命名",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+            }
+            Surface(onClick = {
+                onDismiss()
+                onDelete()
+            }, color = Color.Transparent) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = Spacing.lg, vertical = Spacing.md),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = FeatherIcons.Trash2,
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp),
+                        tint = MaterialTheme.colorScheme.error
+                    )
+                    Spacer(Modifier.width(Spacing.lg))
+                    Text(
+                        text = "删除",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+            }
+        }
     }
 }

@@ -235,6 +235,7 @@ fun AppNavigation() {
                         scope.launch { drawerState.close() }
                     },
                     onDelete = { agentViewModel.deleteSession(it.id) },
+                    onRename = { session, title -> agentViewModel.renameSession(session.id, title) },
                     onNavigateToSettings = {
                         scope.launch { drawerState.close() }
                         navController.navigate("settings")

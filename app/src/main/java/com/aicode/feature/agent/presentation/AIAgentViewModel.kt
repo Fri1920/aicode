@@ -891,6 +891,13 @@ class AIAgentViewModel @Inject constructor(
         }
     }
 
+    /** 重命名会话标题。仅更新 title，不改 updatedAt，列表顺序保持不变。 */
+    fun renameSession(id: String, newTitle: String) = viewModelScope.launch {
+        val trimmed = newTitle.trim()
+        if (trimmed.isEmpty()) return@launch
+        sessionUseCase.updateTitle(id, trimmed)
+    }
+
     private suspend fun ensureSession(): String {
         _currentSessionId.value?.let { return it }
         val ws = _currentWorkspace.value
