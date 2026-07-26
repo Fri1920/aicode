@@ -2,6 +2,7 @@ package com.aicode.feature.backup.presentation
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.aicode.feature.backup.domain.BackupDecryptionException
 import com.aicode.feature.backup.domain.BackupManager
 import com.aicode.feature.backup.domain.BackupOptions
 import com.aicode.feature.backup.domain.RestoreStats
@@ -46,7 +47,7 @@ class BackupViewModel @Inject constructor(
                 .onSuccess { _state.value = BackupState.ImportSuccess(it) }
                 .onFailure {
                     val msg = when (it) {
-                        is javax.crypto.AEADBadTagException -> "口令错误或备份文件已损坏"
+                        is BackupDecryptionException -> it.message ?: "备份口令错误，或加密备份文件已损坏"
                         else -> it.message ?: "导入失败"
                     }
                     _state.value = BackupState.Error(msg)
