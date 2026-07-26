@@ -96,6 +96,7 @@ fun SettingsScreen(
     val modelMetadata by viewModel.modelMetadata.collectAsStateWithLifecycle()
     val containerProfiles by viewModel.profiles.collectAsStateWithLifecycle()
     val activeProfileId by viewModel.activeProfileId.collectAsStateWithLifecycle()
+    val remoteConnections by viewModel.remoteConnections.collectAsStateWithLifecycle()
 
     var section by remember { mutableStateOf(SettingsSection.Menu) }
     var logReturnSection by remember { mutableStateOf(SettingsSection.Menu) }
@@ -256,7 +257,9 @@ fun SettingsScreen(
                     onSaveCustom = { viewModel.saveCustomContainerProfile(it) },
                     onEditCustom = { viewModel.editCustomContainerProfile(it) },
                     onDeleteCustom = { viewModel.deleteCustomContainerProfile(it) },
-                    onSwitchConfirmed = onStopAllAndCloseTerminal
+                    onSwitchConfirmed = onStopAllAndCloseTerminal,
+                    onResetBuiltin = { viewModel.resetBuiltinContainer() },
+                    remoteConnections = remoteConnections
                 )
                 SettingsSection.Log -> LogSection(
                     current = logLevel,

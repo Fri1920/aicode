@@ -28,6 +28,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.DrawerState
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -206,7 +207,7 @@ private fun attachmentsRoot(workspace: File): File =
     File(File(workspace, ".aicode"), "attachments").apply { mkdirs() }
 
 private fun workspaceContainerPath(relativePath: String): String =
-    "/workspace/$relativePath"
+    "~/workspace/$relativePath"
 
 private fun attachmentRelativePath(workspace: File, target: File): String =
     target.relativeTo(workspace).invariantSeparatorsPath
@@ -524,6 +525,11 @@ fun AIChatPanel(
         }
     }
 
+    val sv = settingsViewModel
+    val executionMode = sv?.executionMode?.collectAsStateWithLifecycle()?.value
+    val connectionState = sv?.connectionState?.collectAsStateWithLifecycle()?.value
+    val isRemote = executionMode == com.aicode.feature.settings.data.repository.ExecutionMode.REMOTE_SSH
+
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
@@ -541,7 +547,8 @@ fun AIChatPanel(
                 onNavigateToTerminal = onNavigateToTerminal,
                 onNavigateToGit = onNavigateToGit,
                 currentMode = currentMode,
-                onToggleMode = { viewModel.setSessionMode(it) }
+                onToggleMode = { viewModel.setSessionMode(it) },
+                connectionState = connectionState?.takeIf { isRemote }
             )
         }
     ) { padding ->
@@ -552,7 +559,10 @@ fun AIChatPanel(
         ) {
             Box(modifier = Modifier.weight(1f)) {
                 if (!messagesReady) {
-                    // 会话/历史尚未就绪
+                    // 远程模式连接未就绪时显示连接状态占位，避免空白或旧工作区记录闪烁
+                    if (isRemote && connectionState != null && connectionState != com.aicode.feature.agent.domain.container.ConnectionState.CONNECTED) {
+                        RemoteConnectingPlaceholder(state = connectionState)
+                    }
                 } else if (messages.isEmpty()) {
                     WelcomeState(modifier = Modifier.fillMaxSize())
                 } else {
@@ -831,7 +841,8 @@ internal fun ChatHeader(
     onNavigateToTerminal: () -> Unit,
     onNavigateToGit: () -> Unit,
     currentMode: AgentMode,
-    onToggleMode: (AgentMode) -> Unit
+    onToggleMode: (AgentMode) -> Unit,
+    connectionState: com.aicode.feature.agent.domain.container.ConnectionState? = null
 ) {
     Surface(
         color = MaterialTheme.colorScheme.background
@@ -893,6 +904,101 @@ internal fun ChatHeader(
                         tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
+            // 远程模式：左边 SSH 连接状态，右边 token 累计统计
+            if (connectionState != null) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = Spacing.md, vertical = Spacing.xs),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    ConnectionIndicator(state = connectionState)
+                    TokenStats(
+                        inputTokens = inputTokens,
+                        outputTokens = outputTokens
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ConnectionIndicator(
+    state: com.aicode.feature.agent.domain.container.ConnectionState
+) {
+    val (dotColor, text) = when (state) {
+        com.aicode.feature.agent.domain.container.ConnectionState.CONNECTED ->
+            MaterialTheme.colorScheme.primary to "SSH：已连接"
+        com.aicode.feature.agent.domain.container.ConnectionState.CONNECTING ->
+            MaterialTheme.colorScheme.tertiary to "SSH：连接中…"
+        com.aicode.feature.agent.domain.container.ConnectionState.FAILED ->
+            MaterialTheme.colorScheme.error to "SSH：连接失败"
+        com.aicode.feature.agent.domain.container.ConnectionState.DISCONNECTED ->
+            MaterialTheme.colorScheme.outline to "SSH：未连接"
+    }
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.xs)
+    ) {
+        Box(
+            modifier = Modifier
+                .size(6.dp)
+                .clip(CircleShape)
+                .background(dotColor)
+        )
+        Text(
+            text = text,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
+}
+
+@Composable
+private fun TokenStats(inputTokens: Int, outputTokens: Int) {
+    val inStr = formatTokenCount(inputTokens)
+    val outStr = formatTokenCount(outputTokens)
+    Text(
+        text = "↑$inStr ↓$outStr",
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant
+    )
+}
+
+@Composable
+private fun RemoteConnectingPlaceholder(
+    state: com.aicode.feature.agent.domain.container.ConnectionState
+) {
+    val text = when (state) {
+        com.aicode.feature.agent.domain.container.ConnectionState.CONNECTING -> "正在连接远程服务器…"
+        com.aicode.feature.agent.domain.container.ConnectionState.FAILED -> "远程服务器连接失败，请检查设置"
+        com.aicode.feature.agent.domain.container.ConnectionState.DISCONNECTED -> "未连接远程服务器"
+        com.aicode.feature.agent.domain.container.ConnectionState.CONNECTED -> ""
+    }
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(Spacing.sm)
+        ) {
+            if (state == com.aicode.feature.agent.domain.container.ConnectionState.CONNECTING) {
+                androidx.compose.material3.CircularProgressIndicator(
+                    modifier = Modifier.size(28.dp),
+                    strokeWidth = 2.dp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Text(
+                text = text,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 }

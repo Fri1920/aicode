@@ -40,56 +40,13 @@ class TerminalSessionManager @Inject constructor(
     @param:ApplicationContext private val appContext: Context,
     private val containerEngine: LinuxContainerEngine,
     private val workspaceRepository: WorkspaceRepository
-) {
+) : TerminalSessionProvider {
     private companion object {
         const val TAG = "TerminalSessionManager"
         const val TRANSCRIPT_ROWS = 2000
         // 无视图挂载时用于「就地启动」会话的默认终端尺寸；视图挂载后会按真实尺寸 resize。
         const val DEFAULT_COLUMNS = 80
         const val DEFAULT_ROWS = 24
-    }
-
-    /** 标签运行状态。Finished 保留在列表里不移除，供用户/AI 回看输出。 */
-    sealed interface RunState {
-        data object Running : RunState
-        data class Finished(val exitCode: Int) : RunState
-    }
-
-    /** 后台命令结束时 emit 的事件，供 ViewModel 订阅后通知 AI。 */
-    data class TabFinishedEvent(
-        val tabId: String,
-        val title: String,
-        val command: String?,
-        val exitCode: Int,
-        /** 发起该后台命令的会话 id；回调据此路由回原会话，而非用户当前所在会话。 */
-        val sourceSessionId: String?
-    )
-
-    /**
-     * 一个终端标签：会话 + 渲染视图 + 元数据。
-     *
-     * [view] 由 Compose 在创建 [TerminalView] 后回填；切换标签时复用同一会话、重新挂载视图。
-     * [client] 的 viewProvider 始终读 [view]，故无论视图如何重建都能把输出刷到当前挂载的视图。
-     */
-    class TerminalTab(
-        val id: String,
-        title: String,
-        val session: TerminalSession,
-        val isBackground: Boolean,
-        val command: String?,
-        val notifyOnExit: Boolean = false,
-        /** 发起该后台命令的会话 id；交互标签为 null。回调据此路由回原会话。 */
-        val sourceSessionId: String? = null,
-        runState: RunState
-    ) {
-        var title: String = title
-            internal set
-
-        @Volatile
-        var view: TerminalView? = null
-
-        var runState: RunState = runState
-            internal set
     }
 
     private val _tabs = MutableStateFlow<List<TerminalTab>>(emptyList())
@@ -103,7 +60,7 @@ class TerminalSessionManager @Inject constructor(
     val revision: StateFlow<Int> = _revision.asStateFlow()
 
     private val _tabFinishedEvents = MutableSharedFlow<TabFinishedEvent>(extraBufferCapacity = 16)
-    val tabFinishedEvents: SharedFlow<TabFinishedEvent> = _tabFinishedEvents.asSharedFlow()
+    override val tabFinishedEvents: SharedFlow<TabFinishedEvent> = _tabFinishedEvents.asSharedFlow()
 
     private val idCounter = AtomicInteger(0)
 
@@ -129,9 +86,9 @@ class TerminalSessionManager @Inject constructor(
         ensureContainer()
         val id = nextId()
         val session = buildSession(
-            // -w 已把 cwd 设为 /workspace，cd 仅作兜底；裸 sh/bash 在 tty 上自动进交互模式，
+            // -w 已把 cwd 设为 /root/workspace，cd 仅作兜底；裸 sh/bash 在 tty 上自动进交互模式，
             // 靠 ENV=/etc/profile 加载登录环境；exec 让 shell 取代外层 sh -c 成为前台交互 shell。
-            shellCommand = "cd /workspace 2>/dev/null; export ENV=/etc/profile; exec ${containerEngine.defaultShell()}"
+            shellCommand = "cd ~/workspace 2>/dev/null; export ENV=/etc/profile; exec ${containerEngine.defaultShell()}"
         )
         addTab(
             TerminalTab(
@@ -154,11 +111,11 @@ class TerminalSessionManager @Inject constructor(
      * 命令跑完后 `exec /bin/sh` 保活，使该标签仍是一个可继续输入的会话（dev server 退出后也能复用），
      * 且输出全程留在 emulator 缓冲里，用户切过去或 AI 用 [getTabOutput] 都能看到累计输出。
      */
-    suspend fun startBackgroundCommand(
+    override suspend fun startBackgroundCommand(
         command: String,
-        title: String? = null,
-        notify: Boolean = false,
-        sourceSessionId: String? = null
+        title: String?,
+        notify: Boolean,
+        sourceSessionId: String?
     ): String {
         ensureContainer()
         val id = nextId()
@@ -170,7 +127,7 @@ class TerminalSessionManager @Inject constructor(
         // notify=false：echo 后 `exec ${shell}` 保活，标签可复用（dev server 退出后也能继续输入）；
         //   此时进程不退出、不回调，退出码无意义，符合 dev server 场景设计。
         val afterCommand = if (notify) "; exit \$ec" else "; exec ${containerEngine.defaultShell()}"
-        val shellCommand = "cd /workspace 2>/dev/null; export ENV=/etc/profile; " +
+        val shellCommand = "cd ~/workspace 2>/dev/null; export ENV=/etc/profile; " +
             "$command; ec=\$?; echo \"[command exited: \$ec]\"$afterCommand"
         val session = buildSession(shellCommand)
         addTab(
@@ -194,7 +151,7 @@ class TerminalSessionManager @Inject constructor(
     }
 
     /** 按 id 向标签发送输入并回车执行（AI 持续发命令的入口）。返回是否命中标签且仍活跃。 */
-    fun sendInput(id: String, input: String, appendNewline: Boolean = true): Boolean {
+    override fun sendInput(id: String, input: String, appendNewline: Boolean): Boolean {
         val tab = tab(id) ?: return false
         if (tab.runState !is RunState.Running) return false
         val text = if (appendNewline && !input.endsWith("\n")) input + "\n" else input
@@ -203,7 +160,7 @@ class TerminalSessionManager @Inject constructor(
     }
 
     /** 按 id 向标签写入原始文本，不自动追加回车。 */
-    fun writeToTab(id: String, text: String): Boolean {
+    override fun writeToTab(id: String, text: String): Boolean {
         val tab = tab(id) ?: return false
         if (tab.runState !is RunState.Running) return false
         writeToSession(tab.session, text)
@@ -211,7 +168,7 @@ class TerminalSessionManager @Inject constructor(
     }
 
     /** 按 id 向标签写入原始字节（控制字符，如 Ctrl-C=0x03）。 */
-    fun writeBytesToTab(id: String, vararg bytes: Int): Boolean {
+    override fun writeBytesToTab(id: String, vararg bytes: Int): Boolean {
         val tab = tab(id) ?: return false
         if (tab.runState !is RunState.Running) return false
         val arr = ByteArray(bytes.size) { bytes[it].toByte() }
@@ -235,7 +192,7 @@ class TerminalSessionManager @Inject constructor(
      * 按 id 读取终端内容（emulator 屏幕缓冲的完整 transcript），供 AI 拉取。
      * 返回 null 表示无此标签。
      */
-    fun getTabOutput(id: String): String? {
+    override fun getTabOutput(id: String): String? {
         val tab = tab(id) ?: return null
         return runCatching {
             tab.session.emulator?.screen?.transcriptText?.trimEnd('\n')
@@ -243,7 +200,7 @@ class TerminalSessionManager @Inject constructor(
     }
 
     /** 列出全部标签的摘要（id/标题/是否后台/运行状态/命令），供 AI 选目标。 */
-    fun listTabs(): List<TabInfo> = _tabs.value.map {
+    override fun listTabs(): List<TabInfo> = _tabs.value.map {
         TabInfo(
             id = it.id,
             title = it.title,
@@ -253,21 +210,13 @@ class TerminalSessionManager @Inject constructor(
         )
     }
 
-    data class TabInfo(
-        val id: String,
-        val title: String,
-        val isBackground: Boolean,
-        val running: Boolean,
-        val command: String?
-    )
-
     /** 切换当前标签。 */
     fun activate(id: String) {
         if (_tabs.value.any { it.id == id }) _activeTabId.value = id
     }
 
     /** 关闭并销毁标签（用户主动关 / AI close）。从列表移除并杀会话。 */
-    fun closeTab(id: String): Boolean {
+    override fun closeTab(id: String): Boolean {
         val tab = tab(id) ?: return false
         runCatching { tab.session.finishIfRunning() }
         tab.view = null
@@ -290,7 +239,7 @@ class TerminalSessionManager @Inject constructor(
         val old = tab(id) ?: return
         runCatching { old.session.finishIfRunning() }
         ensureContainer()
-        val session = buildSession("cd /workspace 2>/dev/null; export ENV=/etc/profile; exec ${containerEngine.defaultShell()}")
+        val session = buildSession("cd ~/workspace 2>/dev/null; export ENV=/etc/profile; exec ${containerEngine.defaultShell()}")
         val newTab = TerminalTab(
             id = old.id,
             title = old.title,

@@ -18,6 +18,13 @@ import com.aicode.feature.agent.data.remote.openai.OpenAIApi
 import com.aicode.feature.agent.domain.provider.AIProvider
 import com.aicode.feature.agent.domain.provider.AnthropicAdapter
 import com.aicode.feature.agent.domain.provider.OpenAIAdapter
+import com.aicode.feature.agent.domain.container.CommandEngine
+import com.aicode.feature.agent.domain.container.DelegatingCommandEngine
+import com.aicode.feature.agent.domain.container.LinuxContainerEngine
+import com.aicode.feature.agent.domain.container.RemoteSshConnection
+import com.aicode.feature.agent.domain.container.RemoteSshEngine
+import com.aicode.feature.settings.data.repository.ExecutionMode
+import com.aicode.feature.settings.data.repository.ExecutionModeHolder
 import com.aicode.feature.agent.domain.tool.file.ReadFileTool
 import com.aicode.feature.agent.domain.tool.file.ViewImageTool
 import com.aicode.feature.agent.domain.tool.file.WriteFileTool
@@ -36,6 +43,14 @@ import com.aicode.feature.agent.domain.permission.ToolPermissionPolicyEngine
 import com.aicode.feature.agent.domain.tool.ToolRegistry
 import com.aicode.feature.agent.domain.tool.ToolOutputStore
 import com.aicode.feature.settings.data.remote.ModelMetadataService
+import com.aicode.feature.terminal.domain.DelegatingTerminalSessionProvider
+import com.aicode.feature.terminal.domain.RemoteTerminalSessionManager
+import com.aicode.feature.terminal.domain.TerminalSessionManager
+import com.aicode.feature.terminal.domain.TerminalSessionProvider
+import com.aicode.feature.workspace.domain.FileAccessProvider
+import com.aicode.feature.workspace.domain.DelegatingFileAccess
+import com.aicode.feature.workspace.domain.LocalFileAccess
+import com.aicode.feature.workspace.domain.RemoteSftpFileAccess
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -184,6 +199,33 @@ object AgentModule {
     fun provideGeminiProvider(api: com.aicode.feature.agent.data.remote.gemini.GeminiApi): AIProvider {
         return com.aicode.feature.agent.domain.provider.GeminiAdapter(api)
     }
+
+    @Provides
+    @Singleton
+    fun provideCommandEngine(delegate: DelegatingCommandEngine): CommandEngine = delegate
+
+    @Provides
+    @Singleton
+    fun provideFileAccess(delegate: DelegatingFileAccess): FileAccessProvider = delegate
+
+    @Provides
+    @Singleton
+    fun provideTerminalSessionProvider(delegate: DelegatingTerminalSessionProvider): TerminalSessionProvider = delegate
+
+    @Provides
+    @Singleton
+    fun provideDelegatingTerminalSessionProvider(
+        modeHolder: com.aicode.feature.settings.data.repository.ExecutionModeHolder,
+        local: TerminalSessionManager,
+        remote: com.aicode.feature.terminal.domain.RemoteTerminalSessionManager
+    ): DelegatingTerminalSessionProvider = DelegatingTerminalSessionProvider(modeHolder, local, remote)
+
+    @Provides
+    @Singleton
+    fun provideRemoteSftpFileAccess(
+        connection: RemoteSshConnection,
+        workspaceRepository: com.aicode.feature.workspace.data.repository.WorkspaceRepository
+    ): RemoteSftpFileAccess = RemoteSftpFileAccess(connection, workspaceRepository)
 
     @Provides
     @Singleton

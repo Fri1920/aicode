@@ -21,7 +21,7 @@ import javax.inject.Inject
  * 凭据页 UI 编排：凭据 CRUD + 提交署名(user.name/email) 配置。
  *
  * 提交署名读写走 `git config`（[GitRepository.setUserIdentity] / [getUserName] / [getUserEmail]）：
- * **优先项目级**（当前工作区 /workspace/.git/config），无则退全局（持久挂载 /root/.aicode/.gitconfig）。
+ * **优先项目级**（当前工作区 ~/workspace/.git/config），无则退全局（持久挂载 /root/.aicode/.gitconfig）。
  * UI 与终端敲 `git config user.name` 读到的是同一份署名——优先项目级、无则退全局，无两套源头竞争。
  */
 @HiltViewModel

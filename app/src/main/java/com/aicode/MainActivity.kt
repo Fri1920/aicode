@@ -68,6 +68,13 @@ class MainActivity : ComponentActivity() {
     @Inject
     lateinit var themeSettings: ThemeSettingsRepository
 
+    /** App 回到前台时，远程模式下若 SSH 断了触发重连。 */
+    @Inject
+    lateinit var remoteSshConnection: com.aicode.feature.agent.domain.container.RemoteSshConnection
+
+    @Inject
+    lateinit var executionModeHolder: com.aicode.feature.settings.data.repository.ExecutionModeHolder
+
     /** 三端（UI/AI Bash/交互终端）git 缺凭据统一弹窗桥：在 AIEditorApp 启动后监听 helper 的文件 IPC 请求。 */
     @Inject
     lateinit var credentialRequestBridge: com.aicode.feature.credentials.data.CredentialRequestBridge
@@ -134,6 +141,16 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+        // 远程模式回到前台时，若 SSH 断了立即触发重连，不等 supervisor 轮询
+        if (executionModeHolder.currentMode() == com.aicode.feature.settings.data.repository.ExecutionMode.REMOTE_SSH) {
+            lifecycleScope.launch {
+                runCatching { remoteSshConnection.tryReconnectIfDisconnected() }
+            }
+        }
+    }
+
     private fun requestLegacyStoragePermissionIfNeeded() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return
         val permissions = arrayOf(
@@ -185,7 +202,9 @@ fun AppNavigation() {
     // 侧边栏需要的数据。
     val currentWorkspace by workspaceViewModel.current.collectAsStateWithLifecycle()
     androidx.compose.runtime.LaunchedEffect(currentWorkspace) {
-        agentViewModel.setWorkspace(currentWorkspace?.path ?: "")
+        // 远程模式连接未就绪时 currentWorkspace 为 null，不触发 setWorkspace，避免空路径点燃 session 加载
+        val path = currentWorkspace?.path ?: return@LaunchedEffect
+        agentViewModel.setWorkspace(path)
     }
 
     val sessions by agentViewModel.sessions.collectAsStateWithLifecycle()

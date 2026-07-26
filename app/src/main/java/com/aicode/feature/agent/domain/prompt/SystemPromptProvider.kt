@@ -121,7 +121,7 @@ class SystemPromptProvider @Inject constructor(
             } else {
                 text
             }
-            cached = "项目规则 (来自 /workspace/${file.second}，务必遵守):\n${body.trim()}"
+            cached = "项目规则 (来自 ~/workspace/${file.second}，务必遵守):\n${body.trim()}"
             lastModified = currentMod
             lastProjectRoot = ctx.projectRoot
             return cached
@@ -133,7 +133,7 @@ class SystemPromptProvider @Inject constructor(
             val hasWorkspace = ctx.projectRoot.isNotBlank()
             return """
                 当前上下文:
-                - 项目根目录: ${if (hasWorkspace) "/workspace" else "（未选择工作区）"}
+                - 项目根目录: ${if (hasWorkspace) "~/workspace" else "（未选择工作区）"}
                 - 当前文件: ${ctx.currentFile ?: "无"}
                 - 选中的代码: ${ctx.selectedCode ?: "无"}
                 - 编程语言: ${ctx.language ?: "未知"}

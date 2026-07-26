@@ -1,7 +1,7 @@
 package com.aicode.feature.agent.domain.tool.explorer
 
 import com.aicode.core.util.FileLogger
-import com.aicode.feature.agent.domain.container.LinuxContainerEngine
+import com.aicode.feature.agent.domain.container.CommandEngine
 import com.aicode.feature.agent.domain.tool.AgentTool
 import com.aicode.feature.agent.domain.tool.ParameterType
 import com.aicode.feature.agent.domain.tool.ToolCapability
@@ -21,7 +21,7 @@ import javax.inject.Inject
  * rg 风格的项目搜索工具。参数原样传给容器内的 ripgrep，容器未就绪则报错。
  */
 class SearchCodeTool @Inject constructor(
-    private val containerEngine: LinuxContainerEngine,
+    private val commandEngine: CommandEngine,
     private val workspaceRepository: WorkspaceRepository
 ) : AgentTool() {
 
@@ -31,7 +31,7 @@ class SearchCodeTool @Inject constructor(
     }
 
     override val name = "search"
-    override val description = "按 rg 风格搜索文本。例：args=\"-n \\\"fun main\\\" /workspace/app\"。"
+    override val description = "按 rg 风格搜索文本。例：args=\"-n \\\"fun main\\\" ~/workspace/app\"。"
     override val permissionPolicy = ToolPermissionPolicy.AUTO_APPROVE
     override val capabilities = setOf(ToolCapability.READ_WORKSPACE)
 
@@ -54,7 +54,7 @@ class SearchCodeTool @Inject constructor(
             if (tokens.isEmpty()) return ToolResult.Error("缺少搜索参数 args", "MISSING_ARGS")
 
             val startedAt = System.currentTimeMillis()
-            val result = containerEngine.runCommandSyncIfReady(
+            val result = commandEngine.runCommandSyncIfReady(
                 command = buildRgCommand(tokens),
                 projectPath = workspaceRepository.currentPath(),
                 timeoutMs = SEARCH_TIMEOUT_MS

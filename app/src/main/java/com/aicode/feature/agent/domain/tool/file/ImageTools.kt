@@ -9,7 +9,7 @@ import com.aicode.feature.agent.domain.tool.ParameterType
 import com.aicode.feature.agent.domain.tool.ToolCapability
 import com.aicode.feature.agent.domain.tool.ToolParameter
 import com.aicode.feature.agent.domain.tool.ToolResult
-import com.aicode.feature.workspace.domain.WorkspacePathMapper
+import com.aicode.feature.workspace.domain.FileAccessProvider
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
@@ -20,7 +20,7 @@ import java.net.URLConnection
 import javax.inject.Inject
 
 class ViewImageTool @Inject constructor(
-    private val pathMapper: WorkspacePathMapper
+    private val fileAccess: FileAccessProvider
 ) : AgentTool() {
     override val name = "viewImage"
     override val description = "查看本地图片文件。读取图片尺寸并把图片作为下一轮视觉输入提供给模型，适合检查截图、设计稿、图标和生成图。"
@@ -29,7 +29,7 @@ class ViewImageTool @Inject constructor(
         "path" to ToolParameter(
             name = "path",
             type = ParameterType.STRING,
-            description = "图片路径：/workspace/... 为项目文件；其它绝对路径为容器系统文件；相对路径基于 /workspace。",
+            description = "图片路径：~/workspace/... 为项目文件；其它绝对路径为容器系统文件；相对路径基于 ~/workspace。",
             required = true
         ),
         "detail" to ToolParameter(
@@ -54,12 +54,13 @@ class ViewImageTool @Inject constructor(
                 ?.takeIf { it in SUPPORTED_DETAILS }
                 ?: "high"
 
-            val file = pathMapper.toHostFile(path)
+            val file = fileAccess.copyToLocal(path)
             FileLogger.d(TAG, "viewImage path=$path -> ${file.absolutePath}, detail=$detail")
 
-            if (!file.exists()) return ToolResult.Error("文件不存在: $path", "FILE_NOT_FOUND")
-            if (!file.isFile) return ToolResult.Error("路径不是文件: $path", "NOT_A_FILE")
-            if (file.length() <= 0L) return ToolResult.Error("图片文件为空: $path", "EMPTY_FILE")
+            if (!fileAccess.exists(path)) return ToolResult.Error("文件不存在: $path", "FILE_NOT_FOUND")
+            if (!fileAccess.isFile(path)) return ToolResult.Error("路径不是文件: $path", "NOT_A_FILE")
+            val fileSize = fileAccess.fileSize(path)
+            if (fileSize <= 0L) return ToolResult.Error("图片文件为空: $path", "EMPTY_FILE")
 
             val bounds = decodeBounds(file)
                 ?: return ToolResult.Error("无法识别图片格式: $path", "UNSUPPORTED_IMAGE")
@@ -68,14 +69,14 @@ class ViewImageTool @Inject constructor(
                 return ToolResult.Error("不是支持的图片文件: $path", "UNSUPPORTED_IMAGE")
             }
 
-            val encoded = if (detail == "original" && file.length() <= MAX_ORIGINAL_BYTES && sourceMime in ORIGINAL_MIME_TYPES) {
+            val encoded = if (detail == "original" && fileSize <= MAX_ORIGINAL_BYTES && sourceMime in ORIGINAL_MIME_TYPES) {
                 EncodedImage(
                     mimeType = sourceMime,
-                    base64Data = Base64.encodeToString(file.readBytes(), Base64.NO_WRAP),
+                    base64Data = Base64.encodeToString(fileAccess.readBytes(path), Base64.NO_WRAP),
                     width = bounds.width,
                     height = bounds.height,
                     detail = "original",
-                    encodedBytes = file.length()
+                    encodedBytes = fileSize
                 )
             } else {
                 encodePreview(file, bounds, detail)
@@ -85,15 +86,15 @@ class ViewImageTool @Inject constructor(
                 JsonObject(
                     mapOf(
                         "content" to JsonPrimitive(
-                            "已加载图片 ${pathMapper.toContainerPath(file.absolutePath)} " +
-                                "(${bounds.width}x${bounds.height}, ${sourceMime}, ${file.length()} bytes)，" +
+                            "已加载图片 ${fileAccess.toDisplayPath(path)} " +
+                                "(${bounds.width}x${bounds.height}, ${sourceMime}, ${fileSize} bytes)，" +
                                 "并作为视觉输入附加到下一轮模型上下文。"
                         ),
-                        "path" to JsonPrimitive(pathMapper.toContainerPath(file.absolutePath)),
+                        "path" to JsonPrimitive(fileAccess.toDisplayPath(path)),
                         "mime_type" to JsonPrimitive(sourceMime),
                         "width" to JsonPrimitive(bounds.width),
                         "height" to JsonPrimitive(bounds.height),
-                        "byte_size" to JsonPrimitive(file.length()),
+                        "byte_size" to JsonPrimitive(fileSize),
                         "detail" to JsonPrimitive(encoded.detail),
                         "encoded_mime_type" to JsonPrimitive(encoded.mimeType),
                         "encoded_width" to JsonPrimitive(encoded.width),
@@ -103,7 +104,7 @@ class ViewImageTool @Inject constructor(
                             mapOf(
                                 "mime_type" to JsonPrimitive(encoded.mimeType),
                                 "base64_data" to JsonPrimitive(encoded.base64Data),
-                                "path" to JsonPrimitive(pathMapper.toContainerPath(file.absolutePath))
+                                "path" to JsonPrimitive(fileAccess.toDisplayPath(path))
                             )
                         )
                     )

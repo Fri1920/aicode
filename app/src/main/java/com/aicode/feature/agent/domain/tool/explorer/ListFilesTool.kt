@@ -7,13 +7,14 @@ import com.aicode.feature.agent.domain.tool.ToolCapability
 import com.aicode.feature.agent.domain.tool.ToolParameter
 import com.aicode.feature.agent.domain.tool.ToolPermissionPolicy
 import com.aicode.feature.agent.domain.tool.ToolResult
+import com.aicode.feature.workspace.domain.FileAccessProvider
+import com.aicode.feature.workspace.domain.FileEntry
 import com.aicode.feature.workspace.domain.WorkspacePathMapper
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
-import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -26,7 +27,7 @@ import javax.inject.Inject
  * 与 `readFile` 一致的路径解析方式。两种模式下均可使用。
  */
 class ListFilesTool @Inject constructor(
-    private val pathMapper: WorkspacePathMapper
+    private val fileAccess: FileAccessProvider
 ) : AgentTool() {
 
     private companion object {
@@ -35,7 +36,7 @@ class ListFilesTool @Inject constructor(
     }
 
     override val name = "list"
-    override val description = "按 ls 风格列出文件和目录。例：args=\"-la /workspace/app\"。"
+    override val description = "按 ls 风格列出文件和目录。例：args=\"-la ~/workspace/app\"。"
     override val permissionPolicy = ToolPermissionPolicy.AUTO_APPROVE
     override val capabilities = setOf(ToolCapability.READ_WORKSPACE)
 
@@ -43,7 +44,7 @@ class ListFilesTool @Inject constructor(
         "args" to ToolParameter(
             name = "args",
             type = ParameterType.STRING,
-            description = "ls 风格参数。不填等同 /workspace。支持 -a -A -l -R -d -1 -h -r -t -S -v -f --。",
+            description = "ls 风格参数。不填等同 ~/workspace。支持 -a -A -l -R -d -1 -h -r -t -S -v -f --。",
             required = false
         )
     )
@@ -77,21 +78,21 @@ class ListFilesTool @Inject constructor(
                     return
                 }
 
-                val file = pathMapper.toHostFile(path)
-                val containerPath = pathMapper.toContainerPath(file.absolutePath)
+                val containerPath = fileAccess.toDisplayPath(path)
 
-                if (!file.exists()) {
+                if (!fileAccess.exists(path)) {
                     appendLine("ls: cannot access '$path': No such file or directory")
                     return
                 }
 
-                if (!file.isDirectory || options.directoryOnly) {
-                    appendEntry(LsEntry(file.name.ifBlank { containerPath }, file), options, ::appendLine)
+                if (!fileAccess.isDirectory(path) || options.directoryOnly) {
+                    val name = path.substringAfterLast('/').ifBlank { containerPath }
+                    appendEntry(LsEntry(name, path), options, ::appendLine)
                     return
                 }
 
                 if (showHeader) appendLine("${containerPath.trimEnd('/')}:")
-                val children = listEntries(file, options)
+                val children = listEntries(path, options)
                 for (entry in children) {
                     if (entryCount >= MAX_ENTRIES) {
                         truncated = true
@@ -106,9 +107,9 @@ class ListFilesTool @Inject constructor(
                             truncated = true
                             return
                         }
-                        if (!entry.file.isDirectory || entry.name == "." || entry.name == "..") continue
+                        if (!fileAccess.isDirectory(entry.fullPath) || entry.name == "." || entry.name == "..") continue
                         appendLine()
-                        listPath(pathMapper.toContainerPath(entry.file.absolutePath), showHeader = true)
+                        listPath(entry.fullPath, showHeader = true)
                     }
                 }
             }
@@ -244,21 +245,23 @@ class ListFilesTool @Inject constructor(
         return result
     }
 
-    private fun listEntries(dir: File, options: LsOptions): List<LsEntry> {
+    private fun listEntries(dirPath: String, options: LsOptions): List<LsEntry> {
         val entries = mutableListOf<LsEntry>()
         if (options.showAll && !options.showAlmostAll) {
-            entries.add(LsEntry(".", dir))
-            dir.parentFile?.let { entries.add(LsEntry("..", it)) }
+            entries.add(LsEntry(".", dirPath, isDir = true, size = 0, lastModified = 0, permissions = "rwx"))
+            fileAccess.parentPath(dirPath)?.let { parent ->
+                entries.add(LsEntry("..", parent, isDir = true, size = 0, lastModified = 0, permissions = "rwx"))
+            }
         }
-        val children = dir.listFiles().orEmpty()
+        val children = fileAccess.listFiles(dirPath)
             .filter { options.showAll || options.showAlmostAll || !it.name.startsWith(".") }
-            .map { LsEntry(it.name, it) }
+            .map { LsEntry(it.name, "$dirPath/${it.name}".trimEnd('/'), it.isDirectory, it.size, it.lastModified, it.permissions) }
         entries.addAll(children)
 
         if (!options.noSort) {
             val comparator = when {
-                options.sortByTime -> compareBy<LsEntry> { -it.file.lastModified() }
-                options.sortBySize -> compareBy<LsEntry> { -it.file.length() }
+                options.sortByTime -> compareBy<LsEntry> { -it.lastModified }
+                options.sortBySize -> compareBy<LsEntry> { -it.size }
                 options.naturalSort -> compareBy<LsEntry> { naturalOrderKey(it.name) }
                 else -> null
             }?.thenBy { it.name }
@@ -281,21 +284,14 @@ class ListFilesTool @Inject constructor(
     }
 
     private fun longFormat(entry: LsEntry, options: LsOptions): String {
-        val file = entry.file
-        val type = if (file.isDirectory) "d" else "-"
-        val owner = permissions(file, owner = true)
-        val group = permissions(file, owner = false)
-        val other = permissions(file, owner = false)
-        val size = if (options.humanReadable) humanSize(file.length()) else file.length().toString()
-        val time = SimpleDateFormat("MMM dd HH:mm", Locale.US).format(Date(file.lastModified()))
+        val type = if (entry.isDir) "d" else "-"
+        val perms = entry.permissions
+        val owner = perms
+        val group = "---"
+        val other = "---"
+        val size = if (options.humanReadable) humanSize(entry.size) else entry.size.toString()
+        val time = SimpleDateFormat("MMM dd HH:mm", Locale.US).format(Date(entry.lastModified))
         return "$type$owner$group$other 1 user group ${size.padStart(8)} $time ${entry.name}"
-    }
-
-    private fun permissions(file: File, owner: Boolean): String {
-        val read = if (file.canRead()) "r" else "-"
-        val write = if (owner && file.canWrite()) "w" else "-"
-        val execute = if (file.canExecute() || file.isDirectory) "x" else "-"
-        return read + write + execute
     }
 
     private fun naturalOrderKey(s: String): String {
@@ -345,6 +341,10 @@ class ListFilesTool @Inject constructor(
 
     private data class LsEntry(
         val name: String,
-        val file: File
+        val fullPath: String,
+        val isDir: Boolean = false,
+        val size: Long = 0,
+        val lastModified: Long = 0,
+        val permissions: String = "---"
     )
 }

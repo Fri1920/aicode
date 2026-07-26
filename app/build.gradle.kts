@@ -217,6 +217,9 @@ dependencies {
 
     // 远程同步 (SFTP/FTP) 与内置 FTP 服务端
     implementation("com.hierynomus:sshj:0.38.0")
+    // BouncyCastle：sshj 0.38.0 用 X25519 密钥交换，Android 自带裁剪版 BC 不含该算法，
+    // 需显式引入完整版并注册替换（见 AIEditorApp.registerBouncyCastle）。版本与 sshj 传递依赖一致。
+    implementation("org.bouncycastle:bcprov-jdk18on:1.75")
     implementation("commons-net:commons-net:3.10.0")
     implementation("org.apache.ftpserver:ftpserver-core:1.2.0")
     implementation("org.slf4j:slf4j-simple:2.0.9")
@@ -229,8 +232,8 @@ dependencies {
     // Termux 开源终端组件：terminal-emulator 负责 VT100/ANSI 解析与 PTY（自带 native .so），
     // terminal-view 是渲染用的 Android View。经 JitPack 分发（com.github.<user>.<repo> 坐标形式），
     // 避免自行实现终端模拟器。
-    implementation("com.github.termux.termux-app:terminal-emulator:v0.118.0")
-    implementation("com.github.termux.termux-app:terminal-view:v0.118.0")
+    implementation(project(":terminal-emulator"))
+    implementation(project(":terminal-view"))
 
     // Material Icons
     implementation("androidx.compose.material:material-icons-core")

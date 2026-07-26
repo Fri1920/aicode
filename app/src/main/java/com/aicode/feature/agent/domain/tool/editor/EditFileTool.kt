@@ -9,7 +9,7 @@ import com.aicode.feature.agent.domain.tool.ToolPermissionPolicy
 import com.aicode.feature.agent.domain.tool.ToolResult
 import com.aicode.core.util.FileLogger
 import com.aicode.core.util.LineDiff
-import com.aicode.feature.workspace.domain.WorkspacePathMapper
+import com.aicode.feature.workspace.domain.FileAccessProvider
 import kotlinx.serialization.json.*
 import javax.inject.Inject
 
@@ -33,11 +33,11 @@ private const val TAG = "EditFileTool"
  * 上下文，或对该编辑显式设置 replace_all=true 才会全部替换。
  */
 class EditFileTool @Inject constructor(
-    private val pathMapper: WorkspacePathMapper
+    private val fileAccess: FileAccessProvider
 ) : AgentTool() {
     override val name = "editFile"
     override val description =
-        "通过精确的字符串匹配替换修改已存在的文件内容。作为局部修改文件的首选工具。支持通过 edits 数组一次性应用多处修改，任一处匹配失败将整批回滚。整文件重写请用 writeFile。"
+        "通过精确的字符串匹配替换修改已存在的文件内容。作为局部修改文件的首选工具。支持通过 edits 数组一次性应用多处修改，整批编辑是原子的——任一处匹配失败将整批回滚，文件不会处于改了一半的状态。整文件重写请用 writeFile。"
     override val permissionPolicy = ToolPermissionPolicy.ASK
     override val capabilities = setOf(ToolCapability.WRITE_WORKSPACE)
 
@@ -62,7 +62,7 @@ class EditFileTool @Inject constructor(
     )
 
     override val parameters = mapOf(
-        "path" to ToolParameter("path", ParameterType.STRING, "文件路径：/workspace/... 为项目文件；其它绝对路径（如 /etc/...、/root/...）为容器系统文件。", required = true),
+        "path" to ToolParameter("path", ParameterType.STRING, "文件路径：~/workspace/... 为项目文件；其它绝对路径（如 /etc/...、/root/...）为容器系统文件。", required = true),
         "edits" to ToolParameter(
             "edits",
             ParameterType.ARRAY,
@@ -114,15 +114,14 @@ class EditFileTool @Inject constructor(
                 }
             }
 
-            val file = pathMapper.toHostFile(path)
-            FileLogger.d(TAG, "edit_file path=$path -> ${file.absolutePath} (edits=${edits.size})")
-            if (!file.exists()) {
+            FileLogger.d(TAG, "edit_file path=$path (edits=${edits.size})")
+            if (!fileAccess.exists(path)) {
                 FileLogger.w(TAG, "edit_file 文件不存在: $path")
                 return ToolResult.Error("文件不存在: $path", "FILE_NOT_FOUND")
             }
 
             // 先在内存里顺序应用所有编辑；任一失败立刻返回、绝不写盘（全有或全无）。
-            var content = file.readText()
+            var content = fileAccess.readFile(path)
             val hunks = ArrayList<Hunk>(edits.size)
             var totalReplacements = 0
 
@@ -131,8 +130,7 @@ class EditFileTool @Inject constructor(
                 if (occurrences == 0) {
                     FileLogger.w(TAG, "edit_file 第 ${i + 1} 个编辑未匹配: $path")
                     return ToolResult.Error(
-                        "第 ${i + 1} 个编辑未在文件中找到 old_string，请确认内容（含缩进/换行）与当前文件完全一致" +
-                            "（注意：前面的编辑可能已经改动了这段内容）",
+                        "第 ${i + 1} 个编辑未在文件中找到 old_string，请确认内容（含缩进/换行）与当前文件完全一致",
                         "NO_MATCH"
                     )
                 }
@@ -159,7 +157,7 @@ class EditFileTool @Inject constructor(
                 totalReplacements += if (e.replaceAll) occurrences else 1
             }
 
-            file.writeText(content)
+            fileAccess.writeFile(path, content, overwrite = true)
 
             val addedTotal = hunks.sumOf { it.added }
             val removedTotal = hunks.sumOf { it.removed }
@@ -176,7 +174,7 @@ class EditFileTool @Inject constructor(
             ToolResult.Success(
                 JsonObject(mapOf(
                     "status" to JsonPrimitive("edited"),
-                    "path" to JsonPrimitive(pathMapper.toContainerPath(file.absolutePath)),
+                    "path" to JsonPrimitive(fileAccess.toDisplayPath(path)),
                     "edits_count" to JsonPrimitive(edits.size),
                     "replacements" to JsonPrimitive(totalReplacements),
                     "total_lines" to JsonPrimitive(content.lines().size),

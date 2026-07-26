@@ -5,6 +5,9 @@ import androidx.lifecycle.viewModelScope
 import com.aicode.core.util.FileLogger
 import com.aicode.feature.agent.domain.container.ContainerInitState
 import com.aicode.feature.agent.domain.container.LinuxContainerEngine
+import com.aicode.feature.settings.data.repository.ExecutionMode
+import com.aicode.feature.settings.data.repository.ExecutionModeHolder
+import com.aicode.feature.terminal.domain.RemoteTerminalSessionManager
 import com.aicode.feature.terminal.domain.TerminalSessionManager
 import com.aicode.feature.terminal.presentation.component.TerminalKeyModifiers
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -23,11 +26,15 @@ import javax.inject.Inject
  */
 @HiltViewModel
 class TerminalViewModel @Inject constructor(
-    private val sessionManager: TerminalSessionManager,
+    private val localManager: TerminalSessionManager,
+    private val remoteManager: RemoteTerminalSessionManager,
+    private val modeHolder: ExecutionModeHolder,
     private val containerEngine: LinuxContainerEngine
 ) : ViewModel() {
 
     private companion object { const val TAG = "TerminalViewModel" }
+
+    private fun isRemote() = modeHolder.currentMode() == ExecutionMode.REMOTE_SSH
 
     /** 容器准备阶段的整体状态：仅用于首个标签创建前的 Loading/Error 提示。 */
     sealed interface PrepareState {
@@ -42,9 +49,9 @@ class TerminalViewModel @Inject constructor(
     /** 容器初始化实时进度（解压/部署/装包），Loading 阶段用它展示细粒度文案。 */
     val containerInit: StateFlow<ContainerInitState> = containerEngine.initProgress
 
-    val tabs = sessionManager.tabs
-    val activeTabId = sessionManager.activeTabId
-    val revision = sessionManager.revision
+    val tabs get() = if (isRemote()) remoteManager.tabs else localManager.tabs
+    val activeTabId get() = if (isRemote()) remoteManager.activeTabId else localManager.activeTabId
+    val revision get() = if (isRemote()) remoteManager.revision else localManager.revision
 
     /** 额外按键行驱动的虚拟修饰键，供 TerminalView 读取。 */
     val modifiers = TerminalKeyModifiers()
@@ -53,12 +60,12 @@ class TerminalViewModel @Inject constructor(
         prepare()
     }
 
-    /** 进入终端页：确保至少有一个标签（首次会解压容器）。 */
+    /** 进入终端页：确保至少有一个标签（首次会解压容器或连 SSH）。 */
     fun prepare() {
         viewModelScope.launch {
             _prepareState.value = PrepareState.Loading
             try {
-                sessionManager.ensureInitialTab()
+                if (isRemote()) remoteManager.ensureInitialTab() else localManager.ensureInitialTab()
                 _prepareState.value = PrepareState.Ready
             } catch (e: Exception) {
                 FileLogger.e(TAG, "终端准备失败", e)
@@ -70,32 +77,32 @@ class TerminalViewModel @Inject constructor(
     fun newTab() {
         viewModelScope.launch {
             try {
-                sessionManager.createInteractiveTab()
+                if (isRemote()) remoteManager.createInteractiveTab() else localManager.createInteractiveTab()
             } catch (e: Exception) {
                 FileLogger.e(TAG, "新建标签失败", e)
             }
         }
     }
 
-    fun activate(id: String) = sessionManager.activate(id)
+    fun activate(id: String) = if (isRemote()) remoteManager.activate(id) else localManager.activate(id)
 
-    fun closeTab(id: String) = sessionManager.closeTab(id)
+    fun closeTab(id: String) = if (isRemote()) remoteManager.closeTab(id) else localManager.closeTab(id)
 
     /** 关闭所有终端标签（切换工作区前调用）。 */
     fun closeAllTabs() {
-        sessionManager.tabs.value.map { it.id }.forEach { sessionManager.closeTab(it) }
+        (if (isRemote()) remoteManager.tabs else localManager.tabs).value.map { it.id }.forEach { closeTab(it) }
     }
 
     fun reconnectActive() {
         val id = activeTabId.value ?: return
-        viewModelScope.launch { runCatching { sessionManager.reconnect(id) } }
+        viewModelScope.launch { runCatching { if (isRemote()) remoteManager.reconnect(id) else localManager.reconnect(id) } }
     }
 
     /** 向当前活动标签写入文本（额外按键行：方向键/Tab 等）。 */
-    fun write(text: String) = sessionManager.writeToActive(text)
+    fun write(text: String) = if (isRemote()) remoteManager.writeToActive(text) else localManager.writeToActive(text)
 
     /** 向当前活动标签写入原始字节（发送控制字符，如 Ctrl-C=0x03、Ctrl-D=0x04）。 */
-    fun writeBytes(vararg bytes: Int) = sessionManager.writeBytesToActive(*bytes)
+    fun writeBytes(vararg bytes: Int) = if (isRemote()) remoteManager.writeBytesToActive(*bytes) else localManager.writeBytesToActive(*bytes)
 
     // 注意：故意不在 onCleared 里销毁会话——会话归 Singleton 管理器所有，需常驻后台。
 }
