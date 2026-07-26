@@ -22,7 +22,7 @@
   - **优先复用 AI 自己创建的终端**：在启动新常驻进程或执行交互式命令前，先用 `action="read"`（不传 tab_id）列出现有终端。如果有 AI 自己之前创建的、仍处于活跃状态的标签，请直接用 `action="send"` 复用它，切忌毫无节制地反复 `start` 开启一堆新窗口。注意复用的是 AI 自己创建的后台终端，不是随便一个终端标签。
   - `action="start"`：**新建**一个后台终端标签跑命令。启动后挂起约 5 秒并流式捕获初始输出，返回 `{tab_id, running, output}`（输出过长时另有 `output_truncated` / `output_path`）。必填 `command`，可选 `title`、`notify`。两种用法：
     - **`notify=false`（默认）**：常驻服务（`npm run dev` 等）。命令结束后会 `exec` 默认 shell 保活标签，可继续 `send`/`read`；**不会**在结束时回调 AI。需要结果时自己 `read`。
-    - **`notify=true`**：会自行结束、且你要等结果的任务（编译、测试、长安装等）。`start` 返回后**不要**再 `sleep`/`read` 轮询——命令一结束，系统会注入 `background_callback` 工具结果并**自动触发新一轮对话**把退出码等通知给你；若需完整日志，再在该轮用 `terminal(action="read", tab_id=...)` 读取。注意：`notify=true` 结束后标签不再活跃（不可 `send`），新任务请重新 `start`。
+    - **`notify=true`**：会自行结束、且你要等结果的任务（编译、测试、长安装等）。`start` 返回后**不要**再 `sleep`/`read` 轮询——命令一结束，系统会注入一条后台任务完成通知（user 消息，形如 `[系统通知 - 非用户输入]` + `<task-notification>` 标签）并**自动触发新一轮对话**把退出码等通知给你；若需完整日志，再在该轮用 `terminal(action="read", tab_id=...)` 读取。注意：`notify=true` 结束后标签不再活跃（不可 `send`），新任务请重新 `start`。
   - `action="send"`：**向已有终端发送命令**（不是新建终端）。按 `tab_id` 向某个后台或交互终端发送一行命令/输入（默认自动回车执行），随后像 `start` 一样等待约 5 秒并流式显示新增输出，最终返回 `{tab_id, running, output}`。若 `output` 过长，按上方 `output_path` 规则读取完整日志。必填 `tab_id`、`input`，可选 `submit`。**如果该终端已不再活跃（命令已结束、`notify=true` 的标签已退出），send 会被拒绝并报错——此时请改用 `start` 新建终端。**
   - `action="key"`：按 `tab_id` 发送常见快捷键/控制字符。必填 `tab_id`、`key`，支持 `ctrl+c`、`ctrl+d`、`ctrl+z`、`ctrl+l`、`ctrl+u`、`ctrl+w`、`esc`、`tab`、`enter`、`up`、`down`、`left`、`right`。中断后台标签里正在跑的前台命令时优先用 `key="ctrl+c"`。
   - `action="read"`：按 `tab_id` 读取某终端当前输出（含后台命令的实时日志）；超长输出按统一 `output_path` 规则回填 preview。省略 `tab_id` 则列出所有终端标签及其状态。`notify=true` 的任务在完成通知到达前不必反复 read 等结果。
