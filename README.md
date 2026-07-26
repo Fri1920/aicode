@@ -3,7 +3,7 @@
   <p align="center">
     Android 端 AI 编程工具 · 内置 Linux 终端 · AI Agent · MCP 协议 · Git 集成
     <br />
-    <em>An AI-powered coding assistant for Android with built-in Linux terminal, agent tools, and MCP support.</em>
+    <a href="README.md">中文</a> · <a href="README.en.md">English</a>
   </p>
 </p>
 
@@ -34,11 +34,9 @@
 
 ## 简介
 
-AiCode 是一款在 Android 手机上运行的 AI 编程工具（Android IDE / mobile coding assistant），将大语言模型与本地 Linux 开发环境深度集成。它内置 Alpine Linux 容器和终端模拟器，让 AI 能直接读写文件、执行 Shell 命令、运行构建工具；同时支持远程 SSH 服务器作为执行后端，把手机变成远程项目的移动工作站。
+AiCode 是一款在 Android 手机上运行的 AI 编程工具，将大语言模型与本地 Linux 开发环境深度集成。它内置 Alpine Linux 容器和终端模拟器，让 AI 能直接读写文件、执行 Shell 命令、运行构建工具；同时支持远程 SSH 服务器作为执行后端，把手机变成远程项目的移动工作站。
 
-**English**: AiCode is an AI-powered coding assistant that runs natively on Android. It integrates LLMs with a built-in Linux terminal (PRoot + Alpine) and a tool-calling agent system — the AI can read/write files, execute shell commands, and manage Git, all from your phone. It also supports remote SSH servers as the execution backend, turning your phone into a mobile workstation for remote projects.
-
-## Features
+## 功能特性
 
 - **AI Agent** — 支持 Anthropic（Claude）、OpenAI（GPT）、Gemini 等多家提供商，通过工具系统（文件操作、Shell 执行、终端管理、网页搜索等）与开发环境深度交互；支持流式输出、上下文压缩、多会话管理
 - **内置终端** — 基于 Termux 组件 + PRoot Alpine Linux 容器，提供完整 Linux 命令行环境，支持后台常驻、多标签管理
@@ -49,30 +47,30 @@ AiCode 是一款在 Android 手机上运行的 AI 编程工具（Android IDE / m
 - **Markdown 渲染** — AI 对话中实时渲染 Markdown，支持代码高亮
 - **自定义提示词** — 系统提示词支持用户自定义覆盖，App 升级不丢失
 
-## Tech Stack
+## 技术栈
 
-| Category | Technology |
-|----------|------------|
-| Language | Kotlin |
+| 类别 | 技术 |
+|------|------|
+| 语言 | Kotlin |
 | UI | Jetpack Compose + Material 3 |
-| DI | Hilt (Dagger) |
-| Database | Room |
-| Network | Retrofit + OkHttp |
-| Async | Kotlin Coroutines / Flow |
-| Terminal | Termux terminal-emulator + terminal-view |
-| Container | PRoot + Alpine Linux rootfs |
-| Remote SSH | SSHJ (exec channel + SFTP + shell channel) |
-| Crypto | BouncyCastle (bcprov-jdk18on，sshj X25519 密钥交换依赖) |
+| 依赖注入 | Hilt (Dagger) |
+| 数据库 | Room |
+| 网络 | Retrofit + OkHttp |
+| 异步 | Kotlin Coroutines / Flow |
+| 终端 | Termux terminal-emulator + terminal-view |
+| 容器 | PRoot + Alpine Linux rootfs |
+| 远程 SSH | SSHJ（exec channel + SFTP + shell channel） |
+| 加密 | BouncyCastle（bcprov-jdk18on，sshj X25519 密钥交换依赖） |
 | FTP | Commons Net |
 
-## Getting Started
+## 快速开始
 
-### Prerequisites
+### 环境要求
 
-- Android 8.0+ (API 26) arm64-v8a 或 x86_64 设备
+- Android 8.0+（API 26）arm64-v8a 或 x86_64 设备
 - JDK 17
 
-### Build
+### 构建
 
 ```bash
 # 单 flavor 冒烟（日常开发推荐，只构 universal debug 一个 APK）
@@ -106,14 +104,14 @@ keyPassword=your_key_password
 
 </details>
 
-### Test
+### 测试
 
 ```bash
 ./gradlew :app:testUniversalDebugUnitTest    # 单 flavor 单元测试（日常推荐）
 ./gradlew test                                # 全 flavor 单元测试
 ```
 
-## Project Structure
+## 项目结构
 
 ```
 app/src/main/java/com/aicode/
@@ -128,7 +126,7 @@ app/src/main/java/com/aicode/
 └── MainActivity.kt      # 主 Activity
 ```
 
-## Known Limitations
+## 已知限制
 
 - `targetSdk` 锁定为 28 以绕过 Android 10+ W^X 策略，使 PRoot 可执行。
 - Release 按 CPU/容器镜像拆三个 variant：
@@ -137,12 +135,12 @@ app/src/main/java/com/aicode/
   - `universal`：`arm64-v8a` + `x86_64`，含两套镜像（通用但体积更大）
   - 容器镜像随系统 ABI 选择，错架构设备安装单架构包后无法运行 PRoot。
 
-## Acknowledgements
+## 致谢
 
 - [OpenCode](https://github.com/anomalyco/opencode) — 终端 AI 编码工具，本项目的核心灵感来源
 - [Termux](https://github.com/termux/termux-app) — Android 终端模拟器，提供了终端组件与 PRoot 方案
 - [Kelivo](https://github.com/Chevey339/kelivo) — 跨平台 LLM 聊天客户端，AI 对话界面设计参考
 
-## License
+## 开源协议
 
-This project is licensed under the [GPL-3.0](LICENSE).
+本项目基于 [GPL-3.0](LICENSE) 协议开源。
