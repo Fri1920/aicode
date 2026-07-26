@@ -58,6 +58,7 @@ class TerminalSessionManager @Inject constructor(
     /** 后台命令结束时 emit 的事件，供 ViewModel 订阅后通知 AI。 */
     data class TabFinishedEvent(
         val tabId: String,
+        val title: String,
         val command: String?,
         val exitCode: Int,
         /** 发起该后台命令的会话 id；回调据此路由回原会话，而非用户当前所在会话。 */
@@ -161,11 +162,16 @@ class TerminalSessionManager @Inject constructor(
     ): String {
         ensureContainer()
         val id = nextId()
-        // notify=true：命令结束后不 exec 保活 shell，让 session 自然结束以触发 onFinished 回调。
-        // notify=false：命令结束后 exec 默认 shell 保活，使标签可复用（dev server 退出后也能继续输入）。
-        val afterCommand = if (notify) "" else "; exec ${containerEngine.defaultShell()}"
+        // 用 `ec=$?` 捕获命令真实退出码后再 echo，否则 echo 本身恒为 0 会覆盖进程退出码，导致
+        // onFinished 回调里的 exitStatus 永远是 0、与屏幕上 echo 出来的码对不上。
+        // notify=true：echo 后 `exit $ec` 让 shell 以命令真实退出码结束 → proot 透传 → 回调 exitStatus
+        //   正确，且 shell 自然退出稳定触发 MSG_PROCESS_EXITED；否则脚本末尾是 echo，进程退出码被
+        //   污染成 0，而某些情况下进程不干净退出还会导致回调不触发。
+        // notify=false：echo 后 `exec ${shell}` 保活，标签可复用（dev server 退出后也能继续输入）；
+        //   此时进程不退出、不回调，退出码无意义，符合 dev server 场景设计。
+        val afterCommand = if (notify) "; exit \$ec" else "; exec ${containerEngine.defaultShell()}"
         val shellCommand = "cd /workspace 2>/dev/null; export ENV=/etc/profile; " +
-            "$command; echo \"[command exited: \$?]\"$afterCommand"
+            "$command; ec=\$?; echo \"[command exited: \$ec]\"$afterCommand"
         val session = buildSession(shellCommand)
         addTab(
             TerminalTab(
@@ -350,7 +356,7 @@ class TerminalSessionManager @Inject constructor(
                     }
                     if (target.notifyOnExit) {
                         _tabFinishedEvents.tryEmit(
-                            TabFinishedEvent(target.id, target.command, finished.exitStatus, target.sourceSessionId)
+                            TabFinishedEvent(target.id, target.title, target.command, finished.exitStatus, target.sourceSessionId)
                         )
                     }
                 }

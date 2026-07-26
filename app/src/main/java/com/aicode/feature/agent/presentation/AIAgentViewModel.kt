@@ -320,7 +320,6 @@ class AIAgentViewModel @Inject constructor(
         // 按事件携带的来源会话路由，而非用户当前所在会话：后台命令可能在用户已切到别的会话后才结束。
         val sessionId = event.sourceSessionId ?: return
         viewModelScope.launch {
-            val cmdDisplay = event.command?.takeIf { it.isNotBlank() }?.let { " \"$it\"" } ?: ""
             val status = if (event.exitCode == 0) "completed" else "failed"
             val notification = buildString {
                 appendLine(BACKGROUND_NOTIFICATION_PREFIX)
@@ -329,10 +328,11 @@ class AIAgentViewModel @Inject constructor(
                 appendLine()
                 appendLine("<task-notification>")
                 appendLine("  <task-id>${event.tabId}</task-id>")
+                appendLine("  <title>${event.title}</title>")
                 appendLine("  <command>${event.command ?: ""}</command>")
                 appendLine("  <exit-code>${event.exitCode}</exit-code>")
                 appendLine("  <status>$status</status>")
-                appendLine("  <summary>后台命令$cmdDisplay 已结束（退出码 ${event.exitCode}）</summary>")
+                appendLine("  <summary>后台任务「${event.title}」已结束（退出码 ${event.exitCode}）</summary>")
                 appendLine("</task-notification>")
                 appendLine()
                 append("可用 terminal(action=\"read\", tab_id=\"${event.tabId}\") 查看完整输出。")
