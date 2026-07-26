@@ -31,6 +31,18 @@ class BackupCryptoTest {
         assertArrayEquals(plain, BackupCrypto.decrypt(ciphertext, password, salt, iv))
     }
 
+
+    @Test
+    fun decryptWithHeader_wrongPasswordReportsPasswordOrCorruptBackup() {
+        val encrypted = BackupCrypto.encryptWithHeader(
+            "encrypted payload".toByteArray(Charsets.UTF_8),
+            "right-password".toCharArray()
+        )
+
+        assertThrows(BackupDecryptionException::class.java) {
+            BackupCrypto.decryptWithHeader(encrypted, "wrong-password".toCharArray())
+        }
+    }
     @Test
     fun decryptWithHeader_rejectsDataTooShortForHeader() {
         assertThrows(IllegalArgumentException::class.java) {

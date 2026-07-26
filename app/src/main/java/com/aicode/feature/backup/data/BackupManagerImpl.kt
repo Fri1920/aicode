@@ -136,7 +136,13 @@ class BackupManagerImpl @Inject constructor(
                 data
             }
             val plain = unTarGz(tarGz)
-                ?: error("不是有效的 AiCode 备份文件")
+                ?: error(
+                    if (password != null && password.isNotEmpty()) {
+                        "备份文件已损坏，或口令与备份文件不匹配"
+                    } else {
+                        "不是有效的 AiCode 备份文件；如果这是加密备份，请输入导出口令"
+                    }
+                )
             val snapshot = json.decodeFromString(BackupSnapshot.serializer(), String(plain, Charsets.UTF_8))
             if (snapshot.schemaVersion > currentSchemaVersion()) {
                 error("备份的数据库版本 v${snapshot.schemaVersion} 高于本应用 v${currentSchemaVersion()}，请升级应用")
