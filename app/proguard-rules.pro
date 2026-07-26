@@ -23,6 +23,18 @@
 -dontwarn org.bouncycastle.**
 -dontwarn org.openjsse.**
 
+# ---- BouncyCastle (bcprov-jdk18on) ----
+# AIEditorApp.registerBouncyCastle() 在启动时注册完整版 BC 取代 Android 裁剪版，供 sshj 做 X25519 密钥交换。
+# JCE 框架通过反射按类名加载 Provider 注册的各算法 SPI（KeyStore/Cipher/Signature/AlgorithmParameters 等），
+# 类名一旦被 R8 混淆，BouncyCastleProvider 注册的 BKS KeyStore 等类型实例化失败，
+# 表现为 release 下 HTTPS 请求抛 KeyStoreException: BKS not found（debug 不开 R8 故正常）。
+# 故保留整个 BC provider 包及其内部 *Mappings（BouncyCastleProvider 靠反射加载这些注册类）。
+-keep class org.bouncycastle.jce.provider.** { *; }
+-keep class org.bouncycastle.jce.provider.BouncyCastleProvider
+-keepclassmembers class org.bouncycastle.jce.provider.BouncyCastleProvider {
+    <init>();
+}
+
 # ---- Gson（Retrofit converter + AILogger 用 GsonBuilder 反射序列化）----
 # Retrofit/Gson 通过反射读写 data class 字段，类名与字段名不可混淆/裁剪。
 #

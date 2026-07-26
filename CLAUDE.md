@@ -9,13 +9,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Asset Synchronization
 项目中的 `app/src/main/assets/prompts/` 和 `app/src/main/assets/docs/` 是 AI Agent 的核心知识来源，必须与代码保持同步：
 
-- **工具变更 → 同步 prompts**：当 `app/src/main/java/com/aicode/feature/agent/domain/tool/` 下的工具新增、删除、重命名或参数签名变化时，必须同步更新 `app/src/main/assets/prompts/60-tools-and-paths.md` 中的工具描述，确保模型看到的工具定义与实际注册一致。
-- **设置功能变更 → 同步 docs**：当 `app/src/main/java/com/aicode/feature/settings/` 下的设置项新增、删除或行为变化时，必须同步更新 `app/src/main/assets/docs/` 下对应的文档文件：
-  - AI 服务商与模型配置变更 → `providers-and-models.md`
-  - MCP 服务器与扩展技能配置变更 → `mcp-and-skills.md`
-  - 日志、私有目录与保活设置变更 → `logs-and-private-dir.md`
-  - 远程服务器与同步设置变更 → `remote-servers.md`
-  - 工作区与模式配置变更 → `app-settings-guide.md`
+- **AI 工作流相关改动 → 检查 prompts**：任何与 AI 工作流相关的改动（工具新增/删除/重命名/参数签名变化、agent 行为变化、提示词逻辑调整等），都必须检查 `app/src/main/assets/prompts/` 下的提示词是否需要同步更新，确保模型看到的工具定义与行为说明与实际一致。AI 应自行在 `prompts/` 目录中查找对应的提示词文件；若不存在则新建。
+- **功能、工具变化 → 检查 docs**：任何功能新增/删除/行为变化或工具变更，还要检查 `app/src/main/assets/docs/` 下是否有对应使用文档需要更新（如新功能的使用说明、工具行为变化的提示）。
+- **UI 变化 → 必须更新对应使用文档**：任何 UI 变化（新增页面、改交互、调布局、改文案）**必须**同步更新 `app/src/main/assets/docs/` 下对应的使用文档，确保用户可见的说明与实际界面一致。AI 应自行在 `docs/` 目录中查找对应的文档；若不存在则新建。
 
 ## Git 提交规范
 
@@ -28,7 +24,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ```
 
 - **type** ∈ `feat | fix | refactor | docs | style | chore | ci | build | perf | test`
-- **scope** 可选，建议用功能模块：`agent | settings | terminal | workspace | git | ui | mcp | db | core | deps`
+- **scope** 可选，建议用功能模块：`agent | settings | terminal | workspace | git | ui | mcp | db | core | docs | build | deps`
 - **subject** 一行简述，中英文均可，句末不加句号。
 - 跳过校验（仅紧急）：`git commit --no-verify ...`
 
@@ -83,19 +79,17 @@ RC 与正式版共享同一 `versionName`，`versionCode` 由 commit count 自�
 
 This is an Android application built with Kotlin, Jetpack Compose, and Hilt. It uses Gradle as the build system.
 
-- **Build the project:** `./gradlew build`
-- **Assemble Debug APK:** `./gradlew assembleDebug`
+- **Build the project:** `./gradlew build` —— 完整构建，含三 flavor 全量编译 + lint + 测试，耗时极长，日常开发不用。
 - **单 flavor 冒烟（AI 改完代码默认跑这个）：** `./gradlew :app:assembleUniversalDebug` —— `assembleDebug`/`assembleRelease` 是 flavor 聚合任务，会把 universal/armsolo/x86solo 三个 APK 各构一遍（三倍 Kotlin 编译 + 资源处理，慢）。AI 改完**编译型代码**（`.kt` / `.gradle.kts` / `AndroidManifest.xml`）后、提交前，默认只构 **universal debug** 单个 APK 做冒烟验证，不要触发全量三 flavor。仅改文档/资源/纯 `.md` 时可跳过。完整发版才用 `assembleRelease` 构三个。
 - **Assemble Release APK:** `./gradlew assembleRelease` —— 按容器镜像/CPU 拆三个 flavor，输出到 `app/build/outputs/apk/<flavor>/release/app-<flavor>-release.apk`（flavor ∈ universal/armsolo/x86solo）
 - **Assemble Release AAB:** `./gradlew bundleRelease` —— 输出到 `app/build/outputs/bundle/<flavor>/release/app-<flavor>-release.aab`
-- **Run Unit Tests:** `./gradlew test`
-- **Run Android Tests:** `./gradlew connectedAndroidTest`
+- **Run Unit Tests:** `./gradlew test` —— 跨 flavor 聚合测试任务，日常用 `./gradlew :app:testUniversalDebugUnitTest` 单 flavor 即可。
 
 ### Release Packaging & Signing
 The release signing configuration is automatically handled in `app/build.gradle.kts`:
-- **Keystore File:** `app/aicode.jks`
-- **Credentials:** Loaded from `app/keystore.properties` (`storePassword`, `keyAlias`, `keyPassword`).
-- **Target ABI:** Only `arm64-v8a` is packaged to keep APK size reasonable while supporting Termux/PRoot rootfs.
+- **Keystore File:** 路径由 `app/keystore.properties` 的 `storeFile` 字段指定（文件名不固定为 `aicode.jks`）。本地通常不存放签名文件，CI 从 GitHub secret 还原到 `app/aicode.jks`。
+- **Credentials:** Loaded from `app/keystore.properties` (`storeFile`, `storePassword`, `keyAlias`, `keyPassword`)。
+- **Target ABI:** 按 flavor 拆分：`universal` 含 `arm64-v8a` + `x86_64`，`armsolo` 仅 `arm64-v8a`，`x86solo` 仅 `x86_64`。
 
 *Note: The project locks `targetSdk = 28` intentionally to allow PRoot execution (W^X policy bypass on Android 10+).*
 
@@ -106,12 +100,14 @@ The application is structured using a feature-based architecture with Domain-Dri
 ### Key Components
 
 - **App Core:** `AIEditorApp` initializes core services like `FileLogger`, `TerminalKeepaliveService`, and `McpManager`.
+- **Core Module:** `app/src/main/java/com/aicode/core/` hosts cross-feature infrastructure: `FileLogger`, `db/MigrationLoader.kt`, etc.
 - **Feature Modules:** Code is organized by feature under `app/src/main/java/com/aicode/feature/`:
     - `agent`: The core AI agent system. Includes prompt management, MCP (Model Context Protocol) integration, tool registry (file tools, shell execution, etc.), permission handling, and adapters for different AI providers (Anthropic, OpenAI).
     - `git`: Git integration and operations.
     - `settings`: Application configuration, including AI provider setup, logging, and keepalive settings.
-    - `terminal`: Terminal emulation and session management, leveraging Termux components (`terminal-emulator`, `terminal-view`) and PRoot via `LinuxContainerEngine`.
-    - `workspace`: Workspace and document provider management.
+    - `terminal`: Terminal emulation and session management. Local mode leverages Termux components (`terminal-emulator`, `terminal-view`) and PRoot via `LinuxContainerEngine`; remote SSH mode uses sshj (`SshShellBackend`, `RemoteTerminalSessionManager`).
+    - `workspace`: Workspace and document provider management. Remote SSH file access via `RemoteSftpFileAccess`.
+- **Remote SSH Link:** `RemoteSshConnection`（共享 sshj `SSHClient`）+ `RemoteSshEngine`（exec channel 执行命令）+ `RemoteSftpFileAccess`（文件操作）+ `RemoteTerminalSessionManager`（终端会话），构成远程模式下的执行链路。
 
 ### Database
 
@@ -121,7 +117,7 @@ The app uses Room for local database storage, primarily found in `feature/agent/
 We use a custom, lightweight file-based migration system (`MigrationLoader.kt`).
 To update the database schema:
 1. Increment the database version in `AgentDatabase.kt`.
-2. Create a new SQL file in `app/src/main/assets/migrations/` named `{VERSION}_description.sql` (e.g., `8_add_new_table.sql`).
+2. Create a new SQL file in `app/src/main/assets/migrations/` named `{VERSION}_description.sql` (e.g., `8_add_remote_servers.sql`、`26_add_session_last_input_tokens.sql`).
 3. Add the necessary DDL/SQL statements to this file. The system will automatically execute it on startup and record it in the `migration_history` table.
 
 ### AI Agent & Tools

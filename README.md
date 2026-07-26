@@ -1,25 +1,27 @@
 <p align="center">
   <h1 align="center">AiCode</h1>
   <p align="center">
-    在 Android 设备上运行的 AI 编程工具
+    Android 端 AI 编程工具 · 内置 Linux 终端 · AI Agent · MCP 协议 · Git 集成
     <br />
-    内置终端 · AI Agent · MCP 协议
+    <em>An AI-powered coding assistant for Android with built-in Linux terminal, agent tools, and MCP support.</em>
   </p>
 </p>
 
 <p align="center">
-  <a href="LICENSE"><img src="https://img.shields.io/badge/License-GPL--3.0-blue.svg" alt="License" /></a>
-  <img src="https://img.shields.io/badge/Platform-Android-green.svg" alt="Platform" />
-  <img src="https://img.shields.io/badge/Language-Kotlin-purple.svg" alt="Language" />
-  <img src="https://img.shields.io/badge/UI-Jetpack%20Compose-4285F4.svg" alt="UI" />
-  <img src="https://img.shields.io/badge/MinSDK-26-orange.svg" alt="MinSDK" />
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-GPL--3.0-blue.svg" alt="License GPL-3.0" /></a>
+  <img src="https://img.shields.io/badge/Platform-Android-green.svg" alt="Android Platform" />
+  <img src="https://img.shields.io/badge/Language-Kotlin-purple.svg" alt="Kotlin" />
+  <img src="https://img.shields.io/badge/UI-Jetpack%20Compose-4285F4.svg" alt="Jetpack Compose UI" />
+  <img src="https://img.shields.io/badge/MinSDK-26-orange.svg" alt="Min SDK 26 (Android 8.0)" />
+  <a href="https://github.com/jieapi/aicode/releases/latest"><img src="https://img.shields.io/github/v/release/jieapi/aicode?display_name=tag&include_prereleases" alt="Latest Release" /></a>
+  <a href="https://github.com/jieapi/aicode/releases"><img src="https://img.shields.io/github/downloads/jieapi/aicode/total" alt="Total Downloads" /></a>
 </p>
 
 <p align="center">
   <table>
     <tr>
-      <td align="center"><img src="docs/screenshots/home.png" alt="主页 · AI 对话" width="270"/></td>
-      <td align="center"><img src="docs/screenshots/terminal.png" alt="终端 · Alpine Linux" width="270"/></td>
+      <td align="center"><img src="docs/screenshots/home.png" alt="AiCode 主页 - AI 对话界面，支持代码生成与 Markdown 渲染" width="270"/></td>
+      <td align="center"><img src="docs/screenshots/terminal.png" alt="AiCode 终端 - 内置 Alpine Linux 容器，完整命令行环境" width="270"/></td>
     </tr>
     <tr>
       <td align="center">主页 · AI 对话</td>
@@ -30,14 +32,22 @@
 
 ---
 
+## 简介
+
+AiCode 是一款在 Android 手机上运行的 AI 编程工具（Android IDE / mobile coding assistant），将大语言模型与本地 Linux 开发环境深度集成。它内置 Alpine Linux 容器和终端模拟器，让 AI 能直接读写文件、执行 Shell 命令、运行构建工具；同时支持远程 SSH 服务器作为执行后端，把手机变成远程项目的移动工作站。
+
+**English**: AiCode is an AI-powered coding assistant that runs natively on Android. It integrates LLMs with a built-in Linux terminal (PRoot + Alpine) and a tool-calling agent system — the AI can read/write files, execute shell commands, and manage Git, all from your phone. It also supports remote SSH servers as the execution backend, turning your phone into a mobile workstation for remote projects.
+
 ## Features
 
-- **AI Agent** — 支持 Anthropic、OpenAI 等多家提供商，通过工具系统（文件操作、Shell 执行等）与开发环境深度交互
-- **内置终端** — 基于 Termux 组件 + PRoot Alpine Linux 容器，提供完整 Linux 命令行环境
-- **MCP 协议** — Model Context Protocol 客户端，连接远程 MCP 服务器动态扩展工具能力
-- **Git 集成** — 内置 Git 操作
-- **远程同步** — 支持 SFTP / FTP 工作区同步
-- **Markdown 渲染** — AI 对话中实时渲染 Markdown 内容
+- **AI Agent** — 支持 Anthropic（Claude）、OpenAI（GPT）、Gemini 等多家提供商，通过工具系统（文件操作、Shell 执行、终端管理、网页搜索等）与开发环境深度交互；支持流式输出、上下文压缩、多会话管理
+- **内置终端** — 基于 Termux 组件 + PRoot Alpine Linux 容器，提供完整 Linux 命令行环境，支持后台常驻、多标签管理
+- **远程 SSH 模式** — 连接远程 SSH 服务器作为执行后端，命令走 exec channel、文件读写走 SFTP、终端走 shell channel，支持自动重连与状态指示
+- **MCP 协议** — Model Context Protocol 客户端，连接本地（stdio）或远程（HTTP）MCP 服务器动态扩展工具能力
+- **Git 集成** — 内置可视化 Git 操作（状态/分支/提交/标签管理），支持长按操作菜单
+- **远程同步** — 支持 SFTP / FTP 工作区同步，内置 FTP 服务器方便电脑端管理
+- **Markdown 渲染** — AI 对话中实时渲染 Markdown，支持代码高亮
+- **自定义提示词** — 系统提示词支持用户自定义覆盖，App 升级不丢失
 
 ## Tech Stack
 
@@ -51,20 +61,22 @@
 | Async | Kotlin Coroutines / Flow |
 | Terminal | Termux terminal-emulator + terminal-view |
 | Container | PRoot + Alpine Linux rootfs |
-| Remote Sync | SSHJ (SFTP) + Commons Net (FTP) |
+| Remote SSH | SSHJ (exec channel + SFTP + shell channel) |
+| Crypto | BouncyCastle (bcprov-jdk18on，sshj X25519 密钥交换依赖) |
+| FTP | Commons Net |
 
 ## Getting Started
 
 ### Prerequisites
 
-- Android 8.0+ (API 26) arm64-v8a 设备
+- Android 8.0+ (API 26) arm64-v8a 或 x86_64 设备
 - JDK 17
 
 ### Build
 
 ```bash
-# Debug（默认走 universal 变体）
-./gradlew assembleDebug
+# 单 flavor 冒烟（日常开发推荐，只构 universal debug 一个 APK）
+./gradlew :app:assembleUniversalDebug
 
 # Release（需配置签名；构全部三个 flavor）
 ./gradlew assembleRelease
@@ -97,21 +109,21 @@ keyPassword=your_key_password
 ### Test
 
 ```bash
-./gradlew test                    # 单元测试
-./gradlew connectedAndroidTest    # 集成测试
+./gradlew :app:testUniversalDebugUnitTest    # 单 flavor 单元测试（日常推荐）
+./gradlew test                                # 全 flavor 单元测试
 ```
 
 ## Project Structure
 
 ```
 app/src/main/java/com/aicode/
-├── core/                # 核心模块（主题、通用组件）
+├── core/                # 核心基础设施（FileLogger、db/MigrationLoader、主题、通用组件）
 ├── feature/
-│   ├── agent/           # AI Agent（提示词、MCP、工具注册、多提供商适配）
-│   ├── git/             # Git 集成
-│   ├── settings/        # 应用设置
-│   ├── terminal/        # 终端模拟与会话管理
-│   └── workspace/       # 工作区与文档管理
+│   ├── agent/           # AI Agent（提示词、MCP、工具注册、多提供商适配、斜杠命令）
+│   ├── git/             # Git 集成（状态/分支/提交/标签）
+│   ├── settings/        # 应用设置（提供商、容器、MCP、远程、日志等）
+│   ├── terminal/        # 终端模拟与会话管理（本地 Termux + 远程 SSH）
+│   └── workspace/       # 工作区与文档管理（本地 + 远程 SFTP/FTP）
 ├── AIEditorApp.kt       # Application 入口
 └── MainActivity.kt      # 主 Activity
 ```
