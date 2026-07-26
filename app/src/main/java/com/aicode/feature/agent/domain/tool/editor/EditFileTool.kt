@@ -37,7 +37,7 @@ class EditFileTool @Inject constructor(
 ) : AgentTool() {
     override val name = "editFile"
     override val description =
-        "通过精确的字符串匹配替换修改已存在的文件内容。作为局部修改文件的首选工具。支持通过 edits 数组一次性应用多处修改，任一处匹配失败将整批回滚。整文件重写请用 writeFile。"
+        "通过精确的字符串匹配替换修改已存在的文件内容。作为局部修改文件的首选工具。支持通过 edits 数组一次性应用多处修改，整批编辑是原子的——任一处匹配失败将整批回滚，文件不会处于改了一半的状态。整文件重写请用 writeFile。"
     override val permissionPolicy = ToolPermissionPolicy.ASK
     override val capabilities = setOf(ToolCapability.WRITE_WORKSPACE)
 
@@ -130,8 +130,7 @@ class EditFileTool @Inject constructor(
                 if (occurrences == 0) {
                     FileLogger.w(TAG, "edit_file 第 ${i + 1} 个编辑未匹配: $path")
                     return ToolResult.Error(
-                        "第 ${i + 1} 个编辑未在文件中找到 old_string，请确认内容（含缩进/换行）与当前文件完全一致" +
-                            "（注意：前面的编辑可能已经改动了这段内容）",
+                        "第 ${i + 1} 个编辑未在文件中找到 old_string，请确认内容（含缩进/换行）与当前文件完全一致",
                         "NO_MATCH"
                     )
                 }

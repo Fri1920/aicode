@@ -119,12 +119,15 @@ class AIEditorApp : Application() {
                                 remoteWorkspacePath = settings.remoteWorkspacePath
                             )
                         )
+                        // 连接成功后同步内置文档到远程 ~/.aicode/docs/，供 AI 查阅。
+                        syncDocsToRemote()
                     }.onFailure { FileLogger.e(TAG, "启动时 SSH 连接失败，将在首次命令时重试", it) }
                 }
-                // 启动 SSH 连接监督：定期探活、断线自动重连、重连成功后重新加载工作区。
+                // 启动 SSH 连接监督：定期探活、断线自动重连、重连成功后重新加载工作区与同步文档。
                 remoteSshConnection.startSupervisor(appScope) {
                     runCatching { workspaceRepository.initialize() }
                         .onFailure { FileLogger.w(TAG, "SSH 重连后重新加载工作区失败", it) }
+                    syncDocsToRemote()
                 }
             }
         }
@@ -144,6 +147,23 @@ class AIEditorApp : Application() {
         }
         // 连接已配置的 MCP server，把其工具注册进 ToolRegistry（内部自有 scope，失败不影响启动）。
         mcpManager.start()
+    }
+
+    /**
+     * 读取 assets/docs 下所有内置文档，通过 SSH exec 同步到远程 ~/.aicode/docs/。
+     * 远程模式下 AI 查阅 ~/.aicode/docs/ 的设置说明文档时，需要这些文件存在于远程服务器。
+     * 连接成功与重连成功后调用，保证远程文档随 App 升级更新。失败仅记日志，不阻断流程。
+     */
+    private suspend fun syncDocsToRemote() {
+        runCatching {
+            val names = assets.list("docs") ?: return@runCatching
+            val docs = linkedMapOf<String, String>()
+            for (name in names) {
+                val content = assets.open("docs/$name").bufferedReader().use { it.readText() }
+                docs[name] = content
+            }
+            remoteSshConnection.uploadDocs(docs)
+        }.onFailure { FileLogger.w(TAG, "同步内置文档到远程失败", it) }
     }
 
     /** 注册完整版 BouncyCastle 取代 Android 自带的裁剪版。

@@ -223,6 +223,35 @@ class RemoteSshConnection @Inject constructor() {
             }.onFailure { FileLogger.w(TAG, "更新 workspace 符号链接失败: $ws", it) }
         }
     }
+
+    /**
+     * 把内置文档同步到远程 ~/.aicode/docs/，让远程模式下 AI 也能像本地模式一样
+     * 查阅 ~/.aicode/docs/ 下的设置说明文档。每次连接/重连后全量覆盖，使 App 升级后
+     * 远程文档随之更新。docs 是纯文本，用 exec + printf 写入即可，无需 SFTP。
+     *
+     * @param docs 文件名 → 文件内容（文本）。
+     */
+    suspend fun uploadDocs(docs: Map<String, String>) {
+        if (docs.isEmpty()) return
+        val client = sshClient ?: return
+        val home = remoteHome ?: return
+        val destDir = home.trimEnd('/') + "/.aicode/docs"
+        withContext(Dispatchers.IO) {
+            runCatching {
+                val mkdirSession = client.startSession()
+                mkdirSession.exec("mkdir -p '$destDir'").join()
+                mkdirSession.close()
+                for ((name, content) in docs) {
+                    val dest = "$destDir/$name"
+                    val escaped = content.replace("\\", "\\\\").replace("'", "'\\\"'\"'")
+                    val session = client.startSession()
+                    session.exec("printf %s '$escaped' > '$dest'").join()
+                    session.close()
+                }
+                FileLogger.i(TAG, "已同步 ${docs.size} 个文档到远程 $destDir")
+            }.onFailure { FileLogger.w(TAG, "同步文档到远程失败", it) }
+        }
+    }
 }
 
 /** 远程 SSH 连接状态，供 UI 指示器与工作区初始化时序判断。 */
