@@ -122,9 +122,7 @@ class BackupManagerImpl @Inject constructor(
         val plain = json.encodeToString(BackupSnapshot.serializer(), snapshot).toByteArray(Charsets.UTF_8)
         val tarGz = tarGz(plain)
         if (password != null && password.isNotEmpty()) {
-            val salt = BackupCrypto.newSalt()
-            val iv = BackupCrypto.newIv()
-            BackupCrypto.encrypt(tarGz, password, salt, iv)
+            BackupCrypto.encryptWithHeader(tarGz, password)
         } else {
             tarGz
         }
@@ -133,13 +131,7 @@ class BackupManagerImpl @Inject constructor(
     override suspend fun import(data: ByteArray, password: CharArray?): Result<RestoreStats> = withContext(Dispatchers.IO) {
         runCatching {
             val tarGz = if (password != null && password.isNotEmpty()) {
-                val salt = ByteArray(BackupCrypto.SALT_LEN)
-                val iv = ByteArray(BackupCrypto.IV_LEN)
-                require(data.size >= salt.size + iv.size) { "不是有效的 AiCode 备份文件" }
-                System.arraycopy(data, 0, salt, 0, salt.size)
-                System.arraycopy(data, salt.size, iv, 0, iv.size)
-                val ciphertext = data.copyOfRange(salt.size + iv.size, data.size)
-                BackupCrypto.decrypt(ciphertext, password, salt, iv)
+                BackupCrypto.decryptWithHeader(data, password)
             } else {
                 data
             }
