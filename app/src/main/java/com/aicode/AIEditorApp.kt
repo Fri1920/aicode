@@ -171,8 +171,14 @@ class AIEditorApp : Application() {
      *  需先移除裁剪版再注册 bcprov-jdk18on（sshj 传递依赖）的完整版，并告诉 sshj 使用它。
      *  必须在任何 sshj 调用之前完成。 */
     private fun registerBouncyCastle() {
+        // 先移除 Android 自带的裁剪版 BC，再注册完整版 bcprov-jdk18on。
+        // 用 addProvider 而非 insertProviderAt(…, 1)：BC 只需存在于 Provider 列表中供 sshj
+        // 通过 SecurityUtils.setSecurityProvider("BC") 按名查到即可，无需排到最高优先级。
+        // 若抬到第 1 位，会抢占 OkHttp/Conscrypt 初始化默认 SSLContext 时的 KeyStore 查找，
+        // BC 注册了 BKS 类型却没有配套默认 truststore，导致抛 KeyStoreException: BKS not found
+        // （表现为检测更新等 HTTPS 请求崩溃）。放末尾让系统自带 provider 继续负责 TLS。
         java.security.Security.removeProvider("BC")
-        java.security.Security.insertProviderAt(org.bouncycastle.jce.provider.BouncyCastleProvider(), 1)
+        java.security.Security.addProvider(org.bouncycastle.jce.provider.BouncyCastleProvider())
         SecurityUtils.setSecurityProvider("BC")
     }
 
