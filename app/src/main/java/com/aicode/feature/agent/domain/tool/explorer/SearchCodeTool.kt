@@ -31,7 +31,7 @@ class SearchCodeTool @Inject constructor(
     }
 
     override val name = "search"
-    override val description = "按 rg 风格搜索文本。例：args=\"-n \\\"fun main\\\" /workspace/app\"。"
+    override val description = "按 rg 风格搜索文本。例：args=\"-n \\\"fun main\\\" ~/workspace/app\"。"
     override val permissionPolicy = ToolPermissionPolicy.AUTO_APPROVE
     override val capabilities = setOf(ToolCapability.READ_WORKSPACE)
 

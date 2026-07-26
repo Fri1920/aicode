@@ -207,9 +207,8 @@ class RemoteSshConnection @Inject constructor() {
     }
 
     /**
-     * 更新 /workspace 符号链接指向当前选中工作区的远程路径，让 AI 用 /workspace/... 路径时
-     * Bash 命令（pwd 等）能直接访问到正确的工作区目录。先试 /workspace（需 root），
-     * 失败则 fallback 到 ~/workspace。应在工作区选中/初始化后调用。
+     * 更新 ~/workspace 符号链接指向当前选中工作区的远程路径，让 AI 用 ~/workspace/... 路径时
+     * Bash 命令（pwd 等）能直接访问到正确的工作区目录。应在工作区选中/初始化后调用。
      */
     suspend fun updateWorkspaceSymlink(workspacePath: String) {
         val client = sshClient ?: return
@@ -218,7 +217,7 @@ class RemoteSshConnection @Inject constructor() {
         withContext(Dispatchers.IO) {
             runCatching {
                 val session = client.startSession()
-                val cmd = session.exec("ln -sfn '$ws' /workspace 2>/dev/null || ln -sfn '$ws' ~/workspace 2>/dev/null; echo done")
+                val cmd = session.exec("ln -sfn '$ws' ~/workspace 2>/dev/null; echo done")
                 java.io.BufferedReader(java.io.InputStreamReader(cmd.inputStream)).readText()
                 session.close()
             }.onFailure { FileLogger.w(TAG, "更新 workspace 符号链接失败: $ws", it) }
@@ -260,6 +259,6 @@ data class RemoteConnectionConfig(
     val port: Int = 22,
     val username: String,
     val auth: RemoteAuth,
-    /** 远程服务器上的工作区根路径（AI 的 /workspace 映射到此路径）。 */
+    /** 远程服务器上的工作区根路径（AI 的 ~/workspace 映射到此路径）。 */
     val remoteWorkspacePath: String
 )

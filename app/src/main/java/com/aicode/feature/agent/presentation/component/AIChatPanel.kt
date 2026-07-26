@@ -207,7 +207,7 @@ private fun attachmentsRoot(workspace: File): File =
     File(File(workspace, ".aicode"), "attachments").apply { mkdirs() }
 
 private fun workspaceContainerPath(relativePath: String): String =
-    "/workspace/$relativePath"
+    "~/workspace/$relativePath"
 
 private fun attachmentRelativePath(workspace: File, target: File): String =
     target.relativeTo(workspace).invariantSeparatorsPath

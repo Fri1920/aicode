@@ -1,4 +1,4 @@
-<!-- 工具与路径约定：项目专属，工具职责划分 + /workspace 容器路径规则 -->
+<!-- 工具与路径约定：项目专属，工具职责划分 + ~/workspace 路径规则 -->
 工具使用约定：
 
 - 需要操作文件或运行命令时直接调用工具，不要把工具调用写成普通文本或代码块。
@@ -32,17 +32,17 @@
 
 代码探索工具（只读）：
 
-- `list`：ls 风格列目录。参数：`args`，如 `list(args="-la /workspace/app")`；不传默认 `/workspace`。支持 `-a -A -l -R -d -1 -h -r -t -S -v -f --`。
-- `search`：rg 风格搜索。参数：`args`，如 `search(args="-n \"fun main\" /workspace/app")`。只接受 ripgrep 参数，不要混入 shell 管道（`|`）、`grep`/`head` 等外部命令或重定向——需要后处理用 `Bash`。
+- `list`：ls 风格列目录。参数：`args`，如 `list(args="-la ~/workspace/app")`；不传默认 `~/workspace`。支持 `-a -A -l -R -d -1 -h -r -t -S -v -f --`。
+- `search`：rg 风格搜索。参数：`args`，如 `search(args="-n \"fun main\" ~/workspace/app")`。只接受 ripgrep 参数，不要混入 shell 管道（`|`）、`grep`/`head` 等外部命令或重定向——需要后处理用 `Bash`。
 
 路径约定（重要）：
 
-- 项目根目录固定为容器内路径 `/workspace`。你只看得到、也只需使用容器内路径。
-- 项目文件用 `/workspace/...`（如 `/workspace/src/Main.kt`）或相对路径（如 `src/Main.kt`，相对 `/workspace`）。
-- `readFile`/`writeFile`/`editFile` 也能读写 `/workspace` 之外的容器系统文件，直接用容器绝对路径即可（如 `/etc/apk/repositories`、`/root/.bashrc`、`/usr/local/bin/...`）。
+- 项目根目录固定为容器内路径 `~/workspace`。你只看得到、也只需使用容器内路径。
+- 项目文件用 `~/workspace/...`（如 `~/workspace/src/Main.kt`）或相对路径（如 `src/Main.kt`，相对 `~/workspace`）。
+- `readFile`/`writeFile`/`editFile` 也能读写 `~/workspace` 之外的容器系统文件，直接用容器绝对路径即可（如 `/etc/apk/repositories`、`/root/.bashrc`、`/usr/local/bin/...`）。
 - AI 配置目录固定为 `~/.aicode`，可用文件工具或 `Bash` 直接访问；它映射到 Android 宿主私有目录 `filesDir/aicode`，不在 rootfs 内，容器重装不会清空。
 - 用户若拥有 Android root 权限，也可绕过 DocumentsProvider 直接从宿主访问 App 私有目录：`/data/data/com.aicode/files/`（部分系统也显示为 `/data/user/0/com.aicode/files/`）。其中 `projects/` 是本地工作区根，`aicode/` 对应容器内 `~/.aicode`。
-- `Bash` 的当前目录已经是 `/workspace`，相对路径都基于该项目根目录解析。
+- `Bash` 的当前目录已经是 `~/workspace`，相对路径都基于该项目根目录解析。
 - `~/.aicode/tool-output/...` 是工具完整输出日志目录，可直接用 `readFile` 分段读取。
 
 用户交互工具：

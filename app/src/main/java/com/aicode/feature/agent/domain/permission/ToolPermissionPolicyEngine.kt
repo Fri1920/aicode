@@ -154,7 +154,7 @@ class ToolPermissionPolicyEngine @Inject constructor(
                 if (normalized == "/" || normalized == "/*" || normalized == "//*") return "安全防护：禁止执行高危删除操作（根目录删除）"
                 if (normalized == "*" || normalized == ".*" || normalized == "." || normalized == "./*" || normalized == ".." || normalized == "../.*") return "安全防护：禁止执行高危删除操作（全局或相对路径通配删除）"
                 if (normalized == "~" || normalized == "~/*") return "安全防护：禁止执行高危删除操作（用户目录删除）"
-                if (normalized == "/workspace" || normalized == "/workspace/*" || normalized == "/workspace/.*" || normalized == "/workspace/." || normalized == "/workspace/.." || normalized.startsWith("/workspace/../") || normalized == "workspace" || normalized == "workspace/*") return "安全防护：禁止执行高危删除操作（工作区根目录删除）"
+                if (normalized == "~/workspace" || normalized == "~/workspace/*" || normalized == "~/workspace/.*" || normalized == "~/workspace/." || normalized == "~/workspace/.." || normalized.startsWith("~/workspace/../") || normalized == "/root/workspace" || normalized == "/root/workspace/*" || normalized == "/root/workspace/.*" || normalized == "/root/workspace/." || normalized == "/root/workspace/.." || normalized.startsWith("/root/workspace/../") || normalized == "workspace" || normalized == "workspace/*") return "安全防护：禁止执行高危删除操作（工作区根目录删除）"
                 if (normalized == "/tmp" || normalized == "/tmp/*") return "安全防护：禁止执行高危删除操作（系统临时目录整体删除）"
                 if (sysDirs.any { normalized == it || normalized.startsWith("$it/") || normalized.startsWith("$it/*") }) {
                     return "安全防护：禁止执行高危删除操作（系统关键目录删除）"

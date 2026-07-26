@@ -83,7 +83,7 @@ class WorkspaceRepository @Inject constructor(
         _current.value = target
         val location = if (isLocal()) projectsRoot.absolutePath else remoteSshConnection.config?.remoteWorkspacePath ?: ""
         FileLogger.i(TAG, "工作区初始化完成，当前: ${target?.name}，根目录: $location")
-        // 远程模式：选中工作区后更新符号链接，让 Bash 的 /workspace 指向当前工作区
+        // 远程模式：选中工作区后更新符号链接，让 Bash 的 ~/workspace 指向当前工作区
         if (!isLocal() && target != null) {
             remoteSshConnection.updateWorkspaceSymlink(target.path)
         }

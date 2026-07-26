@@ -218,24 +218,30 @@ class ContainerInstaller @Inject constructor(
     }
 
     /**
-     * 按 [profile] 返回 rootfs 目录：内置仍是 [rootfsDir]（不动），自定义用 filesDir/rootfs_<id>。
+     * 按 [profile] 返回 rootfs 目录：内置仍是 [rootfsDir]（不动），自定义本地镜像用 filesDir/rootfs_<id>。
+     * 远程 SSH profile 无本地 rootfs，返回一个占位目录（不会被使用/创建）。
      * 目录隔离——内置与自定义互不共享、互不删除，切回内置时其 rootfs 原封不动。
      */
     fun rootfsDirFor(profile: ContainerProfile): File =
-        if (profile.isBuiltin) rootfsDir else File(context.filesDir, "rootfs_${profile.id}")
+        if (profile.isBuiltin) rootfsDir
+        else File(context.filesDir, "rootfs_${profile.id}")
 
     /** 自定义镜像的已安装标记（独立于内置 .installed，避免混淆）。 */
     private fun customInstalledMarker(profile: ContainerProfile): File =
         File(rootfsDirFor(profile), ".installed_custom")
 
-    /** 按 [profile] 判断是否已安装就绪：内置走现有版本校验，自定义看目录与标记是否存在。 */
+    /** 按 [profile] 判断是否已安装就绪：内置走现有版本校验，自定义本地看目录与标记，远程 SSH 恒就绪。 */
     fun isInstalledFor(profile: ContainerProfile): Boolean =
-        if (profile.isBuiltin) isInstalled()
-        else prootBin.exists() && rootfsDirFor(profile).isDirectory && customInstalledMarker(profile).exists()
+        when {
+            profile.isBuiltin -> isInstalled()
+            profile.rootfsSource is RootfsSource.RemoteSsh -> true
+            else -> prootBin.exists() && rootfsDirFor(profile).isDirectory && customInstalledMarker(profile).exists()
+        }
 
     /**
-     * 按 [profile] 解压安装 rootfs。内置调现有全流程（proot/resolv/apk 源）；自定义只解压 tar.gz + 装 proot，
-     * **不写 resolv.conf / apk 源、不 provision**——镜像源与所需工具由用户自行在容器内处理。
+     * 按 [profile] 解压安装 rootfs。内置调现有全流程（proot/resolv/apk 源）；自定义本地镜像只解压 tar.gz
+     * + 装 proot，**不写 resolv.conf / apk 源、不 provision**——镜像源与所需工具由用户自行在容器内处理。
+     * 远程 SSH profile 无本地 rootfs，直接返回（命令执行走 [RemoteSshEngine]，不需本地 rootfs）。
      */
     suspend fun installRootfsIfNeed(
         profile: ContainerProfile,
@@ -247,6 +253,9 @@ class ContainerInstaller @Inject constructor(
             installRootfsIfNeed(onProgress)
             return@withContext
         }
+
+        // 远程 SSH profile：无本地 rootfs 可解压，视为就绪。
+        if (profile.rootfsSource is RootfsSource.RemoteSsh) return@withContext
 
         val dest = rootfsDirFor(profile)
         FileLogger.i(TAG, "安装自定义容器 rootfs：${profile.id} -> ${dest.absolutePath}")
@@ -267,16 +276,26 @@ class ContainerInstaller @Inject constructor(
                     extractRootfsTo(dest, it, format, onProgress)
                 } ?: FileLogger.w(TAG, "打开导入的 rootfs uri 失败: ${src.uri}")
             }
+            is RootfsSource.RemoteSsh -> { /* 无本地 rootfs，上面已提前 return */ }
         }
         prootTmpDir.mkdirs()
         customInstalledMarker(profile).writeText("custom")
         FileLogger.i(TAG, "自定义容器 rootfs 安装完成：${profile.id}")
     }
 
-    /** 删除自定义 profile 的 rootfs 目录（删 profile 时调用）。内置 rootfs 不可删。 */
+    /** 删除自定义 profile 的 rootfs 目录（删 profile 时调用）。内置 rootfs 不可删，远程 SSH 无 rootfs 可删。 */
     fun deleteCustomRootfs(profile: ContainerProfile) {
         if (profile.isBuiltin) return
+        if (profile.rootfsSource is RootfsSource.RemoteSsh) return
         rootfsDirFor(profile).deleteRecursively()
+    }
+
+    /**
+     * 重置内置 Alpine 容器：删除其 rootfs 目录（含 .installed / .provisioned 标记），
+     * 下次 [ensureInstalled] 会重新解压 + provision。供内置镜像「重置」按钮调用。
+     */
+    fun resetBuiltinRootfs() {
+        if (rootfsDir.exists()) rootfsDir.deleteRecursively()
     }
 
     init {

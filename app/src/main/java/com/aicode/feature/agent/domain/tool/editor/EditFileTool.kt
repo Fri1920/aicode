@@ -62,7 +62,7 @@ class EditFileTool @Inject constructor(
     )
 
     override val parameters = mapOf(
-        "path" to ToolParameter("path", ParameterType.STRING, "文件路径：/workspace/... 为项目文件；其它绝对路径（如 /etc/...、/root/...）为容器系统文件。", required = true),
+        "path" to ToolParameter("path", ParameterType.STRING, "文件路径：~/workspace/... 为项目文件；其它绝对路径（如 /etc/...、/root/...）为容器系统文件。", required = true),
         "edits" to ToolParameter(
             "edits",
             ParameterType.ARRAY,

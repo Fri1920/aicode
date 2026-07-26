@@ -633,12 +633,12 @@ class LinuxContainerEngine @Inject constructor(
             "-0"              // 伪 root，apk 等需要
         )
 
-        // 把当前工作区目录绑定到容器内 /workspace，使命令与文件工具作用于同一目录
+        // 把当前工作区目录绑定到容器内 ~/workspace（即 /root/workspace），使命令与文件工具作用于同一目录
         if (projectPath != null) {
             argv.add("-b")
-            argv.add("$projectPath:/workspace")
+            argv.add("$projectPath:/root/workspace")
             argv.add("-w")
-            argv.add("/workspace")
+            argv.add("/root/workspace")
         }
 
         // 把 AI 配置目录绑定到容器内 /root/.aicode（读写）：内含 skills/（load_skill 读到的指令常引用
@@ -672,7 +672,7 @@ class LinuxContainerEngine @Inject constructor(
             // libc.so/liblog.so 走系统默认路径(/system/lib64)。
             "LD_LIBRARY_PATH" to "${containerInstaller.prootLibDir.absolutePath}:/system/lib64:/system/lib",
             // 说明（statx / seccomp）：旧 proot 5.1.0 的 seccomp 过滤表没有 statx，Node 用 statx 解析
-            // 模块路径会拿到未翻译的 /workspace/xxx → ENOENT「Cannot find module」。Termux proot
+            // 模块路径会拿到未翻译的 ~/workspace/xxx → ENOENT「Cannot find module」。Termux proot
             // (5.1.107.x) 的 seccomp 过滤表已包含 statx，默认 seccomp 模式即可正确翻译，故此处
             // **刻意不设 PROOT_NO_SECCOMP**——这正是 Termux 自己用 proot 的方式；强制全量 ptrace
             // (PROOT_NO_SECCOMP=1) 反而在本设备触发过 ptrace(PEEKDATA) I/O error。

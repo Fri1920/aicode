@@ -23,7 +23,7 @@ data class FileEntry(
  * - `LocalFileAccess`：包一层 [WorkspacePathMapper]，走 java.io.File 直读（本地模式原行为不变）；
  * - `RemoteSftpFileAccess`：用 SFTP 读写远程文件。
  *
- * 路径入参统一为 AI 给的"容器路径"（`/workspace/...`），由实现内部映射到本地宿主路径或远程路径。
+ * 路径入参统一为 AI 给的"容器路径"（`~/workspace/...`），由实现内部映射到本地宿主路径或远程路径。
  * 工具层（FileTools/ImageTools/ListFilesTool/EditFileTool）依赖本接口而非具体实现，
  * 由 DI 按当前执行模式注入对应实例。
  *

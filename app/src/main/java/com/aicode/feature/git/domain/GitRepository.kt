@@ -22,7 +22,7 @@ private const val TAG = "GitRepository"
 /**
  * 在容器内执行 git 命令并解析输出。
  *
- * 直接复用 [LinuxContainerEngine.runCommandSync]（cwd = 当前工作区，绑定挂载到 /workspace），
+ * 直接复用 [LinuxContainerEngine.runCommandSync]（cwd = 当前工作区，绑定挂载到 ~/workspace），
  * 不经 agent 工具链 / 权限引擎——Git 页是用户主动操作。所有输出解析为纯领域模型。
  *
  * 命令经 [shellQuote] 逐参数转义后拼成单条 `git ...` 字符串交给 `/bin/sh -c`，故格式串里的
@@ -556,7 +556,7 @@ class GitRepository @Inject constructor(
     }
 
     /**
-     * 写入提交署名，**优先项目级**：当前工作区（/workspace/.git/config）已有项目级署名时写 local，
+     * 写入提交署名，**优先项目级**：当前工作区（~/workspace/.git/config）已有项目级署名时写 local，
      * 否则写 global（容器 `GIT_CONFIG_GLOBAL=/root/.aicode/.gitconfig`，持久挂载，跨 rootfs 升级不丢）作默认。
      * 这样 UI 与终端 `git config user.name` 读到的同一份——优先项目级、无则退全局，对齐 git 自身解析顺序。
      * 空值跳过对应项不动现有配置。由 UI 在用户保存身份时显式调用。

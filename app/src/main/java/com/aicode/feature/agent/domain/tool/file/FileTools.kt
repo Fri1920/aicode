@@ -22,7 +22,7 @@ class ReadFileTool @Inject constructor(
     override val description = "读取指定路径的文件内容。支持工作区文件或容器绝对路径的系统文件。单次读取受文件大小限制，超大文件可通过 start_line 分段读取。"
     override val capabilities = setOf(ToolCapability.READ_WORKSPACE)
     override val parameters = mapOf(
-        "path" to ToolParameter("path", ParameterType.STRING, "文件路径：/workspace/... 为项目文件；其它绝对路径（如 /etc/...、/root/...）为容器系统文件。", required = true),
+        "path" to ToolParameter("path", ParameterType.STRING, "文件路径：~/workspace/... 为项目文件；其它绝对路径（如 /etc/...、/root/...）为容器系统文件。", required = true),
         "start_line" to ToolParameter("start_line", ParameterType.INTEGER, "开始行号（从 1 计）。", required = false),
         "end_line" to ToolParameter("end_line", ParameterType.INTEGER, "结束行号；与 start_line 的跨度最多 2000 行，超出按 2000 行截断。", required = false)
     )
@@ -125,7 +125,7 @@ class WriteFileTool @Inject constructor(
     override val permissionPolicy = ToolPermissionPolicy.ASK
     override val capabilities = setOf(ToolCapability.WRITE_WORKSPACE)
     override val parameters = mapOf(
-        "path" to ToolParameter("path", ParameterType.STRING, "文件路径：/workspace/... 为项目文件；其它绝对路径（如 /etc/...、/root/...）为容器系统文件。", required = true),
+        "path" to ToolParameter("path", ParameterType.STRING, "文件路径：~/workspace/... 为项目文件；其它绝对路径（如 /etc/...、/root/...）为容器系统文件。", required = true),
         "content" to ToolParameter("content", ParameterType.STRING, "文件内容", required = true),
         "overwrite" to ToolParameter("overwrite", ParameterType.BOOLEAN, "目标已存在时是否覆盖。默认 true；设为 false 时若文件已存在则报错。", required = false)
     )

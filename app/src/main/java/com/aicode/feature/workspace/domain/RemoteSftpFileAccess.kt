@@ -22,7 +22,7 @@ private const val TAG = "RemoteSftpFileAccess"
  * 在 Android 上必现 `ArrayIndexOutOfBoundsException: dstPos=-4`，且崩溃会拖垮整个 SSH transport。
  * exec channel 不走 SFTPEngine，无此问题。`Bash` 工具已验证 exec 可靠。
  *
- * 路径映射：AI 给的 `/workspace/...` 映射到 [RemoteSshConnection.config] 的 `remoteWorkspacePath` + 相对路径。
+ * 路径映射：AI 给的 `~/workspace/...` 映射到 [RemoteSshConnection.config] 的 `remoteWorkspacePath` + 相对路径。
  * 其它绝对路径（如 `/etc/...`）直接作为远程绝对路径使用。
  *
  * 文本文件用 `cat`/重定向读写，二进制文件用 `base64` 中转。
@@ -41,10 +41,12 @@ class RemoteSftpFileAccess @Inject constructor(
     }
 
     /** 把 AI 路径映射到远程服务器上的真实路径。
-     *  /workspace 映射到当前选中工作区（与本地模式 WorkspacePathMapper 行为一致），
+     *  ~/workspace 映射到当前选中工作区（与本地模式 WorkspacePathMapper 行为一致），
      *  其它绝对路径直接作为远程绝对路径使用。 */
     private fun toRemotePath(path: String): String {
         val root = currentWorkspaceRoot().trimEnd('/')
+        // CONTAINER_ROOT 是 ~/workspace，展开 ~ 后做前缀匹配
+        val wsRoot = (connection.remoteHome ?: "~").trimEnd('/') + "/workspace"
         val p = path.trim().let {
             if (it.startsWith("~/")) {
                 val home = connection.remoteHome
@@ -52,9 +54,9 @@ class RemoteSftpFileAccess @Inject constructor(
             } else it
         }
         return when {
-            p == CONTAINER_ROOT || p == "$CONTAINER_ROOT/" -> root
-            p.startsWith("$CONTAINER_ROOT/") ->
-                root + "/" + p.removePrefix("$CONTAINER_ROOT/")
+            p == wsRoot || p == "$wsRoot/" || p == CONTAINER_ROOT || p == "$CONTAINER_ROOT/" -> root
+            p.startsWith("$wsRoot/") ->
+                root + "/" + p.removePrefix("$wsRoot/")
             p.startsWith("/") -> p
             else -> root + "/" + p
         }

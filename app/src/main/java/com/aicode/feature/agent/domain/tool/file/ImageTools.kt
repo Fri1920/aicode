@@ -29,7 +29,7 @@ class ViewImageTool @Inject constructor(
         "path" to ToolParameter(
             name = "path",
             type = ParameterType.STRING,
-            description = "图片路径：/workspace/... 为项目文件；其它绝对路径为容器系统文件；相对路径基于 /workspace。",
+            description = "图片路径：~/workspace/... 为项目文件；其它绝对路径为容器系统文件；相对路径基于 ~/workspace。",
             required = true
         ),
         "detail" to ToolParameter(

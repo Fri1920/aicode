@@ -28,6 +28,8 @@ import com.aicode.feature.settings.data.repository.KeepaliveSettingsRepository
 import com.aicode.feature.settings.data.repository.LogSettingsRepository
 import com.aicode.feature.settings.data.repository.ThemeSettingsRepository
 import com.aicode.feature.settings.data.repository.VisionModelSettingsRepository
+import com.aicode.feature.workspace.domain.model.RemoteConnection
+import com.aicode.feature.workspace.domain.repository.RemoteRepository
 import com.aicode.feature.settings.domain.model.AIProviderConfig
 import com.aicode.feature.settings.domain.model.ModelMetadata
 import com.aicode.feature.settings.domain.model.ProviderType
@@ -80,7 +82,8 @@ class SettingsViewModel @Inject constructor(
     private val containerInstaller: ContainerInstaller,
     private val executionModeRepository: ExecutionModeRepository,
     private val executionModeHolder: ExecutionModeHolder,
-    private val remoteSshConnection: RemoteSshConnection
+    private val remoteSshConnection: RemoteSshConnection,
+    private val remoteRepository: RemoteRepository
 ) : ViewModel() {
     private companion object {
         const val MAX_LOG_LINES = 1200
@@ -150,16 +153,15 @@ class SettingsViewModel @Inject constructor(
         .map { listOf(ContainerProfile.BUILTIN_ALPINE) + it }
         .stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.Eagerly, listOf(ContainerProfile.BUILTIN_ALPINE))
 
-    /** 当前执行模式（本地 PRoot / 远程 SSH）。 */
-    private val _executionMode = MutableStateFlow(ExecutionMode.LOCAL_PROOT)
-    val executionMode: StateFlow<ExecutionMode> = _executionMode.asStateFlow()
-
-    /** 远程 SSH 连接配置。 */
-    private val _remoteConnection = MutableStateFlow<com.aicode.feature.settings.data.repository.RemoteConnectionSettings?>(null)
-    val remoteConnection: StateFlow<com.aicode.feature.settings.data.repository.RemoteConnectionSettings?> = _remoteConnection.asStateFlow()
+    /** 当前执行模式（本地 PRoot / 远程 SSH），供 UI 判断是否显示远程连接指示器。 */
+    val executionMode: StateFlow<ExecutionMode> = executionModeHolder.mode
 
     /** 远程 SSH 连接状态，供 UI 显示指示器。 */
     val connectionState: StateFlow<ConnectionState> = remoteSshConnection.connectionState
+
+    /** 工作区已配置的远程连接通道，供容器镜像 SSH 模式下拉复用。 */
+    val remoteConnections: StateFlow<List<RemoteConnection>> = remoteRepository.getConnections()
+        .stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.Eagerly, emptyList())
 
     init {
         viewModelScope.launch {
@@ -221,18 +223,6 @@ class SettingsViewModel @Inject constructor(
             launch {
                 containerSettingsRepository.customProfilesFlow.collectLatest {
                     _customProfiles.value = it
-                }
-            }
-
-            launch {
-                executionModeRepository.executionModeFlow.collectLatest {
-                    _executionMode.value = it
-                }
-            }
-
-            launch {
-                executionModeRepository.remoteConnectionFlow.collectLatest {
-                    _remoteConnection.value = it
                 }
             }
 
@@ -391,33 +381,60 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
-    /** 切换当前选中的容器 profile。 */
+    /**
+     * 切换当前选中的容器 profile，并按其 [ContainerProfile.mode] 同步切全局执行模式。
+     *
+     * 本地镜像 → [ExecutionMode.LOCAL_PROOT]；远程 SSH 镜像 → [ExecutionMode.REMOTE_SSH]，
+     * 并据其 [RootfsSource.RemoteSsh] 绑定的工作区通道构造 [RemoteConnectionSettings] 持久化 + 触发 SSH 连接。
+     * 委托层每次调用读 holder，切换即时生效，无需重启。
+     */
     fun setActiveContainerProfile(id: String) {
         viewModelScope.launch {
+            val profile = _customProfiles.value.firstOrNull { it.id == id }
+                ?: ContainerProfile.BUILTIN_ALPINE.takeIf { it.id == id }
+                ?: return@launch
             containerSettingsRepository.setActiveProfile(id)
+            when (profile.mode) {
+                ExecutionMode.LOCAL_PROOT -> {
+                    executionModeRepository.setExecutionMode(ExecutionMode.LOCAL_PROOT)
+                    executionModeHolder.setMode(ExecutionMode.LOCAL_PROOT)
+                }
+
+                ExecutionMode.REMOTE_SSH -> {
+                    val ssh = profile.rootfsSource as? RootfsSource.RemoteSsh ?: return@launch
+                    val conn = remoteConnections.value.firstOrNull { it.id == ssh.connectionId }
+                        ?: return@launch
+                    val settings = com.aicode.feature.settings.data.repository.RemoteConnectionSettings(
+                        host = conn.host,
+                        port = conn.port,
+                        username = conn.username,
+                        password = conn.password,
+                        remoteWorkspacePath = ssh.remoteWorkspacePath.ifBlank { "/home/${conn.username}/workspace" }
+                    )
+                    executionModeRepository.setRemoteConnection(settings)
+                    executionModeRepository.setExecutionMode(ExecutionMode.REMOTE_SSH)
+                    executionModeHolder.setMode(ExecutionMode.REMOTE_SSH)
+                    // 运行时切换需主动连接（启动时由 AIEditorApp 连）；复用 RemoteSshConnection.connect
+                    runCatching {
+                        remoteSshConnection.connect(
+                            com.aicode.feature.agent.domain.container.RemoteConnectionConfig(
+                                host = settings.host,
+                                port = settings.port,
+                                username = settings.username,
+                                auth = com.aicode.feature.workspace.domain.remote.RemoteAuth.Password(settings.password),
+                                remoteWorkspacePath = settings.remoteWorkspacePath
+                            )
+                        )
+                    }.onFailure { FileLogger.w("SettingsViewModel", "切换到远程镜像时 SSH 连接失败", it) }
+                }
+            }
         }
     }
 
-    /** 切换执行模式（本地 PRoot / 远程 SSH）。委托层每次调用读 holder，切换即时生效，无需重启。 */
-    fun setExecutionMode(mode: ExecutionMode) {
+    /** 重置内置 Alpine 容器：删除其 rootfs，下次启动重新解压 + provision。 */
+    fun resetBuiltinContainer() {
         viewModelScope.launch {
-            executionModeRepository.setExecutionMode(mode)
-            executionModeHolder.setMode(mode)
-        }
-    }
-
-    /** App 回到前台时，远程模式下若 SSH 断了立即触发重连。 */
-    fun retryConnectionIfDisconnected() {
-        if (executionModeHolder.currentMode() != ExecutionMode.REMOTE_SSH) return
-        viewModelScope.launch {
-            remoteSshConnection.tryReconnectIfDisconnected()
-        }
-    }
-
-    /** 保存远程 SSH 连接配置。 */
-    fun setRemoteConnection(settings: com.aicode.feature.settings.data.repository.RemoteConnectionSettings) {
-        viewModelScope.launch {
-            executionModeRepository.setRemoteConnection(settings)
+            containerInstaller.resetBuiltinRootfs()
         }
     }
 
@@ -448,6 +465,11 @@ class SettingsViewModel @Inject constructor(
             containerInstaller.deleteCustomRootfs(profile)
             if (_activeProfileId.value == profile.id) {
                 containerSettingsRepository.setActiveProfile(ContainerProfile.BUILTIN_ID)
+                // 删的是当前激活的远程镜像：回退到内置本地镜像，同步切回本地模式
+                if (profile.mode == ExecutionMode.REMOTE_SSH) {
+                    executionModeRepository.setExecutionMode(ExecutionMode.LOCAL_PROOT)
+                    executionModeHolder.setMode(ExecutionMode.LOCAL_PROOT)
+                }
             }
         }
     }

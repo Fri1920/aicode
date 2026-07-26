@@ -86,9 +86,9 @@ class TerminalSessionManager @Inject constructor(
         ensureContainer()
         val id = nextId()
         val session = buildSession(
-            // -w 已把 cwd 设为 /workspace，cd 仅作兜底；裸 sh/bash 在 tty 上自动进交互模式，
+            // -w 已把 cwd 设为 /root/workspace，cd 仅作兜底；裸 sh/bash 在 tty 上自动进交互模式，
             // 靠 ENV=/etc/profile 加载登录环境；exec 让 shell 取代外层 sh -c 成为前台交互 shell。
-            shellCommand = "cd /workspace 2>/dev/null; export ENV=/etc/profile; exec ${containerEngine.defaultShell()}"
+            shellCommand = "cd ~/workspace 2>/dev/null; export ENV=/etc/profile; exec ${containerEngine.defaultShell()}"
         )
         addTab(
             TerminalTab(
@@ -122,7 +122,7 @@ class TerminalSessionManager @Inject constructor(
         // notify=true：命令结束后不 exec 保活 shell，让 session 自然结束以触发 onFinished 回调。
         // notify=false：命令结束后 exec 默认 shell 保活，使标签可复用（dev server 退出后也能继续输入）。
         val afterCommand = if (notify) "" else "; exec ${containerEngine.defaultShell()}"
-        val shellCommand = "cd /workspace 2>/dev/null; export ENV=/etc/profile; " +
+        val shellCommand = "cd ~/workspace 2>/dev/null; export ENV=/etc/profile; " +
             "$command; echo \"[command exited: \$?]\"$afterCommand"
         val session = buildSession(shellCommand)
         addTab(
@@ -234,7 +234,7 @@ class TerminalSessionManager @Inject constructor(
         val old = tab(id) ?: return
         runCatching { old.session.finishIfRunning() }
         ensureContainer()
-        val session = buildSession("cd /workspace 2>/dev/null; export ENV=/etc/profile; exec ${containerEngine.defaultShell()}")
+        val session = buildSession("cd ~/workspace 2>/dev/null; export ENV=/etc/profile; exec ${containerEngine.defaultShell()}")
         val newTab = TerminalTab(
             id = old.id,
             title = old.title,
