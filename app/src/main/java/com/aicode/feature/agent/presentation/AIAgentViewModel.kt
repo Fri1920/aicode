@@ -108,13 +108,14 @@ class AIAgentViewModel @Inject constructor(
 
     private val _currentWorkspace = MutableStateFlow<String>("")
     fun setWorkspace(path: String) {
-        if (_currentWorkspace.value == path) return
+        if (path.isBlank() || _currentWorkspace.value == path) return
         _currentWorkspace.value = path
     }
 
     val sessions: StateFlow<List<ChatSession>> = _currentWorkspace
         .flatMapLatest { path ->
-            chatSessionDao.getAllSessionsByWorkspace(path)
+            if (path.isBlank()) flowOf(emptyList())
+            else chatSessionDao.getAllSessionsByWorkspace(path)
                 .map { list -> list.map { it.toDomain() } }
         }
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
@@ -283,6 +284,7 @@ class AIAgentViewModel @Inject constructor(
             sessionUseCase.initColdStartCleanup()
 
             _currentWorkspace.collectLatest { path ->
+                if (path.isBlank()) return@collectLatest
                 val existing = sessionUseCase.getFirstSessionOfWorkspace(path)
                 _currentSessionId.value = if (existing != null) {
                     existing.id // ORDER BY updatedAt DESC：最近一条
@@ -356,6 +358,10 @@ class AIAgentViewModel @Inject constructor(
         targetSessionId: String? = null
     ): Job = viewModelScope.launch {
         val sessionId = targetSessionId ?: ensureSession()
+        if (sessionId.isBlank()) {
+            FileLogger.w(TAG, "工作区未就绪，跳过请求")
+            return@launch
+        }
         sessionJobs[sessionId] = coroutineContext[Job]!!
         setAgentState(sessionId, AgentUIState.Loading)
 
@@ -481,6 +487,10 @@ class AIAgentViewModel @Inject constructor(
         isAutoTrigger: Boolean = false
     ): Job = viewModelScope.launch {
         val sessionId = targetSessionId ?: ensureSession()
+        if (sessionId.isBlank()) {
+            FileLogger.w(TAG, "工作区未就绪，跳过请求")
+            return@launch
+        }
         sessionJobs[sessionId] = coroutineContext[Job]!!
         setAgentState(sessionId, AgentUIState.Streaming)
 
@@ -730,6 +740,7 @@ class AIAgentViewModel @Inject constructor(
 
     /** 新建会话；若当前会话还是空的则直接复用，避免堆积空会话。 */
     fun newSession() = viewModelScope.launch {
+        if (_currentWorkspace.value.isBlank()) return@launch
         val curId = _currentSessionId.value
         if (curId != null && sessionUseCase.isSessionEmpty(curId)) {
             setAgentState(curId, AgentUIState.Idle)
@@ -864,20 +875,27 @@ class AIAgentViewModel @Inject constructor(
         _queuedRequests.value = _queuedRequests.value - id
 
         if (_currentSessionId.value == id) {
-            val remaining = sessionUseCase.getFirstSessionOfWorkspace(_currentWorkspace.value)
-            if (remaining != null) {
-                _currentSessionId.value = remaining.id
+            val ws = _currentWorkspace.value
+            if (ws.isBlank()) {
+                _currentSessionId.value = null
             } else {
-                val s = sessionUseCase.newSessionEntity(_currentWorkspace.value)
-                sessionUseCase.upsertSession(s)
-                _currentSessionId.value = s.id
+                val remaining = sessionUseCase.getFirstSessionOfWorkspace(ws)
+                if (remaining != null) {
+                    _currentSessionId.value = remaining.id
+                } else {
+                    val s = sessionUseCase.newSessionEntity(ws)
+                    sessionUseCase.upsertSession(s)
+                    _currentSessionId.value = s.id
+                }
             }
         }
     }
 
     private suspend fun ensureSession(): String {
         _currentSessionId.value?.let { return it }
-        val existing = sessionUseCase.getFirstSessionOfWorkspace(_currentWorkspace.value)
+        val ws = _currentWorkspace.value
+        if (ws.isBlank()) return ""
+        val existing = sessionUseCase.getFirstSessionOfWorkspace(ws)
         val id = if (existing != null) existing.id else {
             val s = sessionUseCase.newSessionEntity(_currentWorkspace.value)
             sessionUseCase.upsertSession(s)

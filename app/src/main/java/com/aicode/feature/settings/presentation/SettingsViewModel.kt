@@ -406,6 +406,14 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
+    /** App 回到前台时，远程模式下若 SSH 断了立即触发重连。 */
+    fun retryConnectionIfDisconnected() {
+        if (executionModeHolder.currentMode() != ExecutionMode.REMOTE_SSH) return
+        viewModelScope.launch {
+            remoteSshConnection.tryReconnectIfDisconnected()
+        }
+    }
+
     /** 保存远程 SSH 连接配置。 */
     fun setRemoteConnection(settings: com.aicode.feature.settings.data.repository.RemoteConnectionSettings) {
         viewModelScope.launch {

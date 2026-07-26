@@ -74,10 +74,10 @@ class GitRepository @Inject constructor(
         return engine.runCommandSync(cmd, workspaceRepository.currentPath())
     }
 
-    /** 当前工作区是否处于一个 git 工作树内。 */
+    /** 当前工作区是否处于一个 git 工作树内。SSH 未连接等异常时返回 false 而非抛出，避免 UI 崩溃。 */
     suspend fun isRepo(): Boolean {
-        val out = git("rev-parse", "--is-inside-work-tree")
-        return out.trim() == "true"
+        return runCatching { git("rev-parse", "--is-inside-work-tree").trim() == "true" }
+            .getOrElse { false }
     }
 
     /** 在当前工作区初始化 git 仓库（`git init`）。据退出码判成败，失败抛 [GitCommandFailureException]。 */

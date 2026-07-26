@@ -528,7 +528,6 @@ fun AIChatPanel(
     val sv = settingsViewModel
     val executionMode = sv?.executionMode?.collectAsStateWithLifecycle()?.value
     val connectionState = sv?.connectionState?.collectAsStateWithLifecycle()?.value
-    val remoteHost = sv?.remoteConnection?.collectAsStateWithLifecycle()?.value?.host
     val isRemote = executionMode == com.aicode.feature.settings.data.repository.ExecutionMode.REMOTE_SSH
 
     Scaffold(
@@ -549,8 +548,7 @@ fun AIChatPanel(
                 onNavigateToGit = onNavigateToGit,
                 currentMode = currentMode,
                 onToggleMode = { viewModel.setSessionMode(it) },
-                connectionState = connectionState?.takeIf { isRemote },
-                remoteHost = remoteHost?.takeIf { isRemote }
+                connectionState = connectionState?.takeIf { isRemote }
             )
         }
     ) { padding ->
@@ -844,8 +842,7 @@ internal fun ChatHeader(
     onNavigateToGit: () -> Unit,
     currentMode: AgentMode,
     onToggleMode: (AgentMode) -> Unit,
-    connectionState: com.aicode.feature.agent.domain.container.ConnectionState? = null,
-    remoteHost: String? = null
+    connectionState: com.aicode.feature.agent.domain.container.ConnectionState? = null
 ) {
     Surface(
         color = MaterialTheme.colorScheme.background
@@ -886,12 +883,6 @@ internal fun ChatHeader(
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
-                        if (connectionState != null) {
-                            ConnectionIndicator(
-                                state = connectionState,
-                                host = remoteHost
-                            )
-                        }
                     }
                 }
                 IconButton(onClick = onNewChat) {
@@ -913,24 +904,39 @@ internal fun ChatHeader(
                         tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
+            // 远程模式：左边 SSH 连接状态，右边 token 累计统计
+            if (connectionState != null) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = Spacing.md, vertical = Spacing.xs),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    ConnectionIndicator(state = connectionState)
+                    TokenStats(
+                        inputTokens = inputTokens,
+                        outputTokens = outputTokens
+                    )
+                }
+            }
         }
     }
 }
 
 @Composable
 private fun ConnectionIndicator(
-    state: com.aicode.feature.agent.domain.container.ConnectionState,
-    host: String?
+    state: com.aicode.feature.agent.domain.container.ConnectionState
 ) {
     val (dotColor, text) = when (state) {
         com.aicode.feature.agent.domain.container.ConnectionState.CONNECTED ->
-            MaterialTheme.colorScheme.primary to "已连接${host?.let { " $it" } ?: ""}"
+            MaterialTheme.colorScheme.primary to "SSH：已连接"
         com.aicode.feature.agent.domain.container.ConnectionState.CONNECTING ->
-            MaterialTheme.colorScheme.tertiary to "连接中…"
+            MaterialTheme.colorScheme.tertiary to "SSH：连接中…"
         com.aicode.feature.agent.domain.container.ConnectionState.FAILED ->
-            MaterialTheme.colorScheme.error to "连接失败"
+            MaterialTheme.colorScheme.error to "SSH：连接失败"
         com.aicode.feature.agent.domain.container.ConnectionState.DISCONNECTED ->
-            MaterialTheme.colorScheme.outline to "未连接"
+            MaterialTheme.colorScheme.outline to "SSH：未连接"
     }
     Row(
         verticalAlignment = Alignment.CenterVertically,
@@ -950,6 +956,17 @@ private fun ConnectionIndicator(
             overflow = TextOverflow.Ellipsis
         )
     }
+}
+
+@Composable
+private fun TokenStats(inputTokens: Int, outputTokens: Int) {
+    val inStr = formatTokenCount(inputTokens)
+    val outStr = formatTokenCount(outputTokens)
+    Text(
+        text = "↑$inStr ↓$outStr",
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant
+    )
 }
 
 @Composable

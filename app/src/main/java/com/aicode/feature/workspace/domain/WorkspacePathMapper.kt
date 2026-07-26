@@ -36,6 +36,9 @@ class WorkspacePathMapper @Inject constructor(
     private val containerInstaller: ContainerInstaller,
     private val containerSettingsRepository: ContainerSettingsRepository
 ) {
+    /** 容器内真实 home 路径（容器就绪后查 $HOME 缓存），供展开 ~。未就绪前回退 /root。 */
+    @Volatile
+    var containerHome: String? = null
     companion object {
         const val CONTAINER_ROOT = "/workspace"
         /** AI 配置目录在容器内的路径，绑定到宿主 [ContainerInstaller.aicodeDir]（独立于 rootfs）。 */
@@ -86,7 +89,12 @@ class WorkspacePathMapper @Inject constructor(
      */
     fun toHostFile(path: String): File {
         val root = hostRoot()
-        val p = path.trim().let { if (it.startsWith("~/")) "/root/" + it.removePrefix("~/") else it }
+        val p = path.trim().let {
+            if (it.startsWith("~/")) {
+                val home = containerHome
+                if (home != null) home.trimEnd('/') + "/" + it.removePrefix("~/") else "/root/" + it.removePrefix("~/")
+            } else it
+        }
         val file = when {
             p == CONTAINER_ROOT || p == "$CONTAINER_ROOT/" -> root
             p.startsWith("$CONTAINER_ROOT/") -> File(root, p.removePrefix("$CONTAINER_ROOT/"))

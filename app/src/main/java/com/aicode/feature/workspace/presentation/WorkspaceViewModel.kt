@@ -33,16 +33,16 @@ class WorkspaceViewModel @Inject constructor(
     }
 
     fun selectWorkspace(name: String) = viewModelScope.launch {
-        repository.selectWorkspace(name)
+        runCatching { repository.selectWorkspace(name) }
     }
 
     fun createWorkspace(name: String, onResult: (Workspace?) -> Unit = {}) = viewModelScope.launch {
-        val ws = repository.createWorkspace(name)
-        if (ws != null) repository.selectWorkspace(ws.name)
+        val ws = runCatching { repository.createWorkspace(name) }.getOrNull()
+        if (ws != null) runCatching { repository.selectWorkspace(ws.name) }
         onResult(ws)
     }
 
     fun deleteWorkspace(name: String) = viewModelScope.launch {
-        repository.deleteWorkspace(name)
+        runCatching { repository.deleteWorkspace(name) }
     }
 }

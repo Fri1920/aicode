@@ -1,6 +1,7 @@
 package com.aicode.feature.agent.domain.container
 
 import com.aicode.core.util.FileLogger
+import com.aicode.feature.workspace.domain.WorkspacePathMapper
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -69,7 +70,8 @@ data class ProotInvocation(
 @Singleton
 class LinuxContainerEngine @Inject constructor(
     private val containerInstaller: ContainerInstaller,
-    private val containerSettingsRepository: com.aicode.feature.settings.data.repository.ContainerSettingsRepository
+    private val containerSettingsRepository: com.aicode.feature.settings.data.repository.ContainerSettingsRepository,
+    private val workspacePathMapper: WorkspacePathMapper
 ) : CommandEngine {
     /** 容器初始化的实时进度，供所有入口（终端页/AI/后台终端/MCP）共享同一份状态。 */
     private val _initProgress = MutableStateFlow<ContainerInitState>(ContainerInitState.Idle)
@@ -526,6 +528,7 @@ class LinuxContainerEngine @Inject constructor(
         containerInstaller.extractDocs()
         if (containerInstaller.isInstalledFor(profile) && isProvisioned()) {
             _initProgress.value = ContainerInitState.Ready
+            refreshContainerHome()
             return@withLock
         }
         // installRootfsIfNeed 在真正解压/部署时回调更新进度（已安装则快路径不回调）
@@ -534,6 +537,16 @@ class LinuxContainerEngine @Inject constructor(
         _initProgress.value =
             if (containerInstaller.isInstalledFor(profile)) ContainerInitState.Ready
             else ContainerInitState.Failed("容器未安装（缺少 rootfs/proot）")
+        if (containerInstaller.isInstalledFor(profile)) refreshContainerHome()
+    }
+
+    /** 查容器内 $HOME 并缓存到 [WorkspacePathMapper]，供文件工具展开 ~。 */
+    private suspend fun refreshContainerHome() {
+        runCatching {
+            val result = execCaptured("echo \$HOME", projectPath = null, timeoutMs = 3000)
+            val home = result.output.trim().ifEmpty { null }
+            if (home != null) workspacePathMapper.containerHome = home
+        }.onFailure { FileLogger.w(TAG, "查容器 \$HOME 失败", it) }
     }
 
     /**

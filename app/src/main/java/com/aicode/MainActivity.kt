@@ -68,6 +68,13 @@ class MainActivity : ComponentActivity() {
     @Inject
     lateinit var themeSettings: ThemeSettingsRepository
 
+    /** App 回到前台时，远程模式下若 SSH 断了触发重连。 */
+    @Inject
+    lateinit var remoteSshConnection: com.aicode.feature.agent.domain.container.RemoteSshConnection
+
+    @Inject
+    lateinit var executionModeHolder: com.aicode.feature.settings.data.repository.ExecutionModeHolder
+
     /** 三端（UI/AI Bash/交互终端）git 缺凭据统一弹窗桥：在 AIEditorApp 启动后监听 helper 的文件 IPC 请求。 */
     @Inject
     lateinit var credentialRequestBridge: com.aicode.feature.credentials.data.CredentialRequestBridge
@@ -130,6 +137,16 @@ class MainActivity : ComponentActivity() {
         lifecycleScope.launch {
             if (keepaliveSettings.isEnabled()) {
                 TerminalKeepaliveService.enablePersistent(this@MainActivity)
+            }
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // 远程模式回到前台时，若 SSH 断了立即触发重连，不等 supervisor 轮询
+        if (executionModeHolder.currentMode() == com.aicode.feature.settings.data.repository.ExecutionMode.REMOTE_SSH) {
+            lifecycleScope.launch {
+                runCatching { remoteSshConnection.tryReconnectIfDisconnected() }
             }
         }
     }

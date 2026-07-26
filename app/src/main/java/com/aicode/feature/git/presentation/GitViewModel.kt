@@ -156,11 +156,11 @@ class GitViewModel @Inject constructor(
         if (_state.value.busy) return
         _state.update { it.copy(loading = true, toast = null) }
         viewModelScope.launch {
-            if (!repository.isRepo()) {
-                _state.update { it.copy(loading = false, notARepo = true) }
-                return@launch
-            }
             try {
+                if (!repository.isRepo()) {
+                    _state.update { it.copy(loading = false, notARepo = true) }
+                    return@launch
+                }
                 val snap = loadSnapshot(includeIdentity = true)
                 val commits = snap.graph.commits.map { GitCommit(it.hash, it.shortHash, it.author, it.date, it.message) }
                 _state.update {

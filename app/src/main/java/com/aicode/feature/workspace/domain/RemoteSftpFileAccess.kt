@@ -2,6 +2,7 @@ package com.aicode.feature.workspace.domain
 
 import com.aicode.core.util.FileLogger
 import com.aicode.feature.agent.domain.container.RemoteSshConnection
+import com.aicode.feature.agent.domain.container.friendlySshError
 import com.aicode.feature.workspace.data.repository.WorkspaceRepository
 import com.aicode.feature.workspace.domain.WorkspacePathMapper.Companion.CONTAINER_ROOT
 import kotlinx.coroutines.runBlocking
@@ -44,7 +45,12 @@ class RemoteSftpFileAccess @Inject constructor(
      *  其它绝对路径直接作为远程绝对路径使用。 */
     private fun toRemotePath(path: String): String {
         val root = currentWorkspaceRoot().trimEnd('/')
-        val p = path.trim().let { if (it.startsWith("~/")) "/home/${connection.config?.username}/" + it.removePrefix("~/") else it }
+        val p = path.trim().let {
+            if (it.startsWith("~/")) {
+                val home = connection.remoteHome
+                if (home != null) home.trimEnd('/') + "/" + it.removePrefix("~/") else it
+            } else it
+        }
         return when {
             p == CONTAINER_ROOT || p == "$CONTAINER_ROOT/" -> root
             p.startsWith("$CONTAINER_ROOT/") ->
@@ -67,10 +73,14 @@ class RemoteSftpFileAccess @Inject constructor(
     /** 单引号转义：远程路径含单引号时用 `'\''` 绕过，保证 shell 命令安全。 */
     private fun shellQuote(s: String): String = "'" + s.replace("'", "'\\''") + "'"
 
-    /** 同步执行远程命令并返回完整 stdout。失败时抛异常。 */
+    /** 同步执行远程命令并返回完整 stdout。失败时抛友好异常。 */
     private fun execSync(command: String): String = runBlocking {
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-            val session = connection.startExecSession(command)
+            val session = try {
+                connection.startExecSession(command)
+            } catch (e: Exception) {
+                throw RuntimeException(friendlySshError(e), e)
+            }
             try {
                 val reader = BufferedReader(InputStreamReader(session.inputStream))
                 val output = reader.readText()
@@ -91,7 +101,12 @@ class RemoteSftpFileAccess @Inject constructor(
     /** 同步执行远程命令，返回退出码（不抛异常）。 */
     private fun execExitCode(command: String): Int = runBlocking {
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-            val session = connection.startExecSession(command)
+            val session = try {
+                connection.startExecSession(command)
+            } catch (e: Exception) {
+                FileLogger.w(TAG, friendlySshError(e), e)
+                return@withContext -1
+            }
             try {
                 BufferedReader(InputStreamReader(session.inputStream)).readText()
                 runCatching { session.close() }
