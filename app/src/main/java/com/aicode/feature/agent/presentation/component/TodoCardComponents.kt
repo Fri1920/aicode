@@ -43,6 +43,8 @@ import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import androidx.compose.ui.res.stringResource
+import com.aicode.R
 
 /** 解析后的待办列表快照 */
 internal data class ParsedTodoResult(
@@ -134,7 +136,7 @@ internal fun TodoItemRow(item: ParsedTodoItem) {
             isCompleted -> {
                 Icon(
                     imageVector = FeatherIcons.Check,
-                    contentDescription = "已完成",
+                    contentDescription = stringResource(R.string.todo_completed),
                     tint = DiffAddText,
                     modifier = Modifier.size(16.dp)
                 )
@@ -188,7 +190,7 @@ internal fun TodoItemRow(item: ParsedTodoItem) {
                 color = MaterialTheme.colorScheme.primaryContainer
             ) {
                 Text(
-                    text = "进行中",
+                    text = stringResource(R.string.todo_in_progress),
                     color = MaterialTheme.colorScheme.onPrimaryContainer,
                     style = MaterialTheme.typography.labelSmall,
                     modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.dp)

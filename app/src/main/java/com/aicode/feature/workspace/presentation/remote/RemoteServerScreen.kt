@@ -15,6 +15,8 @@ import com.aicode.feature.workspace.domain.model.RemoteConnection
 import com.aicode.feature.workspace.domain.model.RemoteMount
 import compose.icons.FeatherIcons
 import compose.icons.feathericons.*
+import androidx.compose.ui.res.stringResource
+import com.aicode.R
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -39,10 +41,10 @@ fun RemoteServerScreen(
             Column {
                 TopAppBar(
                     colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
-                    title = { Text("远程工作区") },
+                    title = { Text(stringResource(R.string.remote_workspace_title)) },
                     navigationIcon = {
                         IconButton(onClick = onNavigateBack) {
-                            Icon(FeatherIcons.ArrowLeft, contentDescription = "返回")
+                            Icon(FeatherIcons.ArrowLeft, contentDescription = stringResource(R.string.common_back))
                         }
                     }
                 )
@@ -50,22 +52,22 @@ fun RemoteServerScreen(
                     Tab(
                         selected = selectedTab == 0,
                         onClick = { selectedTab = 0 },
-                        text = { Text("连接配置") }
+                        text = { Text(stringResource(R.string.remote_tab_connections)) }
                     )
                     Tab(
                         selected = selectedTab == 1,
                         onClick = { selectedTab = 1 },
-                        text = { Text("工作区") }
+                        text = { Text(stringResource(R.string.common_workspace)) }
                     )
                     Tab(
                         selected = selectedTab == 2,
                         onClick = { selectedTab = 2 },
-                        text = { Text("内置FTP") }
+                        text = { Text(stringResource(R.string.remote_tab_ftp)) }
                     )
                     Tab(
                         selected = selectedTab == 3,
                         onClick = { selectedTab = 3 },
-                        text = { Text("同步设置") }
+                        text = { Text(stringResource(R.string.remote_tab_sync)) }
                     )
                 }
             }
@@ -81,7 +83,7 @@ fun RemoteServerScreen(
                         showAddMountDialog = true
                     }
                 }) {
-                    Icon(FeatherIcons.Plus, contentDescription = "添加")
+                    Icon(FeatherIcons.Plus, contentDescription = stringResource(R.string.common_add))
                 }
             }
         }
@@ -90,7 +92,7 @@ fun RemoteServerScreen(
             if (selectedTab == 0) {
                 if (uiState.connections.isEmpty()) {
                     Text(
-                        text = "暂无连接配置，请点击添加。",
+                        text = stringResource(R.string.remote_no_connections),
                         modifier = Modifier.align(Alignment.Center),
                         style = MaterialTheme.typography.bodyLarge
                     )
@@ -115,7 +117,7 @@ fun RemoteServerScreen(
             } else if (selectedTab == 1) {
                 if (uiState.mounts.isEmpty()) {
                     Text(
-                        text = "暂无工作区，请点击添加。",
+                        text = stringResource(R.string.remote_no_workspaces),
                         modifier = Modifier.align(Alignment.Center),
                         style = MaterialTheme.typography.bodyLarge
                     )
@@ -165,7 +167,7 @@ fun RemoteServerScreen(
                     modifier = Modifier.align(Alignment.BottomCenter).padding(16.dp),
                     action = {
                         TextButton(onClick = { viewModel.clearError() }) {
-                            Text("关闭")
+                            Text(stringResource(R.string.common_close))
                         }
                     }
                 ) {
@@ -199,11 +201,11 @@ fun RemoteServerScreen(
                 containerColor = MaterialTheme.colorScheme.surface,
                 tonalElevation = 0.dp,
                 onDismissRequest = { showAddMountDialog = false },
-                title = { Text("提示") },
-                text = { Text("请先在「连接配置」中添加一个远程通道。") },
+                title = { Text(stringResource(R.string.remote_hint_title)) },
+                text = { Text(stringResource(R.string.remote_add_channel_first)) },
                 confirmButton = {
                     TextButton(onClick = { showAddMountDialog = false; selectedTab = 0 }) {
-                        Text("去添加")
+                        Text(stringResource(R.string.remote_go_add))
                     }
                 }
             )

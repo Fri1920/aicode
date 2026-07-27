@@ -59,6 +59,8 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import androidx.compose.ui.res.stringResource
+import com.aicode.R
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -93,7 +95,7 @@ class MainActivity : ComponentActivity() {
         if (!granted) {
             Toast.makeText(
                 this,
-                "未授予存储权限，本地镜像目录可能无法写入。",
+                getString(R.string.main_no_storage_permission),
                 Toast.LENGTH_LONG
             ).show()
         }

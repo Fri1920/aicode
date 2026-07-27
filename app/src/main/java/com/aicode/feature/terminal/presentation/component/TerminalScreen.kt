@@ -39,6 +39,7 @@ import androidx.compose.runtime.Composable
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import android.content.Context
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -57,6 +58,9 @@ import com.aicode.feature.terminal.presentation.TerminalViewModel
 import com.termux.view.TerminalView
 import compose.icons.FeatherIcons
 import compose.icons.feathericons.*
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import com.aicode.R
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -65,6 +69,7 @@ fun TerminalScreen(
     onNavigateBack: () -> Unit
 ) {
     val prepareState by viewModel.prepareState.collectAsStateWithLifecycle()
+    val context = LocalContext.current
     val containerInit by viewModel.containerInit.collectAsStateWithLifecycle()
     val tabs by viewModel.tabs.collectAsStateWithLifecycle()
     val activeTabId by viewModel.activeTabId.collectAsStateWithLifecycle()
@@ -76,21 +81,21 @@ fun TerminalScreen(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
             TopAppBar(
-                title = { Text("终端") },
+                title = { Text(stringResource(R.string.terminal_title)) },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.surface,
                     titleContentColor = MaterialTheme.colorScheme.onBackground
                 ),
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(FeatherIcons.ArrowLeft, contentDescription = "返回")
+                        Icon(FeatherIcons.ArrowLeft, contentDescription = stringResource(R.string.common_back))
                     }
                 },
                 actions = {
                     IconButton(onClick = { viewModel.reconnectActive() }) {
                         Icon(
                             FeatherIcons.RefreshCw,
-                            contentDescription = "重连当前标签",
+                            contentDescription = stringResource(R.string.terminal_reconnect_tab),
                             tint = androidx.compose.ui.graphics.Color(0xFF424242))
                     }
                 }
@@ -106,13 +111,13 @@ fun TerminalScreen(
             when (val state = prepareState) {
                 is TerminalViewModel.PrepareState.Loading -> StatusView(
                     loading = true,
-                    message = containerInitMessage(containerInit)
+                    message = containerInitMessage(context, containerInit)
                 )
 
                 is TerminalViewModel.PrepareState.Error -> StatusView(
                     loading = false,
-                    message = "无法启动终端：\n${state.message}",
-                    actionLabel = "重试",
+                    message = stringResource(R.string.terminal_start_failed, state.message),
+                    actionLabel = stringResource(R.string.terminal_retry),
                     onAction = { viewModel.prepare() }
                 )
 
@@ -133,8 +138,8 @@ fun TerminalScreen(
                         if (active == null) {
                             StatusView(
                                 loading = false,
-                                message = "没有打开的终端标签",
-                                actionLabel = "新建标签",
+                                message = stringResource(R.string.terminal_no_open_tabs),
+                                actionLabel = stringResource(R.string.common_new_tab),
                                 onAction = { viewModel.newTab() }
                             )
                         } else {
@@ -191,7 +196,7 @@ private fun TabBar(
             ) {
                 Icon(
                     FeatherIcons.Plus,
-                    contentDescription = "新建标签",
+                    contentDescription = stringResource(R.string.common_new_tab),
                     tint = androidx.compose.ui.graphics.Color(0xFF424242),
                     modifier = Modifier.size(18.dp)
                 )
@@ -249,7 +254,7 @@ private fun TabChip(
         ) {
             Icon(
                 FeatherIcons.X,
-                contentDescription = "关闭标签",
+                contentDescription = stringResource(R.string.terminal_close_tab),
                 tint = androidx.compose.ui.graphics.Color(0xFF424242),
                 modifier = Modifier.size(14.dp)
             )
@@ -325,17 +330,17 @@ private fun StatusView(
 }
 
 /** 把容器初始化进度状态映射为 Loading 阶段展示给用户的文案。 */
-private fun containerInitMessage(state: ContainerInitState): String = when (state) {
+private fun containerInitMessage(context: Context, state: ContainerInitState): String = when (state) {
     is ContainerInitState.ExtractingRootfs ->
-        "正在解压环境…\n已处理 ${state.processed} 个文件"
+        context.getString(R.string.terminal_extracting_env, state.processed)
     ContainerInitState.DeployingProot ->
-        "正在部署 proot 运行时…"
+        context.getString(R.string.terminal_deploying_proot)
     is ContainerInitState.InstallingPackages ->
-        "正在安装 python3 / git / pip / node / npm…\n${state.line ?: ""}"
+        context.getString(R.string.terminal_installing_packages, state.line ?: "")
     is ContainerInitState.Failed ->
-        "正在准备容器环境…\n${state.reason}"
+        context.getString(R.string.terminal_preparing_env_failed, state.reason)
     ContainerInitState.Idle, ContainerInitState.Ready ->
-        "正在准备容器环境…\n首次运行会解压容器，请稍候"
+        context.getString(R.string.terminal_preparing_env_first_run)
 }
 
 /** 手机软键盘缺失的常用按键：Esc / Tab / Ctrl(预置) / 方向键 / Ctrl-C / Ctrl-D。 */

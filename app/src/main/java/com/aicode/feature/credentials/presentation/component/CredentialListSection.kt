@@ -28,6 +28,8 @@ import com.aicode.core.theme.Spacing
 import com.aicode.feature.credentials.domain.model.GitCredential
 import compose.icons.FeatherIcons
 import compose.icons.feathericons.Edit2
+import androidx.compose.ui.res.stringResource
+import com.aicode.R
 
 /**
  * 凭据二级页：顶部提交署名卡 + 凭据列表 + 空态。新增/编辑由顶栏「+」与点击触发 [CredentialEditorScreen]。
@@ -65,7 +67,7 @@ internal fun CredentialListSection(
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = "尚未添加凭据，点右上角 + 添加\n(host / 用户名 / Token)",
+                        text = stringResource(R.string.credential_empty_hint),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -120,7 +122,7 @@ private fun CredentialItem(
             IconButton(onClick = onEdit) {
                 Icon(
                     FeatherIcons.Edit2,
-                    contentDescription = "编辑",
+                    contentDescription = stringResource(R.string.common_edit),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }

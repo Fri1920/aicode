@@ -49,10 +49,12 @@ import com.aicode.feature.agent.domain.tool.question.PendingUserQuestion
 import com.aicode.feature.agent.domain.tool.question.QuestionItem
 import com.aicode.feature.agent.domain.tool.question.SingleAnswer
 import com.aicode.feature.agent.domain.tool.question.UserQuestionAnswer
+import androidx.compose.ui.res.stringResource
+import com.aicode.R
 
 
 /** 「其他」选项的固定 label，不与 AI 传入的选项重复。 */
-private const val OTHER_LABEL = "其他"
+private const val OTHER_LABEL = "Other"
 
 /**
  * AI 向用户提问的面板：展示 1-4 个结构化问题，每个带 2-4 个预设选项 + 一个「其他」自由输入选项。
@@ -106,7 +108,7 @@ fun AskUserQuestionPanel(
                 )
                 Spacer(Modifier.width(Spacing.sm))
                 Text(
-                    text = "AI 需要你的确认",
+                    text = stringResource(R.string.ask_confirm_title),
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.onSurface,
                     fontWeight = FontWeight.SemiBold,
@@ -142,13 +144,13 @@ fun AskUserQuestionPanel(
 
             Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
                 AgentActionButton(
-                    text = "补充",
+                    text = stringResource(R.string.ask_supplement),
                     onClick = onSkip,
                     modifier = Modifier.weight(1f),
                     tone = AgentActionTone.Neutral
                 )
                 AgentActionButton(
-                    text = "确认",
+                    text = stringResource(R.string.ask_confirm),
                     onClick = {
                         val answers = question.questions.mapIndexed { i, q ->
                             val sel = selectedMap[i] ?: emptyList<String>()
@@ -217,7 +219,7 @@ private fun QuestionCard(
             val description = if (!isOther) {
                 item.options.getOrNull(optIdx)?.description ?: ""
             } else {
-                "输入自定义答案"
+                stringResource(R.string.ask_custom_answer)
             }
 
             Row(
@@ -254,7 +256,7 @@ private fun QuestionCard(
                 Spacer(Modifier.width(Spacing.sm))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = label,
+                        text = if (isOther) stringResource(R.string.common_other) else label,
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurface,
                         fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal
@@ -275,7 +277,7 @@ private fun QuestionCard(
                 TextField(
                     value = customText,
                     onValueChange = onCustomTextChanged,
-                    placeholder = { Text("请输入…", style = MaterialTheme.typography.bodySmall) },
+                    placeholder = { Text(stringResource(R.string.ask_input_hint), style = MaterialTheme.typography.bodySmall) },
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(start = 28.dp),

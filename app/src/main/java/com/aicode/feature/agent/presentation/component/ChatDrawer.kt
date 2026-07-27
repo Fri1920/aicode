@@ -54,6 +54,8 @@ import com.aicode.feature.agent.domain.model.ChatSession
 import com.aicode.feature.agent.presentation.AgentUIState
 import compose.icons.FeatherIcons
 import compose.icons.feathericons.*
+import androidx.compose.ui.res.stringResource
+import com.aicode.R
 
 /**
  * 侧边栏内容：顶部「新建会话」，中部历史记录列表，底部「设置」入口。
@@ -109,7 +111,7 @@ fun ChatDrawerContent(
             )
             Spacer(Modifier.width(Spacing.md))
             Text(
-                text = "新建会话",
+                text = stringResource(R.string.chat_new_session),
                 style = MaterialTheme.typography.bodyLarge,
                 fontWeight = FontWeight.Medium,
                 color = MaterialTheme.colorScheme.primary
@@ -118,7 +120,7 @@ fun ChatDrawerContent(
 
         Spacer(Modifier.height(Spacing.sm))
         Text(
-            text = "历史记录",
+            text = stringResource(R.string.chat_history),
             style = MaterialTheme.typography.labelLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(horizontal = Spacing.md, vertical = Spacing.sm)
@@ -127,7 +129,7 @@ fun ChatDrawerContent(
         Box(modifier = Modifier.weight(1f)) {
             if (sessions.isEmpty()) {
                 Text(
-                    "暂无会话，点击「新建会话」开始",
+                    stringResource(R.string.chat_no_sessions_hint),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(horizontal = Spacing.md, vertical = Spacing.md)
@@ -173,7 +175,7 @@ fun ChatDrawerContent(
             )
             Spacer(Modifier.width(Spacing.md))
             Text(
-                text = "设置",
+                text = stringResource(R.string.chat_settings),
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurface
             )
@@ -183,16 +185,16 @@ fun ChatDrawerContent(
     pendingDelete?.let { session ->
         AlertDialog(
             onDismissRequest = { pendingDelete = null },
-            title = { Text("删除会话") },
-            text = { Text("确定删除「${session.title}」？该会话的所有消息都将被清除，且无法恢复。") },
+            title = { Text(stringResource(R.string.chat_delete_session)) },
+            text = { Text(stringResource(R.string.chat_delete_session_confirm, session.title)) },
             confirmButton = {
                 TextButton(onClick = {
                     onDelete(session)
                     pendingDelete = null
-                }) { Text("删除", color = MaterialTheme.colorScheme.error) }
+                }) { Text(stringResource(R.string.common_delete), color = MaterialTheme.colorScheme.error) }
             },
             dismissButton = {
-                TextButton(onClick = { pendingDelete = null }) { Text("取消") }
+                TextButton(onClick = { pendingDelete = null }) { Text(stringResource(R.string.common_cancel)) }
             }
         )
     }
@@ -216,13 +218,13 @@ fun ChatDrawerContent(
         var renameText by remember(session.id) { mutableStateOf(session.title) }
         AlertDialog(
             onDismissRequest = { pendingRename = null },
-            title = { Text("重命名会话") },
+            title = { Text(stringResource(R.string.chat_rename_session)) },
             text = {
                 OutlinedTextField(
                     value = renameText,
                     onValueChange = { renameText = it },
                     singleLine = true,
-                    label = { Text("会话名") },
+                    label = { Text(stringResource(R.string.chat_session_name)) },
                     modifier = Modifier.fillMaxWidth()
                 )
             },
@@ -233,10 +235,10 @@ fun ChatDrawerContent(
                         pendingRename = null
                     },
                     enabled = renameText.isNotBlank() && renameText != session.title
-                ) { Text("重命名") }
+                ) { Text(stringResource(R.string.common_rename)) }
             },
             dismissButton = {
-                TextButton(onClick = { pendingRename = null }) { Text("取消") }
+                TextButton(onClick = { pendingRename = null }) { Text(stringResource(R.string.common_cancel)) }
             }
         )
     }
@@ -292,7 +294,7 @@ private fun SessionActionSheet(
                     )
                     Spacer(Modifier.width(Spacing.lg))
                     Text(
-                        text = "重命名",
+                        text = stringResource(R.string.common_rename),
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurface
                     )
@@ -316,7 +318,7 @@ private fun SessionActionSheet(
                     )
                     Spacer(Modifier.width(Spacing.lg))
                     Text(
-                        text = "删除",
+                        text = stringResource(R.string.common_delete),
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.error
                     )

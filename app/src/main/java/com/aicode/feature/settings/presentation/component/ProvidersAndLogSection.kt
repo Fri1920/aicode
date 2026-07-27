@@ -41,6 +41,10 @@ import com.aicode.feature.settings.presentation.LogViewerUiState
 import com.aicode.feature.settings.domain.model.AIProviderConfig
 import compose.icons.FeatherIcons
 import compose.icons.feathericons.Edit2
+import android.content.Context
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import com.aicode.R
 
 /** 提供商二级页：列表 + 空态提示。新增/编辑由顶栏「+」与点击触发 [ProviderEditorScreen]。 */
 @Composable
@@ -50,7 +54,7 @@ internal fun ProvidersSection(
     onEdit: (AIProviderConfig) -> Unit
 ) {
     if (providers.isEmpty()) {
-        EmptyHint("还没有提供商，点右上角 + 添加")
+        EmptyHint(stringResource(R.string.providers_empty))
         return
     }
     LazyColumn(
@@ -91,15 +95,16 @@ internal fun SystemLogsSection(
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
         ) {
+    val context = LocalContext.current
             Column(modifier = Modifier.padding(Spacing.lg)) {
                 Text(
-                    text = logViewerState.filterServerName?.let { "MCP 日志：$it" } ?: "全部日志",
+                    text = logViewerState.filterServerName?.let { stringResource(R.string.log_mcp_prefix, it) } ?: stringResource(R.string.log_all),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Normal,
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
-                    text = logViewerSummary(logViewerState),
+                    text = logViewerSummary(context, logViewerState),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = Spacing.xs)
@@ -136,9 +141,9 @@ internal fun SystemLogsSection(
             val verticalScroll = rememberScrollState()
             val horizontalScroll = rememberScrollState()
             val text = when {
-                logViewerState.loading -> "正在读取日志..."
+                logViewerState.loading -> stringResource(R.string.log_reading)
                 logViewerState.error != null -> logViewerState.error
-                logViewerState.content.isBlank() -> "当前筛选条件下没有日志"
+                logViewerState.content.isBlank() -> stringResource(R.string.log_no_match)
                 else -> logViewerState.content
             }
 
@@ -162,13 +167,13 @@ internal fun SystemLogsSection(
     }
 }
 
-private fun logViewerSummary(state: LogViewerUiState): String {
-    val file = state.selectedFileName ?: "未选择文件"
-    val scope = state.filterServerName?.let { "筛选：$it" } ?: "未筛选"
+private fun logViewerSummary(context: Context, state: LogViewerUiState): String {
+    val file = state.selectedFileName ?: context.getString(R.string.log_no_file)
+    val scope = state.filterServerName?.let { context.getString(R.string.log_filter_prefix, it) } ?: context.getString(R.string.log_no_filter)
     val count = if (state.totalLines > state.shownLines) {
-        "显示最后 ${state.shownLines}/${state.totalLines} 行"
+        context.getString(R.string.log_show_last_lines, state.shownLines, state.totalLines)
     } else {
-        "显示 ${state.shownLines} 行"
+        context.getString(R.string.log_show_lines, state.shownLines)
     }
     return "$file · $scope · $count"
 }
@@ -205,14 +210,14 @@ internal fun LogLevelCard(
     ) {
         Column(modifier = Modifier.padding(Spacing.lg)) {
             Text(
-                text = "日志等级",
+                text = stringResource(R.string.log_level),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Normal,
                 color = MaterialTheme.colorScheme.onSurface
             )
             Text(
-                text = "记录低于该等级的日志将被忽略。开发期建议 VERBOSE（全部记录）；NONE 关闭日志。" +
-                    "日志文件位于 Android/data/<包名>/files/logs/。",
+                text = stringResource(R.string.log_level_desc) +
+                    stringResource(R.string.log_file_location),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = Spacing.xs, bottom = Spacing.sm)
@@ -268,9 +273,9 @@ fun ProviderItem(
                 )
                 Text(
                     text = if (provider.models.isEmpty()) {
-                        "未配置模型，点击编辑添加"
+                        stringResource(R.string.provider_no_models_hint)
                     } else {
-                        "模型：${provider.effectiveModel} · 共 ${provider.models.size} 个"
+                        stringResource(R.string.provider_model_summary, provider.effectiveModel, provider.models.size)
                     },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -284,7 +289,7 @@ fun ProviderItem(
             IconButton(onClick = onEdit) {
                 Icon(
                     FeatherIcons.Edit2,
-                    contentDescription = "编辑",
+                    contentDescription = stringResource(R.string.common_edit),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }

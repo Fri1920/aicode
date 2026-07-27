@@ -49,6 +49,8 @@ import dev.snipme.highlights.model.BoldHighlight
 import dev.snipme.highlights.model.ColorHighlight
 import dev.snipme.highlights.model.SyntaxLanguage
 import dev.snipme.highlights.model.SyntaxThemes
+import androidx.compose.ui.res.stringResource
+import com.aicode.R
 
 /**
  * diff 视图所需的数据。由 [com.aicode.feature.git.presentation.GitViewModel] 在后台线程
@@ -111,7 +113,7 @@ fun DiffViewerScreen(
                 ),
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(FeatherIcons.ArrowLeft, contentDescription = "返回")
+                        Icon(FeatherIcons.ArrowLeft, contentDescription = stringResource(R.string.common_back))
                     }
                 }
             )
@@ -272,7 +274,7 @@ private fun DiffLineRow(row: DiffRow, gutterWidth: androidx.compose.ui.unit.Dp) 
 @Composable
 private fun EmptyDiff(padding: androidx.compose.foundation.layout.PaddingValues) {
     Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
-        Text("无差异", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(stringResource(R.string.diff_no_changes), color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
@@ -287,7 +289,7 @@ private fun BinaryHint(padding: androidx.compose.foundation.layout.PaddingValues
                 modifier = Modifier.size(32.dp)
             )
             Spacer(Modifier.height(Spacing.sm))
-            Text("二进制文件，不支持文本差异对比", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(stringResource(R.string.diff_binary_file), color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
@@ -297,13 +299,13 @@ private fun LargeFileHint(diffData: DiffData, padding: androidx.compose.foundati
     Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
-                "文件过大，已跳过差异计算",
+                stringResource(R.string.diff_file_too_large),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(Modifier.height(Spacing.xs))
             Text(
-                "超过 2000 行的文件不做行级 diff 以避免内存压力。",
+                stringResource(R.string.diff_file_too_large_desc),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

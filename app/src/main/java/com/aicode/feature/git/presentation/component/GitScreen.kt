@@ -100,6 +100,8 @@ import com.aicode.feature.git.domain.model.GraphEdge
 import com.aicode.feature.git.presentation.GitViewModel
 import compose.icons.FeatherIcons
 import compose.icons.feathericons.*
+import androidx.compose.ui.res.stringResource
+import com.aicode.R
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -169,7 +171,7 @@ fun GitScreen(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             TopAppBar(
-                title = { Text(if (showCredentials) "凭据与署名" else "Git") },
+                title = { Text(if (showCredentials) stringResource(R.string.git_credentials_and_identity) else "Git") },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.surface,
                     titleContentColor = MaterialTheme.colorScheme.onBackground
@@ -179,21 +181,21 @@ fun GitScreen(
                         // 凭据列表态回 Git 页，否则退出 Git 页。编辑/新增态由 [CredentialEditorScreen] 自身 BackHandler 处理，不走此顶栏。
                         if (showCredentials) showCredentials = false else onNavigateBack()
                     }) {
-                        Icon(FeatherIcons.ArrowLeft, contentDescription = "返回")
+                        Icon(FeatherIcons.ArrowLeft, contentDescription = stringResource(R.string.common_back))
                     }
                 },
                 actions = {
                     if (!showCredentials) {
                         IconButton(onClick = { showCredentials = true }) {
-                            Icon(FeatherIcons.Key, contentDescription = "凭据与署名")
+                            Icon(FeatherIcons.Key, contentDescription = stringResource(R.string.git_credentials_and_identity))
                         }
                         IconButton(onClick = { viewModel.refresh() }, enabled = !state.busy) {
-                            Icon(FeatherIcons.RefreshCw, contentDescription = "刷新")
+                            Icon(FeatherIcons.RefreshCw, contentDescription = stringResource(R.string.git_refresh))
                         }
                     } else {
                         // showCredentials 列表态：显示添加凭据。编辑/新增态已 return，渲染顶栏时不会落到此分支。
                         IconButton(onClick = { isAddingCredential = true }) {
-                            Icon(FeatherIcons.Plus, contentDescription = "添加凭据")
+                            Icon(FeatherIcons.Plus, contentDescription = stringResource(R.string.credential_add))
                         }
                     }
                 }
@@ -225,9 +227,9 @@ fun GitScreen(
                         text = {
                             Text(
                                 when (tab) {
-                                    GitTab.STATUS -> "状态"
-                                    GitTab.BRANCHES -> "分支"
-                                    GitTab.LOG -> "提交"
+                                    GitTab.STATUS -> stringResource(R.string.git_tab_status)
+                                    GitTab.BRANCHES -> stringResource(R.string.git_tab_branches)
+                                    GitTab.LOG -> stringResource(R.string.git_tab_commits)
                                 }
                             )
                         }
@@ -240,7 +242,7 @@ fun GitScreen(
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         CircularProgressIndicator()
                         Spacer(Modifier.height(Spacing.sm))
-                        Text("正在计算差异...", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(stringResource(R.string.git_computing_diff), color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
                 state.loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -334,31 +336,31 @@ private fun StatusTab(
         HorizontalDivider()
 
         if (clean) {
-            EmptyState("工作区干净，无改动")
+            EmptyState(stringResource(R.string.git_clean_with_changes))
         } else {
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(bottom = Spacing.xl)
             ) {
                 if (s!!.staged.isNotEmpty()) {
-                    item { SectionHeader("已暂存 (${s.staged.size})") }
+                    item { SectionHeader(stringResource(R.string.git_staged_count, s.staged.size)) }
                     items(s.staged, key = { "s-${it.path}" }) { f ->
-                        FileRow(f, actionIcon = FeatherIcons.Minus, actionDesc = "取消暂存", onAction = { onUnstage(f.path) }, enabled = !busy)
+                        FileRow(f, actionIcon = FeatherIcons.Minus, actionDesc = stringResource(R.string.git_unstage), onAction = { onUnstage(f.path) }, enabled = !busy)
                     }
                 }
                 if (s.unstaged.isNotEmpty()) {
-                    item { SectionHeader("已修改 (${s.unstaged.size})") }
+                    item { SectionHeader(stringResource(R.string.git_modified_count, s.unstaged.size)) }
                     items(s.unstaged, key = { "u-${it.path}" }) { f ->
-                        FileRow(f, actionIcon = FeatherIcons.Plus, actionDesc = "暂存", onAction = { onStage(f.path) }, enabled = !busy, onClick = { onFileDiff(f.path) })
+                        FileRow(f, actionIcon = FeatherIcons.Plus, actionDesc = stringResource(R.string.git_stage), onAction = { onStage(f.path) }, enabled = !busy, onClick = { onFileDiff(f.path) })
                     }
                 }
                 if (s.untracked.isNotEmpty()) {
-                    item { SectionHeader("未跟踪 (${s.untracked.size})") }
+                    item { SectionHeader(stringResource(R.string.git_untracked_count, s.untracked.size)) }
                     items(s.untracked, key = { it }) { path ->
                         FileRow(
                             file = GitFileChange(path, "?", staged = false),
                             actionIcon = FeatherIcons.Plus,
-                            actionDesc = "暂存",
+                            actionDesc = stringResource(R.string.git_stage),
                             onAction = { onStage(path) },
                             enabled = !busy
                         )
@@ -395,12 +397,12 @@ private fun StatusOverview(status: GitStatus?, clean: Boolean) {
                 Spacer(Modifier.width(Spacing.md))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = if (clean) "工作区干净" else "工作区有改动",
+                        text = if (clean) stringResource(R.string.git_clean) else stringResource(R.string.git_has_changes),
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
-                        text = status?.branch ?: "(无分支)",
+                        text = status?.branch ?: stringResource(R.string.git_no_branch),
                         style = MaterialTheme.typography.titleMedium,
                         fontFamily = FontFamily.Monospace,
                         color = MaterialTheme.colorScheme.onSurface,
@@ -417,9 +419,9 @@ private fun StatusOverview(status: GitStatus?, clean: Boolean) {
             Spacer(Modifier.height(Spacing.md))
 
             Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                StatusMetric("已暂存", staged, MaterialTheme.colorScheme.tertiary, Modifier.weight(1f))
-                StatusMetric("已修改", modified, Color(0xFFD97706), Modifier.weight(1f))
-                StatusMetric("未跟踪", untracked, MaterialTheme.colorScheme.onSurfaceVariant, Modifier.weight(1f))
+                StatusMetric(stringResource(R.string.git_staged_label), staged, MaterialTheme.colorScheme.tertiary, Modifier.weight(1f))
+                StatusMetric(stringResource(R.string.git_modified_label), modified, Color(0xFFD97706), Modifier.weight(1f))
+                StatusMetric(stringResource(R.string.git_untracked_label), untracked, MaterialTheme.colorScheme.onSurfaceVariant, Modifier.weight(1f))
             }
         }
     }
@@ -487,31 +489,31 @@ private fun StatusActionsBar(
     BoxWithConstraints(modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.lg, vertical = Spacing.sm)) {
         if (maxWidth < 420.dp) {
             Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                ActionButton("提交更改", FeatherIcons.Check, prominent = true, enabled = canCommit, onClick = onCommit, modifier = Modifier.fillMaxWidth())
+                ActionButton(stringResource(R.string.git_commit_changes), FeatherIcons.Check, prominent = true, enabled = canCommit, onClick = onCommit, modifier = Modifier.fillMaxWidth())
                 if (!hasIdentity) {
                     Text(
-                        "未配置署名，无法提交。请在「凭据」页填写 user.name / user.email。",
+                        stringResource(R.string.git_no_identity),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.error
                     )
                 }
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                    ActionButton("暂存全部", FeatherIcons.Plus, enabled = !busy, onClick = onStageAll, modifier = Modifier.weight(1f))
-                    ActionButton("拉取", FeatherIcons.DownloadCloud, enabled = !busy && hasRemote, onClick = onPull, modifier = Modifier.weight(1f))
-                    ActionButton("推送", FeatherIcons.UploadCloud, enabled = !busy && hasRemote, onClick = onPush, modifier = Modifier.weight(1f))
+                    ActionButton(stringResource(R.string.git_stage_all), FeatherIcons.Plus, enabled = !busy, onClick = onStageAll, modifier = Modifier.weight(1f))
+                    ActionButton(stringResource(R.string.git_pull), FeatherIcons.DownloadCloud, enabled = !busy && hasRemote, onClick = onPull, modifier = Modifier.weight(1f))
+                    ActionButton(stringResource(R.string.git_push), FeatherIcons.UploadCloud, enabled = !busy && hasRemote, onClick = onPush, modifier = Modifier.weight(1f))
                 }
             }
         } else {
             Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                    ActionButton("提交更改", FeatherIcons.Check, prominent = true, enabled = canCommit, onClick = onCommit, modifier = Modifier.weight(1.4f))
-                    ActionButton("暂存全部", FeatherIcons.Plus, enabled = !busy, onClick = onStageAll, modifier = Modifier.weight(1f))
-                    ActionButton("拉取", FeatherIcons.DownloadCloud, enabled = !busy && hasRemote, onClick = onPull, modifier = Modifier.weight(1f))
-                    ActionButton("推送", FeatherIcons.UploadCloud, enabled = !busy && hasRemote, onClick = onPush, modifier = Modifier.weight(1f))
+                    ActionButton(stringResource(R.string.git_commit_changes), FeatherIcons.Check, prominent = true, enabled = canCommit, onClick = onCommit, modifier = Modifier.weight(1.4f))
+                    ActionButton(stringResource(R.string.git_stage_all), FeatherIcons.Plus, enabled = !busy, onClick = onStageAll, modifier = Modifier.weight(1f))
+                    ActionButton(stringResource(R.string.git_pull), FeatherIcons.DownloadCloud, enabled = !busy && hasRemote, onClick = onPull, modifier = Modifier.weight(1f))
+                    ActionButton(stringResource(R.string.git_push), FeatherIcons.UploadCloud, enabled = !busy && hasRemote, onClick = onPush, modifier = Modifier.weight(1f))
                 }
                 if (!hasIdentity) {
                     Text(
-                        "未配置署名，无法提交。请在「凭据」页填写 user.name / user.email。",
+                        stringResource(R.string.git_no_identity),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.error
                     )
@@ -546,7 +548,7 @@ private fun BranchesTab(
                 CircularProgressIndicator(modifier = Modifier.size(32.dp), strokeWidth = 2.dp)
                 Spacer(Modifier.height(Spacing.sm))
                 Text(
-                    "正在加载分支列表…",
+                    stringResource(R.string.git_loading_branches),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -555,10 +557,10 @@ private fun BranchesTab(
         return
     }
     if (branches.isEmpty() && tags.isEmpty()) {
-        EmptyState("暂无分支")
+        EmptyState(stringResource(R.string.git_no_branches))
         return
     }
-    val currentBranch = branches.firstOrNull { it.current }?.name ?: "未检出分支"
+    val currentBranch = branches.firstOrNull { it.current }?.name ?: stringResource(R.string.git_no_checked_out_branch)
     val localBranches = branches.filter { !it.remote }
     val remoteBranches = branches.filter { it.remote }
     val expanded = remember { mutableStateMapOf<String, Boolean>() }
@@ -575,22 +577,22 @@ private fun BranchesTab(
         val isTag = tags.any { it.name == ref }
         AlertDialog(
             onDismissRequest = { pendingCheckout = null },
-            title = { Text("切换分支") },
+            title = { Text(stringResource(R.string.git_switch_branch)) },
             text = {
                 Text(
-                    if (isTag) "切换到标签 $ref 将进入 detached HEAD 状态——不处于任何分支上，新提交不属于任何分支。确定继续？"
-                    else if (isRemote) "从远程分支 $ref 创建本地跟踪分支并切换？"
-                    else "确定切换到 $ref？"
+                    if (isTag) stringResource(R.string.git_detached_head_warning, ref)
+                    else if (isRemote) stringResource(R.string.git_create_tracking_branch, ref)
+                    else stringResource(R.string.git_switch_confirm, ref)
                 )
             },
             confirmButton = {
                 TextButton(onClick = {
                     pendingCheckout = null
                     onCheckout(ref, isRemote)
-                }) { Text("切换") }
+                }) { Text(stringResource(R.string.common_switch)) }
             },
             dismissButton = {
-                TextButton(onClick = { pendingCheckout = null }) { Text("取消") }
+                TextButton(onClick = { pendingCheckout = null }) { Text(stringResource(R.string.common_cancel)) }
             }
         )
     }
@@ -616,14 +618,14 @@ private fun BranchesTab(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Text(
-                    text = "新建分支",
+                    text = stringResource(R.string.git_new_branch),
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 OutlinedTextField(
                     value = newName,
                     onValueChange = { newName = it },
-                    label = { Text("分支名") },
+                    label = { Text(stringResource(R.string.git_branch_name)) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -635,7 +637,7 @@ private fun BranchesTab(
                         value = startPoint,
                         onValueChange = {},
                         readOnly = true,
-                        label = { Text("基准分支") },
+                        label = { Text(stringResource(R.string.git_base_branch)) },
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
                         modifier = Modifier
                             .fillMaxWidth()
@@ -658,7 +660,7 @@ private fun BranchesTab(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("创建并切换")
+                    Text(stringResource(R.string.git_create_and_switch))
                     Switch(checked = checkout, onCheckedChange = { checkout = it })
                 }
                 Row(
@@ -666,7 +668,7 @@ private fun BranchesTab(
                     horizontalArrangement = Arrangement.End,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    TextButton(onClick = { showCreateDialog = false }) { Text("取消") }
+                    TextButton(onClick = { showCreateDialog = false }) { Text(stringResource(R.string.common_cancel)) }
                     Spacer(Modifier.width(Spacing.sm))
                     Button(
                         onClick = {
@@ -674,7 +676,7 @@ private fun BranchesTab(
                             showCreateDialog = false
                         },
                         enabled = newName.isNotBlank()
-                    ) { Text("创建") }
+                    ) { Text(stringResource(R.string.common_create)) }
                 }
             }
         }
@@ -683,21 +685,21 @@ private fun BranchesTab(
     pendingDelete?.let { (name, isRemote) ->
         AlertDialog(
             onDismissRequest = { pendingDelete = null },
-            title = { Text(if (isRemote) "删除远程分支" else "删除分支") },
+            title = { Text(if (isRemote) stringResource(R.string.git_delete_remote_branch) else stringResource(R.string.git_delete_branch)) },
             text = {
                 Text(
-                    if (isRemote) "删除远程分支 $name？该操作不可撤销。"
-                    else "删除本地分支 $name？"
+                    if (isRemote) stringResource(R.string.git_delete_remote_branch_confirm, name)
+                    else stringResource(R.string.git_delete_local_branch_confirm, name)
                 )
             },
             confirmButton = {
                 TextButton(onClick = {
                     pendingDelete = null
                     if (isRemote) onDeleteRemoteBranch(name) else onDeleteBranch(name)
-                }) { Text("删除", color = MaterialTheme.colorScheme.error) }
+                }) { Text(stringResource(R.string.common_delete), color = MaterialTheme.colorScheme.error) }
             },
             dismissButton = {
-                TextButton(onClick = { pendingDelete = null }) { Text("取消") }
+                TextButton(onClick = { pendingDelete = null }) { Text(stringResource(R.string.common_cancel)) }
             }
         )
     }
@@ -706,14 +708,14 @@ private fun BranchesTab(
         var newName by remember(oldName) { mutableStateOf(oldName) }
         AlertDialog(
             onDismissRequest = { pendingRename = null },
-            title = { Text("重命名分支") },
+            title = { Text(stringResource(R.string.git_rename_branch)) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("将 $oldName 重命名为：")
+                    Text(stringResource(R.string.git_rename_to, oldName))
                     OutlinedTextField(
                         value = newName,
                         onValueChange = { newName = it },
-                        label = { Text("新分支名") },
+                        label = { Text(stringResource(R.string.git_new_branch_name)) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
@@ -729,10 +731,10 @@ private fun BranchesTab(
                         }
                     },
                     enabled = newName.trim().isNotBlank() && newName.trim() != oldName
-                ) { Text("重命名") }
+                ) { Text(stringResource(R.string.common_rename)) }
             },
             dismissButton = {
-                TextButton(onClick = { pendingRename = null }) { Text("取消") }
+                TextButton(onClick = { pendingRename = null }) { Text(stringResource(R.string.common_cancel)) }
             }
         )
     }
@@ -753,19 +755,19 @@ private fun BranchesTab(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Text(
-                    text = "新建标签",
+                    text = stringResource(R.string.common_new_tab),
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
-                    text = "从当前 HEAD（$currentBranch）创建轻量标签",
+                    text = stringResource(R.string.git_create_tag_desc, currentBranch),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 OutlinedTextField(
                     value = tagName,
                     onValueChange = { tagName = it },
-                    label = { Text("标签名") },
+                    label = { Text(stringResource(R.string.git_tag_name)) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -774,7 +776,7 @@ private fun BranchesTab(
                     horizontalArrangement = Arrangement.End,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    TextButton(onClick = { showCreateTagDialog = false }) { Text("取消") }
+                    TextButton(onClick = { showCreateTagDialog = false }) { Text(stringResource(R.string.common_cancel)) }
                     Spacer(Modifier.width(Spacing.sm))
                     Button(
                         onClick = {
@@ -785,7 +787,7 @@ private fun BranchesTab(
                             }
                         },
                         enabled = tagName.trim().isNotBlank()
-                    ) { Text("创建") }
+                    ) { Text(stringResource(R.string.common_create)) }
                 }
             }
         }
@@ -794,16 +796,16 @@ private fun BranchesTab(
     pendingDeleteTag?.let { name ->
         AlertDialog(
             onDismissRequest = { pendingDeleteTag = null },
-            title = { Text("删除标签") },
-            text = { Text("删除本地标签 $name？") },
+            title = { Text(stringResource(R.string.git_delete_tag)) },
+            text = { Text(stringResource(R.string.git_delete_tag_confirm, name)) },
             confirmButton = {
                 TextButton(onClick = {
                     pendingDeleteTag = null
                     onDeleteTag(name)
-                }) { Text("删除", color = MaterialTheme.colorScheme.error) }
+                }) { Text(stringResource(R.string.common_delete), color = MaterialTheme.colorScheme.error) }
             },
             dismissButton = {
-                TextButton(onClick = { pendingDeleteTag = null }) { Text("取消") }
+                TextButton(onClick = { pendingDeleteTag = null }) { Text(stringResource(R.string.common_cancel)) }
             }
         )
     }
@@ -827,7 +829,7 @@ private fun BranchesTab(
             item {
                 RefRow(
                     name = currentBranch,
-                    subtitle = "当前检出",
+                    subtitle = stringResource(R.string.git_checked_out),
                     icon = FeatherIcons.GitCommit,
                     isCurrent = true
                 )
@@ -935,7 +937,7 @@ private fun BranchesOverview(
                 Spacer(Modifier.width(Spacing.md))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = "当前分支",
+                        text = stringResource(R.string.git_current_branch),
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -953,9 +955,9 @@ private fun BranchesOverview(
             Spacer(Modifier.height(Spacing.md))
 
             Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                StatusMetric("本地", localCount, MaterialTheme.colorScheme.primary, Modifier.weight(1f))
-                StatusMetric("远程", remoteCount, MaterialTheme.colorScheme.secondary, Modifier.weight(1f))
-                StatusMetric("标签", tagCount, MaterialTheme.colorScheme.tertiary, Modifier.weight(1f))
+                StatusMetric(stringResource(R.string.common_local), localCount, MaterialTheme.colorScheme.primary, Modifier.weight(1f))
+                StatusMetric(stringResource(R.string.git_remote), remoteCount, MaterialTheme.colorScheme.secondary, Modifier.weight(1f))
+                StatusMetric(stringResource(R.string.git_tags), tagCount, MaterialTheme.colorScheme.tertiary, Modifier.weight(1f))
             }
         }
     }
@@ -979,7 +981,7 @@ private fun RefSectionHeader(
     ) {
         Icon(
             imageVector = if (isExpanded) FeatherIcons.ChevronDown else FeatherIcons.ChevronRight,
-            contentDescription = if (isExpanded) "折叠" else "展开",
+            contentDescription = if (isExpanded) stringResource(R.string.common_collapse) else stringResource(R.string.common_expand),
             modifier = Modifier.size(18.dp),
             tint = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -995,7 +997,7 @@ private fun RefSectionHeader(
             IconButton(onClick = onAdd, modifier = Modifier.size(28.dp)) {
                 Icon(
                     FeatherIcons.Plus,
-                    contentDescription = "新增",
+                    contentDescription = stringResource(R.string.git_new),
                     modifier = Modifier.size(16.dp),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -1013,9 +1015,9 @@ private sealed class RefAction(
     val isDestructive: Boolean,
     val onClick: () -> Unit
 ) {
-    class Switch(onClick: () -> Unit) : RefAction("切换", FeatherIcons.GitCommit, false, onClick)
-    class Rename(onClick: () -> Unit) : RefAction("重命名", FeatherIcons.Edit2, false, onClick)
-    class Delete(onClick: () -> Unit) : RefAction("删除", FeatherIcons.Trash2, true, onClick)
+    class Switch(onClick: () -> Unit) : RefAction("Switch", FeatherIcons.GitCommit, false, onClick)
+    class Rename(onClick: () -> Unit) : RefAction("Rename", FeatherIcons.Edit2, false, onClick)
+    class Delete(onClick: () -> Unit) : RefAction("Delete", FeatherIcons.Trash2, true, onClick)
 }
 
 @Composable
@@ -1238,7 +1240,7 @@ private fun LazyListScope.renderBranchTree(
                     }
                     RefRow(
                         name = node.segment,
-                        subtitle = if (b.current) "当前检出" else null,
+                        subtitle = if (b.current) stringResource(R.string.git_checked_out) else null,
                         icon = if (isRemote) FeatherIcons.Cloud else FeatherIcons.GitBranch,
                         isCurrent = b.current,
                         isLoading = checkoutLoading == b.name,
@@ -1267,7 +1269,7 @@ private fun LogTab(
 ) {
     val commits = graph.commits
     if (commits.isEmpty()) {
-        EmptyState("暂无提交记录")
+        EmptyState(stringResource(R.string.git_no_commits))
         return
     }
     // 泳道调色板：按列号循环取色，分支越多颜色越丰富。
@@ -1297,7 +1299,7 @@ private fun LogTab(
         contentPadding = PaddingValues(bottom = Spacing.xl)
     ) {
         item { LogOverview(commits = overviewCommits, expandedCount = expandedCommits.size) }
-        item { SectionHeader("提交记录 (${commits.size})") }
+        item { SectionHeader(stringResource(R.string.git_commit_count, commits.size)) }
         commits.forEachIndexed { index, c ->
             val isExpanded = c.hash in expandedCommits
             item(key = "commit-${c.hash}") {
@@ -1353,7 +1355,7 @@ private fun LogTab(
                         CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
                     } else {
                         Text(
-                            "上拉加载更早提交",
+                            stringResource(R.string.git_load_more_commits),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -1387,7 +1389,7 @@ private fun LogOverview(commits: List<GitCommit>, expandedCount: Int) {
                 Spacer(Modifier.width(Spacing.md))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = "最新提交",
+                        text = stringResource(R.string.git_latest_commit),
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -1404,8 +1406,8 @@ private fun LogOverview(commits: List<GitCommit>, expandedCount: Int) {
             Spacer(Modifier.height(Spacing.md))
 
             Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                StatusMetric("最近提交", commits.size, MaterialTheme.colorScheme.primary, Modifier.weight(1f))
-                StatusMetric("已展开", expandedCount, MaterialTheme.colorScheme.secondary, Modifier.weight(1f))
+                StatusMetric(stringResource(R.string.git_recent_commit), commits.size, MaterialTheme.colorScheme.primary, Modifier.weight(1f))
+                StatusMetric(stringResource(R.string.git_expanded), expandedCount, MaterialTheme.colorScheme.secondary, Modifier.weight(1f))
                 DateMetric(latest.date, Modifier.weight(1f))
             }
         }
@@ -1421,7 +1423,7 @@ private fun DateMetric(date: String, modifier: Modifier = Modifier) {
     ) {
         Column(modifier = Modifier.padding(horizontal = Spacing.sm, vertical = Spacing.sm)) {
             Text(
-                text = "最新日期",
+                text = stringResource(R.string.git_latest_date),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1
@@ -1495,7 +1497,7 @@ private fun GraphCommitRow(
                 Row(verticalAlignment = Alignment.Top) {
                     Icon(
                         imageVector = if (isExpanded) FeatherIcons.ChevronDown else FeatherIcons.ChevronRight,
-                        contentDescription = if (isExpanded) "折叠" else "展开",
+                        contentDescription = if (isExpanded) stringResource(R.string.common_collapse) else stringResource(R.string.common_expand),
                         modifier = Modifier.size(16.dp),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -1768,7 +1770,7 @@ private fun groupEdgesByCommit(graph: GitGraph): Map<Int, List<GraphEdge>> {
 @Composable
 private fun CommitFilesSummary(count: Int, indent: androidx.compose.ui.unit.Dp) {
     Text(
-        text = "$count 个文件改动",
+        text = stringResource(R.string.git_files_changed, count),
         style = MaterialTheme.typography.labelSmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = Modifier.fillMaxWidth().padding(start = indent, end = Spacing.lg, top = Spacing.sm, bottom = Spacing.xs)
@@ -1778,7 +1780,7 @@ private fun CommitFilesSummary(count: Int, indent: androidx.compose.ui.unit.Dp) 
 @Composable
 private fun EmptyCommitFilesRow(indent: androidx.compose.ui.unit.Dp) {
     Text(
-        text = "该提交无文件改动",
+        text = stringResource(R.string.git_no_files_changed),
         style = MaterialTheme.typography.labelSmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = Modifier.fillMaxWidth().padding(start = indent, end = Spacing.lg, top = Spacing.sm, bottom = Spacing.sm)
@@ -1797,7 +1799,7 @@ private fun LoadingFilesRow(indent: androidx.compose.ui.unit.Dp) {
         )
         Spacer(Modifier.width(Spacing.sm))
         Text(
-            text = "正在加载改动文件...",
+            text = stringResource(R.string.git_loading_files),
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -2015,19 +2017,19 @@ private fun NotARepoState(onInit: () -> Unit) {
             verticalArrangement = Arrangement.spacedBy(Spacing.md)
         ) {
             Text(
-                "当前工作区不是 Git 仓库",
+                stringResource(R.string.git_not_a_repo),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Text(
-                "初始化后会在此创建 .git，之后可暂存、提交、关联远程。",
+                stringResource(R.string.git_init_desc),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             FilledTonalButton(onClick = onInit) {
                 Icon(FeatherIcons.GitBranch, contentDescription = null)
                 Spacer(Modifier.width(Spacing.sm))
-                Text("初始化 Git 仓库")
+                Text(stringResource(R.string.git_init_repo))
             }
         }
     }
@@ -2038,12 +2040,12 @@ private fun CommitDialog(onDismiss: () -> Unit, onConfirm: (String) -> Unit) {
     var message by remember { mutableStateOf("") }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("提交") },
+        title = { Text(stringResource(R.string.git_tab_commits)) },
         text = {
             OutlinedTextField(
                 value = message,
                 onValueChange = { message = it },
-                label = { Text("提交信息") },
+                label = { Text(stringResource(R.string.git_commit_message)) },
                 modifier = Modifier.fillMaxWidth(),
                 minLines = 2
             )
@@ -2052,8 +2054,8 @@ private fun CommitDialog(onDismiss: () -> Unit, onConfirm: (String) -> Unit) {
             TextButton(
                 onClick = { if (message.isNotBlank()) onConfirm(message.trim()) },
                 enabled = message.isNotBlank()
-            ) { Text("提交") }
+            ) { Text(stringResource(R.string.git_tab_commits)) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } }
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_cancel)) } }
     )
 }

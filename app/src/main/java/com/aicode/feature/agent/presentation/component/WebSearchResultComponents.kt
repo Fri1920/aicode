@@ -47,6 +47,8 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import java.net.URI
+import androidx.compose.ui.res.stringResource
+import com.aicode.R
 
 internal data class ParsedWebSearchResult(
     val searchId: String,
@@ -156,13 +158,13 @@ private fun WebSearchSummary(result: ParsedWebSearchResult) {
         Spacer(Modifier.width(Spacing.sm))
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = "网络搜索",
+                text = stringResource(R.string.web_search_title),
                 color = MaterialTheme.colorScheme.onSurface,
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.SemiBold
             )
             Text(
-                text = "找到 ${result.results.size} 条结果",
+                text = stringResource(R.string.web_search_results_count, result.results.size),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.bodySmall
             )
@@ -215,7 +217,7 @@ private fun WebSearchResultItem(index: Int, item: ParsedWebSearchItem) {
                         Spacer(Modifier.width(Spacing.xs))
                         Icon(
                             if (expanded) FeatherIcons.ChevronUp else FeatherIcons.ChevronDown,
-                            contentDescription = if (expanded) "收起" else "展开",
+                            contentDescription = if (expanded) stringResource(R.string.common_collapse_action) else stringResource(R.string.common_expand),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f),
                             modifier = Modifier.size(16.dp)
                         )

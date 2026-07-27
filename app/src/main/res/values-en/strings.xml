@@ -46,4 +46,578 @@
     <string name="settings_keepalive_subtitle">Show foreground notification to avoid process kill</string>
     <string name="settings_backup_subtitle">Encrypted export/import config, chat history and credentials</string>
     <string name="settings_about_subtitle">Version check · GitHub · License</string>
+
+    <!-- i18n: UI strings -->
+    <!-- Common -->
+    <string name="common_ai_providers">AI Providers</string>
+    <string name="common_save">Save</string>
+    <string name="common_allow">Allow</string>
+    <string name="common_close">Close</string>
+    <string name="common_other">Other</string>
+    <string name="common_switch">Switch</string>
+    <string name="common_create">Create</string>
+    <string name="common_delete">Delete</string>
+    <string name="common_cancel">Cancel</string>
+    <string name="common_name">Name</string>
+    <string name="common_image_preview">Image Preview</string>
+    <string name="common_expand">Expand</string>
+    <string name="common_workspace">Workspace</string>
+    <string name="common_tool">Tool</string>
+    <string name="common_current">Current</string>
+    <string name="common_collapse">Collapse</string>
+    <string name="common_collapse_action">Collapse</string>
+    <string name="chat_new_session">New Session</string>
+    <string name="common_new_tab">New Tab</string>
+    <string name="common_show">Show</string>
+    <string name="common_local">Local</string>
+    <string name="common_model">Model</string>
+    <string name="common_add">Add</string>
+    <string name="credential_add">Add Credential</string>
+    <string name="common_username">Username</string>
+    <string name="common_got_it">Got it</string>
+    <string name="common_edit">Edit</string>
+    <string name="credential_token">Access Token / PAT</string>
+    <string name="common_rename">Rename</string>
+    <string name="common_hide">Hide</string>
+
+    <!-- Log -->
+    <string name="log_all">All Logs</string>
+    <string name="log_filter_prefix">Filter: %1$s</string>
+    <string name="log_mcp_prefix">MCP Log: %1$s</string>
+    <string name="log_no_file">No file selected</string>
+    <string name="log_no_filter">No filter</string>
+    <string name="log_no_match">No logs match the current filter</string>
+    <string name="log_reading">Reading logs...</string>
+    <string name="log_show_last_lines">Showing last %1$s/%2$s lines</string>
+    <string name="log_show_lines">Showing %1$s lines</string>
+
+    <!-- ? -->
+    <string name="sync_unknown_connection">Unknown connection</string>
+
+    <!-- AI Chat Panel -->
+    <string name="chat_attachment_prefix">Attachments:</string>
+    <string name="chat_attachment_max">Up to %1$s attachments at once</string>
+    <string name="chat_attachment_uploaded">%1$s attachments uploaded</string>
+    <string name="chat_attachment_uploaded_partial">%1$s attachments uploaded, some were not added</string>
+    <string name="chat_image_too_large">Image exceeds %1$s, please compress and retry</string>
+    <string name="chat_uploaded_to">Uploaded to %1$s</string>
+    <string name="chat_select_workspace_first">Please select a workspace first</string>
+    <string name="chat_read_file_failed">Cannot read the selected file</string>
+    <string name="chat_workspace_unavailable">Workspace unavailable</string>
+    <string name="chat_upload_failed">Upload failed</string>
+    <string name="chat_unsupported_image_type">Unrecognized image type, only jpg/png/gif/webp supported</string>
+    <string name="chat_new_session_btn">New Chat</string>
+    <string name="chat_open_sidebar">Open sidebar</string>
+    <string name="chat_no_model_selected">No model selected</string>
+    <string name="chat_open_git">Open version control</string>
+    <string name="chat_open_terminal">Open terminal</string>
+    <string name="chat_ssh_connected">SSH: Connected</string>
+    <string name="chat_ssh_connecting">SSH: Connecting…</string>
+    <string name="chat_ssh_failed">SSH: Connection failed</string>
+    <string name="chat_ssh_disconnected">SSH: Not connected</string>
+    <string name="chat_connecting_remote">Connecting to remote server…</string>
+    <string name="chat_remote_connect_failed">Remote server connection failed, please check settings</string>
+    <string name="chat_no_remote_connection">Not connected to remote server</string>
+    <string name="chat_placeholder">How can I help you?</string>
+    <string name="chat_input_hint">Describe what you need, and I\'ll help you write, modify, or explain code</string>
+
+    <!-- About -->
+    <string name="about_version">Version</string>
+    <string name="about_github_repo">GitHub Repository</string>
+    <string name="about_license">Open Source License</string>
+    <string name="about_description">AI-powered code editor running on Android · Built-in Terminal · AI Agent · MCP Protocol</string>
+    <string name="about_check_update">Check for updates</string>
+    <string name="about_checking_update">Querying GitHub for the latest version…</string>
+    <string name="about_up_to_date">Already up to date</string>
+    <string name="about_up_to_date_detail">Current version v%1$s, already the latest Release on GitHub.</string>
+    <string name="about_new_version_found">New version available</string>
+    <string name="about_new_version_detail">Current v%1$s, latest v%2$s. Tap "Download" to open GitHub Releases for the latest APK.</string>
+    <string name="about_download">Download</string>
+    <string name="about_later">Later</string>
+    <string name="about_check_failed">Check failed</string>
+    <string name="about_ok">OK</string>
+    <string name="about_parse_version_failed">Cannot parse the latest version number</string>
+    <string name="about_network_error">Network error</string>
+
+    <!-- Ask User Question -->
+    <string name="ask_confirm_title">AI needs your confirmation</string>
+    <string name="ask_supplement">Supplement</string>
+    <string name="ask_confirm">Confirm</string>
+    <string name="ask_custom_answer">Enter a custom answer</string>
+    <string name="ask_input_hint">Please enter…</string>
+
+    <!-- Backup -->
+    <string name="backup_exported">Backup exported</string>
+    <string name="backup_write_failed">Write failed: %1$s</string>
+    <string name="backup_read_failed">Failed to read backup file</string>
+    <string name="backup_export_title">Export Backup</string>
+    <string name="backup_export_subtitle">Select data to export, optionally password-encrypted (tar.gz)</string>
+    <string name="backup_import_title">Import Backup</string>
+    <string name="backup_import_subtitle">Restore data from backup file (merged, existing data preserved)</string>
+    <string name="backup_set_password">Set export password</string>
+    <string name="backup_password_hint">Leave empty for unencrypted tar.gz; enter a password for AES-GCM encryption</string>
+    <string name="backup_export_btn">Export</string>
+    <string name="backup_password_input">Enter backup password</string>
+    <string name="backup_password_optional_hint">Leave empty if backup is unencrypted</string>
+    <string name="backup_import_btn">Import</string>
+    <string name="backup_operation_failed">Operation failed</string>
+    <string name="backup_import_done">Import complete</string>
+    <string name="backup_section_title">Backup &amp; Restore</string>
+    <string name="backup_section_desc">Export as tar.gz archive, optionally AES-GCM encrypted, including API keys and credentials. If the password is lost, encrypted backups cannot be recovered. Data remains stored in plaintext within the app after import.</string>
+    <string name="backup_select_data">Select export data</string>
+    <string name="backup_data_git_credentials">Git Credentials</string>
+    <string name="backup_data_remote">Remote Connections &amp; Mounts</string>
+    <string name="backup_data_chat_history">Chat History</string>
+    <string name="backup_data_mcp">MCP Servers</string>
+    <string name="backup_data_permissions">Permission Rules</string>
+    <string name="backup_data_app_settings">App Settings</string>
+    <string name="backup_next">Next</string>
+    <string name="backup_password_label">Password (optional)</string>
+    <string name="backup_processing">Processing</string>
+    <string name="backup_processing_data">Processing data…</string>
+    <string name="backup_restored_data">Restored data:</string>
+    <string name="backup_stat_providers">· AI Providers: %1$s</string>
+    <string name="backup_stat_git_credentials">· Git Credentials: %1$s</string>
+    <string name="backup_stat_remote_connections">· Remote Connections: %1$s</string>
+    <string name="backup_stat_remote_mounts">· Remote Mounts: %1$s</string>
+    <string name="backup_stat_chat_sessions">· Chat Sessions: %1$s</string>
+    <string name="backup_stat_chat_messages">· Chat Messages: %1$s</string>
+    <string name="backup_stat_todo_items">· Todo Items: %1$s</string>
+    <string name="backup_stat_mcp_servers">· MCP Servers: %1$s</string>
+    <string name="backup_stat_permission_rules">· Global Permission Rules: %1$s</string>
+    <string name="backup_settings_covered">Theme, keepalive, logging, vision, and sync preferences covered</string>
+
+    <!-- Backup ViewModel -->
+    <string name="backup_export_failed">Export failed</string>
+    <string name="backup_wrong_password">Wrong backup password, or the encrypted backup file is corrupted</string>
+    <string name="backup_import_failed">Import failed</string>
+
+    <!-- Chat Drawer -->
+    <string name="chat_history">History</string>
+    <string name="chat_no_sessions_hint">No sessions yet, tap "New Session" to start</string>
+    <string name="chat_settings">Settings</string>
+    <string name="chat_delete_session">Delete Session</string>
+    <string name="chat_delete_session_confirm">Delete "%1$s"? All messages in this session will be cleared and cannot be undone.</string>
+    <string name="chat_rename_session">Rename Session</string>
+    <string name="chat_session_name">Session name</string>
+
+    <!-- Chat Input Bar -->
+    <string name="chat_input_placeholder">Type a message to chat with AI…</string>
+    <string name="chat_upload_file">Upload File</string>
+    <string name="chat_upload_image">Upload Image</string>
+    <string name="chat_remove_attachment">Remove attachment</string>
+    <string name="chat_manage">Manage</string>
+    <string name="chat_no_models_hint">No models available, add one in "Manage"</string>
+    <string name="chat_stop">Stop</string>
+    <string name="chat_send">Send</string>
+    <string name="chat_perm_single_use_desc">Contains command substitution/pipes/redirects, cannot be remembered, single-use only</string>
+    <string name="chat_perm_always_tool_desc">"Always allow" will remember all calls of this tool for this project</string>
+    <string name="chat_perm_always_prefix">"Always allow" will remember for this project:</string>
+    <string name="chat_perm_deny">Deny</string>
+    <string name="chat_perm_always_allow">Always Allow</string>
+    <string name="chat_code_changes_applied">Code changes applied</string>
+    <string name="chat_preview_changes">Preview code changes · %1$s</string>
+    <string name="chat_apply">Apply</string>
+    <string name="chat_plan_completed">Plan completed</string>
+    <string name="chat_continue_feedback">Continue feedback</string>
+    <string name="chat_approve_and_implement">Approve and implement</string>
+
+    <!-- Chat Message Bubbles -->
+    <string name="chat_copied">Copied</string>
+    <string name="chat_copy">Copy</string>
+    <string name="chat_bg_command_done">Background command completed</string>
+    <string name="chat_context_compressed">Context compressed</string>
+    <string name="chat_compressing_context">Compressing context</string>
+    <string name="chat_retrying">Network issue, retrying %1$s/%2$s</string>
+    <string name="chat_thinking_process">Thinking process</string>
+    <string name="chat_expand_remaining">Expand remaining %1$s lines</string>
+
+    <!-- Container Settings -->
+    <string name="container_section_desc">Select a container image as the command execution backend. Local images use PRoot container, remote SSH images connect to a remote server to execute commands.</string>
+    <string name="container_bindings">Bindings: %1$s</string>
+    <string name="container_reset">Reset</string>
+    <string name="container_add_image">Add Image</string>
+    <string name="container_remote_ssh">Remote SSH</string>
+    <string name="container_custom_image">Custom Image</string>
+    <string name="container_delete_config">Delete Image Config</string>
+    <string name="container_delete_confirm">Delete "%1$s"? %2$sBuilt-in Alpine is not affected.</string>
+    <string name="container_rootfs_will_be_cleared">Its rootfs directory will also be removed.</string>
+    <string name="container_switch_image">Switch Container Image</string>
+    <string name="container_switch_confirm">After switching to "%1$s", the currently running AI sessions will be stopped and terminal tabs will be closed. Continue?</string>
+    <string name="container_reset_builtin">Reset Built-in Container</string>
+    <string name="container_reset_confirm">This will delete the built-in Alpine container\'s rootfs directory (including installed tools and configs). It will be re-extracted and initialized on next container start. Continue?</string>
+    <string name="container_builtin_auto">Built-in Image · Auto (bash/sh)</string>
+    <string name="container_remote_ssh_desc">Remote SSH · %1$s · %2$s</string>
+    <string name="container_imported_desc">Imported tar.gz · shell: %1$s</string>
+    <string name="container_edit_image">Edit Image</string>
+    <string name="container_local_image">Local Image</string>
+    <string name="container_shell_path">Shell path (e.g. /bin/sh, /bin/bash)</string>
+    <string name="container_extra_bindings">Extra bindings (space-separated, e.g. /sdcard:/mnt)</string>
+    <string name="container_extra_proot_args">Extra proot args (space-separated)</string>
+    <string name="container_imported_click">Imported (tap to reselect)</string>
+    <string name="container_file_selected">File selected</string>
+    <string name="container_select_image_file">Select tar.gz / tgz / tar.xz / txz image file</string>
+    <string name="container_no_sftp_channel">No SFTP channel available. Please configure an SFTP connection in the "Remote Server" page first.</string>
+    <string name="container_select_ssh_channel">Select SSH Channel</string>
+    <string name="container_ssh_channel">SSH Channel</string>
+    <string name="container_remote_workspace_path">Remote Workspace Path</string>
+    <string name="container_remote_workspace_desc">AI\'s ~/workspace will be mapped to this remote path. Commands run via SSH exec, file I/O via SFTP.</string>
+
+    <!-- Credential Editor -->
+    <string name="credential_edit">Edit Credential</string>
+    <string name="credential_delete">Delete Credential</string>
+    <string name="credential_usage_desc">Credentials are used for authentication when pushing/pulling https remote repos. For multiple accounts on the same host, the one with "Default" enabled takes priority; if none is default, the first one for that host is used.</string>
+    <string name="credential_host">Remote Host</string>
+    <string name="credential_alias">Alias (optional)</string>
+    <string name="credential_set_default">Set as default credential for this host</string>
+    <string name="credential_default_hint">For multiple accounts on the same host, the default one is injected first</string>
+    <string name="credential_fields_required">Host, username, and token are all required</string>
+
+    <!-- Credential List -->
+    <string name="credential_empty_hint">No credentials yet, tap + to add\n(host / username / token)</string>
+
+    <!-- Credential Prompt -->
+    <string name="credential_prompt_title">Login credentials needed for %1$s</string>
+    <string name="credential_remote_host">Remote Host</string>
+    <string name="credential_prompt_desc">Once filled, it will be saved and retried automatically. The credential is also saved to git inside the container, so terminal and AI can use it directly for bare git commands.</string>
+    <string name="credential_save_and_retry">Save and Retry</string>
+
+    <!-- Diff Viewer -->
+    <string name="diff_no_changes">No differences</string>
+    <string name="diff_binary_file">Binary file, text diff not supported</string>
+    <string name="diff_file_too_large">File too large, diff calculation skipped</string>
+    <string name="diff_file_too_large_desc">Files over 2000 lines are not diffed line-by-line to avoid memory pressure.</string>
+
+    <!-- Git -->
+    <string name="git_credentials_and_identity">Credentials &amp; Identity</string>
+    <string name="git_refresh">Refresh</string>
+    <string name="git_tab_status">Status</string>
+    <string name="git_tab_branches">Branches</string>
+    <string name="git_tab_commits">Commits</string>
+    <string name="git_computing_diff">Computing diff...</string>
+    <string name="git_clean_with_changes">Working tree clean, no changes</string>
+    <string name="git_staged_count">Staged (%1$s)</string>
+    <string name="git_unstage">Unstage</string>
+    <string name="git_modified_count">Modified (%1$s)</string>
+    <string name="git_stage">Stage</string>
+    <string name="git_untracked_count">Untracked (%1$s)</string>
+    <string name="git_clean">Working tree clean</string>
+    <string name="git_has_changes">Working tree has changes</string>
+    <string name="git_no_branch">(no branch)</string>
+    <string name="git_staged_label">Staged</string>
+    <string name="git_modified_label">Modified</string>
+    <string name="git_untracked_label">Untracked</string>
+    <string name="git_commit_changes">Commit Changes</string>
+    <string name="git_no_identity">No identity configured, cannot commit. Please fill in user.name / user.email in the "Credentials" page.</string>
+    <string name="git_stage_all">Stage All</string>
+    <string name="git_pull">Pull</string>
+    <string name="git_push">Push</string>
+    <string name="git_loading_branches">Loading branch list…</string>
+    <string name="git_no_branches">No branches</string>
+    <string name="git_no_checked_out_branch">No branch checked out</string>
+    <string name="git_switch_branch">Switch Branch</string>
+    <string name="git_detached_head_warning">Switching to tag %1$s will enter detached HEAD state — not on any branch, new commits won\'t belong to any branch. Continue?</string>
+    <string name="git_create_tracking_branch">Create a local tracking branch from remote branch %1$s and switch?</string>
+    <string name="git_switch_confirm">Switch to %1$s?</string>
+    <string name="git_new_branch">New Branch</string>
+    <string name="git_branch_name">Branch name</string>
+    <string name="git_base_branch">Base branch</string>
+    <string name="git_create_and_switch">Create and Switch</string>
+    <string name="git_delete_remote_branch">Delete Remote Branch</string>
+    <string name="git_delete_branch">Delete Branch</string>
+    <string name="git_delete_remote_branch_confirm">Delete remote branch %1$s? This action cannot be undone.</string>
+    <string name="git_delete_local_branch_confirm">Delete local branch %1$s?</string>
+    <string name="git_rename_branch">Rename Branch</string>
+    <string name="git_rename_to">Rename %1$s to:</string>
+    <string name="git_new_branch_name">New branch name</string>
+    <string name="git_new_tag">New Tag</string>
+    <string name="git_create_tag_desc">Create lightweight tag from current HEAD (%1$s)</string>
+    <string name="git_tag_name">Tag name</string>
+    <string name="git_delete_tag">Delete Tag</string>
+    <string name="git_delete_tag_confirm">Delete local tag %1$s?</string>
+    <string name="git_checked_out">Checked out</string>
+    <string name="git_current_branch">Current branch</string>
+    <string name="git_remote">Remote</string>
+    <string name="git_tags">Tags</string>
+    <string name="git_new">New</string>
+    <string name="git_no_commits">No commits yet</string>
+    <string name="git_commit_count">Commits (%1$s)</string>
+    <string name="git_load_more_commits">Pull up to load more commits</string>
+    <string name="git_latest_commit">Latest commit</string>
+    <string name="git_recent_commit">Recent commit</string>
+    <string name="git_expanded">Expanded</string>
+    <string name="git_latest_date">Latest date</string>
+    <string name="git_files_changed">%1$s files changed</string>
+    <string name="git_no_files_changed">No files changed in this commit</string>
+    <string name="git_loading_files">Loading changed files...</string>
+    <string name="git_not_a_repo">Current workspace is not a Git repository</string>
+    <string name="git_init_desc">Initialization will create .git here, after which you can stage, commit, and link remotes.</string>
+    <string name="git_init_repo">Initialize Git Repository</string>
+    <string name="git_commit_message">Commit message</string>
+
+    <!-- Git Identity -->
+    <string name="git_identity_title">Commit Identity (git config --global)</string>
+    <string name="git_identity_desc">Used as author for every commit. Applies globally in the container, shared across all workspaces.</string>
+    <string name="git_remote_url">Remote URL (remote.origin.url)</string>
+    <string name="git_actual_identity_none">Actual git identity: (not configured)</string>
+    <string name="git_actual_identity">Actual git identity: %1$s</string>
+
+    <!-- Main Activity -->
+    <string name="main_no_storage_permission">Storage permission not granted, local image directory may not be writable.</string>
+
+    <!-- MCP Editor -->
+    <string name="mcp_add">Add MCP</string>
+    <string name="mcp_edit">Edit MCP</string>
+    <string name="mcp_view_logs">View this MCP\'s logs</string>
+    <string name="mcp_refresh_tools">Refresh Tools</string>
+    <string name="mcp_basic_settings">Basic Settings</string>
+    <string name="mcp_enabled">Enabled</string>
+    <string name="mcp_name_hint">e.g. fetch, github, gitlab</string>
+    <string name="mcp_transport_type">Transport Type</string>
+    <string name="mcp_remote_http">Remote HTTP</string>
+    <string name="mcp_local_stdio">Local stdio</string>
+    <string name="mcp_save_first_hint">Please save and connect to the server first to view the tool list</string>
+    <string name="mcp_no_tools_hint">No tools detected, tap the refresh button in the top right to retry</string>
+    <string name="mcp_no_description">No description</string>
+    <string name="mcp_needs_approval">Needs approval</string>
+    <string name="mcp_delete_server">Delete this MCP server</string>
+
+    <!-- MCP HTTP Fields -->
+    <string name="mcp_server_url">Server URL</string>
+    <string name="mcp_server_url_hint">e.g. https://api.example.com/sse</string>
+    <string name="mcp_custom_headers">Custom Headers</string>
+    <string name="mcp_no_custom_headers">No custom headers configured</string>
+    <string name="mcp_header_name">Header Name</string>
+    <string name="mcp_header_name_hint">e.g. Authorization</string>
+    <string name="mcp_header_value">Header Value</string>
+    <string name="mcp_header_value_hint">e.g. Bearer xxxxxx</string>
+    <string name="mcp_add_header">Add Header</string>
+
+    <!-- MCP Settings -->
+    <string name="mcp_empty">No MCP servers configured</string>
+    <string name="mcp_empty_hint">Tap + in the top right to add a remote HTTP or local stdio server</string>
+    <string name="mcp_disabled">Disabled</string>
+    <string name="mcp_not_connected">Not connected</string>
+    <string name="mcp_connected">Connected</string>
+    <string name="mcp_connecting">Connecting…</string>
+    <string name="mcp_connection_failed">Connection failed</string>
+    <string name="mcp_builtin">Built-in</string>
+    <string name="mcp_tools_count">Tools: %1$s/%2$s</string>
+    <string name="mcp_details">Details</string>
+
+    <!-- MCP stdio Fields -->
+    <string name="mcp_command">Command</string>
+    <string name="mcp_command_hint">e.g. npx</string>
+    <string name="mcp_args">Arguments</string>
+    <string name="mcp_no_args">No extra arguments</string>
+    <string name="mcp_arg_value">Argument Value</string>
+    <string name="mcp_arg_hint">e.g. -y or @modelcontextprotocol/server-xxx</string>
+    <string name="mcp_add_arg">Add Argument</string>
+    <string name="mcp_env_vars">Environment Variables</string>
+    <string name="mcp_no_env_vars">No custom environment variables</string>
+    <string name="mcp_env_name">Variable Name</string>
+    <string name="mcp_env_name_hint">e.g. API_KEY</string>
+    <string name="mcp_env_value">Variable Value</string>
+    <string name="mcp_env_value_hint">e.g. sk-xxxx</string>
+    <string name="mcp_add_env_var">Add Environment Variable</string>
+
+    <!-- Permissions Settings -->
+    <string name="perm_builtin_whitelist">Built-in Security Whitelist</string>
+    <string name="perm_whitelist_desc">The system has a preset whitelist for a few completely harmless, read-only commands that don\'t spawn subprocesses (e.g. ls, pwd, cat, grep, ps, top, git status) for automatic approval without a dialog.</string>
+    <string name="perm_rules_desc">Here you can manage remembered rules generated when users select "Always Allow" in conversations. The fine-grained authorization mechanism matches precisely by command or path (e.g. rm temp.log, git pull).</string>
+    <string name="perm_current_project">Current project: %1$s</string>
+    <string name="perm_current_project_none">Current project (not selected)</string>
+    <string name="perm_no_project_rules">No rules for this project</string>
+    <string name="perm_global">Global</string>
+    <string name="perm_no_global_rules">No global rules</string>
+    <string name="perm_entire_tool">Entire tool</string>
+    <string name="perm_deny">Deny</string>
+    <string name="perm_promote_to_global">Promote to global</string>
+
+    <!-- Provider Editor -->
+    <string name="provider_new">New Provider</string>
+    <string name="provider_add">Add Provider</string>
+    <string name="provider_edit">Edit Provider</string>
+    <string name="provider_delete">Delete Provider</string>
+    <string name="provider_add_model">Add Model</string>
+    <string name="provider_config">Config</string>
+    <string name="provider_full_url">Full URL</string>
+    <string name="provider_full_url_on_desc">When enabled, the Base URL is the full request endpoint, no default path appended</string>
+    <string name="provider_full_url_off_desc">When disabled, the default path is automatically appended</string>
+    <string name="provider_response_api">Response API (new)</string>
+    <string name="provider_models_count">Models (%1$s)</string>
+    <string name="provider_fetch_models">Fetch Models</string>
+    <string name="provider_model_name">Model Name</string>
+    <string name="provider_model_name_hint">e.g. gpt-4o</string>
+    <string name="provider_model_already_added">This model has already been added</string>
+    <string name="provider_filter_models_hint">Filter models by name</string>
+    <string name="provider_fetching">Fetching…</string>
+    <string name="provider_fetch_failed">Fetch failed: %1$s</string>
+    <string name="provider_no_matching_models">No matching models</string>
+    <string name="provider_collapse_brand">Collapse %1$s</string>
+    <string name="provider_expand_brand">Expand %1$s</string>
+    <string name="provider_please_wait">Please wait…</string>
+    <string name="provider_test">Test</string>
+
+    <!-- Provider Logo -->
+    <string name="provider_brand_doubao">Doubao</string>
+    <string name="provider_brand_zhipu">Zhipu</string>
+    <string name="provider_brand_tongyi">Tongyi</string>
+    <string name="provider_brand_tongyi_qianwen">Tongyi Qianwen</string>
+    <string name="provider_model_icon">Model icon</string>
+
+    <!-- Providers & Log -->
+    <string name="providers_empty">No providers yet, tap + to add one</string>
+    <string name="log_level">Log Level</string>
+    <string name="log_level_desc">Logs below this level will be ignored. Use VERBOSE during development (log all); NONE to disable logging.</string>
+    <string name="log_file_location">Log files are located at Android/data/&lt;package&gt;/files/logs/.</string>
+    <string name="provider_no_models_hint">No models configured, tap edit to add</string>
+    <string name="provider_model_summary">Model: %1$s · %2$s total</string>
+
+    <!-- Remote Dialogs -->
+    <string name="remote_edit_connection">Edit Connection Channel</string>
+    <string name="remote_add_connection">Add Connection Channel</string>
+    <string name="remote_protocol_type">Protocol:</string>
+    <string name="remote_channel_name_hint">Channel name (e.g. Internal storage image)</string>
+    <string name="remote_connection_name_hint">Connection name (e.g. Tencent Cloud Server)</string>
+    <string name="remote_internal_dir">Internal Storage Target Directory</string>
+    <string name="remote_host_address">Host (IP or domain)</string>
+    <string name="remote_select_dir">Select Directory</string>
+    <string name="remote_port">Port</string>
+    <string name="remote_password">Password</string>
+    <string name="remote_toggle_password">Toggle password visibility</string>
+    <string name="remote_internal_dir_desc">This directory serves as the image root. The workspace will sync here one-way for apps that can only access regular directories.</string>
+    <string name="remote_test_dir">Test Directory</string>
+    <string name="remote_test_connection">Test Connection</string>
+    <string name="remote_edit_workspace">Edit Workspace</string>
+    <string name="remote_add_workspace">Add Workspace</string>
+    <string name="remote_select_channel">Select Remote Channel</string>
+    <string name="remote_link_channel">Link Remote Connection Channel</string>
+    <string name="remote_mount_subdir">Mount Target Subdirectory</string>
+    <string name="remote_target_dir">Remote Target Directory (absolute path)</string>
+    <string name="remote_browse_dir">Browse Directory</string>
+    <string name="remote_local_channel_subdir_desc">The local channel\'s image root comes from the connection config; fill in a subdirectory under the root, usually just /.</string>
+    <string name="remote_select_local_workspace">Select Local Workspace</string>
+    <string name="remote_map_to_local">Map to Local Workspace</string>
+    <string name="remote_no_local_workspace">No local workspaces, please create one in the sidebar first.</string>
+    <string name="remote_auto_connect_on_start">Auto-connect on app start</string>
+    <string name="remote_auto_connect_and_sync">Auto-connect and sync this workspace on boot</string>
+    <string name="remote_select_remote_dir">Select Remote Directory</string>
+    <string name="remote_current_path">Current path: %1$s</string>
+    <string name="remote_load_failed">Load failed: %1$s</string>
+    <string name="remote_parent_dir">.. (parent)</string>
+    <string name="remote_confirm_select">Confirm Selection</string>
+
+    <!-- Remote FTP -->
+    <string name="ftp_usage_title">Usage Guide</string>
+    <string name="ftp_usage_desc">1. Phone and computer must be on the same WiFi network.\n2. After starting the service, access the FTP address below from your computer\'s file explorer (or FileZilla).\n3. Once connected, you can directly view and edit all code projects under the phone\'s workspace root (projects) from your computer.</string>
+    <string name="ftp_running">Running: %1$s</string>
+    <string name="ftp_not_running">Service not running</string>
+    <string name="ftp_error">Error: %1$s</string>
+    <string name="ftp_config_title">Service Configuration</string>
+    <string name="ftp_listen_port">Listen Port</string>
+    <string name="ftp_login_username">Login Username</string>
+    <string name="ftp_login_password">Login Password</string>
+    <string name="ftp_allow_anonymous">Allow Anonymous</string>
+    <string name="ftp_anonymous_desc">Connect without username and password</string>
+    <string name="ftp_auto_start">Auto-start on boot</string>
+    <string name="ftp_auto_start_desc">Automatically start FTP service in background on app launch</string>
+    <string name="ftp_config_saved">Configuration saved</string>
+    <string name="ftp_save_config">Save Configuration</string>
+
+    <!-- Remote Server -->
+    <string name="remote_workspace_title">Remote Workspace</string>
+    <string name="remote_tab_connections">Connections</string>
+    <string name="remote_tab_ftp">Built-in FTP</string>
+    <string name="remote_tab_sync">Sync Settings</string>
+    <string name="remote_no_connections">No connections yet, tap to add.</string>
+    <string name="remote_no_workspaces">No workspaces yet, tap to add.</string>
+    <string name="remote_hint_title">Hint</string>
+    <string name="remote_add_channel_first">Please add a remote channel in "Connections" first.</string>
+    <string name="remote_go_add">Go Add</string>
+
+    <!-- Remote Server ViewModel -->
+    <string name="remote_upload_all_failed">Full upload failed: %1$s</string>
+    <string name="remote_upload_all_success">Full upload successful!</string>
+    <string name="remote_download_all_failed">Full download failed: %1$s</string>
+    <string name="remote_download_all_success">Full download successful!</string>
+    <string name="remote_connect_success">Connection successful!</string>
+    <string name="remote_connect_failed">Connection failed: %1$s</string>
+    <string name="remote_unknown_error">Unknown error</string>
+
+    <!-- Remote Sync -->
+    <string name="sync_ignore_list">Directory/File Ignore List</string>
+    <string name="sync_ignore_desc">Separate multiple rules with commas. Directories and files with these names will not be synced to the remote server (e.g. node_modules).</string>
+    <string name="sync_ignore_rules">Ignore Rules</string>
+    <string name="sync_ignore_saved">Ignore rules saved</string>
+    <string name="sync_save_rules">Save Rules</string>
+    <string name="sync_follow_gitignore">Follow .gitignore rules</string>
+    <string name="sync_gitignore_desc">If a .gitignore exists in the project root, it will also be read and ignored.</string>
+    <string name="sync_gitignore_enabled">.gitignore filtering enabled</string>
+    <string name="sync_gitignore_disabled">.gitignore filtering disabled</string>
+    <string name="sync_max_batch_size">Max Sync Batch Size</string>
+    <string name="sync_batch_size_desc">Prevents sudden mass file modifications from overwhelming the server and causing disconnection. Operations exceeding this limit will be queued and processed in batches with brief pauses between batches.</string>
+    <string name="sync_max_batch_count">Max Count</string>
+    <string name="sync_batch_size_saved">Max batch size saved</string>
+    <string name="sync_save_batch_size">Save Count</string>
+    <string name="sync_via_connection">Via: %1$s</string>
+    <string name="sync_auto_connect">Auto-connect</string>
+    <string name="sync_mount_subdir">Mount subdir: %1$s</string>
+    <string name="sync_remote_path">Remote path: %1$s</string>
+    <string name="sync_local_path">Local path: %1$s</string>
+    <string name="sync_disconnect">Disconnect</string>
+    <string name="sync_all">Sync All</string>
+    <string name="sync_upload_all">Upload All</string>
+    <string name="sync_download_all">Download All</string>
+    <string name="sync_connect_and_sync">Connect and Sync</string>
+
+    <!-- Terminal -->
+    <string name="terminal_title">Terminal</string>
+    <string name="terminal_reconnect_tab">Reconnect current tab</string>
+    <string name="terminal_start_failed">Cannot start terminal:\n%1$s</string>
+    <string name="terminal_retry">Retry</string>
+    <string name="terminal_no_open_tabs">No open terminal tabs</string>
+    <string name="terminal_close_tab">Close Tab</string>
+    <string name="terminal_extracting_env">Extracting environment…\n%1$s files processed</string>
+    <string name="terminal_deploying_proot">Deploying proot runtime…</string>
+    <string name="terminal_installing_packages">Installing python3 / git / pip / node / npm…\n%1$s</string>
+    <string name="terminal_preparing_env_failed">Preparing container environment…\n%1$s</string>
+    <string name="terminal_preparing_env_first_run">Preparing container environment…\nFirst run will extract the container, please wait</string>
+
+    <!-- Todo Card -->
+    <string name="todo_completed">Completed</string>
+    <string name="todo_in_progress">In Progress</string>
+
+    <!-- Tool Message -->
+    <string name="tool_instruction">Instruction</string>
+    <string name="tool_result">Result</string>
+    <string name="tool_expand_remaining">Expand remaining %1$s lines</string>
+
+    <!-- Vision Model -->
+    <string name="vision_follow_chat_model">Follow current chat model</string>
+    <string name="vision_follow_desc">Vision always uses the currently selected chat model; if it doesn\'t support Vision, image recognition is unavailable.</string>
+    <string name="vision_no_models">No models available. Please add and configure a model in "AI Providers" before selecting a dedicated vision model.</string>
+    <string name="vision_supports_images">Supports image input</string>
+    <string name="vision_no_image_support">No image input support (not recommended for vision)</string>
+
+    <!-- Web Search Result -->
+    <string name="web_search_title">Web Search</string>
+    <string name="web_search_results_count">%1$s results found</string>
+
+    <!-- Workspace Picker -->
+    <string name="workspace_select">Select Workspace</string>
+    <string name="workspace_switch">Switch Workspace</string>
+    <string name="workspace_switch_confirm">Switching workspace will stop all running AI sessions and close terminal tabs in the current workspace. Continue?</string>
+    <string name="workspace_confirm">Confirm</string>
+    <string name="workspace_open">Open Workspace</string>
+    <string name="workspace_new">New</string>
+    <string name="workspace_empty_hint">No workspaces, tap "New" to create one</string>
+    <string name="workspace_delete">Delete Workspace</string>
+    <string name="workspace_delete_confirm">Delete "%1$s"? All files in this directory will be deleted and cannot be undone.</string>
+    <string name="workspace_new_workspace">New Workspace</string>
+    <string name="workspace_name_hint">e.g. my-project</string>
+    <string name="workspace_name_exists">A workspace with this name already exists</string>
+
+    <!-- Helper Strings -->
+    <string name="container_channel_deleted">Channel deleted</string>
 </resources>

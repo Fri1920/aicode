@@ -14,6 +14,8 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import compose.icons.FeatherIcons
 import compose.icons.feathericons.*
+import androidx.compose.ui.res.stringResource
+import com.aicode.R
 
 @Composable
 fun WiFiFtpServerSection(viewModel: RemoteServerViewModel) {
@@ -61,13 +63,13 @@ fun WiFiFtpServerSection(viewModel: RemoteServerViewModel) {
                 Spacer(modifier = Modifier.width(16.dp))
                 Column {
                     Text(
-                        text = "使用说明",
+                        text = stringResource(R.string.ftp_usage_title),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Normal,
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
-                        text = "1. 手机与电脑需连接至同一 WiFi 局域网。\n2. 开启服务后，在电脑的文件资源管理器（或 FileZilla）地址栏访问下方 FTP 地址。\n3. 连接成功后，即可在电脑端直接查看并编辑手机工作区根目录（projects）下的全部代码项目。",
+                        text = stringResource(R.string.ftp_usage_desc),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(top = 4.dp)
@@ -104,7 +106,7 @@ fun WiFiFtpServerSection(viewModel: RemoteServerViewModel) {
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                             Text(
-                                text = if (isRunning) "运行中: $serverUrl" else "服务未开启",
+                                text = if (isRunning) stringResource(R.string.ftp_running, serverUrl) else stringResource(R.string.ftp_not_running),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = if (isRunning) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.padding(top = 2.dp)
@@ -120,7 +122,7 @@ fun WiFiFtpServerSection(viewModel: RemoteServerViewModel) {
                 if (errorMessage != null) {
                     Spacer(modifier = Modifier.height(12.dp))
                     Text(
-                        text = "错误: $errorMessage",
+                        text = context.getString(R.string.ftp_error, errorMessage!!),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.error
                     )
@@ -147,7 +149,7 @@ fun WiFiFtpServerSection(viewModel: RemoteServerViewModel) {
                     )
                     Spacer(modifier = Modifier.width(16.dp))
                     Text(
-                        text = "服务参数配置",
+                        text = stringResource(R.string.ftp_config_title),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Normal,
                         color = MaterialTheme.colorScheme.onSurface
@@ -157,7 +159,7 @@ fun WiFiFtpServerSection(viewModel: RemoteServerViewModel) {
                 OutlinedTextField(
                     value = editPort,
                     onValueChange = { editPort = it.filter { char -> char.isDigit() } },
-                    label = { Text("监听端口") },
+                    label = { Text(stringResource(R.string.ftp_listen_port)) },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true
                 )
@@ -165,7 +167,7 @@ fun WiFiFtpServerSection(viewModel: RemoteServerViewModel) {
                 OutlinedTextField(
                     value = editUsername,
                     onValueChange = { editUsername = it },
-                    label = { Text("登录用户名") },
+                    label = { Text(stringResource(R.string.ftp_login_username)) },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
                     enabled = !editAnonymous
@@ -174,7 +176,7 @@ fun WiFiFtpServerSection(viewModel: RemoteServerViewModel) {
                 OutlinedTextField(
                     value = editPassword,
                     onValueChange = { editPassword = it },
-                    label = { Text("登录密码") },
+                    label = { Text(stringResource(R.string.ftp_login_password)) },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
                     enabled = !editAnonymous
@@ -186,8 +188,8 @@ fun WiFiFtpServerSection(viewModel: RemoteServerViewModel) {
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
-                        Text(text = "允许匿名访问", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
-                        Text(text = "无需输入用户名和密码即可连接", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(text = stringResource(R.string.ftp_allow_anonymous), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
+                        Text(text = stringResource(R.string.ftp_anonymous_desc), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     Switch(checked = editAnonymous, onCheckedChange = { editAnonymous = it })
                 }
@@ -198,8 +200,8 @@ fun WiFiFtpServerSection(viewModel: RemoteServerViewModel) {
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
-                        Text(text = "开机自启", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
-                        Text(text = "应用启动时后台自动运行 FTP 服务", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(text = stringResource(R.string.ftp_auto_start), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
+                        Text(text = stringResource(R.string.ftp_auto_start_desc), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     Switch(checked = editAutoStart, onCheckedChange = { editAutoStart = it })
                 }
@@ -208,11 +210,11 @@ fun WiFiFtpServerSection(viewModel: RemoteServerViewModel) {
                     onClick = {
                         val p = editPort.toIntOrNull() ?: 2121
                         viewModel.saveFtpServerConfig(p, editUsername, editPassword, editAnonymous, editAutoStart)
-                        android.widget.Toast.makeText(context, "配置已保存", android.widget.Toast.LENGTH_SHORT).show()
+                        android.widget.Toast.makeText(context, context.getString(R.string.ftp_config_saved), android.widget.Toast.LENGTH_SHORT).show()
                     },
                     modifier = Modifier.align(Alignment.End)
                 ) {
-                    Text("保存配置")
+                    Text(stringResource(R.string.ftp_save_config))
                 }
             }
         }

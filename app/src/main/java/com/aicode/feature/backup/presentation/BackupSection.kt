@@ -50,6 +50,8 @@ import compose.icons.feathericons.Upload
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import androidx.compose.ui.res.stringResource
+import com.aicode.R
 
 @Composable
 internal fun BackupSection(viewModel: BackupViewModel) {
@@ -73,9 +75,9 @@ internal fun BackupSection(viewModel: BackupViewModel) {
                         context.contentResolver.openOutputStream(uri)?.use { it.write(bytes) }
                     }
                 }.onSuccess {
-                    Toast.makeText(context, "备份已导出", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, context.getString(R.string.backup_exported), Toast.LENGTH_SHORT).show()
                 }.onFailure {
-                    Toast.makeText(context, "写入失败: ${it.message}", Toast.LENGTH_LONG).show()
+                    Toast.makeText(context, context.getString(R.string.backup_write_failed, it.message), Toast.LENGTH_LONG).show()
                 }
                 viewModel.reset()
             }
@@ -98,7 +100,7 @@ internal fun BackupSection(viewModel: BackupViewModel) {
                 }
             }.getOrNull()
             if (data == null) {
-                Toast.makeText(context, "读取备份文件失败", Toast.LENGTH_LONG).show()
+                Toast.makeText(context, context.getString(R.string.backup_read_failed), Toast.LENGTH_LONG).show()
                 pendingAction = null
             } else {
                 pendingImportData = data
@@ -116,15 +118,15 @@ internal fun BackupSection(viewModel: BackupViewModel) {
         BackupInfoCard()
         ActionCard(
             icon = FeatherIcons.Download,
-            title = "导出备份",
-            subtitle = "选择要导出的数据，可设置口令加密（tar.gz 格式）",
+            title = stringResource(R.string.backup_export_title),
+            subtitle = stringResource(R.string.backup_export_subtitle),
             enabled = state !is BackupState.Working,
             onClick = { pendingAction = PendingAction.ExportOptions }
         )
         ActionCard(
             icon = FeatherIcons.Upload,
-            title = "导入备份",
-            subtitle = "从备份文件还原数据（合并，不清除现有数据）",
+            title = stringResource(R.string.backup_import_title),
+            subtitle = stringResource(R.string.backup_import_subtitle),
             enabled = state !is BackupState.Working,
             onClick = {
                 pendingAction = PendingAction.Import
@@ -150,9 +152,9 @@ internal fun BackupSection(viewModel: BackupViewModel) {
     // 导出：再输口令（可留空）
     if (pendingAction == PendingAction.ExportPassword) {
         PasswordDialog(
-            title = "设置导出口令",
-            subtitle = "留空则不加密，输出明文 tar.gz；填写则用口令加密（AES-GCM）",
-            confirmText = "导出",
+            title = stringResource(R.string.backup_set_password),
+            subtitle = stringResource(R.string.backup_password_hint),
+            confirmText = stringResource(R.string.backup_export_btn),
             password = password,
             onPasswordChange = { password = it },
             onConfirm = {
@@ -172,9 +174,9 @@ internal fun BackupSection(viewModel: BackupViewModel) {
     // 导入口令弹窗（SAF 选完文件、字节就绪后弹出）
     if (pendingAction == PendingAction.Import && pendingImportData != null) {
         PasswordDialog(
-            title = "输入备份口令",
-            subtitle = "若备份未加密可留空",
-            confirmText = "导入",
+            title = stringResource(R.string.backup_password_input),
+            subtitle = stringResource(R.string.backup_password_optional_hint),
+            confirmText = stringResource(R.string.backup_import_btn),
             password = password,
             onPasswordChange = { password = it },
             onConfirm = {
@@ -206,13 +208,13 @@ internal fun BackupSection(viewModel: BackupViewModel) {
 
     when (state) {
         is BackupState.Error -> ResultDialog(
-            title = "操作失败",
+            title = stringResource(R.string.backup_operation_failed),
             message = (state as BackupState.Error).message,
             onDismiss = { viewModel.reset() }
         )
         is BackupState.ImportSuccess -> ResultDialog(
-            title = "导入完成",
-            message = buildImportSummary((state as BackupState.ImportSuccess).stats),
+            title = stringResource(R.string.backup_import_done),
+            message = buildImportSummary(context, (state as BackupState.ImportSuccess).stats),
             onDismiss = { viewModel.reset() }
         )
         else -> {}
@@ -231,14 +233,14 @@ private fun BackupInfoCard() {
     ) {
         Column(modifier = Modifier.padding(Spacing.lg)) {
             Text(
-                text = "备份与还原",
+                text = stringResource(R.string.backup_section_title),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onSurface
             )
             Spacer(Modifier.height(Spacing.xs))
             Text(
-                text = "导出为 tar.gz 压缩包，可选用口令加密（AES-GCM），含 API Key 等凭据。口令丢失则加密备份无法恢复。导入后应用内仍按现状明文存储。",
+                text = stringResource(R.string.backup_section_desc),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -284,20 +286,20 @@ private fun ExportOptionsDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("选择导出数据") },
+        title = { Text(stringResource(R.string.backup_select_data)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
-                OptionRow("AI 提供商", options.providers) { onOptionsChange(options.copy(providers = it)) }
-                OptionRow("Git 凭据", options.gitCredentials) { onOptionsChange(options.copy(gitCredentials = it)) }
-                OptionRow("远程连接与挂载", options.remoteConnections) { onOptionsChange(options.copy(remoteConnections = it)) }
-                OptionRow("聊天历史", options.chatHistory) { onOptionsChange(options.copy(chatHistory = it)) }
-                OptionRow("MCP 服务器", options.mcpServers) { onOptionsChange(options.copy(mcpServers = it)) }
-                OptionRow("授权规则", options.permissionRules) { onOptionsChange(options.copy(permissionRules = it)) }
-                OptionRow("应用设置", options.appSettings) { onOptionsChange(options.copy(appSettings = it)) }
+                OptionRow(stringResource(R.string.common_ai_providers), options.providers) { onOptionsChange(options.copy(providers = it)) }
+                OptionRow(stringResource(R.string.backup_data_git_credentials), options.gitCredentials) { onOptionsChange(options.copy(gitCredentials = it)) }
+                OptionRow(stringResource(R.string.backup_data_remote), options.remoteConnections) { onOptionsChange(options.copy(remoteConnections = it)) }
+                OptionRow(stringResource(R.string.backup_data_chat_history), options.chatHistory) { onOptionsChange(options.copy(chatHistory = it)) }
+                OptionRow(stringResource(R.string.backup_data_mcp), options.mcpServers) { onOptionsChange(options.copy(mcpServers = it)) }
+                OptionRow(stringResource(R.string.backup_data_permissions), options.permissionRules) { onOptionsChange(options.copy(permissionRules = it)) }
+                OptionRow(stringResource(R.string.backup_data_app_settings), options.appSettings) { onOptionsChange(options.copy(appSettings = it)) }
             }
         },
-        confirmButton = { TextButton(onClick = onConfirm) { Text("下一步") } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } }
+        confirmButton = { TextButton(onClick = onConfirm) { Text(stringResource(R.string.backup_next)) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_cancel)) } }
     )
 }
 
@@ -336,7 +338,7 @@ private fun PasswordDialog(
                 OutlinedTextField(
                     value = password,
                     onValueChange = onPasswordChange,
-                    label = { Text("口令（可选）") },
+                    label = { Text(stringResource(R.string.backup_password_label)) },
                     singleLine = true,
                     visualTransformation = PasswordVisualTransformation(),
                     modifier = Modifier.fillMaxWidth()
@@ -344,7 +346,7 @@ private fun PasswordDialog(
             }
         },
         confirmButton = { TextButton(onClick = onConfirm) { Text(confirmText) } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } }
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_cancel)) } }
     )
 }
 
@@ -352,14 +354,14 @@ private fun PasswordDialog(
 private fun ProgressDialog() {
     AlertDialog(
         onDismissRequest = {},
-        title = { Text("处理中") },
+        title = { Text(stringResource(R.string.backup_processing)) },
         text = {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(Spacing.md)
             ) {
                 CircularProgressIndicator(modifier = Modifier.height(24.dp), strokeWidth = 2.dp)
-                Text("正在处理数据…")
+                Text(stringResource(R.string.backup_processing_data))
             }
         },
         confirmButton = {}
@@ -372,20 +374,20 @@ private fun ResultDialog(title: String, message: String, onDismiss: () -> Unit) 
         onDismissRequest = onDismiss,
         title = { Text(title) },
         text = { Text(message) },
-        confirmButton = { TextButton(onClick = onDismiss) { Text("知道了") } }
+        confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_got_it)) } }
     )
 }
 
-private fun buildImportSummary(stats: com.aicode.feature.backup.domain.RestoreStats): String = buildString {
-    appendLine("已还原数据：")
-    if (stats.providers > 0) appendLine("· AI 提供商 ${stats.providers} 个")
-    if (stats.gitCredentials > 0) appendLine("· Git 凭据 ${stats.gitCredentials} 条")
-    if (stats.remoteConnections > 0) appendLine("· 远程连接 ${stats.remoteConnections} 个")
-    if (stats.remoteMounts > 0) appendLine("· 远程挂载 ${stats.remoteMounts} 个")
-    if (stats.chatSessions > 0) appendLine("· 聊天会话 ${stats.chatSessions} 个")
-    if (stats.agentMessages > 0) appendLine("· 聊天消息 ${stats.agentMessages} 条")
-    if (stats.todoItems > 0) appendLine("· 待办项 ${stats.todoItems} 条")
-    if (stats.mcpServers > 0) appendLine("· MCP 服务器 ${stats.mcpServers} 个")
-    if (stats.globalPermissionRules > 0) appendLine("· 全局授权规则 ${stats.globalPermissionRules} 条")
-    append("主题、保活、日志、识图、同步偏好已覆盖")
+private fun buildImportSummary(context: android.content.Context, stats: com.aicode.feature.backup.domain.RestoreStats): String = buildString {
+    appendLine(context.getString(R.string.backup_restored_data))
+    if (stats.providers > 0) appendLine(context.getString(R.string.backup_stat_providers, stats.providers))
+    if (stats.gitCredentials > 0) appendLine(context.getString(R.string.backup_stat_git_credentials, stats.gitCredentials))
+    if (stats.remoteConnections > 0) appendLine(context.getString(R.string.backup_stat_remote_connections, stats.remoteConnections))
+    if (stats.remoteMounts > 0) appendLine(context.getString(R.string.backup_stat_remote_mounts, stats.remoteMounts))
+    if (stats.chatSessions > 0) appendLine(context.getString(R.string.backup_stat_chat_sessions, stats.chatSessions))
+    if (stats.agentMessages > 0) appendLine(context.getString(R.string.backup_stat_chat_messages, stats.agentMessages))
+    if (stats.todoItems > 0) appendLine(context.getString(R.string.backup_stat_todo_items, stats.todoItems))
+    if (stats.mcpServers > 0) appendLine(context.getString(R.string.backup_stat_mcp_servers, stats.mcpServers))
+    if (stats.globalPermissionRules > 0) appendLine(context.getString(R.string.backup_stat_permission_rules, stats.globalPermissionRules))
+    append(context.getString(R.string.backup_settings_covered))
 }

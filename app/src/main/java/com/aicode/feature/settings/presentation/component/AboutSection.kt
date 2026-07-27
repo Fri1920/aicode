@@ -1,5 +1,6 @@
 package com.aicode.feature.settings.presentation.component
 
+import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Canvas
@@ -102,13 +103,13 @@ internal fun AboutSection() {
 
         LinkRow(
             leading = FeatherIcons.Tag,
-            title = "版本",
+            title = stringResource(R.string.about_version),
             value = "v${appInfo.name}",
             onClick = {
                 if (updateDialog == null) {
                     updateDialog = UpdateDialogState.Checking
                     scope.launch {
-                        updateDialog = checkUpdate(appInfo.name)
+                        updateDialog = checkUpdate(context, appInfo.name)
                     }
                 }
             }
@@ -117,7 +118,7 @@ internal fun AboutSection() {
         // GitHub 仓库
         LinkRow(
             leading = FeatherIcons.Github,
-            title = "GitHub 仓库",
+            title = stringResource(R.string.about_github_repo),
             value = null,
             onClick = { openUrl(context, GITHUB_REPO_URL) }
         )
@@ -125,7 +126,7 @@ internal fun AboutSection() {
         // 许可证
         LinkRow(
             leading = FeatherIcons.Book,
-            title = "开源许可证",
+            title = stringResource(R.string.about_license),
             value = null,
             onClick = { openUrl(context, LICENSE_URL) }
         )
@@ -180,7 +181,7 @@ private fun AboutHeaderCard(appName: String, appIcon: androidx.compose.ui.graphi
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
-                    text = "在 Android 设备上运行的 AI 驱动代码编辑器 · 内置终端 · AI Agent · MCP 协议",
+                    text = stringResource(R.string.about_description),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -263,28 +264,28 @@ private fun UpdateResultDialog(
     when (state) {
         UpdateDialogState.Checking -> AlertDialog(
             onDismissRequest = onDismiss,
-            title = { Text("检查更新") },
-            text = { Text("正在向 GitHub 查询最新版本…") },
+            title = { Text(stringResource(R.string.about_check_update)) },
+            text = { Text(stringResource(R.string.about_checking_update)) },
             confirmButton = {}
         )
         is UpdateDialogState.UpToDate -> AlertDialog(
             onDismissRequest = onDismiss,
-            title = { Text("已经是最新版本") },
-            text = { Text("当前版本 v$currentVersion，已是 GitHub 上最新的 Release。") },
-            confirmButton = { TextButton(onClick = onDismiss) { Text("知道了") } }
+            title = { Text(stringResource(R.string.about_up_to_date)) },
+            text = { Text(stringResource(R.string.about_up_to_date_detail, currentVersion)) },
+            confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_got_it)) } }
         )
         is UpdateDialogState.NewVersion -> AlertDialog(
             onDismissRequest = onDismiss,
-            title = { Text("发现新版本") },
-            text = { Text("当前 v$currentVersion，最新 v${state.latestTag}。点击「前往下载」打开 GitHub Releases 页面获取最新 APK。") },
-            confirmButton = { TextButton(onClick = onOpenRelease) { Text("前往下载") } },
-            dismissButton = { TextButton(onClick = onDismiss) { Text("稍后") } }
+            title = { Text(stringResource(R.string.about_new_version_found)) },
+            text = { Text(stringResource(R.string.about_new_version_detail, currentVersion, state.latestTag)) },
+            confirmButton = { TextButton(onClick = onOpenRelease) { Text(stringResource(R.string.about_download)) } },
+            dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.about_later)) } }
         )
         is UpdateDialogState.Error -> AlertDialog(
             onDismissRequest = onDismiss,
-            title = { Text("检查失败") },
+            title = { Text(stringResource(R.string.about_check_failed)) },
             text = { Text(state.message) },
-            confirmButton = { TextButton(onClick = onDismiss) { Text("好") } }
+            confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.about_ok)) } }
         )
     }
 }
@@ -299,7 +300,7 @@ private fun openUrl(context: android.content.Context, url: String) {
 /**
  * 拉取 GitHub /repos/{owner}/{repo}/releases/latest，比对最新 tag 与当前 versionName。
  */
-private suspend fun checkUpdate(currentVersion: String): UpdateDialogState = withContext(Dispatchers.IO) {
+private suspend fun checkUpdate(context: Context, currentVersion: String): UpdateDialogState = withContext(Dispatchers.IO) {
     runCatching {
         val req = okhttp3.Request.Builder()
             .url(GITHUB_LATEST_API)
@@ -311,7 +312,7 @@ private suspend fun checkUpdate(currentVersion: String): UpdateDialogState = wit
             }
             val body = resp.body?.string().orEmpty()
             val tag = JsonParser.parseString(body).asJsonObject?.get("tag_name")?.asString
-                ?: return@use UpdateDialogState.Error("无法解析最新版本号")
+                ?: return@use UpdateDialogState.Error(context.getString(R.string.about_parse_version_failed))
             val latest = parseVersionTag(tag) ?: tag
             if (sameVersion(latest, currentVersion)) {
                 UpdateDialogState.UpToDate
@@ -319,7 +320,7 @@ private suspend fun checkUpdate(currentVersion: String): UpdateDialogState = wit
                 UpdateDialogState.NewVersion(latestTag = latest)
             }
         }
-    }.getOrElse { UpdateDialogState.Error(it.message ?: "网络错误") }
+    }.getOrElse { UpdateDialogState.Error(it.message ?: context.getString(R.string.about_network_error)) }
 }
 
 /** GitHub tag 形如 v1.0.0 / 1.0.0 / v1.0.0-rc1，提取出纯版本号。 */
