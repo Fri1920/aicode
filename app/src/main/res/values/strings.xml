@@ -1,4 +1,49 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">AiCode</string>
+
+    <!-- 设置页菜单标题 -->
+    <string name="settings_title">设置</string>
+    <string name="settings_providers">AI 提供商</string>
+    <string name="settings_provider_editor">提供商</string>
+    <string name="settings_vision_model">识图模型</string>
+    <string name="settings_mcp">MCP 服务器</string>
+    <string name="settings_container">容器镜像</string>
+    <string name="settings_log">日志等级</string>
+    <string name="settings_log_viewer">日志查看</string>
+    <string name="settings_permissions">工具授权</string>
+    <string name="settings_remote_servers">远程工作区</string>
+    <string name="settings_backup">备份与还原</string>
+    <string name="settings_about">关于</string>
+    <string name="settings_language">语言</string>
+
+    <!-- 语言设置页 -->
+    <string name="language_follow_system">跟随系统</string>
+
+    <!-- SettingsScreen 通用 -->
+    <string name="common_back">返回</string>
+    <string name="settings_add_provider">添加提供商</string>
+    <string name="settings_reconnect">重新连接</string>
+    <string name="settings_add_mcp_server">添加 MCP 服务器</string>
+    <string name="settings_refresh_logs">刷新日志</string>
+    <string name="settings_providers_empty">未添加提供商</string>
+    <string name="settings_providers_count">%1$d 个</string>
+    <string name="settings_providers_active"> · 启用：%1$s</string>
+    <string name="settings_vision_follow_chat">跟随当前聊天模型</string>
+    <string name="settings_vision_dedicated">专用：%1$s · %2$s</string>
+    <string name="settings_mcp_empty">未配置 MCP 服务器</string>
+    <string name="settings_mcp_count_connected">%1$d 个 · 已连接 %2$d</string>
+    <string name="settings_container_current">当前：%1$s</string>
+    <string name="settings_container_builtin_alpine">内置 Alpine</string>
+    <string name="settings_log_current">当前：%1$s</string>
+    <string name="settings_log_viewer_subtitle">查看最近日志，支持 MCP 名称过滤</string>
+    <string name="settings_permissions_empty">未保存授权规则</string>
+    <string name="settings_permissions_count">已保存 %1$d 条</string>
+    <string name="settings_remote_subtitle">管理 SFTP / FTP 工作区同步</string>
+    <string name="settings_theme_title">外观主题</string>
+    <string name="settings_theme_subtitle">选择跟随系统或固定明暗模式</string>
+    <string name="settings_keepalive_title">后台运行保活</string>
+    <string name="settings_keepalive_subtitle">显示前台通知，避免退到后台时系统杀进程</string>
+    <string name="settings_backup_subtitle">加密导出/导入配置、聊天历史与凭据</string>
+    <string name="settings_about_subtitle">版本检查 · GitHub · 许可证</string>
 </resources>

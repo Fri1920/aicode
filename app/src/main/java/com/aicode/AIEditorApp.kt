@@ -4,6 +4,8 @@ import android.app.Application
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.os.Build
+import androidx.appcompat.app.AppCompatDelegate
+import androidx.core.os.LocaleListCompat
 import com.aicode.core.util.AILogger
 import com.aicode.core.util.FileLogger
 import net.schmizz.sshj.common.SecurityUtils
@@ -11,6 +13,7 @@ import com.aicode.feature.agent.domain.container.ContainerInstaller
 import com.aicode.feature.credentials.data.GitCredentialsFileSync
 import com.aicode.feature.agent.domain.mcp.McpManager
 import com.aicode.feature.settings.data.repository.KeepaliveSettingsRepository
+import com.aicode.feature.settings.data.repository.LanguageSettingsRepository
 import com.aicode.feature.settings.data.repository.LogSettingsRepository
 import com.aicode.feature.terminal.domain.TerminalKeepaliveService
 import dagger.hilt.android.HiltAndroidApp
@@ -21,6 +24,7 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
 @HiltAndroidApp
@@ -55,6 +59,10 @@ class AIEditorApp : Application() {
     /** 执行模式仓库（本地 PRoot / 远程 SSH）。 */
     @Inject
     lateinit var executionModeRepository: com.aicode.feature.settings.data.repository.ExecutionModeRepository
+
+    /** 应用语言偏好仓库：监听变化同步到 AppCompatDelegate 使资源即时切换。 */
+    @Inject
+    lateinit var languageSettings: LanguageSettingsRepository
 
     /** 执行模式同步缓存：启动时从 DataStore 读首帧注入 DI。 */
     @Inject
@@ -147,6 +155,20 @@ class AIEditorApp : Application() {
         }
         // 连接已配置的 MCP server，把其工具注册进 ToolRegistry（内部自有 scope，失败不影响启动）。
         mcpManager.start()
+        // 监听语言偏好变化，通过 AppCompatDelegate 切换 App locale。
+        // ComponentActivity 不受 AppCompat 自动 recreate 管理，需手动重建。
+        appScope.launch {
+            languageSettings.languageFlow.collect { tag ->
+                val locales = if (tag.isNullOrBlank()) {
+                    LocaleListCompat.getEmptyLocaleList()
+                } else {
+                    LocaleListCompat.forLanguageTags(tag)
+                }
+                withContext(Dispatchers.Main) {
+                    AppCompatDelegate.setApplicationLocales(locales)
+                }
+            }
+        }
     }
 
     /**

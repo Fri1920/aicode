@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">AiCode</string>
+
+    <!-- Settings menu titles -->
+    <string name="settings_title">Settings</string>
+    <string name="settings_providers">AI Providers</string>
+    <string name="settings_provider_editor">Provider</string>
+    <string name="settings_vision_model">Vision Model</string>
+    <string name="settings_mcp">MCP Servers</string>
+    <string name="settings_container">Container Image</string>
+    <string name="settings_log">Log Level</string>
+    <string name="settings_log_viewer">Log Viewer</string>
+    <string name="settings_permissions">Tool Permissions</string>
+    <string name="settings_remote_servers">Remote Workspace</string>
+    <string name="settings_backup">Backup &amp; Restore</string>
+    <string name="settings_about">About</string>
+    <string name="settings_language">Language</string>
+
+    <!-- Language settings -->
+    <string name="language_follow_system">Follow System</string>
+
+    <!-- SettingsScreen common -->
+    <string name="common_back">Back</string>
+    <string name="settings_add_provider">Add provider</string>
+    <string name="settings_reconnect">Reconnect</string>
+    <string name="settings_add_mcp_server">Add MCP server</string>
+    <string name="settings_refresh_logs">Refresh logs</string>
+    <string name="settings_providers_empty">No providers added</string>
+    <string name="settings_providers_count">%1$d</string>
+    <string name="settings_providers_active"> · Active: %1$s</string>
+    <string name="settings_vision_follow_chat">Follow current chat model</string>
+    <string name="settings_vision_dedicated">Dedicated: %1$s · %2$s</string>
+    <string name="settings_mcp_empty">No MCP servers configured</string>
+    <string name="settings_mcp_count_connected">%1$d · Connected %2$d</string>
+    <string name="settings_container_current">Current: %1$s</string>
+    <string name="settings_container_builtin_alpine">Built-in Alpine</string>
+    <string name="settings_log_current">Current: %1$s</string>
+    <string name="settings_log_viewer_subtitle">View recent logs, supports MCP name filter</string>
+    <string name="settings_permissions_empty">No permission rules saved</string>
+    <string name="settings_permissions_count">%1$d rules saved</string>
+    <string name="settings_remote_subtitle">Manage SFTP / FTP workspace sync</string>
+    <string name="settings_theme_title">Appearance</string>
+    <string name="settings_theme_subtitle">Follow system or fixed light/dark mode</string>
+    <string name="settings_keepalive_title">Background keepalive</string>
+    <string name="settings_keepalive_subtitle">Show foreground notification to avoid process kill</string>
+    <string name="settings_backup_subtitle">Encrypted export/import config, chat history and credentials</string>
+    <string name="settings_about_subtitle">Version check · GitHub · License</string>
+</resources>

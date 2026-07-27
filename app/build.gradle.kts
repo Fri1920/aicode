@@ -144,6 +144,9 @@ android {
             excludes += "META-INF/NOTICE.txt"
             excludes += "META-INF/notice.txt"
             excludes += "META-INF/INDEX.LIST"
+            excludes += "/sshj.properties"
+            excludes += "/kotlin-tooling-metadata.json"
+            excludes += "/DebugProbesKt.bin"
         }
     }
 
@@ -251,6 +254,8 @@ dependencies {
 
     // Core Android
     implementation("androidx.core:core:1.16.0")
+    // AppCompat — 提供 AppCompatDelegate.setApplicationLocales 实现 per-app 语言切换
+    implementation("androidx.appcompat:appcompat:1.7.0")
 
     // Testing
     testImplementation("junit:junit:4.13.2")
