@@ -50,6 +50,13 @@
     <string name="settings_backup_subtitle">Encrypted export/import config, chat history and credentials</string>
     <string name="settings_about_subtitle">Version check · GitHub · License</string>
 
+    <!-- Settings category titles -->
+    <string name="settings_category_ai">AI Configuration</string>
+    <string name="settings_category_environment">Environment</string>
+    <string name="settings_category_tools">Tools  &amp; Permissions</string>
+    <string name="settings_category_appearance">Appearance  &amp; Language</string>
+    <string name="settings_category_other">Other</string>
+
     <!-- i18n: UI strings -->
     <!-- Common -->
     <string name="common_ai_providers">AI Providers</string>

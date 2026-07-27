@@ -650,8 +650,11 @@ class AIAgentViewModel @Inject constructor(
             setCompacting(sessionId, false)
             setRetryState(sessionId, null)
 
-            // Process the next queued request if any
+            // 正常完成时先回到 Idle，再处理队列；队列若有下一轮会重新设 Streaming
             val currentState = _agentStates.value[sessionId]
+            if (currentState !is AgentUIState.Error && currentState !is AgentUIState.Loading && currentState !is AgentUIState.Streaming) {
+                setAgentState(sessionId, AgentUIState.Idle)
+            }
             if (currentState !is AgentUIState.Loading && currentState !is AgentUIState.Streaming) {
                 processNextInQueue(sessionId)
             }

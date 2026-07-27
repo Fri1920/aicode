@@ -358,8 +358,10 @@ internal fun SettingsMenu(
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
             .padding(Spacing.lg),
-        verticalArrangement = Arrangement.spacedBy(Spacing.md)
+        verticalArrangement = Arrangement.spacedBy(Spacing.sm)
     ) {
+        // ── AI 配置 ──
+        SectionHeader(text = stringResource(R.string.settings_category_ai))
         MenuRow(
             icon = FeatherIcons.Cloud,
             title = stringResource(SettingsSection.Providers.titleRes),
@@ -387,11 +389,29 @@ internal fun SettingsMenu(
             subtitle = if (mcpCount == 0) stringResource(R.string.settings_mcp_empty) else stringResource(R.string.settings_mcp_count_connected, mcpCount, mcpConnected),
             onClick = { onOpen(SettingsSection.Mcp) }
         )
+
+        // ── 运行环境 ──
+        SectionHeader(text = stringResource(R.string.settings_category_environment))
         MenuRow(
             icon = FeatherIcons.HardDrive,
             title = stringResource(SettingsSection.Container.titleRes),
             subtitle = stringResource(R.string.settings_container_current, activeContainerProfileName ?: stringResource(R.string.settings_container_builtin_alpine)),
             onClick = { onOpen(SettingsSection.Container) }
+        )
+        MenuRow(
+            icon = FeatherIcons.Server,
+            title = stringResource(SettingsSection.RemoteServers.titleRes),
+            subtitle = stringResource(R.string.settings_remote_subtitle),
+            onClick = { onOpen(SettingsSection.RemoteServers) }
+        )
+
+        // ── 工具与权限 ──
+        SectionHeader(text = stringResource(R.string.settings_category_tools))
+        MenuRow(
+            icon = FeatherIcons.Lock,
+            title = stringResource(SettingsSection.Permissions.titleRes),
+            subtitle = if (permissionRuleCount == 0) stringResource(R.string.settings_permissions_empty) else stringResource(R.string.settings_permissions_count, permissionRuleCount),
+            onClick = { onOpen(SettingsSection.Permissions) }
         )
         MenuRow(
             icon = FeatherIcons.FileText,
@@ -405,19 +425,9 @@ internal fun SettingsMenu(
             subtitle = stringResource(R.string.settings_log_viewer_subtitle),
             onClick = { onOpen(SettingsSection.LogViewer) }
         )
-        MenuRow(
-            icon = FeatherIcons.Lock,
-            title = stringResource(SettingsSection.Permissions.titleRes),
-            subtitle = if (permissionRuleCount == 0) stringResource(R.string.settings_permissions_empty) else stringResource(R.string.settings_permissions_count, permissionRuleCount),
-            onClick = { onOpen(SettingsSection.Permissions) }
-        )
-        MenuRow(
-            icon = FeatherIcons.Server,
-            title = stringResource(SettingsSection.RemoteServers.titleRes),
-            subtitle = stringResource(R.string.settings_remote_subtitle),
-            onClick = { onOpen(SettingsSection.RemoteServers) }
-        )
 
+        // ── 外观与语言 ──
+        SectionHeader(text = stringResource(R.string.settings_category_appearance))
         ThemeModeRow(
             icon = FeatherIcons.Moon,
             title = stringResource(R.string.settings_theme_title),
@@ -431,6 +441,9 @@ internal fun SettingsMenu(
             subtitle = currentLanguageDisplayName,
             onClick = { onOpen(SettingsSection.Language) }
         )
+
+        // ── 其他 ──
+        SectionHeader(text = stringResource(R.string.settings_category_other))
         SwitchRow(
             icon = FeatherIcons.RefreshCw,
             title = stringResource(R.string.settings_keepalive_title),
@@ -575,6 +588,18 @@ internal fun SwitchRow(
             )
         }
     }
+}
+
+/** 分组小标题。 */
+@Composable
+internal fun SectionHeader(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.labelLarge,
+        fontWeight = FontWeight.Bold,
+        color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier.padding(top = Spacing.sm, bottom = Spacing.xs)
+    )
 }
 
 /** 二级菜单入口行：图标 + 标题 + 摘要 + 右箭头。 */

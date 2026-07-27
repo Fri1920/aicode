@@ -212,7 +212,7 @@ fun McpServerEditDialog(
                 // ── Tab Content Area ──
                 Box(
                     modifier = Modifier
-                        .weight(1f, fill = false)
+                        .weight(1f)
                         .fillMaxWidth()
                 ) {
                     if (selectedTab == 0) {

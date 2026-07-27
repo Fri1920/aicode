@@ -50,6 +50,13 @@
     <string name="settings_backup_subtitle">加密导出/导入配置、聊天历史与凭据</string>
     <string name="settings_about_subtitle">版本检查 · GitHub · 许可证</string>
 
+    <!-- Settings category titles -->
+    <string name="settings_category_ai">AI 配置</string>
+    <string name="settings_category_environment">运行环境</string>
+    <string name="settings_category_tools">工具与权限</string>
+    <string name="settings_category_appearance">外观与语言</string>
+    <string name="settings_category_other">其他</string>
+
     <!-- i18n: UI 文案 -->
     <!-- Common -->
     <string name="common_ai_providers">AI 提供商</string>
