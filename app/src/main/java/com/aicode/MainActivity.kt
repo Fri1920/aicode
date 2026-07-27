@@ -120,9 +120,22 @@ class MainActivity : ComponentActivity() {
         // 绘制到系统状态栏/导航栏之下，让应用背景与系统栏融为一体（消除割裂的色块）。
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
-        // 监听语言偏好变化，重建 Activity 使 attachBaseContext 重新应用新 locale。
+        // 监听语言偏好变化，更新 Application/Activity locale 后重建。
         lifecycleScope.launch {
-            languageSettings.languageFlow.drop(1).distinctUntilChanged().collect {
+            languageSettings.languageFlow.drop(1).distinctUntilChanged().collect { tag ->
+                // 同步更新 Application context 的 Configuration，确保非 Activity 来源的
+                // Resources（如 ViewModel 中 context.getString）也能拿到正确 locale。
+                val app = applicationContext
+                if (tag.isNullOrBlank()) {
+                    // 跟随系统：重置为系统默认 Configuration
+                    val sysConfig = android.content.res.Configuration(resources.configuration)
+                    sysConfig.setLocale(java.util.Locale.getDefault())
+                    app.resources.updateConfiguration(sysConfig, app.resources.displayMetrics)
+                } else {
+                    val config = android.content.res.Configuration(app.resources.configuration)
+                    config.setLocale(java.util.Locale.forLanguageTag(tag))
+                    app.resources.updateConfiguration(config, app.resources.displayMetrics)
+                }
                 recreate()
             }
         }

@@ -42,6 +42,9 @@
     <string name="settings_remote_subtitle">Manage SFTP / FTP workspace sync</string>
     <string name="settings_theme_title">Appearance</string>
     <string name="settings_theme_subtitle">Follow system or fixed light/dark mode</string>
+    <string name="theme_auto">Auto</string>
+    <string name="theme_dark">Dark</string>
+    <string name="theme_light">Light</string>
     <string name="settings_keepalive_title">Background keepalive</string>
     <string name="settings_keepalive_subtitle">Show foreground notification to avoid process kill</string>
     <string name="settings_backup_subtitle">Encrypted export/import config, chat history and credentials</string>

@@ -501,7 +501,7 @@ internal fun ThemeModeRow(
                 onExpandedChange = { expanded = !expanded }
             ) {
                 OutlinedTextField(
-                    value = selected.label,
+                    value = stringResource(selected.labelRes),
                     onValueChange = {},
                     readOnly = true,
                     singleLine = true,
@@ -516,7 +516,7 @@ internal fun ThemeModeRow(
                 ) {
                     AppThemeMode.entries.forEach { mode ->
                         DropdownMenuItem(
-                            text = { Text(mode.label) },
+                            text = { Text(stringResource(mode.labelRes)) },
                             onClick = {
                                 onSelected(mode)
                                 expanded = false

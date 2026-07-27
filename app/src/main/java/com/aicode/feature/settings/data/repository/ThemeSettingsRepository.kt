@@ -1,6 +1,7 @@
 package com.aicode.feature.settings.data.repository
 
 import android.content.Context
+import com.aicode.R
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
@@ -14,10 +15,10 @@ import javax.inject.Singleton
 
 private val Context.themeDataStore by preferencesDataStore(name = "theme_prefs")
 
-enum class AppThemeMode(val label: String) {
-    AUTO("自动"),
-    DARK("深色"),
-    LIGHT("浅色");
+enum class AppThemeMode(val labelRes: Int) {
+    AUTO(R.string.theme_auto),
+    DARK(R.string.theme_dark),
+    LIGHT(R.string.theme_light);
 
     companion object {
         fun fromPersisted(value: String?): AppThemeMode? = entries.firstOrNull { it.name == value }

@@ -4,8 +4,6 @@ import android.app.Application
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.os.Build
-import androidx.appcompat.app.AppCompatDelegate
-import androidx.core.os.LocaleListCompat
 import com.aicode.core.util.AILogger
 import com.aicode.core.util.FileLogger
 import net.schmizz.sshj.common.SecurityUtils
@@ -24,7 +22,6 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
 @HiltAndroidApp
@@ -32,6 +29,21 @@ class AIEditorApp : Application() {
 
     private companion object {
         const val TAG = "AIEditorApp"
+        const val LANG_PREFS = "language_prefs_sync"
+        const val LANG_KEY = "language_tag"
+    }
+
+    override fun attachBaseContext(base: android.content.Context) {
+        val tag = base.getSharedPreferences(LANG_PREFS, android.content.Context.MODE_PRIVATE)
+            .getString(LANG_KEY, null)
+        val context = if (tag.isNullOrBlank()) {
+            base
+        } else {
+            val config = android.content.res.Configuration(base.resources.configuration)
+            config.setLocale(java.util.Locale.forLanguageTag(tag))
+            base.createConfigurationContext(config)
+        }
+        super.attachBaseContext(context)
     }
 
     /** Hilt 字段注入：在 [onCreate] 的 super 调用后即可用。 */
@@ -60,7 +72,7 @@ class AIEditorApp : Application() {
     @Inject
     lateinit var executionModeRepository: com.aicode.feature.settings.data.repository.ExecutionModeRepository
 
-    /** 应用语言偏好仓库：监听变化同步到 AppCompatDelegate 使资源即时切换。 */
+    /** 应用语言偏好仓库：持久化用户选择的语言，供 attachBaseContext 同步读取。 */
     @Inject
     lateinit var languageSettings: LanguageSettingsRepository
 
@@ -155,20 +167,10 @@ class AIEditorApp : Application() {
         }
         // 连接已配置的 MCP server，把其工具注册进 ToolRegistry（内部自有 scope，失败不影响启动）。
         mcpManager.start()
-        // 监听语言偏好变化，通过 AppCompatDelegate 切换 App locale。
-        // ComponentActivity 不受 AppCompat 自动 recreate 管理，需手动重建。
-        appScope.launch {
-            languageSettings.languageFlow.collect { tag ->
-                val locales = if (tag.isNullOrBlank()) {
-                    LocaleListCompat.getEmptyLocaleList()
-                } else {
-                    LocaleListCompat.forLanguageTags(tag)
-                }
-                withContext(Dispatchers.Main) {
-                    AppCompatDelegate.setApplicationLocales(locales)
-                }
-            }
-        }
+        // 语言切换由 MainActivity 的 attachBaseContext + recreate() 统一管理。
+        // MainActivity 继承 ComponentActivity（非 AppCompatActivity），
+        // AppCompatDelegate.setApplicationLocales 的自动 recreate 不生效，
+        // 且两者同时设置 locale 会竞争导致偶发语言错乱。
     }
 
     /**

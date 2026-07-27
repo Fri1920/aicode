@@ -42,6 +42,9 @@
     <string name="settings_remote_subtitle">管理 SFTP / FTP 工作区同步</string>
     <string name="settings_theme_title">外观主题</string>
     <string name="settings_theme_subtitle">选择跟随系统或固定明暗模式</string>
+    <string name="theme_auto">自动</string>
+    <string name="theme_dark">深色</string>
+    <string name="theme_light">浅色</string>
     <string name="settings_keepalive_title">后台运行保活</string>
     <string name="settings_keepalive_subtitle">显示前台通知，避免退到后台时系统杀进程</string>
     <string name="settings_backup_subtitle">加密导出/导入配置、聊天历史与凭据</string>
