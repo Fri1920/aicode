@@ -569,7 +569,7 @@ class AIAgentViewModel @Inject constructor(
                             }
                         }
                         setStreamingReasoning(sessionId, null)
-                        setStreamingText(sessionId, normalized.ifEmpty { null })
+                        setStreamingText(sessionId, null)
                     }
                     is AgentEvent.ToolCallStarted -> {
                         val msgId = "tool_${event.id}"
