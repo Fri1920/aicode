@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -47,7 +46,10 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import java.net.URI
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import android.content.Intent
+import android.net.Uri
 import com.aicode.R
 
 internal data class ParsedWebSearchResult(
@@ -174,7 +176,7 @@ private fun WebSearchSummary(result: ParsedWebSearchResult) {
 
 @Composable
 private fun WebSearchResultItem(index: Int, item: ParsedWebSearchItem) {
-    var expanded by remember(item.url, item.title) { mutableStateOf(false) }
+    val context = LocalContext.current
 
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -184,7 +186,13 @@ private fun WebSearchResultItem(index: Int, item: ParsedWebSearchItem) {
     ) {
         Column(
             modifier = Modifier
-                .clickable { expanded = !expanded }
+                .clickable {
+                    if (item.url.isNotBlank()) {
+                        runCatching {
+                            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(item.url)))
+                        }
+                    }
+                }
                 .padding(Spacing.sm),
             verticalArrangement = Arrangement.spacedBy(Spacing.xs)
         ) {
@@ -214,13 +222,6 @@ private fun WebSearchResultItem(index: Int, item: ParsedWebSearchItem) {
                             tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f),
                             modifier = Modifier.size(14.dp)
                         )
-                        Spacer(Modifier.width(Spacing.xs))
-                        Icon(
-                            if (expanded) FeatherIcons.ChevronUp else FeatherIcons.ChevronDown,
-                            contentDescription = if (expanded) stringResource(R.string.common_collapse_action) else stringResource(R.string.common_expand),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f),
-                            modifier = Modifier.size(16.dp)
-                        )
                     }
                     Spacer(Modifier.height(2.dp))
                     Text(
@@ -232,47 +233,7 @@ private fun WebSearchResultItem(index: Int, item: ParsedWebSearchItem) {
                     )
                 }
             }
-
-            if (expanded) {
-                if (!item.publishDate.isNullOrBlank()) {
-                    WebSearchChip(text = item.publishDate)
-                }
-
-                if (item.excerpts.isNotEmpty()) {
-                    SelectionContainer {
-                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                            item.excerpts.take(3).forEach { excerpt ->
-                                Text(
-                                    text = excerpt,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    maxLines = 4,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                            }
-                        }
-                    }
-                }
-            }
         }
-    }
-}
-
-@Composable
-private fun WebSearchChip(text: String) {
-    Surface(
-        shape = RoundedCornerShape(Radius.pill),
-        color = MaterialTheme.colorScheme.surfaceVariant,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
-    ) {
-        Text(
-            text = text,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            style = MaterialTheme.typography.labelSmall,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(horizontal = Spacing.sm, vertical = 3.dp)
-        )
     }
 }
 

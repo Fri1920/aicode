@@ -56,6 +56,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.LocalClipboard
@@ -209,12 +211,21 @@ internal fun AgentMessageItem(
                                     )
                                 }
                                 CompositionLocalProvider(LocalTextSelectionColors provides selectionColors) {
-                                    MarkdownContent(
-                                        text = message.content,
-                                        color = textColor,
-                                        modifier = Modifier.padding(horizontal = Spacing.sm, vertical = Spacing.sm),
-                                        cache = markdownCache
-                                    )
+                                    if (isUser) {
+                                        Text(
+                                            text = message.content,
+                                            color = textColor,
+                                            style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 20.sp),
+                                            modifier = Modifier.padding(horizontal = Spacing.sm, vertical = Spacing.sm)
+                                        )
+                                    } else {
+                                        MarkdownContent(
+                                            text = message.content,
+                                            color = textColor,
+                                            modifier = Modifier.padding(horizontal = Spacing.sm, vertical = Spacing.sm),
+                                            cache = markdownCache
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -766,13 +777,24 @@ internal fun ReasoningBubble(
                     Text(
                         text = text,
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.pointerInput(text) {
+                            detectTapGestures(
+                                onDoubleTap = {
+                                    userToggled = true
+                                    expanded = false
+                                }
+                            )
+                        }
                     )
                 } else if (overThreshold) {
-                    // 折叠态：前 N 行 + 「展开剩余 X 行」
+                    // 折叠态：显示最新内容（尾部 N 行）+「还有 X 行」
                     Spacer(Modifier.height(Spacing.sm))
+                    val tailText = remember(text) {
+                        text.lines().takeLast(REASONING_COLLAPSE_LINE_LIMIT).joinToString("\n")
+                    }
                     Text(
-                        text = text,
+                        text = tailText,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = REASONING_COLLAPSE_LINE_LIMIT,
