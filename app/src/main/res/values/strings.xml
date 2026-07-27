@@ -99,11 +99,11 @@
 
     <!-- AI Chat Panel -->
     <string name="chat_attachment_prefix">附件：</string>
-    <string name="chat_attachment_max">最多可同时发送 $max 个附件</string>
-    <string name="chat_attachment_uploaded">已上传 $count 个附件</string>
-    <string name="chat_attachment_uploaded_partial">已上传 $count 个附件，部分附件未加入</string>
+    <string name="chat_attachment_max">最多可同时发送 %1$s 个附件</string>
+    <string name="chat_attachment_uploaded">已上传 %1$s 个附件</string>
+    <string name="chat_attachment_uploaded_partial">已上传 %1$s 个附件，部分附件未加入</string>
     <string name="chat_image_too_large">图片超过 %1$s，请压缩后重试</string>
-    <string name="chat_uploaded_to">已上传到 $path</string>
+    <string name="chat_uploaded_to">已上传到 %1$s</string>
     <string name="chat_select_workspace_first">请先选择工作区</string>
     <string name="chat_read_file_failed">无法读取所选文件</string>
     <string name="chat_workspace_unavailable">工作区不可用</string>
@@ -132,9 +132,9 @@
     <string name="about_check_update">检查更新</string>
     <string name="about_checking_update">正在向 GitHub 查询最新版本…</string>
     <string name="about_up_to_date">已经是最新版本</string>
-    <string name="about_up_to_date_detail">当前版本 v$currentVersion，已是 GitHub 上最新的 Release。</string>
+    <string name="about_up_to_date_detail">当前版本 v%1$s，已是 GitHub 上最新的 Release。</string>
     <string name="about_new_version_found">发现新版本</string>
-    <string name="about_new_version_detail">当前 v$currentVersion，最新 v%1$s。点击「前往下载」打开 GitHub Releases 页面获取最新 APK。</string>
+    <string name="about_new_version_detail">当前 v%1$s，最新 v%2$s。点击「前往下载」打开 GitHub Releases 页面获取最新 APK。</string>
     <string name="about_download">前往下载</string>
     <string name="about_later">稍后</string>
     <string name="about_check_failed">检查失败</string>
@@ -231,9 +231,9 @@
     <string name="chat_bg_command_done">后台命令已完成</string>
     <string name="chat_context_compressed">上下文已压缩</string>
     <string name="chat_compressing_context">正在压缩上下文</string>
-    <string name="chat_retrying">网络波动，正在重试 $attempt/$maxRetries</string>
+    <string name="chat_retrying">网络波动，正在重试 %1$s/%2$s</string>
     <string name="chat_thinking_process">思考过程</string>
-    <string name="chat_expand_remaining">展开剩余 $hidden 行</string>
+    <string name="chat_expand_remaining">展开剩余 %1$s 行</string>
 
     <!-- Container Settings -->
     <string name="container_section_desc">选择一个容器镜像作为命令执行后端。本地镜像走 PRoot 容器，远程 SSH 镜像连接远程服务器执行命令。</string>
@@ -243,7 +243,7 @@
     <string name="container_remote_ssh">远程 SSH</string>
     <string name="container_custom_image">自定义镜像</string>
     <string name="container_delete_config">删除镜像配置</string>
-    <string name="container_delete_confirm">确定删除「%1$s」？${if (deleting.mode == ExecutionMode.LOCAL_PROOT &amp;&amp; !deleting.isBuiltin) "其 rootfs 目录会被一并清除。" else ""}内置 Alpine 不受影响。</string>
+    <string name="container_delete_confirm">确定删除「%1$s」？%2$s内置 Alpine 不受影响。</string>
     <string name="container_rootfs_will_be_cleared">其 rootfs 目录会被一并清除。</string>
     <string name="container_switch_image">切换容器镜像</string>
     <string name="container_switch_confirm">切换到「%1$s」后，当前正在运行的 AI 会话将被停止、终端标签将被关闭。是否继续切换？</string>
@@ -251,7 +251,7 @@
     <string name="container_reset_confirm">将删除内置 Alpine 容器的 rootfs 目录（含已安装的工具与配置），下次启动容器时会重新解压并初始化。是否继续？</string>
     <string name="container_builtin_auto">内置镜像 · 自动 (bash/sh)</string>
     <string name="container_remote_ssh_desc">远程 SSH · ${connName ?: "通道已删除"} · ${ssh?.remoteWorkspacePath ?: ""}</string>
-    <string name="container_imported_desc">导入的 tar.gz · shell: $shellDesc</string>
+    <string name="container_imported_desc">导入的 tar.gz · shell: %1$s</string>
     <string name="container_edit_image">编辑镜像</string>
     <string name="container_local_image">本地镜像</string>
     <string name="container_shell_path">shell 路径（如 /bin/sh、/bin/bash）</string>
@@ -280,7 +280,7 @@
     <string name="credential_empty_hint">尚未添加凭据，点右上角 + 添加\n(host / 用户名 / Token)</string>
 
     <!-- Credential Prompt -->
-    <string name="credential_prompt_title">需要 $host 的登录凭据</string>
+    <string name="credential_prompt_title">需要 %1$s 的登录凭据</string>
     <string name="credential_remote_host">远程主机</string>
     <string name="credential_prompt_desc">填完即保存并自动重试。该凭据同时会保存到容器内 git，终端与 AI 执行裸 git 命令时也可直接使用。</string>
     <string name="credential_save_and_retry">保存并重试</string>
@@ -319,25 +319,25 @@
     <string name="git_no_branches">暂无分支</string>
     <string name="git_no_checked_out_branch">未检出分支</string>
     <string name="git_switch_branch">切换分支</string>
-    <string name="git_detached_head_warning">切换到标签 $ref 将进入 detached HEAD 状态——不处于任何分支上，新提交不属于任何分支。确定继续？</string>
-    <string name="git_create_tracking_branch">从远程分支 $ref 创建本地跟踪分支并切换？</string>
-    <string name="git_switch_confirm">确定切换到 $ref？</string>
+    <string name="git_detached_head_warning">切换到标签 %1$s 将进入 detached HEAD 状态——不处于任何分支上，新提交不属于任何分支。确定继续？</string>
+    <string name="git_create_tracking_branch">从远程分支 %1$s 创建本地跟踪分支并切换？</string>
+    <string name="git_switch_confirm">确定切换到 %1$s？</string>
     <string name="git_new_branch">新建分支</string>
     <string name="git_branch_name">分支名</string>
     <string name="git_base_branch">基准分支</string>
     <string name="git_create_and_switch">创建并切换</string>
     <string name="git_delete_remote_branch">删除远程分支</string>
     <string name="git_delete_branch">删除分支</string>
-    <string name="git_delete_remote_branch_confirm">删除远程分支 $name？该操作不可撤销。</string>
-    <string name="git_delete_local_branch_confirm">删除本地分支 $name？</string>
+    <string name="git_delete_remote_branch_confirm">删除远程分支 %1$s？该操作不可撤销。</string>
+    <string name="git_delete_local_branch_confirm">删除本地分支 %1$s？</string>
     <string name="git_rename_branch">重命名分支</string>
-    <string name="git_rename_to">将 $oldName 重命名为：</string>
+    <string name="git_rename_to">将 %1$s 重命名为：</string>
     <string name="git_new_branch_name">新分支名</string>
     <string name="git_new_tag">新建标签</string>
-    <string name="git_create_tag_desc">从当前 HEAD（$currentBranch）创建轻量标签</string>
+    <string name="git_create_tag_desc">从当前 HEAD（%1$s）创建轻量标签</string>
     <string name="git_tag_name">标签名</string>
     <string name="git_delete_tag">删除标签</string>
-    <string name="git_delete_tag_confirm">删除本地标签 $name？</string>
+    <string name="git_delete_tag_confirm">删除本地标签 %1$s？</string>
     <string name="git_checked_out">当前检出</string>
     <string name="git_current_branch">当前分支</string>
     <string name="git_remote">远程</string>
@@ -350,7 +350,7 @@
     <string name="git_recent_commit">最近提交</string>
     <string name="git_expanded">已展开</string>
     <string name="git_latest_date">最新日期</string>
-    <string name="git_files_changed">$count 个文件改动</string>
+    <string name="git_files_changed">%1$s 个文件改动</string>
     <string name="git_no_files_changed">该提交无文件改动</string>
     <string name="git_loading_files">正在加载改动文件...</string>
     <string name="git_not_a_repo">当前工作区不是 Git 仓库</string>
@@ -363,7 +363,7 @@
     <string name="git_identity_desc">用于每次提交的 author。容器全局生效，所有工作区共用。</string>
     <string name="git_remote_url">仓库地址 remote.origin.url</string>
     <string name="git_actual_identity_none">git 实际署名：(未配置)</string>
-    <string name="git_actual_identity">git 实际署名：$globalHint</string>
+    <string name="git_actual_identity">git 实际署名：%1$s</string>
 
     <!-- Main Activity -->
     <string name="main_no_storage_permission">未授予存储权限，本地镜像目录可能无法写入。</string>
@@ -428,7 +428,7 @@
     <string name="perm_builtin_whitelist">内置安全白名单</string>
     <string name="perm_whitelist_desc">系统已预设白名单，对少量完全无害、只读且不派生子进程的命令（如 ls、pwd、cat、grep、ps、top、git status 等）免弹窗自动放行。</string>
     <string name="perm_rules_desc">在此可管理用户在对话中选「始终允许」生成的记忆规则。精细化授权机制会按命令或路径精准匹配（如 rm temp.log、git pull）。</string>
-    <string name="perm_current_project">当前项目：$projectName</string>
+    <string name="perm_current_project">当前项目：%1$s</string>
     <string name="perm_current_project_none">当前项目（未选择）</string>
     <string name="perm_no_project_rules">本项目暂无规则</string>
     <string name="perm_global">全局</string>
@@ -457,8 +457,8 @@
     <string name="provider_fetching">正在拉取…</string>
     <string name="provider_fetch_failed">拉取失败：%1$s</string>
     <string name="provider_no_matching_models">没有匹配的模型</string>
-    <string name="provider_collapse_brand">折叠$brandName</string>
-    <string name="provider_expand_brand">展开$brandName</string>
+    <string name="provider_collapse_brand">折叠%1$s</string>
+    <string name="provider_expand_brand">展开%1$s</string>
     <string name="provider_please_wait">请稍候…</string>
     <string name="provider_test">测试</string>
 
@@ -506,17 +506,17 @@
     <string name="remote_auto_connect_on_start">应用启动时自动连接</string>
     <string name="remote_auto_connect_and_sync">开机自动连接并同步该工作区</string>
     <string name="remote_select_remote_dir">选择远程目录</string>
-    <string name="remote_current_path">当前路径: $currentPath</string>
-    <string name="remote_load_failed">加载失败: $error</string>
+    <string name="remote_current_path">当前路径: %1$s</string>
+    <string name="remote_load_failed">加载失败: %1$s</string>
     <string name="remote_parent_dir">.. (上一级)</string>
     <string name="remote_confirm_select">确认选择</string>
 
     <!-- Remote FTP -->
     <string name="ftp_usage_title">使用说明</string>
     <string name="ftp_usage_desc">1. 手机与电脑需连接至同一 WiFi 局域网。\n2. 开启服务后，在电脑的文件资源管理器（或 FileZilla）地址栏访问下方 FTP 地址。\n3. 连接成功后，即可在电脑端直接查看并编辑手机工作区根目录（projects）下的全部代码项目。</string>
-    <string name="ftp_running">运行中: $serverUrl</string>
+    <string name="ftp_running">运行中: %1$s</string>
     <string name="ftp_not_running">服务未开启</string>
-    <string name="ftp_error">错误: $errorMessage</string>
+    <string name="ftp_error">错误: %1$s</string>
     <string name="ftp_config_title">服务参数配置</string>
     <string name="ftp_listen_port">监听端口</string>
     <string name="ftp_login_username">登录用户名</string>
@@ -594,7 +594,7 @@
     <!-- Tool Message -->
     <string name="tool_instruction">指令</string>
     <string name="tool_result">结果</string>
-    <string name="tool_expand_remaining">展开剩余 $hiddenCount 行</string>
+    <string name="tool_expand_remaining">展开剩余 %1$s 行</string>
 
     <!-- Vision Model -->
     <string name="vision_follow_chat_model">跟随当前聊天模型</string>
