@@ -86,6 +86,8 @@
     <string name="common_username">Username</string>
     <string name="common_got_it">Got it</string>
     <string name="common_edit">Edit</string>
+    <string name="common_enabled">Enabled</string>
+    <string name="common_disabled">Disabled</string>
     <string name="credential_token">Access Token / PAT</string>
     <string name="common_rename">Rename</string>
     <string name="common_hide">Hide</string>

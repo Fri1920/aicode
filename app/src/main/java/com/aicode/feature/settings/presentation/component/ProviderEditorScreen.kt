@@ -110,6 +110,7 @@ fun ProviderEditorScreen(
     var baseUrl by remember { mutableStateOf(initialProvider?.baseUrl ?: "") }
     var useFullUrl by remember { mutableStateOf(initialProvider?.useFullUrl ?: false) }
     var useResponseApi by remember { mutableStateOf(initialProvider?.useResponseApi ?: false) }
+    var isEnabled by remember { mutableStateOf(initialProvider?.isEnabled ?: true) }
     var type by remember { mutableStateOf(initialProvider?.type ?: ProviderType.OPENAI) }
     val providerId = remember { initialProvider?.id ?: System.currentTimeMillis().toString() }
     val models = remember { mutableStateListOf<String>().apply { addAll(initialProvider?.models ?: emptyList()) } }
@@ -144,6 +145,7 @@ fun ProviderEditorScreen(
         apiKey = apiKey,
         baseUrl = baseUrl.ifBlank { defaultProviderBaseUrl(type) },
         useFullUrl = useFullUrl,
+        isEnabled = isEnabled,
         defaultModel = initialProvider?.defaultModel ?: "",
         isActive = initialProvider?.isActive ?: false,
         models = models.toList(),
@@ -247,6 +249,18 @@ fun ProviderEditorScreen(
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(stringResource(R.string.common_enabled))
+                        Switch(
+                            checked = isEnabled,
+                            onCheckedChange = { isEnabled = it }
+                        )
+                    }
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),

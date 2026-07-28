@@ -236,7 +236,6 @@ fun SettingsScreen(
                 )
                 SettingsSection.Providers -> ProvidersSection(
                     providers = providers,
-                    onToggle = { id, enabled -> viewModel.setProviderEnabled(id, enabled) },
                     onEdit = {
                         editingProvider = it
                         section = SettingsSection.ProviderEditor
