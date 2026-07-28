@@ -25,6 +25,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -40,6 +41,7 @@ import com.aicode.core.util.LogLevel
 import com.aicode.feature.settings.presentation.LogViewerUiState
 import com.aicode.feature.settings.domain.model.AIProviderConfig
 import compose.icons.FeatherIcons
+import compose.icons.feathericons.Edit2
 import android.content.Context
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -291,6 +293,13 @@ fun ProviderItem(
                     },
                     modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
                 )
+            }
+            Spacer(Modifier.width(Spacing.sm))
+            IconButton(onClick = onEdit) {
+                Icon(
+                    FeatherIcons.Edit2,
+                    contentDescription = stringResource(R.string.common_edit),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }

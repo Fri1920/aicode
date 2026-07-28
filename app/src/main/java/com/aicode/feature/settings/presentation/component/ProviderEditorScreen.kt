@@ -53,6 +53,9 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.ui.platform.LocalClipboard
+import android.content.ClipData
+import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -79,7 +82,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.foundation.background
+import kotlinx.coroutines.launch
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aicode.core.theme.Radius
@@ -580,9 +588,9 @@ private fun FetchModelsDialog(
                                 if (newOnes.isEmpty()) {
                                     Text(stringResource(R.string.provider_no_matching_models), style = MaterialTheme.typography.bodyMedium)
                                 } else {
-                                    // 按品牌分组，分类 header 可折叠
+                                    // 按品牌分组，分类 header 可折叠。"other" 分组永远在最后，其他按显示名称排序。
                                     val grouped = newOnes.groupBy { m -> modelBrandKey(m) }
-                                        .toSortedMap(compareBy { brandDisplayName(context, it) })
+                                        .toSortedMap(compareBy<String> { it == "other" }.thenBy { brandDisplayName(context, it) })
 
                                     LazyColumn(
                                         modifier = Modifier.fillMaxSize(),
@@ -726,6 +734,7 @@ private fun ModelTag(text: String? = null, icon: androidx.compose.ui.graphics.ve
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun ProviderModelRow(
     model: String,
@@ -735,6 +744,8 @@ internal fun ProviderModelRow(
     onTest: () -> Unit,
     onRemove: () -> Unit
 ) {
+    var showErrorDetail by remember { mutableStateOf(false) }
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -760,11 +771,16 @@ internal fun ProviderModelRow(
             Spacer(Modifier.width(Spacing.sm))
 
             // Right Actions
-            if (testing) {
-                CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
-            } else {
-                TextButton(onClick = onTest, contentPadding = PaddingValues(horizontal = Spacing.sm)) {
-                    Text(stringResource(R.string.provider_test), style = MaterialTheme.typography.labelMedium)
+            Box(
+                modifier = Modifier.width(56.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                if (testing) {
+                    CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                } else {
+                    TextButton(onClick = onTest, contentPadding = PaddingValues(horizontal = Spacing.sm)) {
+                        Text(stringResource(R.string.provider_test), style = MaterialTheme.typography.labelMedium)
+                    }
                 }
             }
             IconButton(onClick = onRemove, modifier = Modifier.size(32.dp)) {
@@ -781,7 +797,11 @@ internal fun ProviderModelRow(
         result?.let { r ->
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.padding(top = Spacing.sm, start = 32.dp)
+                modifier = Modifier
+                    .padding(top = Spacing.sm, start = 32.dp)
+                    .then(
+                        if (!r.success) Modifier.clickable { showErrorDetail = true } else Modifier
+                    )
             ) {
                 Icon(
                     if (r.success) FeatherIcons.Check else FeatherIcons.AlertCircle,
@@ -790,13 +810,82 @@ internal fun ProviderModelRow(
                     modifier = Modifier.size(14.dp)
                 )
                 Spacer(Modifier.width(Spacing.xs))
+                val displayMsg = if (r.success) {
+                    r.message
+                } else {
+                    val codeMatch = Regex("""(?i)(HTTP\s*\d{3}|code[:\s]+[a-zA-Z0-9_]+)""").find(r.message)
+                    if (codeMatch != null) codeMatch.value
+                    else r.message.lines().firstOrNull()?.let { if (it.length > 20) it.take(20) + "..." else it } ?: "Error"
+                }
                 Text(
-                    r.message,
+                    text = displayMsg,
                     style = MaterialTheme.typography.bodySmall,
                     color = if (r.success) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.error,
-                    maxLines = 2,
+                    maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
+            }
+        }
+    }
+
+    if (showErrorDetail && result != null && !result.success) {
+        val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        val clipboard = LocalClipboard.current
+        var copied by remember { mutableStateOf(false) }
+        val scope = rememberCoroutineScope()
+
+        LaunchedEffect(copied) {
+            if (copied) {
+                kotlinx.coroutines.delay(1500)
+                copied = false
+            }
+        }
+
+        ModalBottomSheet(
+            onDismissRequest = { showErrorDetail = false },
+            sheetState = sheetState,
+            containerColor = MaterialTheme.colorScheme.surface
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(Spacing.lg)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = "Error Details",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                    IconButton(onClick = {
+                        scope.launch {
+                            clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("error", result.message)))
+                            copied = true
+                        }
+                    }) {
+                        Icon(
+                            if (copied) FeatherIcons.Check else FeatherIcons.Copy,
+                            contentDescription = "Copy Error",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+                Spacer(Modifier.height(Spacing.sm))
+                Text(
+                    text = result.message,
+                    style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f), RoundedCornerShape(Radius.sm))
+                        .padding(Spacing.sm)
+                )
+                Spacer(Modifier.height(Spacing.xl))
             }
         }
     }
