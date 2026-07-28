@@ -245,8 +245,7 @@
     <string name="chat_expand_remaining">展开剩余 %1$s 行</string>
 
     <!-- Container Settings -->
-    <string name="container_section_desc">选择一个容器镜像作为命令执行后端。本地镜像走 PRoot 容器，远程 SSH 镜像连接远程服务器执行命令。</string>
-    <string name="container_bindings">绑定: ${profile.extraBindings.joinToString(" ")}</string>
+    <string name="container_bindings">绑定: %1$s</string>
     <string name="container_reset">重置</string>
     <string name="container_add_image">添加镜像</string>
     <string name="container_remote_ssh">远程 SSH</string>
@@ -286,7 +285,7 @@
     <string name="credential_fields_required">host、用户名、Token 均不能为空</string>
 
     <!-- Credential List -->
-    <string name="credential_empty_hint">尚未添加凭据，点右上角 + 添加\n(host / 用户名 / Token)</string>
+    <string name="credential_empty_hint">尚未添加凭据，点右上角 + 添加</string>
 
     <!-- Credential Prompt -->
     <string name="credential_prompt_title">需要 %1$s 的登录凭据</string>
@@ -368,9 +367,11 @@
     <string name="git_commit_message">提交信息</string>
 
     <!-- Git Identity -->
-    <string name="git_identity_title">提交署名（git config --global）</string>
+    <string name="git_tab_identity">署名</string>
+    <string name="git_tab_credentials">凭据</string>
+    <string name="git_identity_title">提交署名</string>
     <string name="git_identity_desc">用于每次提交的 author。容器全局生效，所有工作区共用。</string>
-    <string name="git_remote_url">仓库地址 remote.origin.url</string>
+    <string name="git_remote_url">remote.origin.url</string>
     <string name="git_actual_identity_none">git 实际署名：(未配置)</string>
     <string name="git_actual_identity">git 实际署名：%1$s</string>
 
@@ -572,7 +573,10 @@
     <string name="sync_max_batch_count">最大数量</string>
     <string name="sync_batch_size_saved">最大队列数量已保存</string>
     <string name="sync_save_batch_size">保存数量</string>
-    <string name="sync_via_connection">通过: ${mount.connection?.name ?: "未知连接"}</string>
+    <string name="sync_via_connection">通过: %1$s</string>
+    <string name="status_connected">已连接</string>
+    <string name="status_disconnected">未连接</string>
+    <string name="status_connection_failed">连接失败</string>
     <string name="sync_auto_connect">自动连接</string>
     <string name="sync_mount_subdir">镜像子目录: %1$s</string>
     <string name="sync_remote_path">远程路径: %1$s</string>

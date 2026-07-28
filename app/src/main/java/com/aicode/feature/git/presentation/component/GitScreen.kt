@@ -84,7 +84,7 @@ import com.aicode.core.theme.Radius
 import com.aicode.core.theme.Spacing
 import com.aicode.feature.credentials.domain.model.GitCredential
 import com.aicode.feature.credentials.presentation.CredentialViewModel
-import com.aicode.feature.credentials.presentation.component.CredentialEditorScreen
+import com.aicode.feature.credentials.presentation.component.CredentialEditorSheet
 import com.aicode.feature.credentials.presentation.component.CredentialListSection
 import com.aicode.feature.credentials.presentation.component.GitUserIdentityCard
 import com.aicode.feature.git.domain.model.GitBranch
@@ -135,27 +135,6 @@ fun GitScreen(
     // 避免与本页 Scaffold 嵌套产生双层顶栏，返回由其自身 BackHandler 接管。
     var editingCredential by remember { mutableStateOf<GitCredential?>(null) }
     var isAddingCredential by remember { mutableStateOf(false) }
-
-    // 编辑/新增凭据：独立全屏页，不进入下方 GitScreen 的 Scaffold，避免双层顶栏。
-    if (editingCredential != null) {
-        val editing = editingCredential!!
-        CredentialEditorScreen(
-            initial = editing,
-            onBack = { editingCredential = null },
-            onSave = { credentialViewModel.saveCredential(it); editingCredential = null },
-            onDelete = { credentialViewModel.deleteCredential(it); editingCredential = null }
-        )
-        return
-    }
-    if (isAddingCredential) {
-        CredentialEditorScreen(
-            initial = null,
-            onBack = { isAddingCredential = false },
-            onSave = { credentialViewModel.saveCredential(it); isAddingCredential = false },
-            onDelete = { /* 新增态无删除 */ }
-        )
-        return
-    }
 
     // diff 视图：独立全屏页，不进入下方 GitScreen 的 Scaffold，避免双层顶栏。
     val diffData = state.diffData
@@ -299,6 +278,24 @@ fun GitScreen(
                 showCommitDialog = false
                 viewModel.commit(msg)
             }
+        )
+    }
+
+    if (editingCredential != null) {
+        val editing = editingCredential!!
+        CredentialEditorSheet(
+            initial = editing,
+            onDismiss = { editingCredential = null },
+            onSave = { credentialViewModel.saveCredential(it); editingCredential = null },
+            onDelete = { credentialViewModel.deleteCredential(it); editingCredential = null }
+        )
+    }
+
+    if (isAddingCredential) {
+        CredentialEditorSheet(
+            initial = null,
+            onDismiss = { isAddingCredential = false },
+            onSave = { credentialViewModel.saveCredential(it); isAddingCredential = false }
         )
     }
 }
@@ -1423,18 +1420,18 @@ private fun DateMetric(date: String, modifier: Modifier = Modifier) {
     ) {
         Column(modifier = Modifier.padding(horizontal = Spacing.sm, vertical = Spacing.sm)) {
             Text(
-                text = stringResource(R.string.git_latest_date),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1
-            )
-            Text(
                 text = date,
-                style = MaterialTheme.typography.labelSmall,
+                style = MaterialTheme.typography.titleMedium,
                 fontFamily = FontFamily.Monospace,
                 color = MaterialTheme.colorScheme.onSurface,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                text = stringResource(R.string.git_latest_date),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1
             )
         }
     }

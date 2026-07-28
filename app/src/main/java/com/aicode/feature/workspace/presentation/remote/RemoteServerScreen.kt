@@ -130,6 +130,7 @@ fun RemoteServerScreen(
                         items(uiState.mounts) { mount ->
                             RemoteMountCard(
                                 mount = mount,
+                                isFailed = mount.id in uiState.failedMountIds,
                                 onEdit = {
                                     mountToEdit = it
                                     showAddMountDialog = true

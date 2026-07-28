@@ -245,7 +245,6 @@
     <string name="chat_expand_remaining">Expand remaining %1$s lines</string>
 
     <!-- Container Settings -->
-    <string name="container_section_desc">Select a container image as the command execution backend. Local images use PRoot container, remote SSH images connect to a remote server to execute commands.</string>
     <string name="container_bindings">Bindings: %1$s</string>
     <string name="container_reset">Reset</string>
     <string name="container_add_image">Add Image</string>
@@ -286,7 +285,7 @@
     <string name="credential_fields_required">Host, username, and token are all required</string>
 
     <!-- Credential List -->
-    <string name="credential_empty_hint">No credentials yet, tap + to add\n(host / username / token)</string>
+    <string name="credential_empty_hint">No credentials yet, tap + to add</string>
 
     <!-- Credential Prompt -->
     <string name="credential_prompt_title">Login credentials needed for %1$s</string>
@@ -368,9 +367,11 @@
     <string name="git_commit_message">Commit message</string>
 
     <!-- Git Identity -->
-    <string name="git_identity_title">Commit Identity (git config --global)</string>
+    <string name="git_tab_identity">Identity</string>
+    <string name="git_tab_credentials">Credentials</string>
+    <string name="git_identity_title">Commit Identity</string>
     <string name="git_identity_desc">Used as author for every commit. Applies globally in the container, shared across all workspaces.</string>
-    <string name="git_remote_url">Remote URL (remote.origin.url)</string>
+    <string name="git_remote_url">remote.origin.url</string>
     <string name="git_actual_identity_none">Actual git identity: (not configured)</string>
     <string name="git_actual_identity">Actual git identity: %1$s</string>
 
@@ -573,6 +574,9 @@
     <string name="sync_batch_size_saved">Max batch size saved</string>
     <string name="sync_save_batch_size">Save Count</string>
     <string name="sync_via_connection">Via: %1$s</string>
+    <string name="status_connected">Connected</string>
+    <string name="status_disconnected">Disconnected</string>
+    <string name="status_connection_failed">Connection Failed</string>
     <string name="sync_auto_connect">Auto-connect</string>
     <string name="sync_mount_subdir">Mount subdir: %1$s</string>
     <string name="sync_remote_path">Remote path: %1$s</string>

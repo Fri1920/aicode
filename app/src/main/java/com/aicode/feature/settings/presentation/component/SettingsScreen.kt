@@ -73,7 +73,6 @@ internal enum class SettingsSection(@StringRes val titleRes: Int) {
     Permissions(R.string.settings_permissions),
     RemoteServers(R.string.settings_remote_servers),
     Backup(R.string.settings_backup),
-    Language(R.string.settings_language),
     About(R.string.settings_about)
 }
 
@@ -115,6 +114,9 @@ fun SettingsScreen(
     var editingProvider by remember { mutableStateOf<AIProviderConfig?>(null) }
     var showMcpDialog by remember { mutableStateOf(false) }
     var editingMcp by remember { mutableStateOf<McpServerConfig?>(null) }
+    var showContainerAddSheet by remember { mutableStateOf(false) }
+    var showThemeSheet by remember { mutableStateOf(false) }
+    var showLanguageSheet by remember { mutableStateOf(false) }
 
     // 处于二级页时，系统返回键先回到上一层；首页时交还给上层导航。
     BackHandler(enabled = section != SettingsSection.Menu) {
@@ -194,6 +196,9 @@ fun SettingsScreen(
                                 Icon(FeatherIcons.Plus, contentDescription = stringResource(R.string.settings_add_mcp_server))
                             }
                         }
+                        SettingsSection.Container -> IconButton(onClick = { showContainerAddSheet = true }) {
+                            Icon(FeatherIcons.Plus, contentDescription = stringResource(R.string.container_add_image))
+                        }
                         SettingsSection.LogViewer -> {
                             IconButton(onClick = { viewModel.refreshLogs() }) {
                                 Icon(FeatherIcons.RefreshCw, contentDescription = stringResource(R.string.settings_refresh_logs))
@@ -222,10 +227,11 @@ fun SettingsScreen(
                     logLevel = logLevel,
                     permissionRuleCount = projectRules.size + globalRules.size,
                     themeMode = themeMode,
-                    onThemeModeChange = { viewModel.setThemeMode(it) },
+                    onOpenThemeSheet = { showThemeSheet = true },
                     keepaliveEnabled = keepaliveEnabled,
                     onToggleKeepalive = { viewModel.setKeepaliveEnabled(it) },
                     currentLanguageDisplayName = currentLanguageDisplayName,
+                    onOpenLanguageSheet = { showLanguageSheet = true },
                     onOpen = {
                         if (it == SettingsSection.LogViewer) {
                             logReturnSection = SettingsSection.Menu
@@ -265,6 +271,8 @@ fun SettingsScreen(
                 SettingsSection.Container -> ContainerSection(
                     profiles = containerProfiles,
                     activeProfileId = activeProfileId,
+                    showAddSheetExternal = showContainerAddSheet,
+                    onDismissAddSheet = { showContainerAddSheet = false },
                     onSelect = { viewModel.setActiveContainerProfile(it) },
                     onSaveCustom = { viewModel.saveCustomContainerProfile(it) },
                     onEditCustom = { viewModel.editCustomContainerProfile(it) },
@@ -296,10 +304,6 @@ fun SettingsScreen(
                 }
                 SettingsSection.ProviderEditor -> {} // 已在上方 early return 处理
                 SettingsSection.RemoteServers -> {} // 已在上方 early return 处理
-                SettingsSection.Language -> LanguageSettingsSection(
-                    currentTag = languageTag,
-                    onSelect = { viewModel.setLanguage(it) }
-                )
                 SettingsSection.About -> AboutSection()
             }
         }
@@ -331,6 +335,22 @@ fun SettingsScreen(
             }
         )
     }
+
+    if (showThemeSheet) {
+        ThemeSelectionSheet(
+            selected = themeMode,
+            onSelected = { viewModel.setThemeMode(it) },
+            onDismiss = { showThemeSheet = false }
+        )
+    }
+
+    if (showLanguageSheet) {
+        LanguageSelectionSheet(
+            currentTag = languageTag,
+            onSelect = { viewModel.setLanguage(it) },
+            onDismiss = { showLanguageSheet = false }
+        )
+    }
 }
 
 /** 设置首页：每个分区一个可点击的二级菜单入口。 */
@@ -346,10 +366,11 @@ internal fun SettingsMenu(
     logLevel: LogLevel,
     permissionRuleCount: Int,
     themeMode: AppThemeMode,
-    onThemeModeChange: (AppThemeMode) -> Unit,
+    onOpenThemeSheet: () -> Unit,
     keepaliveEnabled: Boolean,
     onToggleKeepalive: (Boolean) -> Unit,
     currentLanguageDisplayName: String,
+    onOpenLanguageSheet: () -> Unit,
     onOpen: (SettingsSection) -> Unit
 ) {
     Column(
@@ -427,18 +448,17 @@ internal fun SettingsMenu(
 
         // ── 外观与语言 ──
         SectionHeader(text = stringResource(R.string.settings_category_appearance))
-        ThemeModeRow(
+        MenuRow(
             icon = FeatherIcons.Moon,
             title = stringResource(R.string.settings_theme_title),
-            subtitle = stringResource(R.string.settings_theme_subtitle),
-            selected = themeMode,
-            onSelected = onThemeModeChange
+            subtitle = stringResource(themeMode.labelRes),
+            onClick = onOpenThemeSheet
         )
         MenuRow(
             icon = FeatherIcons.Globe,
-            title = stringResource(SettingsSection.Language.titleRes),
+            title = stringResource(R.string.settings_language),
             subtitle = currentLanguageDisplayName,
-            onClick = { onOpen(SettingsSection.Language) }
+            onClick = onOpenLanguageSheet
         )
 
         // ── 其他 ──
@@ -462,82 +482,6 @@ internal fun SettingsMenu(
             subtitle = stringResource(R.string.settings_about_subtitle),
             onClick = { onOpen(SettingsSection.About) }
         )
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-internal fun ThemeModeRow(
-    icon: ImageVector,
-    title: String,
-    subtitle: String,
-    selected: AppThemeMode,
-    onSelected: (AppThemeMode) -> Unit
-) {
-    var expanded by remember { mutableStateOf(false) }
-
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(Radius.md),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(Spacing.lg),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(24.dp)
-            )
-            Spacer(Modifier.width(Spacing.md))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Normal,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    text = subtitle,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            ExposedDropdownMenuBox(
-                expanded = expanded,
-                onExpandedChange = { expanded = !expanded }
-            ) {
-                OutlinedTextField(
-                    value = stringResource(selected.labelRes),
-                    onValueChange = {},
-                    readOnly = true,
-                    singleLine = true,
-                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-                    modifier = Modifier
-                        .width(124.dp)
-                        .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable)
-                )
-                ExposedDropdownMenu(
-                    expanded = expanded,
-                    onDismissRequest = { expanded = false }
-                ) {
-                    AppThemeMode.entries.forEach { mode ->
-                        DropdownMenuItem(
-                            text = { Text(stringResource(mode.labelRes)) },
-                            onClick = {
-                                onSelected(mode)
-                                expanded = false
-                            }
-                        )
-                    }
-                }
-            }
-        }
     }
 }
 

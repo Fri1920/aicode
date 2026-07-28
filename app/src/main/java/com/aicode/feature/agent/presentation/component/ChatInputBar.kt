@@ -505,7 +505,7 @@ internal fun ModelSheet(
     currentProviderId: String,
     currentModel: String,
     onSelect: (String, String) -> Unit,
-    onManage: () -> Unit,
+    onManage: () -> Unit = {},
     onDismiss: () -> Unit
 ) {
     val sheetState = rememberModalBottomSheetState()
@@ -530,11 +530,6 @@ internal fun ModelSheet(
                     color = MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier.weight(1f)
                 )
-                TextButton(onClick = onManage) {
-                    Icon(FeatherIcons.Settings, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(Spacing.xs))
-                    Text(stringResource(R.string.chat_manage))
-                }
             }
 
             if (providers.all { it.models.isEmpty() }) {
@@ -593,8 +588,6 @@ internal fun ModelRow(
             .padding(horizontal = Spacing.md, vertical = Spacing.md),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        ModelLogoIcon(modelName = name, size = 22.dp)
-        Spacer(Modifier.width(Spacing.md))
         Text(
             text = name,
             style = MaterialTheme.typography.bodyLarge,
