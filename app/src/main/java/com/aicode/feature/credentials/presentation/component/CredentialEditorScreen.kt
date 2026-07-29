@@ -3,9 +3,12 @@ package com.aicode.feature.credentials.presentation.component
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -14,12 +17,15 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -27,10 +33,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
-import androidx.compose.material3.TextButton
+import androidx.compose.ui.unit.dp
+import com.aicode.R
 import com.aicode.core.theme.Spacing
 import com.aicode.feature.credentials.domain.model.GitCredential
 import com.aicode.feature.credentials.domain.model.newCredentialId
@@ -39,26 +47,24 @@ import compose.icons.feathericons.ArrowLeft
 import compose.icons.feathericons.Eye
 import compose.icons.feathericons.EyeOff
 import compose.icons.feathericons.Trash2
-import androidx.compose.ui.res.stringResource
-import com.aicode.R
 
 /**
- * 凭据编辑页（全屏）。host / 用户名 / Token / 别名 / 设为默认。
- * host 为空或 token 为空时不允许保存（落库前拦截，避免无效凭据）。
+ * 凭据编辑 BottomSheet 弹窗：从底部弹出编辑/新增 host、用户名、Token。
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun CredentialEditorScreen(
+internal fun CredentialEditorSheet(
     initial: GitCredential?,
-    onBack: () -> Unit,
+    onDismiss: () -> Unit,
     onSave: (GitCredential) -> Unit,
-    onDelete: (String) -> Unit
+    onDelete: ((String) -> Unit)? = null
 ) {
-    var host by remember { mutableStateOf(initial?.host ?: "") }
-    var username by remember { mutableStateOf(initial?.username ?: "") }
-    var token by remember { mutableStateOf(initial?.token ?: "") }
-    var label by remember { mutableStateOf(initial?.label ?: "") }
-    var isDefault by remember { mutableStateOf(initial?.isDefault ?: false) }
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    var host by remember(initial) { mutableStateOf(initial?.host ?: "") }
+    var username by remember(initial) { mutableStateOf(initial?.username ?: "") }
+    var token by remember(initial) { mutableStateOf(initial?.token ?: "") }
+    var label by remember(initial) { mutableStateOf(initial?.label ?: "") }
+    var isDefault by remember(initial) { mutableStateOf(initial?.isDefault ?: false) }
     var tokenVisible by remember { mutableStateOf(false) }
 
     val canSave = host.trim().isNotBlank() && username.trim().isNotBlank() && token.isNotBlank()
@@ -77,47 +83,45 @@ internal fun CredentialEditorScreen(
         )
     }
 
-    fun saveAndBack() {
-        current()?.let {
-            onSave(it)
-            onBack()
-        }
-    }
-
-    BackHandler { onBack() }
-
-    Scaffold(
-        containerColor = MaterialTheme.colorScheme.background,
-        topBar = {
-            TopAppBar(
-                title = { Text(if (initial == null) stringResource(R.string.credential_add) else stringResource(R.string.credential_edit)) },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background,
-                    titleContentColor = MaterialTheme.colorScheme.onBackground
-                ),
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(FeatherIcons.ArrowLeft, contentDescription = stringResource(R.string.common_back))
-                    }
-                },
-                actions = {
-                    if (initial != null) {
-                        IconButton(onClick = { onDelete(initial.id); onBack() }) {
-                            Icon(FeatherIcons.Trash2, contentDescription = stringResource(R.string.credential_delete), tint = MaterialTheme.colorScheme.error)
-                        }
-                    }
-                }
-            )
-        }
-    ) { padding ->
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = MaterialTheme.colorScheme.surface
+    ) {
         Column(
             modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .verticalScroll(rememberScrollState())
-                .padding(Spacing.lg),
-            verticalArrangement = Arrangement.spacedBy(Spacing.md)
+                .fillMaxWidth()
+                .padding(horizontal = Spacing.lg)
+                .padding(bottom = Spacing.xl)
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(Spacing.sm)
         ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = Spacing.xs),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = if (initial == null) stringResource(R.string.credential_add) else stringResource(R.string.credential_edit),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                if (initial != null && onDelete != null) {
+                    IconButton(onClick = {
+                        onDelete(initial.id)
+                        onDismiss()
+                    }) {
+                        Icon(
+                            FeatherIcons.Trash2,
+                            contentDescription = stringResource(R.string.credential_delete),
+                            tint = MaterialTheme.colorScheme.error
+                        )
+                    }
+                }
+            }
+
             Text(
                 text = stringResource(R.string.credential_usage_desc),
                 style = MaterialTheme.typography.bodySmall,
@@ -159,8 +163,9 @@ internal fun CredentialEditorScreen(
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth()
             )
-            androidx.compose.foundation.layout.Row(
+            Row(
                 modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column(modifier = Modifier.weight(1f)) {
@@ -173,18 +178,48 @@ internal fun CredentialEditorScreen(
                 }
                 Switch(checked = isDefault, onCheckedChange = { isDefault = it })
             }
-            Button(
-                onClick = { saveAndBack() },
-                enabled = canSave,
-                modifier = Modifier.fillMaxWidth()
-            ) { Text(if (initial == null) stringResource(R.string.common_add) else stringResource(R.string.common_save)) }
-            if (!canSave) {
-                Text(
-                    text = stringResource(R.string.credential_fields_required),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.error
-                )
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = Spacing.md),
+                horizontalArrangement = Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                TextButton(onClick = onDismiss) {
+                    Text(stringResource(R.string.common_cancel), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Spacer(modifier = Modifier.width(Spacing.sm))
+                Button(
+                    onClick = {
+                        current()?.let {
+                            onSave(it)
+                            onDismiss()
+                        }
+                    },
+                    enabled = canSave
+                ) {
+                    Text(if (initial != null) stringResource(R.string.common_save) else stringResource(R.string.common_add))
+                }
             }
         }
     }
+}
+
+/**
+ * 保留原本 CredentialEditorScreen 用于兼容调用。
+ */
+@Composable
+internal fun CredentialEditorScreen(
+    initial: GitCredential?,
+    onBack: () -> Unit,
+    onSave: (GitCredential) -> Unit,
+    onDelete: (String) -> Unit
+) {
+    CredentialEditorSheet(
+        initial = initial,
+        onDismiss = onBack,
+        onSave = onSave,
+        onDelete = onDelete
+    )
 }

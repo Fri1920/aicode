@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -26,7 +27,7 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Switch
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -50,7 +51,6 @@ import com.aicode.R
 @Composable
 internal fun ProvidersSection(
     providers: List<AIProviderConfig>,
-    onToggle: (String, Boolean) -> Unit,
     onEdit: (AIProviderConfig) -> Unit
 ) {
     if (providers.isEmpty()) {
@@ -65,7 +65,6 @@ internal fun ProvidersSection(
         items(providers) { provider ->
             ProviderItem(
                 provider = provider,
-                onToggle = { onToggle(provider.id, it) },
                 onEdit = { onEdit(provider) }
             )
         }
@@ -242,7 +241,6 @@ internal fun LogLevelCard(
 @Composable
 fun ProviderItem(
     provider: AIProviderConfig,
-    onToggle: (Boolean) -> Unit,
     onEdit: () -> Unit
 ) {
     Card(
@@ -264,28 +262,39 @@ fun ProviderItem(
                 .padding(Spacing.lg),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = provider.name,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Normal,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    text = if (provider.models.isEmpty()) {
-                        stringResource(R.string.provider_no_models_hint)
-                    } else {
-                        stringResource(R.string.provider_model_summary, provider.effectiveModel, provider.models.size)
-                    },
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            Switch(
-                checked = provider.isEnabled,
-                onCheckedChange = onToggle,
+            ProviderLogoIcon(
+                provider = provider,
+                size = 28.dp,
                 modifier = Modifier.padding(end = Spacing.md)
             )
+            Text(
+                text = provider.name,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Normal,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.weight(1f)
+            )
+            Surface(
+                shape = RoundedCornerShape(Radius.sm),
+                color = if (provider.isEnabled) {
+                    MaterialTheme.colorScheme.primaryContainer
+                } else {
+                    MaterialTheme.colorScheme.surfaceVariant
+                }
+            ) {
+                Text(
+                    text = stringResource(if (provider.isEnabled) R.string.common_enabled else R.string.common_disabled),
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Medium,
+                    color = if (provider.isEnabled) {
+                        MaterialTheme.colorScheme.onPrimaryContainer
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                )
+            }
+            Spacer(Modifier.width(Spacing.sm))
             IconButton(onClick = onEdit) {
                 Icon(
                     FeatherIcons.Edit2,

@@ -29,8 +29,15 @@ import com.aicode.feature.agent.domain.tool.ToolOutputStore
 import com.aicode.feature.agent.domain.tool.ToolStreamEvent
 import com.aicode.feature.agent.domain.tool.toTransportString
 import com.aicode.feature.settings.data.remote.ModelMetadataService
+import com.aicode.feature.settings.data.repository.CompactionModelSettingsRepository
 import com.aicode.feature.settings.data.repository.VisionModelSettingsRepository
 import com.aicode.feature.settings.domain.model.AIProviderConfig
+import com.aicode.feature.agent.data.remote.anthropic.AnthropicApi
+import com.aicode.feature.agent.data.remote.gemini.GeminiApi
+import com.aicode.feature.agent.data.remote.openai.OpenAIApi
+import com.aicode.feature.agent.domain.provider.AnthropicAdapter
+import com.aicode.feature.agent.domain.provider.GeminiAdapter
+import com.aicode.feature.agent.domain.provider.OpenAIAdapter
 import com.aicode.feature.settings.domain.model.ProviderType
 import com.aicode.feature.settings.domain.repository.AIProviderRepository
 import kotlinx.coroutines.CancellationException
@@ -54,6 +61,9 @@ class StatefulAgentWorkflow @Inject constructor(
     @param:javax.inject.Named("OpenAIProvider") private val openAIProvider: AIProvider,
     @param:javax.inject.Named("AnthropicProvider") private val anthropicProvider: AIProvider,
     @param:javax.inject.Named("GeminiProvider") private val geminiProvider: AIProvider,
+    private val openAIApi: OpenAIApi,
+    private val anthropicApi: AnthropicApi,
+    private val geminiApi: GeminiApi,
     private val promptProvider: SystemPromptProvider,
     private val permissionManager: ToolPermissionManager,
     private val policyEngine: ToolPermissionPolicyEngine,
@@ -62,13 +72,13 @@ class StatefulAgentWorkflow @Inject constructor(
     private val toolOutputStore: ToolOutputStore,
     private val modelMetadataService: ModelMetadataService,
     private val visionModelSettingsRepository: VisionModelSettingsRepository,
+    private val compactionModelSettingsRepository: CompactionModelSettingsRepository,
     private val sessionUseCase: SessionUseCase,
     private val messagePersistenceUseCase: MessagePersistenceUseCase
 ) : AgentWorkflow {
 
     private companion object {
         const val TAG = "StatefulAgentWorkflow"
-        const val MAX_ITERATIONS = 50
         const val LIVE_TAIL_CHARS = 4_000
         const val PROGRESS_INTERVAL_MS = 250L
         const val USER_REJECTED_CODE = "USER_REJECTED"
@@ -161,8 +171,28 @@ class StatefulAgentWorkflow @Inject constructor(
         val provider = getProviderFor(config, sessionId)
         val history = messagePersistenceUseCase.buildHistory(sessionId, "__manual_compress__")
         if (history.size <= 2) return false
-        val compacted = contextCompactor.compactIfNeeded(history, provider, sessionId, force = true, onEvent = onEvent)
+        val compactionProvider = resolveCompactionFallbackProvider() ?: provider
+        val compacted = contextCompactor.compactIfNeeded(history, compactionProvider, sessionId, force = true, onEvent = onEvent)
         return compacted.size != history.size
+    }
+
+    /**
+     * 根据 [config] 创建一个全新的、独立的 [AIProvider] 实例。
+     * 用于识图回退和上下文压缩等独立请求场景，完全不占用或修改主对话所用的 Provider 单例。
+     */
+    private fun createStandaloneProvider(config: AIProviderConfig, sessionId: String?): AIProvider {
+        val provider: AIProvider = when (config.type) {
+            ProviderType.ANTHROPIC -> AnthropicAdapter(anthropicApi)
+            ProviderType.GEMINI -> GeminiAdapter(geminiApi)
+            else -> OpenAIAdapter(openAIApi)
+        }
+        provider.apiKey = config.apiKey
+        provider.baseUrl = config.baseUrl
+        provider.model = config.effectiveModel
+        provider.useFullUrl = config.useFullUrl
+        provider.useResponseApi = config.useResponseApi
+        provider.logSessionId = sessionId
+        return provider
     }
 
     /**
@@ -289,12 +319,6 @@ class StatefulAgentWorkflow @Inject constructor(
             }
         }
         
-        // 限制最大迭代次数
-        if (!newState.isFinished && newState.iterations >= MAX_ITERATIONS && effects.contains(AgentSideEffect.CallLlm)) {
-            newState = newState.copy(isFinished = true, error = "达到最大迭代次数限制 ($MAX_ITERATIONS 次)")
-            effects.clear()
-        }
-        
         return Pair(newState, effects)
     }
 
@@ -327,10 +351,12 @@ class StatefulAgentWorkflow @Inject constructor(
             for (effect in effects) {
                 when (effect) {
                     is AgentSideEffect.CallLlm -> {
-                        // 识图轮：若当前聊天模型无 vision，临时切到识图专用模型发送，发完恢复三单例字段。
-                        val visionRound = if (state.pendingVisionRound) resolveVisionFallbackProvider(currentContext.sessionId) else null
-                        val providerInUse = visionRound?.provider ?: aiProvider
-                        val compactedMessages = contextCompactor.compactIfNeeded(state.messages, providerInUse, context.sessionId)
+                        // 识图轮：若当前聊天模型无 vision，使用独立识图模型发送
+                        val visionProvider = if (state.pendingVisionRound) resolveVisionFallbackProvider(currentContext.sessionId) else null
+                        val providerInUse = visionProvider ?: aiProvider
+                        // 压缩轮：若配置了压缩专用模型，使用独立压缩模型压缩
+                        val compactionProvider = resolveCompactionFallbackProvider(currentContext.sessionId) ?: providerInUse
+                        val compactedMessages = contextCompactor.compactIfNeeded(state.messages, compactionProvider, context.sessionId)
                         if (compactedMessages !== state.messages) {
                             state = state.copy(messages = compactedMessages)
                         }
@@ -340,7 +366,6 @@ class StatefulAgentWorkflow @Inject constructor(
                         } catch (e: Exception) {
                             actionQueue.addLast(AgentAction.LlmError("LLM 调用失败: ${e.message}"))
                         } finally {
-                            visionRound?.restore()
                             if (state.pendingVisionRound) state = state.copy(pendingVisionRound = false)
                         }
                     }
@@ -423,10 +448,12 @@ class StatefulAgentWorkflow @Inject constructor(
             for (effect in effects) {
                 when (effect) {
                     is AgentSideEffect.CallLlm -> {
-                        // 识图轮：若当前聊天模型无 vision，临时切到识图专用模型发送，发完恢复三单例字段。
-                        val visionRound = if (state.pendingVisionRound) resolveVisionFallbackProvider(currentContext.sessionId) else null
-                        val providerInUse = visionRound?.provider ?: aiProvider
-                        val compactedMessages = contextCompactor.compactIfNeeded(state.messages, providerInUse, context.sessionId) { emit(it) }
+                        // 识图轮：若当前聊天模型无 vision，使用独立识图模型发送
+                        val visionProvider = if (state.pendingVisionRound) resolveVisionFallbackProvider(currentContext.sessionId) else null
+                        val providerInUse = visionProvider ?: aiProvider
+                        // 压缩轮：若配置了压缩专用模型，使用独立压缩模型压缩
+                        val compactionProvider = resolveCompactionFallbackProvider(currentContext.sessionId) ?: providerInUse
+                        val compactedMessages = contextCompactor.compactIfNeeded(state.messages, compactionProvider, context.sessionId) { emit(it) }
                         if (compactedMessages !== state.messages) {
                             state = state.copy(messages = compactedMessages)
                         }
@@ -477,7 +504,6 @@ class StatefulAgentWorkflow @Inject constructor(
                             }
                             actionQueue.addLast(AgentAction.LlmError("LLM 调用失败: ${e.message}"))
                         } finally {
-                            visionRound?.restore()
                             if (state.pendingVisionRound) state = state.copy(pendingVisionRound = false)
                         }
                     }
@@ -546,14 +572,25 @@ class StatefulAgentWorkflow @Inject constructor(
             return ToolRunResult(ToolResult.Error("工具 $name 不存在", "TOOL_NOT_FOUND").toTransportString(), true)
         }
         return try {
-            if (name == "viewImage" && !activeModelSupportsVision(context.sessionId) && !visionFallbackReady()) {
-                return ToolRunResult(
-                    ToolResult.Error(
-                        "当前聊天模型不支持图片输入，且未配置支持 Vision 的识图专用模型。请在「设置 → 识图模型」中指定一个支持 Vision 的模型后再查看图片。",
-                        "MODEL_VISION_UNSUPPORTED"
-                    ).toTransportString(),
-                    true
-                )
+            if (name == "viewImage" && !activeModelSupportsVision(context.sessionId)) {
+                if (!visionFallbackReady()) {
+                    return ToolRunResult(
+                        ToolResult.Error(
+                            "当前聊天模型不支持图片输入，且未配置支持 Vision 的识图专用模型。请在「设置 → 默认模型 → 识图模型」中指定一个支持 Vision 的模型后再查看图片。",
+                            "MODEL_VISION_UNSUPPORTED"
+                        ).toTransportString(),
+                        true
+                    )
+                }
+                // 非多模态模型：同步用识图模型理解图片，文本结果直接作为工具返回
+                val result = tool.executeWithContext(toolCall.arguments, context)
+                val userPrompt = (toolCall.arguments["prompt"] as? JsonPrimitive)?.contentOrNull?.trim()
+                val textResult = runVisionFallback(result, context.sessionId, userPrompt)
+                val processed = toolOutputStore.process(name, toolCall.id, ToolResult.Success(JsonObject(mapOf(
+                    "content" to JsonPrimitive(textResult),
+                    "model" to JsonPrimitive("vision-fallback")
+                ))))
+                return ToolRunResult(processed.toTransportString(), processed is ToolResult.Error, emptyList())
             }
             val result = tool.executeWithContext(toolCall.arguments, context)
             val images = if (name == "viewImage") extractInlineImages(result) else emptyList()
@@ -564,6 +601,48 @@ class StatefulAgentWorkflow @Inject constructor(
             throw e
         } catch (e: Exception) {
             ToolRunResult(ToolResult.Error("工具执行失败: ${e.message}", "TOOL_EXECUTION_FAILED").toTransportString(), true)
+        }
+    }
+
+    /**
+     * 非多模态模型的 viewImage 回退：从工具结果中提取 base64 图片，
+     * 同步发给识图专用模型理解内容，返回文本结果。
+     */
+    private suspend fun runVisionFallback(result: ToolResult, sessionId: String?, customPrompt: String? = null): String {
+        val data = (result as? ToolResult.Success)?.data as? JsonObject
+            ?: return "无法解析图片数据"
+        val image = data["image"] as? JsonObject
+            ?: return "无法提取图片数据"
+        val mimeType = image["mime_type"]?.jsonPrimitive?.contentOrNull
+            ?: return "无法识别图片格式"
+        val base64Data = image["base64_data"]?.jsonPrimitive?.contentOrNull
+            ?: return "无法读取图片数据"
+        val path = image["path"]?.jsonPrimitive?.contentOrNull.orEmpty()
+
+        val agentImage = AgentImage(mimeType = mimeType, base64Data = base64Data, path = path)
+        val visionProvider = resolveVisionFallbackProvider(sessionId)
+            ?: return "识图模型不可用"
+
+        val promptText = if (!customPrompt.isNullOrBlank()) {
+            "请针对用户/模型的如下关注重点，详细分析并描述这张图片：\n$customPrompt"
+        } else {
+            "请详细描述这张图片的内容，包括其中出现的文字、元素、布局、颜色等关键信息。"
+        }
+
+        try {
+            val messages = listOf(
+                AgentMessage.UserMessage(
+                    content = promptText,
+                    images = listOf(agentImage)
+                )
+            )
+            val response = visionProvider.complete("", messages, emptyList())
+            return response.content.ifBlank { "（识图模型未返回内容）" }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            FileLogger.e(TAG, "识图回退失败", e)
+            return "识图失败: ${e.message}"
         }
     }
 
@@ -590,42 +669,11 @@ class StatefulAgentWorkflow @Inject constructor(
         return metadata.supportsVision
     }
 
-    /** 一次 provider 单例可变字段的快照，用于识图轮临切后恢复。 */
-    private data class ProviderSnapshot(
-        val provider: AIProvider,
-        val apiKey: String,
-        val baseUrl: String,
-        val useFullUrl: Boolean,
-        val useResponseApi: Boolean,
-        val model: String,
-        val logSessionId: String?
-    )
-
-    private fun snapshotProvider(provider: AIProvider) = ProviderSnapshot(
-        provider = provider,
-        apiKey = provider.apiKey,
-        baseUrl = provider.baseUrl,
-        useFullUrl = provider.useFullUrl,
-        useResponseApi = provider.useResponseApi,
-        model = provider.model,
-        logSessionId = provider.logSessionId
-    )
-
-    private fun restoreProvider(snap: ProviderSnapshot) {
-        snap.provider.apiKey = snap.apiKey
-        snap.provider.baseUrl = snap.baseUrl
-        snap.provider.useFullUrl = snap.useFullUrl
-        snap.provider.useResponseApi = snap.useResponseApi
-        snap.provider.model = snap.model
-        snap.provider.logSessionId = snap.logSessionId
-    }
-
     /**
      * 识图轮专用 provider 解析。仅当当前聊天模型不支持 vision、且专用模型已配置且可用时返回
-     * 已填好连接字段、已对原单例做好快照的专用 provider；否则返回 null（表示无需切换、沿用 aiProvider）。
-     * 调用方必须在发送完请求的 finally 里调用 [restoreProvider] 用 [VisionRoundEnv.snapshot] 恢复。
+     * 全新的独立 AIProvider 实例；否则返回 null（表示无需切换、沿用 aiProvider）。
      */
-    private suspend fun resolveVisionFallbackProvider(sessionId: String?): VisionRoundEnv? {
+    private suspend fun resolveVisionFallbackProvider(sessionId: String?): AIProvider? {
         if (activeModelSupportsVision(sessionId)) return null // 当前聊天模型就有原生能力，直接用之
         if (!visionFallbackReady()) return null       // 无可用兜底，仍沿用 aiProvider（守卫已先行拦截并报错）
         val providerId = visionModelSettingsRepository.getVisionProviderId().trim()
@@ -634,16 +682,21 @@ class StatefulAgentWorkflow @Inject constructor(
             ?: error("识图专用模型配置丢失")
         if (config.apiKey.isBlank()) error("识图专用模型「${config.name}」未填写 API Key")
         if (model.isBlank()) error("识图专用模型未指定模型")
-        // 切到专用 provider 实例（getProviderFor 会改写其单例字段），先对三个单例都做快照，finally 全量恢复——最稳。
-        val snapshots = listOf(snapshotProvider(anthropicProvider), snapshotProvider(openAIProvider), snapshotProvider(geminiProvider))
-        val provider = getProviderFor(config.copy(selectedModel = model), null)
-        return VisionRoundEnv(provider = provider, snapshots = snapshots)
+        return createStandaloneProvider(config.copy(selectedModel = model), sessionId)
     }
 
-    /** 识图轮 provider 切换上下文：持有专用 provider 实例与三个单例的快照。inner 以便调用外层 [restoreProvider]。 */
-    private inner class VisionRoundEnv(val provider: AIProvider, val snapshots: List<ProviderSnapshot>) {
-        /** 恢复三个单例的可变字段。 */
-        fun restore() = snapshots.forEach { restoreProvider(it) }
+    /**
+     * 压缩轮专用 provider 解析。若用户配置了压缩专用模型且 provider 存在、已启用、有 apiKey，
+     * 则返回全新的独立 AIProvider 实例；否则返回 null（沿用当前聊天模型）。
+     */
+    private suspend fun resolveCompactionFallbackProvider(sessionId: String? = null): AIProvider? {
+        val providerId = compactionModelSettingsRepository.getCompactionProviderId().trim()
+        if (providerId.isEmpty()) return null
+        val model = compactionModelSettingsRepository.getCompactionModel().trim()
+        if (model.isEmpty()) return null
+        val config = aiProviderRepository.getProviderById(providerId) ?: return null
+        if (!config.isEnabled || config.apiKey.isBlank()) return null
+        return createStandaloneProvider(config.copy(selectedModel = model), sessionId)
     }
 
     private suspend fun runToolStream(

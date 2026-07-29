@@ -36,6 +36,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
@@ -103,7 +105,7 @@ internal fun ToolMessageBody(message: AgentUIMessage, liveOutput: String? = null
 
     val expandable = !running && (edit != null || !resultText.isNullOrBlank() || !argsFull.isNullOrBlank()
             || (todoData != null && todoData.items.isNotEmpty()) || webSearchData != null)
-    var expanded by remember(message.id) { mutableStateOf(edit != null || todoData != null || webSearchData != null) }
+    var expanded by remember(message.id) { mutableStateOf(edit != null || todoData != null) }
 
     val toolLabel = if (edit != null) edit.path.substringAfterLast('/') else (message.toolName ?: stringResource(R.string.common_tool))
 
@@ -180,25 +182,33 @@ internal fun ToolMessageBody(message: AgentUIMessage, liveOutput: String? = null
                 )
             }
         } else if (expanded) {
-            if (todoData != null && todoData.items.isNotEmpty()) {
-                Spacer(Modifier.height(Spacing.sm))
-                TodoCard(items = todoData.items)
-            } else if (webSearchData != null) {
-                Spacer(Modifier.height(Spacing.sm))
-                WebSearchResultCard(result = webSearchData)
-            } else if (edit != null) {
-                edit.hunks.forEach { h ->
-                    Spacer(Modifier.height(Spacing.xs))
-                    DiffView(diff = h.diff, startLine = h.startLine)
+            Column(
+                modifier = Modifier.pointerInput(message.id) {
+                    detectTapGestures(
+                        onDoubleTap = { expanded = false }
+                    )
                 }
-            } else {
-                if (!argsFull.isNullOrBlank()) {
+            ) {
+                if (todoData != null && todoData.items.isNotEmpty()) {
                     Spacer(Modifier.height(Spacing.sm))
-                    ToolSection(label = stringResource(R.string.tool_instruction), content = argsFull)
-                }
-                if (!resultText.isNullOrBlank()) {
+                    TodoCard(items = todoData.items)
+                } else if (webSearchData != null) {
                     Spacer(Modifier.height(Spacing.sm))
-                    ToolSection(label = stringResource(R.string.tool_result), content = resultText)
+                    WebSearchResultCard(result = webSearchData)
+                } else if (edit != null) {
+                    edit.hunks.forEach { h ->
+                        Spacer(Modifier.height(Spacing.xs))
+                        DiffView(diff = h.diff, startLine = h.startLine)
+                    }
+                } else {
+                    if (!argsFull.isNullOrBlank()) {
+                        Spacer(Modifier.height(Spacing.sm))
+                        ToolSection(label = stringResource(R.string.tool_instruction), content = argsFull)
+                    }
+                    if (!resultText.isNullOrBlank()) {
+                        Spacer(Modifier.height(Spacing.sm))
+                        ToolSection(label = stringResource(R.string.tool_result), content = resultText)
+                    }
                 }
             }
         }

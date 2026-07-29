@@ -35,6 +35,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
@@ -313,7 +314,7 @@ private fun WorkspaceRow(
         Icon(
             FeatherIcons.Folder,
             contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.size(20.dp)
         )
         Spacer(Modifier.width(Spacing.md))
@@ -321,18 +322,12 @@ private fun WorkspaceRow(
             text = workspace.name,
             style = MaterialTheme.typography.bodyLarge,
             color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f)
         )
-        if (selected) {
-            Icon(
-                FeatherIcons.Check,
-                contentDescription = stringResource(R.string.common_current),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(20.dp)
-            )
-        } else if (canDelete) {
+        if (canDelete) {
             Box(
                 modifier = Modifier
                     .size(32.dp)
@@ -343,7 +338,7 @@ private fun WorkspaceRow(
                 Icon(
                     FeatherIcons.Trash2,
                     contentDescription = stringResource(R.string.common_delete),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    tint = MaterialTheme.colorScheme.error,
                     modifier = Modifier.size(18.dp)
                 )
             }

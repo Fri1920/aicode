@@ -38,6 +38,12 @@ class ViewImageTool @Inject constructor(
             description = "图片细节级别。low 会缩小到较小预览；high 适合一般视觉检查；original 尽量传原图，过大时自动降级为 high。",
             required = false,
             enum = listOf("low", "high", "original")
+        ),
+        "prompt" to ToolParameter(
+            name = "prompt",
+            type = ParameterType.STRING,
+            description = "可选的提问或说明（如「提取报错信息」「分析 UI 布局」）。非多模态模型使用识图服务时，识图模型会优先围绕该问题或说明进行针对性描述。",
+            required = false
         )
     )
 

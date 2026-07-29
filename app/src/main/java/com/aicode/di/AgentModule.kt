@@ -14,6 +14,7 @@ import com.aicode.feature.agent.data.local.database.AgentDatabase
 import com.aicode.feature.agent.data.CodeChangeTracker
 import dagger.hilt.android.qualifiers.ApplicationContext
 import com.aicode.feature.agent.data.remote.anthropic.AnthropicApi
+import com.aicode.feature.agent.data.remote.gemini.GeminiApi
 import com.aicode.feature.agent.data.remote.openai.OpenAIApi
 import com.aicode.feature.agent.domain.provider.AIProvider
 import com.aicode.feature.agent.domain.provider.AnthropicAdapter
@@ -281,6 +282,9 @@ object AgentModule {
         @Named("OpenAIProvider") openAIProvider: AIProvider,
         @Named("AnthropicProvider") anthropicProvider: AIProvider,
         @Named("GeminiProvider") geminiProvider: AIProvider,
+        openAIApi: OpenAIApi,
+        anthropicApi: AnthropicApi,
+        geminiApi: GeminiApi,
         promptProvider: SystemPromptProvider,
         permissionManager: ToolPermissionManager,
         policyEngine: ToolPermissionPolicyEngine,
@@ -289,6 +293,7 @@ object AgentModule {
         toolOutputStore: ToolOutputStore,
         modelMetadataService: ModelMetadataService,
         visionModelSettingsRepository: com.aicode.feature.settings.data.repository.VisionModelSettingsRepository,
+        compactionModelSettingsRepository: com.aicode.feature.settings.data.repository.CompactionModelSettingsRepository,
         sessionUseCase: com.aicode.feature.agent.domain.session.SessionUseCase,
         messagePersistenceUseCase: com.aicode.feature.agent.domain.session.MessagePersistenceUseCase
     ): AgentWorkflow {
@@ -298,6 +303,9 @@ object AgentModule {
             openAIProvider,
             anthropicProvider,
             geminiProvider,
+            openAIApi,
+            anthropicApi,
+            geminiApi,
             promptProvider,
             permissionManager,
             policyEngine,
@@ -306,6 +314,7 @@ object AgentModule {
             toolOutputStore,
             modelMetadataService,
             visionModelSettingsRepository,
+            compactionModelSettingsRepository,
             sessionUseCase,
             messagePersistenceUseCase
         )

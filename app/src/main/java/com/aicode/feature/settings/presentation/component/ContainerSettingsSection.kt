@@ -76,6 +76,8 @@ import com.aicode.R
 internal fun ContainerSection(
     profiles: List<ContainerProfile>,
     activeProfileId: String,
+    showAddSheetExternal: Boolean = false,
+    onDismissAddSheet: () -> Unit = {},
     onSelect: (String) -> Unit,
     onSaveCustom: (ContainerProfile) -> Unit,
     onEditCustom: (ContainerProfile) -> Unit,
@@ -85,7 +87,8 @@ internal fun ContainerSection(
     remoteConnections: List<RemoteConnection> = emptyList()
 ) {
     val context = LocalContext.current
-    var showAddSheet by remember { mutableStateOf(false) }
+    var showAddSheetInternal by remember { mutableStateOf(false) }
+    val showAddSheet = showAddSheetInternal || showAddSheetExternal
     var editingProfile by remember { mutableStateOf<ContainerProfile?>(null) }
     var deletingProfile by remember { mutableStateOf<ContainerProfile?>(null) }
     var pendingSwitch by remember { mutableStateOf<ContainerProfile?>(null) }
@@ -96,15 +99,6 @@ internal fun ContainerSection(
         contentPadding = PaddingValues(Spacing.lg),
         verticalArrangement = Arrangement.spacedBy(Spacing.md)
     ) {
-        item {
-            Text(
-                text = stringResource(R.string.container_section_desc),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(bottom = Spacing.sm)
-            )
-        }
-
         items(profiles, key = { it.id }) { profile ->
             val active = profile.id == activeProfileId
             Card(
@@ -159,7 +153,7 @@ internal fun ContainerSection(
                             Icon(
                                 imageVector = FeatherIcons.Trash2,
                                 contentDescription = stringResource(R.string.common_delete),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                tint = MaterialTheme.colorScheme.error
                             )
                         }
                     } else {
@@ -174,41 +168,16 @@ internal fun ContainerSection(
                 }
             }
         }
-
-        item {
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { showAddSheet = true },
-                shape = RoundedCornerShape(Radius.md),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(Spacing.lg),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(Spacing.md)
-                ) {
-                    Icon(
-                        imageVector = FeatherIcons.Plus,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary
-                    )
-                    Text(
-                        text = stringResource(R.string.container_add_image),
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                }
-            }
-        }
     }
 
     if (showAddSheet) {
         ProfileEditSheet(
             initial = null,
             remoteConnections = remoteConnections,
-            onDismiss = { showAddSheet = false },
+            onDismiss = {
+                showAddSheetInternal = false
+                onDismissAddSheet()
+            },
             onConfirm = { profile ->
                 val id = "custom-${System.currentTimeMillis()}"
                 onSaveCustom(
@@ -218,7 +187,8 @@ internal fun ContainerSection(
                         profile.copy(id = id, name = profile.name.ifBlank { context.getString(R.string.container_custom_image) })
                     }
                 )
-                showAddSheet = false
+                showAddSheetInternal = false
+                onDismissAddSheet()
             }
         )
     }

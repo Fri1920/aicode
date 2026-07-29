@@ -22,6 +22,7 @@ import com.aicode.feature.settings.data.remote.ModelTestResult
 import com.aicode.feature.settings.data.repository.AppThemeMode
 import com.aicode.feature.settings.data.repository.ContainerSettingsRepository
 import com.aicode.feature.settings.data.repository.ExecutionMode
+import com.aicode.feature.settings.data.repository.CompactionModelSettingsRepository
 import com.aicode.feature.settings.data.repository.ExecutionModeHolder
 import com.aicode.feature.settings.data.repository.ExecutionModeRepository
 import com.aicode.feature.settings.data.repository.KeepaliveSettingsRepository
@@ -80,6 +81,7 @@ class SettingsViewModel @Inject constructor(
     private val mcpManager: McpManager,
     private val permissionRulesRepository: PermissionRulesRepository,
     private val visionModelSettingsRepository: VisionModelSettingsRepository,
+    private val compactionModelSettingsRepository: CompactionModelSettingsRepository,
     private val containerSettingsRepository: ContainerSettingsRepository,
     private val containerInstaller: ContainerInstaller,
     private val executionModeRepository: ExecutionModeRepository,
@@ -103,6 +105,13 @@ class SettingsViewModel @Inject constructor(
 
     private val _visionModel = MutableStateFlow("")
     val visionModel: StateFlow<String> = _visionModel.asStateFlow()
+
+    /** 压缩专用模型选择：providerId 为空即「跟随当前聊天模型」。 */
+    private val _compactionProviderId = MutableStateFlow("")
+    val compactionProviderId: StateFlow<String> = _compactionProviderId.asStateFlow()
+
+    private val _compactionModel = MutableStateFlow("")
+    val compactionModel: StateFlow<String> = _compactionModel.asStateFlow()
 
     private val _logLevel = MutableStateFlow(LogLevel.VERBOSE)
     val logLevel: StateFlow<LogLevel> = _logLevel.asStateFlow()
@@ -200,6 +209,18 @@ class SettingsViewModel @Inject constructor(
             launch {
                 visionModelSettingsRepository.modelFlow.collectLatest {
                     _visionModel.value = it
+                }
+            }
+
+            launch {
+                compactionModelSettingsRepository.providerIdFlow.collectLatest {
+                    _compactionProviderId.value = it
+                }
+            }
+
+            launch {
+                compactionModelSettingsRepository.modelFlow.collectLatest {
+                    _compactionModel.value = it
                 }
             }
 
@@ -503,6 +524,20 @@ class SettingsViewModel @Inject constructor(
     fun clearVisionModel() {
         viewModelScope.launch {
             visionModelSettingsRepository.clear()
+        }
+    }
+
+    /** 设置压缩专用模型；providerId 留空等同 [clearCompactionModel]（跟随聊天模型）。 */
+    fun setCompactionModel(providerId: String, model: String) {
+        viewModelScope.launch {
+            compactionModelSettingsRepository.setCompactionModel(providerId, model)
+        }
+    }
+
+    /** 清空压缩专用模型——回退到跟随当前聊天模型。 */
+    fun clearCompactionModel() {
+        viewModelScope.launch {
+            compactionModelSettingsRepository.clear()
         }
     }
 

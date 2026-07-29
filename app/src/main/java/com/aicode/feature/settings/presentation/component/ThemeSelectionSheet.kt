@@ -22,22 +22,22 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.aicode.R
 import com.aicode.core.theme.Spacing
-import com.aicode.core.util.LanguageRegistry
+import com.aicode.feature.settings.data.repository.AppThemeMode
 import compose.icons.FeatherIcons
 import compose.icons.feathericons.Check
 
 /**
- * 语言选择 BottomSheet 弹窗：参考会话长按菜单样式。
+ * 主题选择 BottomSheet 弹窗：参考会话长按菜单样式。
  *
- * @param currentTag 当前语言 tag，null 表示跟随系统。
- * @param onSelect 选中回调，参数为 tag（null 表示跟随系统）。
+ * @param selected 当前选中的主题模式。
+ * @param onSelected 选中回调。
  * @param onDismiss 关闭弹窗。
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun LanguageSelectionSheet(
-    currentTag: String?,
-    onSelect: (String?) -> Unit,
+internal fun ThemeSelectionSheet(
+    selected: AppThemeMode,
+    onSelected: (AppThemeMode) -> Unit,
     onDismiss: () -> Unit
 ) {
     val sheetState = rememberModalBottomSheetState()
@@ -52,7 +52,7 @@ internal fun LanguageSelectionSheet(
                 .padding(bottom = Spacing.xl)
         ) {
             Text(
-                text = stringResource(R.string.settings_language),
+                text = stringResource(R.string.settings_theme_title),
                 style = MaterialTheme.typography.titleSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
@@ -62,46 +62,12 @@ internal fun LanguageSelectionSheet(
                     .padding(bottom = Spacing.md)
             )
 
-            // 跟随系统
-            val followSystemSelected = currentTag.isNullOrBlank()
-            Surface(
-                onClick = {
-                    onDismiss()
-                    onSelect(null)
-                },
-                color = Color.Transparent
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = Spacing.lg, vertical = Spacing.md),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = stringResource(R.string.language_follow_system),
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = if (followSystemSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
-                        fontWeight = if (followSystemSelected) FontWeight.SemiBold else FontWeight.Normal,
-                        modifier = Modifier.weight(1f)
-                    )
-                    if (followSystemSelected) {
-                        Icon(
-                            imageVector = FeatherIcons.Check,
-                            contentDescription = null,
-                            modifier = Modifier.size(20.dp),
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                    }
-                }
-            }
-
-            // 注册的语言列表
-            LanguageRegistry.languages.forEach { lang ->
-                val selected = currentTag == lang.tag
+            AppThemeMode.entries.forEach { mode ->
+                val isSelected = mode == selected
                 Surface(
                     onClick = {
                         onDismiss()
-                        onSelect(lang.tag)
+                        onSelected(mode)
                     },
                     color = Color.Transparent
                 ) {
@@ -112,13 +78,13 @@ internal fun LanguageSelectionSheet(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = lang.displayName,
+                            text = stringResource(mode.labelRes),
                             style = MaterialTheme.typography.bodyLarge,
-                            color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
-                            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                            fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
                             modifier = Modifier.weight(1f)
                         )
-                        if (selected) {
+                        if (isSelected) {
                             Icon(
                                 imageVector = FeatherIcons.Check,
                                 contentDescription = null,

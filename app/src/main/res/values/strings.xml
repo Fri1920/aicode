@@ -6,7 +6,10 @@
     <string name="settings_title">设置</string>
     <string name="settings_providers">AI 提供商</string>
     <string name="settings_provider_editor">提供商</string>
+    <string name="settings_default_models">默认模型</string>
+    <string name="settings_default_models_subtitle">配置识图模型等默认偏好</string>
     <string name="settings_vision_model">识图模型</string>
+    <string name="settings_compaction_model">压缩模型</string>
     <string name="settings_mcp">MCP 服务器</string>
     <string name="settings_container">容器镜像</string>
     <string name="settings_log">日志等级</string>
@@ -31,6 +34,8 @@
     <string name="settings_providers_active"> · 启用：%1$s</string>
     <string name="settings_vision_follow_chat">跟随当前聊天模型</string>
     <string name="settings_vision_dedicated">专用：%1$s · %2$s</string>
+    <string name="settings_compaction_follow_chat">跟随当前聊天模型</string>
+    <string name="settings_compaction_dedicated">专用：%1$s · %2$s</string>
     <string name="settings_mcp_empty">未配置 MCP 服务器</string>
     <string name="settings_mcp_count_connected">%1$d 个 · 已连接 %2$d</string>
     <string name="settings_container_current">当前：%1$s</string>
@@ -49,6 +54,13 @@
     <string name="settings_keepalive_subtitle">显示前台通知，避免退到后台时系统杀进程</string>
     <string name="settings_backup_subtitle">加密导出/导入配置、聊天历史与凭据</string>
     <string name="settings_about_subtitle">版本检查 · GitHub · 许可证</string>
+
+    <!-- Settings category titles -->
+    <string name="settings_category_ai">AI 配置</string>
+    <string name="settings_category_environment">运行环境</string>
+    <string name="settings_category_tools">工具与权限</string>
+    <string name="settings_category_appearance">外观与语言</string>
+    <string name="settings_category_other">其他</string>
 
     <!-- i18n: UI 文案 -->
     <!-- Common -->
@@ -79,6 +91,8 @@
     <string name="common_username">用户名</string>
     <string name="common_got_it">知道了</string>
     <string name="common_edit">编辑</string>
+    <string name="common_enabled">已启用</string>
+    <string name="common_disabled">已禁用</string>
     <string name="credential_token">访问令牌 Token / PAT</string>
     <string name="common_rename">重命名</string>
     <string name="common_hide">隐藏</string>
@@ -236,8 +250,7 @@
     <string name="chat_expand_remaining">展开剩余 %1$s 行</string>
 
     <!-- Container Settings -->
-    <string name="container_section_desc">选择一个容器镜像作为命令执行后端。本地镜像走 PRoot 容器，远程 SSH 镜像连接远程服务器执行命令。</string>
-    <string name="container_bindings">绑定: ${profile.extraBindings.joinToString(" ")}</string>
+    <string name="container_bindings">绑定: %1$s</string>
     <string name="container_reset">重置</string>
     <string name="container_add_image">添加镜像</string>
     <string name="container_remote_ssh">远程 SSH</string>
@@ -277,7 +290,7 @@
     <string name="credential_fields_required">host、用户名、Token 均不能为空</string>
 
     <!-- Credential List -->
-    <string name="credential_empty_hint">尚未添加凭据，点右上角 + 添加\n(host / 用户名 / Token)</string>
+    <string name="credential_empty_hint">尚未添加凭据，点右上角 + 添加</string>
 
     <!-- Credential Prompt -->
     <string name="credential_prompt_title">需要 %1$s 的登录凭据</string>
@@ -359,9 +372,11 @@
     <string name="git_commit_message">提交信息</string>
 
     <!-- Git Identity -->
-    <string name="git_identity_title">提交署名（git config --global）</string>
+    <string name="git_tab_identity">署名</string>
+    <string name="git_tab_credentials">凭据</string>
+    <string name="git_identity_title">提交署名</string>
     <string name="git_identity_desc">用于每次提交的 author。容器全局生效，所有工作区共用。</string>
-    <string name="git_remote_url">仓库地址 remote.origin.url</string>
+    <string name="git_remote_url">remote.origin.url</string>
     <string name="git_actual_identity_none">git 实际署名：(未配置)</string>
     <string name="git_actual_identity">git 实际署名：%1$s</string>
 
@@ -563,7 +578,10 @@
     <string name="sync_max_batch_count">最大数量</string>
     <string name="sync_batch_size_saved">最大队列数量已保存</string>
     <string name="sync_save_batch_size">保存数量</string>
-    <string name="sync_via_connection">通过: ${mount.connection?.name ?: "未知连接"}</string>
+    <string name="sync_via_connection">通过: %1$s</string>
+    <string name="status_connected">已连接</string>
+    <string name="status_disconnected">未连接</string>
+    <string name="status_connection_failed">连接失败</string>
     <string name="sync_auto_connect">自动连接</string>
     <string name="sync_mount_subdir">镜像子目录: %1$s</string>
     <string name="sync_remote_path">远程路径: %1$s</string>
@@ -600,8 +618,11 @@
     <string name="vision_follow_chat_model">跟随当前聊天模型</string>
     <string name="vision_follow_desc">识图始终用当前选中的聊天模型；当其不支持 Vision 时识图不可用。</string>
     <string name="vision_no_models">暂无可用模型。请在「AI 提供商」中添加并配置模型后再选识图专用模型。</string>
-    <string name="vision_supports_images">支持图片输入</string>
-    <string name="vision_no_image_support">不支持图片输入（不推荐用于识图）</string>
+
+    <!-- Compaction Model -->
+    <string name="compaction_follow_chat_model">跟随当前聊天模型</string>
+    <string name="compaction_follow_desc">上下文压缩始终用当前选中的聊天模型。</string>
+    <string name="compaction_no_models">暂无可用模型。请在「AI 提供商」中添加并配置模型后再选压缩专用模型。</string>
 
     <!-- Web Search Result -->
     <string name="web_search_title">网络搜索</string>

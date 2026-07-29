@@ -106,12 +106,40 @@ class MessagePersistenceUseCase @Inject constructor(
         val result = mutableListOf<AgentMessage>()
         for (e in entities) {
             when (MessageRole.valueOf(e.role)) {
-                MessageRole.USER -> result.add(
-                    AgentMessage.UserMessage(
-                        id = e.id,
-                        content = if (e.isCompactionMarker) CONTEXT_COMPACTION_MARKER else e.content
+                MessageRole.USER -> {
+                    val rawContent = if (e.isCompactionMarker) CONTEXT_COMPACTION_MARKER else e.content
+                    val attachments = if (!e.isCompactionMarker) {
+                        e.attachmentsJson?.let {
+                            runCatching { json.decodeFromString<List<AgentAttachment>>(it) }.getOrNull()
+                        } ?: emptyList()
+                    } else emptyList()
+
+                    val finalContent = if (attachments.isNotEmpty()) {
+                        val attachmentText = buildString {
+                            append("附件：")
+                            attachments.forEach { att ->
+                                append('\n')
+                                append("- ")
+                                append(att.fileName)
+                                append("：")
+                                append(att.containerPath)
+                            }
+                        }
+                        if (rawContent.isBlank()) attachmentText else "${rawContent.trimEnd()}\n\n$attachmentText"
+                    } else {
+                        rawContent
+                    }
+
+                    val images = attachments.mapNotNull { it.toAgentImage() }
+
+                    result.add(
+                        AgentMessage.UserMessage(
+                            id = e.id,
+                            content = finalContent,
+                            images = images
+                        )
                     )
-                )
+                }
                 MessageRole.ASSISTANT -> {
                     val toolCalls = e.toolCallsJson?.let {
                         runCatching { json.decodeFromString<List<ToolCall>>(it) }.getOrNull()
@@ -148,5 +176,22 @@ class MessagePersistenceUseCase @Inject constructor(
             }
         }
         return result
+    }
+
+    private fun AgentAttachment.toAgentImage(): com.aicode.feature.agent.domain.model.AgentImage? {
+        if (!isImage || localPath.isBlank()) return null
+        val file = java.io.File(localPath)
+        if (!file.exists() || !file.isFile || file.length() <= 0) return null
+        return try {
+            val bytes = file.readBytes()
+            val base64 = java.util.Base64.getEncoder().encodeToString(bytes)
+            com.aicode.feature.agent.domain.model.AgentImage(
+                mimeType = mimeType.ifBlank { "image/jpeg" },
+                base64Data = base64,
+                path = containerPath
+            )
+        } catch (e: Exception) {
+            null
+        }
     }
 }

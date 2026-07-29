@@ -22,9 +22,12 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -54,6 +57,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.LocalClipboard
@@ -152,12 +157,16 @@ internal fun AgentMessageItem(
     val clipboard = LocalClipboard.current
     val copyScope = rememberCoroutineScope()
 
-    Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(Spacing.xs)
+    ) {
         if (hasReasoning) {
             ReasoningBubble(text = message.reasoning!!, initiallyExpanded = false)
         }
         if (hasContent || hasAttachments || message.role != MessageRole.ASSISTANT) {
             Column(
+                modifier = Modifier.fillMaxWidth(),
                 // 助手消息左对齐，用户消息右对齐
                 horizontalAlignment = if (isUser) Alignment.End else Alignment.Start
             ) {
@@ -176,7 +185,12 @@ internal fun AgentMessageItem(
                         border = if (message.role == MessageRole.ASSISTANT) {
                             BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
                         } else null,
-                        modifier = Modifier.fillMaxWidth(0.88f)
+                        // 用户气泡按内容自适应宽度；AI/工具气泡填满可用宽度，两侧外边距由 LazyColumn contentPadding 统一提供
+                        modifier = if (isUser) {
+                            Modifier.widthIn(max = (LocalConfiguration.current.screenWidthDp * 0.85).dp)
+                        } else {
+                            Modifier.fillMaxWidth()
+                        }
                     ) {
                         if (message.role == MessageRole.TOOL) {
                             ToolMessageBody(message, liveOutput = liveOutput)
@@ -198,12 +212,21 @@ internal fun AgentMessageItem(
                                     )
                                 }
                                 CompositionLocalProvider(LocalTextSelectionColors provides selectionColors) {
-                                    MarkdownContent(
-                                        text = message.content,
-                                        color = textColor,
-                                        modifier = Modifier.padding(horizontal = Spacing.sm, vertical = Spacing.sm),
-                                        cache = markdownCache
-                                    )
+                                    if (isUser) {
+                                        Text(
+                                            text = message.content,
+                                            color = textColor,
+                                            style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 20.sp),
+                                            modifier = Modifier.padding(horizontal = Spacing.sm, vertical = Spacing.sm)
+                                        )
+                                    } else {
+                                        MarkdownContent(
+                                            text = message.content,
+                                            color = textColor,
+                                            modifier = Modifier.padding(horizontal = Spacing.sm, vertical = Spacing.sm),
+                                            cache = markdownCache
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -261,7 +284,6 @@ internal fun AgentMessageItem(
 private fun MessageAttachmentPreviewRow(attachments: List<AgentAttachment>) {
     Row(
         modifier = Modifier
-            .fillMaxWidth(0.88f)
             .horizontalScroll(rememberScrollState())
             .padding(top = Spacing.xs),
         horizontalArrangement = Arrangement.spacedBy(Spacing.sm)
@@ -381,7 +403,7 @@ private fun BackgroundNotificationBar(message: AgentUIMessage) {
     Surface(
         shape = RoundedCornerShape(Radius.md),
         color = MaterialTheme.colorScheme.surfaceVariant,
-        modifier = Modifier.fillMaxWidth(0.88f)
+        modifier = Modifier.fillMaxWidth()
     ) {
         Row(
             modifier = Modifier.padding(horizontal = Spacing.sm, vertical = Spacing.sm),
@@ -407,20 +429,33 @@ private fun BackgroundNotificationBar(message: AgentUIMessage) {
 
 @Composable
 private fun CompactionDivider() {
-    Row(
+    Surface(
+        shape = RoundedCornerShape(Radius.md),
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = Spacing.xs),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(Spacing.sm)
+            .padding(vertical = Spacing.xs)
     ) {
-        HorizontalDivider(modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.outlineVariant)
-        Text(
-            text = stringResource(R.string.chat_context_compressed),
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            style = MaterialTheme.typography.labelSmall
-        )
-        HorizontalDivider(modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.outlineVariant)
+        Row(
+            modifier = Modifier.padding(horizontal = Spacing.sm, vertical = Spacing.sm),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(Spacing.sm)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(8.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.primary)
+            )
+            Text(
+                text = stringResource(R.string.chat_context_compressed),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodySmall,
+                fontWeight = FontWeight.Medium,
+                modifier = Modifier.weight(1f)
+            )
+        }
     }
 }
 
@@ -676,7 +711,7 @@ internal fun StreamingBubble(text: String) {
             shape = RoundedCornerShape(Radius.md, Radius.md, Radius.md, Radius.xs),
             color = MaterialTheme.colorScheme.surface,
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-            modifier = Modifier.fillMaxWidth(0.88f)
+            modifier = Modifier.fillMaxWidth()
         ) {
             Column(modifier = Modifier.padding(horizontal = Spacing.sm, vertical = Spacing.sm)) {
                 MarkdownContent(
@@ -719,7 +754,7 @@ internal fun ReasoningBubble(
         Surface(
             shape = RoundedCornerShape(Radius.md, Radius.md, Radius.md, Radius.xs),
             color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-            modifier = Modifier.fillMaxWidth(0.88f)
+            modifier = Modifier.fillMaxWidth()
         ) {
             Column(modifier = Modifier.padding(horizontal = Spacing.sm, vertical = Spacing.sm)) {
                 Row(
@@ -756,17 +791,29 @@ internal fun ReasoningBubble(
                     Text(
                         text = text,
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.pointerInput(text) {
+                            detectTapGestures(
+                                onDoubleTap = {
+                                    userToggled = true
+                                    expanded = false
+                                }
+                            )
+                        }
                     )
                 } else if (overThreshold) {
-                    // 折叠态：前 N 行 + 「展开剩余 X 行」
+                    // 折叠态：显示最新内容（尾部 N 行）+「还有 X 行」
                     Spacer(Modifier.height(Spacing.sm))
+                    val tailText = remember(text) {
+                        text.lines().takeLast(REASONING_COLLAPSE_LINE_LIMIT).joinToString("\n")
+                    }
                     Text(
-                        text = text,
+                        text = tailText,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = REASONING_COLLAPSE_LINE_LIMIT,
-                        overflow = TextOverflow.Ellipsis
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.heightIn(min = (REASONING_COLLAPSE_LINE_LIMIT * 18).dp)
                     )
                     val hidden = lineCount - REASONING_COLLAPSE_LINE_LIMIT
                     Row(

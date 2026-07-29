@@ -87,14 +87,9 @@ internal fun GitUserIdentityCard(
             )
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
+                horizontalArrangement = Arrangement.End,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = if (globalHint.isBlank()) stringResource(R.string.git_actual_identity_none) else stringResource(R.string.git_actual_identity, globalHint),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
                 Button(onClick = { onSave(name.trim(), email.trim(), repoUrl.trim()) }) { Text(stringResource(R.string.common_save)) }
             }
         }

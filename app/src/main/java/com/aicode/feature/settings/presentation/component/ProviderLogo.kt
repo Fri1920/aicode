@@ -23,22 +23,14 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 
 /**
- * 根据 provider 的 baseUrl 与 name 匹配品牌 logo drawable 资源。
- * 顺序从具体到通用，保证子集（如 openrouter / siliconflow）优先命中。
+ * 根据 provider 的协议类型匹配对应的品牌 logo drawable 资源。
  */
 fun providerLogoRes(provider: AIProviderConfig?): Int? {
     if (provider == null) return null
-    val target = "${provider.baseUrl} ${provider.name}".lowercase()
-    return when {
-        target.contains("doubao") || target.contains("豆包") || target.contains("volces") || target.contains("ark.cn-beijing") -> R.drawable.logo_doubao
-        target.contains("moonshot") || target.contains("kimi") -> R.drawable.logo_moonshot
-        target.contains("zhipu") || target.contains("智谱") || target.contains("bigmodel") || target.contains("glm") -> R.drawable.logo_zhipu
-        target.contains("qwen") || target.contains("通义") || target.contains("dashscope") -> R.drawable.logo_qwen
-        target.contains("deepseek") -> R.drawable.logo_deepseek
-        target.contains("grok") || target.contains("xai") || target.contains("x-ai") -> R.drawable.logo_grok
-        target.contains("anthropic") || target.contains("claude") -> R.drawable.logo_anthropic
-        target.contains("gemini") || target.contains("generativelanguage") -> R.drawable.logo_gemini
-        target.contains("openai") -> R.drawable.logo_openai
+    return when (provider.type) {
+        com.aicode.feature.settings.domain.model.ProviderType.OPENAI -> R.drawable.logo_openai
+        com.aicode.feature.settings.domain.model.ProviderType.ANTHROPIC -> R.drawable.logo_anthropic
+        com.aicode.feature.settings.domain.model.ProviderType.GEMINI -> R.drawable.logo_gemini
         else -> null
     }
 }
@@ -60,11 +52,7 @@ fun modelBrandKey(modelName: String): String {
         target.contains("claude") || target.contains("anthropic") -> "anthropic"
         target.contains("gemini") || target.contains("gemma") -> "gemini"
         target.contains("gpt") || target.contains("o1") || target.contains("o3") || target.contains("o4") || target.contains("openai") || target.contains("chatgpt") || target.contains("dall-e") -> "openai"
-        else -> {
-            // 回退：从模型名称前缀提取（如 "meta-llama/..." → "meta"）
-            val parts = modelName.split("/", "-", limit = 2)
-            if (parts.size > 1 && parts[0].length >= 2) parts[0].lowercase() else "other"
-        }
+        else -> "other"
     }
 }
 

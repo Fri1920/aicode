@@ -1,13 +1,17 @@
 package com.aicode.feature.workspace.presentation.remote
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.aicode.feature.workspace.domain.model.RemoteConnection
@@ -233,6 +237,7 @@ fun RemoteConnectionCard(
 @Composable
 fun RemoteMountCard(
     mount: RemoteMount,
+    isFailed: Boolean = false,
     onEdit: (RemoteMount) -> Unit,
     onDelete: (RemoteMount) -> Unit,
     onUpload: (RemoteMount) -> Unit,
@@ -257,12 +262,38 @@ fun RemoteMountCard(
                     Icon(
                         FeatherIcons.Folder,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                     Spacer(modifier = Modifier.width(12.dp))
                     Column {
-                        Text(text = stringResource(R.string.sync_via_connection, mount.connection?.name ?: stringResource(R.string.sync_unknown_connection)), fontWeight = FontWeight.Normal, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
-                        if (mount.autoConnect) {
-                            Text(text = stringResource(R.string.sync_auto_connect), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+                        Text(
+                            text = stringResource(R.string.sync_via_connection, mount.connection?.name ?: stringResource(R.string.sync_unknown_connection)),
+                            fontWeight = FontWeight.Normal,
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        val (statusText, statusColor) = when {
+                            mount.isActive -> stringResource(R.string.status_connected) to Color(0xFF22C55E)
+                            isFailed -> stringResource(R.string.status_connection_failed) to MaterialTheme.colorScheme.error
+                            else -> stringResource(R.string.status_disconnected) to Color(0xFFF59E0B)
+                        }
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            modifier = Modifier.padding(top = 2.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(8.dp)
+                                    .clip(CircleShape)
+                                    .background(statusColor)
+                            )
+                            Text(
+                                text = statusText,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = statusColor,
+                                fontWeight = FontWeight.Medium
+                            )
                         }
                     }
                 }
@@ -275,14 +306,6 @@ fun RemoteMountCard(
                     }
                 }
             }
-
-            Spacer(modifier = Modifier.height(12.dp))
-            Text(
-                text = if (isLocal) stringResource(R.string.sync_mount_subdir, mount.remotePath) else stringResource(R.string.sync_remote_path, mount.remotePath),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Text(text = stringResource(R.string.sync_local_path, mount.localMountPath), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
 
             Spacer(modifier = Modifier.height(8.dp))
             Row(

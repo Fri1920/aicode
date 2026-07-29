@@ -27,6 +27,7 @@ import com.aicode.feature.credentials.data.local.dao.GitCredentialDao
 import com.aicode.feature.credentials.data.local.entity.GitCredentialEntity
 import com.aicode.feature.settings.data.local.dao.AIProviderDao
 import com.aicode.feature.settings.data.local.entity.AIProviderEntity
+import com.aicode.feature.settings.data.repository.CompactionModelSettingsRepository
 import com.aicode.feature.settings.data.repository.KeepaliveSettingsRepository
 import com.aicode.feature.settings.data.repository.LogSettingsRepository
 import com.aicode.feature.settings.data.repository.SyncSettingsRepository
@@ -66,6 +67,7 @@ class BackupManagerImpl @Inject constructor(
     private val keepaliveSettingsRepository: KeepaliveSettingsRepository,
     private val logSettingsRepository: LogSettingsRepository,
     private val visionModelSettingsRepository: VisionModelSettingsRepository,
+    private val compactionModelSettingsRepository: CompactionModelSettingsRepository,
     private val syncSettingsRepository: SyncSettingsRepository,
     private val workspaceRepository: WorkspaceRepository
 ) : BackupManager {
@@ -97,6 +99,8 @@ class BackupManagerImpl @Inject constructor(
         val logLevel = if (options.appSettings) logSettingsRepository.snapshot() else null
         val visionProviderId = if (options.appSettings) visionModelSettingsRepository.getVisionProviderId() else ""
         val visionModel = if (options.appSettings) visionModelSettingsRepository.getVisionModel() else ""
+        val compactionProviderId = if (options.appSettings) compactionModelSettingsRepository.getCompactionProviderId() else ""
+        val compactionModel = if (options.appSettings) compactionModelSettingsRepository.getCompactionModel() else ""
         val syncSettings = if (options.appSettings) syncSettingsRepository.snapshot() else null
 
         val snapshot = BackupSnapshot(
@@ -117,6 +121,8 @@ class BackupManagerImpl @Inject constructor(
             logLevel = logLevel,
             visionProviderId = visionProviderId,
             visionModel = visionModel,
+            compactionProviderId = compactionProviderId,
+            compactionModel = compactionModel,
             syncSettings = syncSettings
         )
         val plain = json.encodeToString(BackupSnapshot.serializer(), snapshot).toByteArray(Charsets.UTF_8)
@@ -213,6 +219,9 @@ class BackupManagerImpl @Inject constructor(
         logSettingsRepository.restore(snapshot.logLevel)
         if (snapshot.visionProviderId.isNotBlank() || snapshot.visionModel.isNotBlank()) {
             visionModelSettingsRepository.setVisionModel(snapshot.visionProviderId, snapshot.visionModel)
+        }
+        if (snapshot.compactionProviderId.isNotBlank() || snapshot.compactionModel.isNotBlank()) {
+            compactionModelSettingsRepository.setCompactionModel(snapshot.compactionProviderId, snapshot.compactionModel)
         }
         snapshot.syncSettings?.let { syncSettingsRepository.restore(it) }
 

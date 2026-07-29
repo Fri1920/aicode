@@ -323,7 +323,7 @@ fun AIChatPanel(
     val activeModel = activeProvider?.effectiveModel.orEmpty()
     val activeModelMetadata = modelMetadata[activeModel]
     val canUploadFiles = projectRoot.isNotBlank() && activeModelMetadata?.supportsTools == true
-    val canUploadImages = projectRoot.isNotBlank() && activeModelMetadata?.supportsVision == true
+    val canUploadImages = projectRoot.isNotBlank()
 
     LaunchedEffect(activeProvider?.type, activeModel) {
         val provider = activeProvider ?: return@LaunchedEffect
@@ -476,7 +476,8 @@ fun AIChatPanel(
             } else {
                 val attachments = pendingAttachments
                 val modelRequest = appendAttachmentsToRequest(context, text, attachments)
-                val images = attachments.toAgentImages()
+                val modelSupportsVision = activeModelMetadata?.supportsVision == true
+                val images = if (modelSupportsVision) attachments.toAgentImages() else emptyList()
                 viewModel.executeAgentRequestStream(
                     request = text,
                     modelRequest = modelRequest,
@@ -701,7 +702,6 @@ fun AIChatPanel(
                 providers = providers,
                 onSelectModel = { p, m ->
                     viewModel.setSessionProviderModel(p, m)
-                    settingsViewModel?.applyModelGlobally(p, m)
                 },
                 onNavigateToSettings = onNavigateToSettings,
                 currentMode = currentMode,

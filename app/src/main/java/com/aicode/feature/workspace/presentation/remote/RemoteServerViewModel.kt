@@ -80,7 +80,8 @@ class RemoteServerViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)
             val result = repository.connectMount(id)
-            _uiState.value = _uiState.value.copy(isLoading = false)
+            val updatedFailed = if (result.isFailure) _uiState.value.failedMountIds + id else _uiState.value.failedMountIds - id
+            _uiState.value = _uiState.value.copy(isLoading = false, failedMountIds = updatedFailed)
             if (result.isFailure) {
                 _uiState.value = _uiState.value.copy(error = "Connection failed: ${result.exceptionOrNull()?.message}")
             }
@@ -90,6 +91,7 @@ class RemoteServerViewModel @Inject constructor(
     fun disconnectMount(id: String) {
         viewModelScope.launch {
             repository.disconnectMount(id)
+            _uiState.value = _uiState.value.copy(failedMountIds = _uiState.value.failedMountIds - id)
         }
     }
 
@@ -283,6 +285,7 @@ data class RemoteServerUiState(
     val connections: List<RemoteConnection> = emptyList(),
     val mounts: List<RemoteMount> = emptyList(),
     val workspaces: List<Workspace> = emptyList(),
+    val failedMountIds: Set<String> = emptySet(),
     val isLoading: Boolean = false,
     val error: String? = null
 )
