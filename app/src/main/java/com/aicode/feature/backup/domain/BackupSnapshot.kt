@@ -30,6 +30,8 @@ data class BackupSnapshot(
     val logLevel: String? = null,
     val visionProviderId: String = "",
     val visionModel: String = "",
+    val compactionProviderId: String = "",
+    val compactionModel: String = "",
     val syncSettings: SyncSettingsSnapshot? = null
 )
 

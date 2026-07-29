@@ -29,6 +29,7 @@ import com.aicode.feature.agent.domain.tool.ToolOutputStore
 import com.aicode.feature.agent.domain.tool.ToolStreamEvent
 import com.aicode.feature.agent.domain.tool.toTransportString
 import com.aicode.feature.settings.data.remote.ModelMetadataService
+import com.aicode.feature.settings.data.repository.CompactionModelSettingsRepository
 import com.aicode.feature.settings.data.repository.VisionModelSettingsRepository
 import com.aicode.feature.settings.domain.model.AIProviderConfig
 import com.aicode.feature.settings.domain.model.ProviderType
@@ -62,6 +63,7 @@ class StatefulAgentWorkflow @Inject constructor(
     private val toolOutputStore: ToolOutputStore,
     private val modelMetadataService: ModelMetadataService,
     private val visionModelSettingsRepository: VisionModelSettingsRepository,
+    private val compactionModelSettingsRepository: CompactionModelSettingsRepository,
     private val sessionUseCase: SessionUseCase,
     private val messagePersistenceUseCase: MessagePersistenceUseCase
 ) : AgentWorkflow {
@@ -161,8 +163,14 @@ class StatefulAgentWorkflow @Inject constructor(
         val provider = getProviderFor(config, sessionId)
         val history = messagePersistenceUseCase.buildHistory(sessionId, "__manual_compress__")
         if (history.size <= 2) return false
-        val compacted = contextCompactor.compactIfNeeded(history, provider, sessionId, force = true, onEvent = onEvent)
-        return compacted.size != history.size
+        val compactionRound = resolveCompactionFallbackProvider()
+        val compactionProvider = compactionRound?.provider ?: provider
+        try {
+            val compacted = contextCompactor.compactIfNeeded(history, compactionProvider, sessionId, force = true, onEvent = onEvent)
+            return compacted.size != history.size
+        } finally {
+            compactionRound?.restore()
+        }
     }
 
     /**
@@ -330,7 +338,14 @@ class StatefulAgentWorkflow @Inject constructor(
                         // 识图轮：若当前聊天模型无 vision，临时切到识图专用模型发送，发完恢复三单例字段。
                         val visionRound = if (state.pendingVisionRound) resolveVisionFallbackProvider(currentContext.sessionId) else null
                         val providerInUse = visionRound?.provider ?: aiProvider
-                        val compactedMessages = contextCompactor.compactIfNeeded(state.messages, providerInUse, context.sessionId)
+                        // 压缩轮：若配置了压缩专用模型，用专用 provider 压缩，压缩完恢复。
+                        val compactionRound = resolveCompactionFallbackProvider()
+                        val compactionProvider = compactionRound?.provider ?: providerInUse
+                        val compactedMessages = try {
+                            contextCompactor.compactIfNeeded(state.messages, compactionProvider, context.sessionId)
+                        } finally {
+                            compactionRound?.restore()
+                        }
                         if (compactedMessages !== state.messages) {
                             state = state.copy(messages = compactedMessages)
                         }
@@ -426,7 +441,14 @@ class StatefulAgentWorkflow @Inject constructor(
                         // 识图轮：若当前聊天模型无 vision，临时切到识图专用模型发送，发完恢复三单例字段。
                         val visionRound = if (state.pendingVisionRound) resolveVisionFallbackProvider(currentContext.sessionId) else null
                         val providerInUse = visionRound?.provider ?: aiProvider
-                        val compactedMessages = contextCompactor.compactIfNeeded(state.messages, providerInUse, context.sessionId) { emit(it) }
+                        // 压缩轮：若配置了压缩专用模型，用专用 provider 压缩，压缩完恢复。
+                        val compactionRound = resolveCompactionFallbackProvider()
+                        val compactionProvider = compactionRound?.provider ?: providerInUse
+                        val compactedMessages = try {
+                            contextCompactor.compactIfNeeded(state.messages, compactionProvider, context.sessionId) { emit(it) }
+                        } finally {
+                            compactionRound?.restore()
+                        }
                         if (compactedMessages !== state.messages) {
                             state = state.copy(messages = compactedMessages)
                         }
@@ -549,7 +571,7 @@ class StatefulAgentWorkflow @Inject constructor(
             if (name == "viewImage" && !activeModelSupportsVision(context.sessionId) && !visionFallbackReady()) {
                 return ToolRunResult(
                     ToolResult.Error(
-                        "当前聊天模型不支持图片输入，且未配置支持 Vision 的识图专用模型。请在「设置 → 识图模型」中指定一个支持 Vision 的模型后再查看图片。",
+                        "当前聊天模型不支持图片输入，且未配置支持 Vision 的识图专用模型。请在「设置 → 默认模型 → 识图模型」中指定一个支持 Vision 的模型后再查看图片。",
                         "MODEL_VISION_UNSUPPORTED"
                     ).toTransportString(),
                     true
@@ -643,6 +665,28 @@ class StatefulAgentWorkflow @Inject constructor(
     /** 识图轮 provider 切换上下文：持有专用 provider 实例与三个单例的快照。inner 以便调用外层 [restoreProvider]。 */
     private inner class VisionRoundEnv(val provider: AIProvider, val snapshots: List<ProviderSnapshot>) {
         /** 恢复三个单例的可变字段。 */
+        fun restore() = snapshots.forEach { restoreProvider(it) }
+    }
+
+    /**
+     * 压缩轮专用 provider 解析。若用户配置了压缩专用模型且 provider 存在、已启用、有 apiKey，
+     * 则返回已填好连接字段、已对三个单例做好快照的专用 provider；否则返回 null（沿用当前聊天模型）。
+     * 调用方必须在压缩完成后调用 [CompactionRoundEnv.restore] 恢复。
+     */
+    private suspend fun resolveCompactionFallbackProvider(): CompactionRoundEnv? {
+        val providerId = compactionModelSettingsRepository.getCompactionProviderId().trim()
+        if (providerId.isEmpty()) return null
+        val model = compactionModelSettingsRepository.getCompactionModel().trim()
+        if (model.isEmpty()) return null
+        val config = aiProviderRepository.getProviderById(providerId) ?: return null
+        if (!config.isEnabled || config.apiKey.isBlank()) return null
+        val snapshots = listOf(snapshotProvider(anthropicProvider), snapshotProvider(openAIProvider), snapshotProvider(geminiProvider))
+        val provider = getProviderFor(config.copy(selectedModel = model), null)
+        return CompactionRoundEnv(provider = provider, snapshots = snapshots)
+    }
+
+    /** 压缩轮 provider 切换上下文。 */
+    private inner class CompactionRoundEnv(val provider: AIProvider, val snapshots: List<ProviderSnapshot>) {
         fun restore() = snapshots.forEach { restoreProvider(it) }
     }
 

@@ -65,7 +65,7 @@ internal enum class SettingsSection(@StringRes val titleRes: Int) {
     Menu(R.string.settings_title),
     Providers(R.string.settings_providers),
     ProviderEditor(R.string.settings_provider_editor),
-    VisionModel(R.string.settings_vision_model),
+    DefaultModels(R.string.settings_default_models),
     Mcp(R.string.settings_mcp),
     Container(R.string.settings_container),
     Log(R.string.settings_log),
@@ -97,6 +97,8 @@ fun SettingsScreen(
     val languageTag by viewModel.languageTag.collectAsStateWithLifecycle()
     val visionProviderId by viewModel.visionProviderId.collectAsStateWithLifecycle()
     val visionModel by viewModel.visionModel.collectAsStateWithLifecycle()
+    val compactionProviderId by viewModel.compactionProviderId.collectAsStateWithLifecycle()
+    val compactionModel by viewModel.compactionModel.collectAsStateWithLifecycle()
     val modelMetadata by viewModel.modelMetadata.collectAsStateWithLifecycle()
     val containerProfiles by viewModel.profiles.collectAsStateWithLifecycle()
     val activeProfileId by viewModel.activeProfileId.collectAsStateWithLifecycle()
@@ -222,6 +224,8 @@ fun SettingsScreen(
                     activeContainerProfileName = containerProfiles.firstOrNull { it.id == activeProfileId }?.name,
                     visionProviderName = providers.firstOrNull { it.id == visionProviderId }?.name,
                     visionModel = visionModel,
+                    compactionProviderName = providers.firstOrNull { it.id == compactionProviderId }?.name,
+                    compactionModel = compactionModel,
                     mcpCount = mcpServers.size,
                     mcpConnected = mcpStatuses.count { it.state == McpServerStatus.State.CONNECTED },
                     logLevel = logLevel,
@@ -247,14 +251,18 @@ fun SettingsScreen(
                         section = SettingsSection.ProviderEditor
                     }
                 )
-                SettingsSection.VisionModel -> VisionModelSection(
+                SettingsSection.DefaultModels -> DefaultModelsSection(
                     providers = providers,
                     visionProviderId = visionProviderId,
                     visionModel = visionModel,
+                    compactionProviderId = compactionProviderId,
+                    compactionModel = compactionModel,
                     modelMetadata = modelMetadata,
                     onLoadMetadata = { viewModel.loadAllModelMetadata() },
-                    onSelect = { pid, m -> viewModel.setVisionModel(pid, m) },
-                    onClear = { viewModel.clearVisionModel() }
+                    onSelectVisionModel = { pid, m -> viewModel.setVisionModel(pid, m) },
+                    onClearVisionModel = { viewModel.clearVisionModel() },
+                    onSelectCompactionModel = { pid, m -> viewModel.setCompactionModel(pid, m) },
+                    onClearCompactionModel = { viewModel.clearCompactionModel() }
                 )
                 SettingsSection.Mcp -> McpSection(
                     servers = mcpServers,
@@ -361,6 +369,8 @@ internal fun SettingsMenu(
     activeContainerProfileName: String?,
     visionProviderName: String?,
     visionModel: String,
+    compactionProviderName: String?,
+    compactionModel: String,
     mcpCount: Int,
     mcpConnected: Int,
     logLevel: LogLevel,
@@ -394,14 +404,19 @@ internal fun SettingsMenu(
             onClick = { onOpen(SettingsSection.Providers) }
         )
         MenuRow(
-            icon = FeatherIcons.Image,
-            title = stringResource(SettingsSection.VisionModel.titleRes),
-            subtitle = if (visionProviderName.isNullOrBlank() || visionModel.isBlank()) {
-                stringResource(R.string.settings_vision_follow_chat)
-            } else {
-                stringResource(R.string.settings_vision_dedicated, visionProviderName, visionModel)
+            icon = FeatherIcons.Cpu,
+            title = stringResource(SettingsSection.DefaultModels.titleRes),
+            subtitle = run {
+                val parts = mutableListOf<String>()
+                if (!visionProviderName.isNullOrBlank() && visionModel.isNotBlank()) {
+                    parts.add(stringResource(R.string.settings_vision_model) + ": " + (visionProviderName?.let { "$it · $visionModel" } ?: visionModel))
+                }
+                if (!compactionProviderName.isNullOrBlank() && compactionModel.isNotBlank()) {
+                    parts.add(stringResource(R.string.settings_compaction_model) + ": " + (compactionProviderName?.let { "$it · $compactionModel" } ?: compactionModel))
+                }
+                if (parts.isEmpty()) stringResource(R.string.settings_default_models_subtitle) else parts.joinToString("\n")
             },
-            onClick = { onOpen(SettingsSection.VisionModel) }
+            onClick = { onOpen(SettingsSection.DefaultModels) }
         )
         MenuRow(
             icon = FeatherIcons.Box,

@@ -289,6 +289,7 @@ object AgentModule {
         toolOutputStore: ToolOutputStore,
         modelMetadataService: ModelMetadataService,
         visionModelSettingsRepository: com.aicode.feature.settings.data.repository.VisionModelSettingsRepository,
+        compactionModelSettingsRepository: com.aicode.feature.settings.data.repository.CompactionModelSettingsRepository,
         sessionUseCase: com.aicode.feature.agent.domain.session.SessionUseCase,
         messagePersistenceUseCase: com.aicode.feature.agent.domain.session.MessagePersistenceUseCase
     ): AgentWorkflow {
@@ -306,6 +307,7 @@ object AgentModule {
             toolOutputStore,
             modelMetadataService,
             visionModelSettingsRepository,
+            compactionModelSettingsRepository,
             sessionUseCase,
             messagePersistenceUseCase
         )

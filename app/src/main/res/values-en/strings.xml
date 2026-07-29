@@ -6,7 +6,10 @@
     <string name="settings_title">Settings</string>
     <string name="settings_providers">AI Providers</string>
     <string name="settings_provider_editor">Provider</string>
+    <string name="settings_default_models">Default Models</string>
+    <string name="settings_default_models_subtitle">Configure default preferences like vision model</string>
     <string name="settings_vision_model">Vision Model</string>
+    <string name="settings_compaction_model">Compaction Model</string>
     <string name="settings_mcp">MCP Servers</string>
     <string name="settings_container">Container Image</string>
     <string name="settings_log">Log Level</string>
@@ -31,6 +34,8 @@
     <string name="settings_providers_active"> · Active: %1$s</string>
     <string name="settings_vision_follow_chat">Follow current chat model</string>
     <string name="settings_vision_dedicated">Dedicated: %1$s · %2$s</string>
+    <string name="settings_compaction_follow_chat">Follow current chat model</string>
+    <string name="settings_compaction_dedicated">Dedicated: %1$s · %2$s</string>
     <string name="settings_mcp_empty">No MCP servers configured</string>
     <string name="settings_mcp_count_connected">%1$d · Connected %2$d</string>
     <string name="settings_container_current">Current: %1$s</string>
@@ -613,8 +618,11 @@
     <string name="vision_follow_chat_model">Follow current chat model</string>
     <string name="vision_follow_desc">Vision always uses the currently selected chat model; if it doesn\'t support Vision, image recognition is unavailable.</string>
     <string name="vision_no_models">No models available. Please add and configure a model in "AI Providers" before selecting a dedicated vision model.</string>
-    <string name="vision_supports_images">Supports image input</string>
-    <string name="vision_no_image_support">No image input support (not recommended for vision)</string>
+
+    <!-- Compaction Model -->
+    <string name="compaction_follow_chat_model">Follow current chat model</string>
+    <string name="compaction_follow_desc">Context compaction always uses the currently selected chat model.</string>
+    <string name="compaction_no_models">No models available. Please add and configure a model in "AI Providers" before selecting a dedicated compaction model.</string>
 
     <!-- Web Search Result -->
     <string name="web_search_title">Web Search</string>

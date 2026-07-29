@@ -6,7 +6,10 @@
     <string name="settings_title">设置</string>
     <string name="settings_providers">AI 提供商</string>
     <string name="settings_provider_editor">提供商</string>
+    <string name="settings_default_models">默认模型</string>
+    <string name="settings_default_models_subtitle">配置识图模型等默认偏好</string>
     <string name="settings_vision_model">识图模型</string>
+    <string name="settings_compaction_model">压缩模型</string>
     <string name="settings_mcp">MCP 服务器</string>
     <string name="settings_container">容器镜像</string>
     <string name="settings_log">日志等级</string>
@@ -31,6 +34,8 @@
     <string name="settings_providers_active"> · 启用：%1$s</string>
     <string name="settings_vision_follow_chat">跟随当前聊天模型</string>
     <string name="settings_vision_dedicated">专用：%1$s · %2$s</string>
+    <string name="settings_compaction_follow_chat">跟随当前聊天模型</string>
+    <string name="settings_compaction_dedicated">专用：%1$s · %2$s</string>
     <string name="settings_mcp_empty">未配置 MCP 服务器</string>
     <string name="settings_mcp_count_connected">%1$d 个 · 已连接 %2$d</string>
     <string name="settings_container_current">当前：%1$s</string>
@@ -613,8 +618,11 @@
     <string name="vision_follow_chat_model">跟随当前聊天模型</string>
     <string name="vision_follow_desc">识图始终用当前选中的聊天模型；当其不支持 Vision 时识图不可用。</string>
     <string name="vision_no_models">暂无可用模型。请在「AI 提供商」中添加并配置模型后再选识图专用模型。</string>
-    <string name="vision_supports_images">支持图片输入</string>
-    <string name="vision_no_image_support">不支持图片输入（不推荐用于识图）</string>
+
+    <!-- Compaction Model -->
+    <string name="compaction_follow_chat_model">跟随当前聊天模型</string>
+    <string name="compaction_follow_desc">上下文压缩始终用当前选中的聊天模型。</string>
+    <string name="compaction_no_models">暂无可用模型。请在「AI 提供商」中添加并配置模型后再选压缩专用模型。</string>
 
     <!-- Web Search Result -->
     <string name="web_search_title">网络搜索</string>
