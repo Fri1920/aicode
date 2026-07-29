@@ -2,6 +2,7 @@ package com.aicode.feature.agent.domain.permission
 
 import android.content.Context
 import com.aicode.core.util.FileLogger
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import com.aicode.feature.workspace.data.repository.WorkspaceRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
@@ -9,7 +10,10 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -39,6 +43,7 @@ import javax.inject.Singleton
  *
  * 并发模式参考 [McpConfigRepository]：Mutex 保护文件 IO + MutableStateFlow 缓存。
  */
+@OptIn(ExperimentalCoroutinesApi::class)
 @Singleton
 class PermissionRulesRepository @Inject constructor(
     @param:ApplicationContext private val context: Context,
@@ -107,6 +112,18 @@ class PermissionRulesRepository @Inject constructor(
 
     /** 当前选中的项目名；无选中时为 null（此时项目级规则不可用，仅全局生效）。 */
     fun currentProjectName(): String? = workspaceRepository.current.value?.name
+
+    /** 当前项目名流，跟随工作区切换自动更新，供 UI 订阅。 */
+    val currentProjectNameFlow: Flow<String?> = workspaceRepository.current.map { it?.name }
+
+    /**
+     * 当前项目规则流：跟随 [workspaceRepository.current] 切换自动重新加载对应项目规则；
+     * 无选中工作区时发空列表。供 UI 订阅，避免一次性快照在初始化未完成时读到 null。
+     */
+    val currentProjectRulesFlow: Flow<List<PermissionRule>> =
+        workspaceRepository.current.flatMapLatest { ws ->
+            if (ws == null) flowOf(emptyList()) else projectRulesFlow(ws.name)
+        }
 
     /** 全局规则流，供管理界面观察。 */
     val globalRulesFlow: Flow<List<PermissionRule>> = flow {

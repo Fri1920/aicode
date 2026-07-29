@@ -146,7 +146,8 @@ class SettingsViewModel @Inject constructor(
     private val _projectRules = MutableStateFlow<List<PermissionRule>>(emptyList())
     val projectRules: StateFlow<List<PermissionRule>> = _projectRules.asStateFlow()
 
-    val currentProjectName: String? = permissionRulesRepository.currentProjectName()
+    val currentProjectName: StateFlow<String?> = permissionRulesRepository.currentProjectNameFlow
+        .stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
     private val _activeProfileId = MutableStateFlow(ContainerProfile.BUILTIN_ID)
     val activeProfileId: StateFlow<String> = _activeProfileId.asStateFlow()
@@ -250,11 +251,9 @@ class SettingsViewModel @Inject constructor(
                 }
             }
 
-            currentProjectName?.let { name ->
-                launch {
-                    permissionRulesRepository.projectRulesFlow(name).collectLatest {
-                        _projectRules.value = it
-                    }
+            launch {
+                permissionRulesRepository.currentProjectRulesFlow.collectLatest {
+                    _projectRules.value = it
                 }
             }
         }
@@ -624,12 +623,12 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun deleteProjectRule(rule: PermissionRule) {
-        val name = currentProjectName ?: return
+        val name = currentProjectName.value ?: return
         viewModelScope.launch { permissionRulesRepository.removeProjectRule(name, rule) }
     }
 
     fun promoteRuleToGlobal(rule: PermissionRule) {
-        val name = currentProjectName ?: return
+        val name = currentProjectName.value ?: return
         viewModelScope.launch { permissionRulesRepository.promoteToGlobal(name, rule) }
     }
 }

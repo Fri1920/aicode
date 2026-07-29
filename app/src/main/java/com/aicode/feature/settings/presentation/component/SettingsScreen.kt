@@ -93,6 +93,7 @@ fun SettingsScreen(
     val mcpReloading by viewModel.mcpReloading.collectAsStateWithLifecycle()
     val globalRules by viewModel.globalRules.collectAsStateWithLifecycle()
     val projectRules by viewModel.projectRules.collectAsStateWithLifecycle()
+    val currentProjectName by viewModel.currentProjectName.collectAsStateWithLifecycle()
     val keepaliveEnabled by viewModel.keepaliveEnabled.collectAsStateWithLifecycle()
     val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
     val languageTag by viewModel.languageTag.collectAsStateWithLifecycle()
@@ -283,7 +284,7 @@ fun SettingsScreen(
                     onSelectFile = { viewModel.selectLogFile(it) }
                 )
                 SettingsSection.Permissions -> PermissionsSection(
-                    projectName = viewModel.currentProjectName,
+                    projectName = currentProjectName,
                     projectRules = projectRules,
                     globalRules = globalRules,
                     onDeleteProject = { viewModel.deleteProjectRule(it) },
