@@ -44,6 +44,8 @@ import com.aicode.feature.workspace.domain.model.Workspace
 import com.aicode.feature.workspace.presentation.WorkspaceViewModel
 import compose.icons.FeatherIcons
 import compose.icons.feathericons.*
+import androidx.compose.ui.res.stringResource
+import com.aicode.R
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -75,7 +77,7 @@ fun WorkspaceChip(
         )
         Spacer(Modifier.width(Spacing.xs))
         Text(
-            text = current?.name ?: "选择工作区",
+            text = current?.name ?: stringResource(R.string.workspace_select),
             style = MaterialTheme.typography.labelLarge,
             color = MaterialTheme.colorScheme.onSurface,
             maxLines = 1,
@@ -83,7 +85,7 @@ fun WorkspaceChip(
         )
         Icon(
             FeatherIcons.MoreHorizontal,
-            contentDescription = "切换工作区",
+            contentDescription = stringResource(R.string.workspace_switch),
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.size(16.dp)
         )
@@ -111,18 +113,18 @@ fun WorkspaceChip(
     pendingWorkspaceSelect?.let { ws ->
         AlertDialog(
             onDismissRequest = { pendingWorkspaceSelect = null },
-            title = { Text("切换工作区") },
-            text = { Text("切换工作区会停止当前工作区所有正在运行的 AI 会话并关闭终端标签。确定要切换吗？") },
+            title = { Text(stringResource(R.string.workspace_switch)) },
+            text = { Text(stringResource(R.string.workspace_switch_confirm)) },
             confirmButton = {
                 TextButton(onClick = {
                     onSwitchConfirmed()
                     viewModel.selectWorkspace(ws.name)
                     pendingWorkspaceSelect = null
                     showSheet = false
-                }) { Text("确定") }
+                }) { Text(stringResource(R.string.workspace_confirm)) }
             },
             dismissButton = {
-                TextButton(onClick = { pendingWorkspaceSelect = null }) { Text("取消") }
+                TextButton(onClick = { pendingWorkspaceSelect = null }) { Text(stringResource(R.string.common_cancel)) }
             }
         )
     }
@@ -151,7 +153,7 @@ fun WorkspaceIconButton(
     ) {
         Icon(
             FeatherIcons.Folder,
-            contentDescription = "打开工作区",
+            contentDescription = stringResource(R.string.workspace_open),
             tint = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
@@ -178,18 +180,18 @@ fun WorkspaceIconButton(
     pendingWorkspaceSelect?.let { ws ->
         AlertDialog(
             onDismissRequest = { pendingWorkspaceSelect = null },
-            title = { Text("切换工作区") },
-            text = { Text("切换工作区会停止当前工作区所有正在运行的 AI 会话并关闭终端标签。确定要切换吗？") },
+            title = { Text(stringResource(R.string.workspace_switch)) },
+            text = { Text(stringResource(R.string.workspace_switch_confirm)) },
             confirmButton = {
                 TextButton(onClick = {
                     onSwitchConfirmed()
                     viewModel.selectWorkspace(ws.name)
                     pendingWorkspaceSelect = null
                     showSheet = false
-                }) { Text("确定") }
+                }) { Text(stringResource(R.string.workspace_confirm)) }
             },
             dismissButton = {
-                TextButton(onClick = { pendingWorkspaceSelect = null }) { Text("取消") }
+                TextButton(onClick = { pendingWorkspaceSelect = null }) { Text(stringResource(R.string.common_cancel)) }
             }
         )
     }
@@ -225,7 +227,7 @@ private fun WorkspaceSheet(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "工作区",
+                    text = stringResource(R.string.common_workspace),
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier.weight(1f)
@@ -233,13 +235,13 @@ private fun WorkspaceSheet(
                 TextButton(onClick = { showCreateDialog = true }) {
                     Icon(FeatherIcons.Plus, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(Spacing.xs))
-                    Text("新建")
+                    Text(stringResource(R.string.workspace_new))
                 }
             }
 
             if (workspaces.isEmpty()) {
                 Text(
-                    "暂无工作区，点击「新建」创建一个",
+                    stringResource(R.string.workspace_empty_hint),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(vertical = Spacing.md)
@@ -277,16 +279,16 @@ private fun WorkspaceSheet(
     pendingDelete?.let { ws ->
         AlertDialog(
             onDismissRequest = { pendingDelete = null },
-            title = { Text("删除工作区") },
-            text = { Text("确定删除「${ws.name}」？该目录下的所有文件都将被删除，且无法恢复。") },
+            title = { Text(stringResource(R.string.workspace_delete)) },
+            text = { Text(stringResource(R.string.workspace_delete_confirm, ws.name)) },
             confirmButton = {
                 TextButton(onClick = {
                     onDelete(ws)
                     pendingDelete = null
-                }) { Text("删除", color = MaterialTheme.colorScheme.error) }
+                }) { Text(stringResource(R.string.common_delete), color = MaterialTheme.colorScheme.error) }
             },
             dismissButton = {
-                TextButton(onClick = { pendingDelete = null }) { Text("取消") }
+                TextButton(onClick = { pendingDelete = null }) { Text(stringResource(R.string.common_cancel)) }
             }
         )
     }
@@ -326,7 +328,7 @@ private fun WorkspaceRow(
         if (selected) {
             Icon(
                 FeatherIcons.Check,
-                contentDescription = "当前",
+                contentDescription = stringResource(R.string.common_current),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(20.dp)
             )
@@ -340,7 +342,7 @@ private fun WorkspaceRow(
             ) {
                 Icon(
                     FeatherIcons.Trash2,
-                    contentDescription = "删除",
+                    contentDescription = stringResource(R.string.common_delete),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(18.dp)
                 )
@@ -362,15 +364,15 @@ private fun CreateWorkspaceDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("新建工作区") },
+        title = { Text(stringResource(R.string.workspace_new_workspace)) },
         text = {
             Column {
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it },
                     singleLine = true,
-                    label = { Text("名称") },
-                    placeholder = { Text("例如 my-project") },
+                    label = { Text(stringResource(R.string.common_name)) },
+                    placeholder = { Text(stringResource(R.string.workspace_name_hint)) },
                     isError = duplicate,
                     leadingIcon = {
                         Icon(FeatherIcons.FolderPlus, contentDescription = null)
@@ -379,7 +381,7 @@ private fun CreateWorkspaceDialog(
                 if (duplicate) {
                     Spacer(Modifier.height(Spacing.xs))
                     Text(
-                        "已存在同名工作区",
+                        stringResource(R.string.workspace_name_exists),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.error
                     )
@@ -387,10 +389,10 @@ private fun CreateWorkspaceDialog(
             }
         },
         confirmButton = {
-            TextButton(enabled = canConfirm, onClick = { onConfirm(trimmed) }) { Text("创建") }
+            TextButton(enabled = canConfirm, onClick = { onConfirm(trimmed) }) { Text(stringResource(R.string.common_create)) }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("取消") }
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_cancel)) }
         }
     )
 }

@@ -1,6 +1,7 @@
 package com.aicode.feature.settings.presentation.component
 
 import androidx.activity.compose.BackHandler
+import androidx.annotation.StringRes
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.rememberScrollState
@@ -41,12 +42,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.aicode.core.theme.Radius
 import com.aicode.core.theme.Spacing
 import com.aicode.core.util.LogLevel
+import com.aicode.R
 import com.aicode.feature.agent.domain.mcp.McpServerConfig
 import com.aicode.feature.agent.domain.mcp.McpServerStatus
 import com.aicode.feature.backup.presentation.BackupSection
@@ -58,19 +61,20 @@ import compose.icons.FeatherIcons
 import compose.icons.feathericons.*
 
 /** 设置页内部二级菜单分区。Menu 为首页菜单，其余为各自的二级页。 */
-internal enum class SettingsSection(val title: String) {
-    Menu("设置"),
-    Providers("AI 提供商"),
-    ProviderEditor("提供商"),
-    VisionModel("识图模型"),
-    Mcp("MCP 服务器"),
-    Container("容器镜像"),
-    Log("日志等级"),
-    LogViewer("日志查看"),
-    Permissions("工具授权"),
-    RemoteServers("远程工作区"),
-    Backup("备份与还原"),
-    About("关于")
+internal enum class SettingsSection(@StringRes val titleRes: Int) {
+    Menu(R.string.settings_title),
+    Providers(R.string.settings_providers),
+    ProviderEditor(R.string.settings_provider_editor),
+    VisionModel(R.string.settings_vision_model),
+    Mcp(R.string.settings_mcp),
+    Container(R.string.settings_container),
+    Log(R.string.settings_log),
+    LogViewer(R.string.settings_log_viewer),
+    Permissions(R.string.settings_permissions),
+    RemoteServers(R.string.settings_remote_servers),
+    Backup(R.string.settings_backup),
+    Language(R.string.settings_language),
+    About(R.string.settings_about)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -91,12 +95,20 @@ fun SettingsScreen(
     val projectRules by viewModel.projectRules.collectAsStateWithLifecycle()
     val keepaliveEnabled by viewModel.keepaliveEnabled.collectAsStateWithLifecycle()
     val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
+    val languageTag by viewModel.languageTag.collectAsStateWithLifecycle()
     val visionProviderId by viewModel.visionProviderId.collectAsStateWithLifecycle()
     val visionModel by viewModel.visionModel.collectAsStateWithLifecycle()
     val modelMetadata by viewModel.modelMetadata.collectAsStateWithLifecycle()
     val containerProfiles by viewModel.profiles.collectAsStateWithLifecycle()
     val activeProfileId by viewModel.activeProfileId.collectAsStateWithLifecycle()
     val remoteConnections by viewModel.remoteConnections.collectAsStateWithLifecycle()
+
+    val currentLanguageDisplayName = if (languageTag.isNullOrBlank()) {
+        stringResource(R.string.language_follow_system)
+    } else {
+        com.aicode.core.util.LanguageRegistry.languages.firstOrNull { it.tag == languageTag }?.displayName
+            ?: stringResource(R.string.language_follow_system)
+    }
 
     var section by remember { mutableStateOf(SettingsSection.Menu) }
     var logReturnSection by remember { mutableStateOf(SettingsSection.Menu) }
@@ -141,7 +153,7 @@ fun SettingsScreen(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             TopAppBar(
-                title = { Text(section.title) },
+                title = { Text(stringResource(section.titleRes)) },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.background,
                     titleContentColor = MaterialTheme.colorScheme.onBackground
@@ -156,7 +168,7 @@ fun SettingsScreen(
                             section = SettingsSection.Menu
                         }
                     }) {
-                        Icon(FeatherIcons.ArrowLeft, contentDescription = "返回")
+                        Icon(FeatherIcons.ArrowLeft, contentDescription = stringResource(R.string.common_back))
                     }
                 },
                 actions = {
@@ -165,26 +177,26 @@ fun SettingsScreen(
                             editingProvider = null
                             section = SettingsSection.ProviderEditor
                         }) {
-                            Icon(FeatherIcons.Plus, contentDescription = "添加提供商")
+                            Icon(FeatherIcons.Plus, contentDescription = stringResource(R.string.settings_add_provider))
                         }
                         SettingsSection.Mcp -> {
                             IconButton(onClick = { viewModel.reloadMcp() }) {
                                 if (mcpReloading) {
                                     CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
                                 } else {
-                                    Icon(FeatherIcons.RefreshCw, contentDescription = "重新连接")
+                                    Icon(FeatherIcons.RefreshCw, contentDescription = stringResource(R.string.settings_reconnect))
                                 }
                             }
                             IconButton(onClick = {
                                 editingMcp = null
                                 showMcpDialog = true
                             }) {
-                                Icon(FeatherIcons.Plus, contentDescription = "添加 MCP 服务器")
+                                Icon(FeatherIcons.Plus, contentDescription = stringResource(R.string.settings_add_mcp_server))
                             }
                         }
                         SettingsSection.LogViewer -> {
                             IconButton(onClick = { viewModel.refreshLogs() }) {
-                                Icon(FeatherIcons.RefreshCw, contentDescription = "刷新日志")
+                                Icon(FeatherIcons.RefreshCw, contentDescription = stringResource(R.string.settings_refresh_logs))
                             }
                         }
                         else -> {}
@@ -213,6 +225,7 @@ fun SettingsScreen(
                     onThemeModeChange = { viewModel.setThemeMode(it) },
                     keepaliveEnabled = keepaliveEnabled,
                     onToggleKeepalive = { viewModel.setKeepaliveEnabled(it) },
+                    currentLanguageDisplayName = currentLanguageDisplayName,
                     onOpen = {
                         if (it == SettingsSection.LogViewer) {
                             logReturnSection = SettingsSection.Menu
@@ -284,6 +297,10 @@ fun SettingsScreen(
                 }
                 SettingsSection.ProviderEditor -> {} // 已在上方 early return 处理
                 SettingsSection.RemoteServers -> {} // 已在上方 early return 处理
+                SettingsSection.Language -> LanguageSettingsSection(
+                    currentTag = languageTag,
+                    onSelect = { viewModel.setLanguage(it) }
+                )
                 SettingsSection.About -> AboutSection()
             }
         }
@@ -333,6 +350,7 @@ internal fun SettingsMenu(
     onThemeModeChange: (AppThemeMode) -> Unit,
     keepaliveEnabled: Boolean,
     onToggleKeepalive: (Boolean) -> Unit,
+    currentLanguageDisplayName: String,
     onOpen: (SettingsSection) -> Unit
 ) {
     Column(
@@ -344,85 +362,92 @@ internal fun SettingsMenu(
     ) {
         MenuRow(
             icon = FeatherIcons.Cloud,
-            title = SettingsSection.Providers.title,
+            title = stringResource(SettingsSection.Providers.titleRes),
             subtitle = if (providerCount == 0) {
-                "未添加提供商"
+                stringResource(R.string.settings_providers_empty)
             } else {
-                "$providerCount 个" + (activeProviderName?.let { " · 启用：$it" } ?: "")
+                stringResource(R.string.settings_providers_count, providerCount) +
+                    (activeProviderName?.let { stringResource(R.string.settings_providers_active, it) } ?: "")
             },
             onClick = { onOpen(SettingsSection.Providers) }
         )
         MenuRow(
             icon = FeatherIcons.Image,
-            title = SettingsSection.VisionModel.title,
+            title = stringResource(SettingsSection.VisionModel.titleRes),
             subtitle = if (visionProviderName.isNullOrBlank() || visionModel.isBlank()) {
-                "跟随当前聊天模型"
+                stringResource(R.string.settings_vision_follow_chat)
             } else {
-                "专用：$visionProviderName · $visionModel"
+                stringResource(R.string.settings_vision_dedicated, visionProviderName, visionModel)
             },
             onClick = { onOpen(SettingsSection.VisionModel) }
         )
         MenuRow(
             icon = FeatherIcons.Box,
-            title = SettingsSection.Mcp.title,
-            subtitle = if (mcpCount == 0) "未配置 MCP 服务器" else "$mcpCount 个 · 已连接 $mcpConnected",
+            title = stringResource(SettingsSection.Mcp.titleRes),
+            subtitle = if (mcpCount == 0) stringResource(R.string.settings_mcp_empty) else stringResource(R.string.settings_mcp_count_connected, mcpCount, mcpConnected),
             onClick = { onOpen(SettingsSection.Mcp) }
         )
         MenuRow(
             icon = FeatherIcons.HardDrive,
-            title = SettingsSection.Container.title,
-            subtitle = "当前：${activeContainerProfileName ?: "内置 Alpine"}",
+            title = stringResource(SettingsSection.Container.titleRes),
+            subtitle = stringResource(R.string.settings_container_current, activeContainerProfileName ?: stringResource(R.string.settings_container_builtin_alpine)),
             onClick = { onOpen(SettingsSection.Container) }
         )
         MenuRow(
             icon = FeatherIcons.FileText,
-            title = SettingsSection.Log.title,
-            subtitle = "当前：${logLevel.name}",
+            title = stringResource(SettingsSection.Log.titleRes),
+            subtitle = stringResource(R.string.settings_log_current, logLevel.name),
             onClick = { onOpen(SettingsSection.Log) }
         )
         MenuRow(
             icon = FeatherIcons.FileText,
-            title = SettingsSection.LogViewer.title,
-            subtitle = "查看最近日志，支持 MCP 名称过滤",
+            title = stringResource(SettingsSection.LogViewer.titleRes),
+            subtitle = stringResource(R.string.settings_log_viewer_subtitle),
             onClick = { onOpen(SettingsSection.LogViewer) }
         )
         MenuRow(
             icon = FeatherIcons.Lock,
-            title = SettingsSection.Permissions.title,
-            subtitle = if (permissionRuleCount == 0) "未保存授权规则" else "已保存 $permissionRuleCount 条",
+            title = stringResource(SettingsSection.Permissions.titleRes),
+            subtitle = if (permissionRuleCount == 0) stringResource(R.string.settings_permissions_empty) else stringResource(R.string.settings_permissions_count, permissionRuleCount),
             onClick = { onOpen(SettingsSection.Permissions) }
         )
         MenuRow(
             icon = FeatherIcons.Server,
-            title = SettingsSection.RemoteServers.title,
-            subtitle = "管理 SFTP / FTP 工作区同步",
+            title = stringResource(SettingsSection.RemoteServers.titleRes),
+            subtitle = stringResource(R.string.settings_remote_subtitle),
             onClick = { onOpen(SettingsSection.RemoteServers) }
         )
 
         ThemeModeRow(
             icon = FeatherIcons.Moon,
-            title = "外观主题",
-            subtitle = "选择跟随系统或固定明暗模式",
+            title = stringResource(R.string.settings_theme_title),
+            subtitle = stringResource(R.string.settings_theme_subtitle),
             selected = themeMode,
             onSelected = onThemeModeChange
         )
+        MenuRow(
+            icon = FeatherIcons.Globe,
+            title = stringResource(SettingsSection.Language.titleRes),
+            subtitle = currentLanguageDisplayName,
+            onClick = { onOpen(SettingsSection.Language) }
+        )
         SwitchRow(
             icon = FeatherIcons.RefreshCw,
-            title = "后台运行保活",
-            subtitle = "显示前台通知，避免退到后台时系统杀进程",
+            title = stringResource(R.string.settings_keepalive_title),
+            subtitle = stringResource(R.string.settings_keepalive_subtitle),
             checked = keepaliveEnabled,
             onCheckedChange = onToggleKeepalive
         )
         MenuRow(
             icon = FeatherIcons.Save,
-            title = SettingsSection.Backup.title,
-            subtitle = "加密导出/导入配置、聊天历史与凭据",
+            title = stringResource(SettingsSection.Backup.titleRes),
+            subtitle = stringResource(R.string.settings_backup_subtitle),
             onClick = { onOpen(SettingsSection.Backup) }
         )
         MenuRow(
             icon = FeatherIcons.Info,
-            title = SettingsSection.About.title,
-            subtitle = "版本检查 · GitHub · 许可证",
+            title = stringResource(SettingsSection.About.titleRes),
+            subtitle = stringResource(R.string.settings_about_subtitle),
             onClick = { onOpen(SettingsSection.About) }
         )
     }
@@ -476,7 +501,7 @@ internal fun ThemeModeRow(
                 onExpandedChange = { expanded = !expanded }
             ) {
                 OutlinedTextField(
-                    value = selected.label,
+                    value = stringResource(selected.labelRes),
                     onValueChange = {},
                     readOnly = true,
                     singleLine = true,
@@ -491,7 +516,7 @@ internal fun ThemeModeRow(
                 ) {
                     AppThemeMode.entries.forEach { mode ->
                         DropdownMenuItem(
-                            text = { Text(mode.label) },
+                            text = { Text(stringResource(mode.labelRes)) },
                             onClick = {
                                 onSelected(mode)
                                 expanded = false

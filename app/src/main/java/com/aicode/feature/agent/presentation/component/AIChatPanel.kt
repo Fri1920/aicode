@@ -85,6 +85,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.util.Base64
+import androidx.compose.ui.res.stringResource
+import com.aicode.R
 
 internal val brandGradient = Brush.linearGradient(listOf(Brand.Blue, Brand.Sky))
 private const val REASONING_SCROLL_BUCKET_CHARS = 120
@@ -131,10 +133,10 @@ internal data class PendingUploadAttachment(
 internal val PendingUploadAttachment.isImage: Boolean
     get() = image != null
 
-private fun List<PendingUploadAttachment>.toAttachmentText(): String {
+private fun List<PendingUploadAttachment>.toAttachmentText(context: Context): String {
     if (isEmpty()) return ""
     return buildString {
-        append("附件：")
+        append(context.getString(R.string.chat_attachment_prefix))
         this@toAttachmentText.forEach { attachment ->
             append('\n')
             append("- ")
@@ -146,10 +148,11 @@ private fun List<PendingUploadAttachment>.toAttachmentText(): String {
 }
 
 private fun appendAttachmentsToRequest(
+    context: Context,
     request: String,
     attachments: List<PendingUploadAttachment>
 ): String {
-    val attachmentText = attachments.toAttachmentText()
+    val attachmentText = attachments.toAttachmentText(context)
     if (attachmentText.isBlank()) return request
     if (request.isBlank()) return attachmentText
     return request.trimEnd() + "\n\n" + attachmentText
@@ -183,11 +186,14 @@ private fun PendingUploadAttachment.toAgentImage(): AgentImage? = image
 private fun List<PendingUploadAttachment>.toAgentImages(): List<AgentImage> =
     mapNotNull { it.toAgentImage() }
 
-private fun maxAttachmentMessage(max: Int): String = "最多可同时发送 $max 个附件"
+private fun maxAttachmentMessage(context: Context, max: Int): String =
+    context.getString(R.string.chat_attachment_max, max)
 
-private fun uploadSuccessMessage(count: Int): String = "已上传 $count 个附件"
+private fun uploadSuccessMessage(context: Context, count: Int): String =
+    context.getString(R.string.chat_attachment_uploaded, count)
 
-private fun partialUploadMessage(count: Int): String = "已上传 $count 个附件，部分附件未加入"
+private fun partialUploadMessage(context: Context, count: Int): String =
+    context.getString(R.string.chat_attachment_uploaded_partial, count)
 
 private fun selectedAttachments(
     uris: List<Uri>,
@@ -200,8 +206,8 @@ private fun hasAttachmentSlots(currentCount: Int): Boolean =
 private fun remainingAttachmentSlots(currentCount: Int): Int =
     (MAX_PENDING_ATTACHMENTS - currentCount).coerceAtLeast(0)
 
-private fun imageLimitError(): String =
-    "图片超过 ${formatBytes(MAX_IMAGE_UPLOAD_BYTES)}，请压缩后重试"
+private fun imageLimitError(context: Context): String =
+    context.getString(R.string.chat_image_too_large, formatBytes(MAX_IMAGE_UPLOAD_BYTES))
 
 private fun attachmentsRoot(workspace: File): File =
     File(File(workspace, ".aicode"), "attachments").apply { mkdirs() }
@@ -212,17 +218,23 @@ private fun workspaceContainerPath(relativePath: String): String =
 private fun attachmentRelativePath(workspace: File, target: File): String =
     target.relativeTo(workspace).invariantSeparatorsPath
 
-private fun pickedFileToastPath(path: String): String = "已上传到 $path"
+private fun pickedFileToastPath(context: Context, path: String): String =
+    context.getString(R.string.chat_uploaded_to, path)
 
-private fun emptyWorkspaceMessage(): String = "请先选择工作区"
+private fun emptyWorkspaceMessage(context: Context): String =
+    context.getString(R.string.chat_select_workspace_first)
 
-private fun unreadableFileMessage(): String = "无法读取所选文件"
+private fun unreadableFileMessage(context: Context): String =
+    context.getString(R.string.chat_read_file_failed)
 
-private fun unavailableWorkspaceMessage(): String = "工作区不可用"
+private fun unavailableWorkspaceMessage(context: Context): String =
+    context.getString(R.string.chat_workspace_unavailable)
 
-private fun uploadFallbackError(): String = "上传失败"
+private fun uploadFallbackError(context: Context): String =
+    context.getString(R.string.chat_upload_failed)
 
-private fun unsupportedImageTypeError(): String = "无法识别图片类型，仅支持 jpg/png/gif/webp"
+private fun unsupportedImageTypeError(context: Context): String =
+    context.getString(R.string.chat_unsupported_image_type)
 
 private fun uploadFileName(context: Context, uri: Uri): String =
     context.displayName(uri).ifBlank { "upload" }
@@ -263,7 +275,7 @@ fun AIChatPanel(
     val currentSessionId by viewModel.currentSessionId.collectAsStateWithLifecycle()
     val sessions by viewModel.sessions.collectAsStateWithLifecycle()
     val currentSession = sessions.find { it.id == currentSessionId }
-    val sessionTitle = currentSession?.title?.takeIf { it.isNotBlank() } ?: "新会话"
+    val sessionTitle = currentSession?.title?.takeIf { it.isNotBlank() } ?: stringResource(R.string.chat_new_session_btn)
     val sessionInputTokens = currentSession?.totalInputTokens ?: 0
     val sessionOutputTokens = currentSession?.totalOutputTokens ?: 0
     val sessionLastInputTokens = currentSession?.lastInputTokens ?: 0
@@ -327,11 +339,11 @@ fun AIChatPanel(
     fun handlePickedAttachments(uris: List<Uri>, images: Boolean) {
         if (uris.isEmpty()) return
         if (projectRoot.isBlank()) {
-            Toast.makeText(context, emptyWorkspaceMessage(), Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, emptyWorkspaceMessage(context), Toast.LENGTH_SHORT).show()
             return
         }
         if (!hasAttachmentSlots(pendingAttachments.size)) {
-            Toast.makeText(context, maxAttachmentMessage(MAX_PENDING_ATTACHMENTS), Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, maxAttachmentMessage(context, MAX_PENDING_ATTACHMENTS), Toast.LENGTH_SHORT).show()
             return
         }
         val selected = selectedAttachments(uris, pendingAttachments.size)
@@ -345,15 +357,15 @@ fun AIChatPanel(
                     pendingAttachments = pendingAttachments + uploaded.toPendingAttachment()
                     successCount += 1
                 }.onFailure { error ->
-                    failures += (error.message ?: uploadFallbackError())
+                    failures += (error.message ?: uploadFallbackError(context))
                 }
             }
 
             when {
                 successCount > 0 && failures.isEmpty() && uris.size <= remainingAttachmentSlots(pendingAttachments.size - successCount) ->
-                    Toast.makeText(context, uploadSuccessMessage(successCount), Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, uploadSuccessMessage(context, successCount), Toast.LENGTH_SHORT).show()
                 successCount > 0 ->
-                    Toast.makeText(context, partialUploadMessage(successCount), Toast.LENGTH_LONG).show()
+                    Toast.makeText(context, partialUploadMessage(context, successCount), Toast.LENGTH_LONG).show()
                 failures.isNotEmpty() ->
                     Toast.makeText(context, failures.first(), Toast.LENGTH_LONG).show()
             }
@@ -463,7 +475,7 @@ fun AIChatPanel(
                 }
             } else {
                 val attachments = pendingAttachments
-                val modelRequest = appendAttachmentsToRequest(text, attachments)
+                val modelRequest = appendAttachmentsToRequest(context, text, attachments)
                 val images = attachments.toAgentImages()
                 viewModel.executeAgentRequestStream(
                     request = text,
@@ -719,12 +731,12 @@ private suspend fun copyUriToWorkspace(
     includeImageData: Boolean = false
 ): UploadedWorkspaceFile = withContext(Dispatchers.IO) {
     val workspace = File(workspacePath)
-    require(workspace.isDirectory) { unavailableWorkspaceMessage() }
+    require(workspace.isDirectory) { unavailableWorkspaceMessage(context) }
 
     val uploadsDir = attachmentsRoot(workspace)
     val target = uniqueUploadFile(uploadsDir, safeUploadFileName(context, uri))
 
-    val input = context.contentResolver.openInputStream(uri) ?: error(unreadableFileMessage())
+    val input = context.contentResolver.openInputStream(uri) ?: error(unreadableFileMessage(context))
     input.use { source ->
         target.outputStream().use { output ->
             source.copyTo(output)
@@ -744,7 +756,7 @@ private suspend fun copyUriToWorkspace(
     val image = if (includeImageData) {
         if (target.length() > MAX_IMAGE_UPLOAD_BYTES) {
             runCatching { target.delete() }
-            error(imageLimitError())
+            error(imageLimitError(context))
         }
         AgentImage(
             mimeType = mimeType,
@@ -807,7 +819,7 @@ private fun resolveImageMimeType(context: Context, uri: Uri, fileName: String): 
         else -> null
     }
     if (byExtension != null) return byExtension
-    error(unsupportedImageTypeError())
+    error(unsupportedImageTypeError(context))
 }
 
 private val SUPPORTED_IMAGE_MIME_TYPES = setOf(
@@ -861,7 +873,7 @@ internal fun ChatHeader(
                 IconButton(onClick = onOpenDrawer) {
                     Icon(
                         FeatherIcons.Menu,
-                        contentDescription = "打开侧边栏",
+                        contentDescription = stringResource(R.string.chat_open_sidebar),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 Column(modifier = Modifier.weight(1f)) {
@@ -877,7 +889,7 @@ internal fun ChatHeader(
                         horizontalArrangement = Arrangement.spacedBy(Spacing.sm)
                     ) {
                         Text(
-                            text = modelName?.takeIf { it.isNotBlank() } ?: "未选择模型",
+                            text = modelName?.takeIf { it.isNotBlank() } ?: stringResource(R.string.chat_no_model_selected),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 1,
@@ -888,19 +900,19 @@ internal fun ChatHeader(
                 IconButton(onClick = onNewChat) {
                     Icon(
                         FeatherIcons.Plus,
-                        contentDescription = "新建会话",
+                        contentDescription = stringResource(R.string.chat_new_session),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 IconButton(onClick = onNavigateToGit) {
                     Icon(
                         FeatherIcons.GitBranch,
-                        contentDescription = "打开版本控制",
+                        contentDescription = stringResource(R.string.chat_open_git),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 IconButton(onClick = onNavigateToTerminal) {
                     Icon(
                         FeatherIcons.Terminal,
-                        contentDescription = "打开终端",
+                        contentDescription = stringResource(R.string.chat_open_terminal),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
@@ -930,13 +942,13 @@ private fun ConnectionIndicator(
 ) {
     val (dotColor, text) = when (state) {
         com.aicode.feature.agent.domain.container.ConnectionState.CONNECTED ->
-            MaterialTheme.colorScheme.primary to "SSH：已连接"
+            MaterialTheme.colorScheme.primary to stringResource(R.string.chat_ssh_connected)
         com.aicode.feature.agent.domain.container.ConnectionState.CONNECTING ->
-            MaterialTheme.colorScheme.tertiary to "SSH：连接中…"
+            MaterialTheme.colorScheme.tertiary to stringResource(R.string.chat_ssh_connecting)
         com.aicode.feature.agent.domain.container.ConnectionState.FAILED ->
-            MaterialTheme.colorScheme.error to "SSH：连接失败"
+            MaterialTheme.colorScheme.error to stringResource(R.string.chat_ssh_failed)
         com.aicode.feature.agent.domain.container.ConnectionState.DISCONNECTED ->
-            MaterialTheme.colorScheme.outline to "SSH：未连接"
+            MaterialTheme.colorScheme.outline to stringResource(R.string.chat_ssh_disconnected)
     }
     Row(
         verticalAlignment = Alignment.CenterVertically,
@@ -974,9 +986,9 @@ private fun RemoteConnectingPlaceholder(
     state: com.aicode.feature.agent.domain.container.ConnectionState
 ) {
     val text = when (state) {
-        com.aicode.feature.agent.domain.container.ConnectionState.CONNECTING -> "正在连接远程服务器…"
-        com.aicode.feature.agent.domain.container.ConnectionState.FAILED -> "远程服务器连接失败，请检查设置"
-        com.aicode.feature.agent.domain.container.ConnectionState.DISCONNECTED -> "未连接远程服务器"
+        com.aicode.feature.agent.domain.container.ConnectionState.CONNECTING -> stringResource(R.string.chat_connecting_remote)
+        com.aicode.feature.agent.domain.container.ConnectionState.FAILED -> stringResource(R.string.chat_remote_connect_failed)
+        com.aicode.feature.agent.domain.container.ConnectionState.DISCONNECTED -> stringResource(R.string.chat_no_remote_connection)
         com.aicode.feature.agent.domain.container.ConnectionState.CONNECTED -> ""
     }
     Box(
@@ -1031,13 +1043,13 @@ internal fun WelcomeState(modifier: Modifier = Modifier) {
         BrandMark(size = 64.dp, iconSize = 34.dp)
         Spacer(Modifier.height(Spacing.xl))
         Text(
-            text = "有什么可以帮你的？",
+            text = stringResource(R.string.chat_placeholder),
             style = MaterialTheme.typography.headlineSmall,
             color = MaterialTheme.colorScheme.onBackground
         )
         Spacer(Modifier.height(Spacing.sm))
         Text(
-            text = "描述你的需求，我来帮你编写、修改或解释代码",
+            text = stringResource(R.string.chat_input_hint),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )

@@ -39,6 +39,8 @@ import compose.icons.feathericons.ArrowLeft
 import compose.icons.feathericons.Eye
 import compose.icons.feathericons.EyeOff
 import compose.icons.feathericons.Trash2
+import androidx.compose.ui.res.stringResource
+import com.aicode.R
 
 /**
  * 凭据编辑页（全屏）。host / 用户名 / Token / 别名 / 设为默认。
@@ -88,20 +90,20 @@ internal fun CredentialEditorScreen(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             TopAppBar(
-                title = { Text(if (initial == null) "添加凭据" else "编辑凭据") },
+                title = { Text(if (initial == null) stringResource(R.string.credential_add) else stringResource(R.string.credential_edit)) },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.background,
                     titleContentColor = MaterialTheme.colorScheme.onBackground
                 ),
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(FeatherIcons.ArrowLeft, contentDescription = "返回")
+                        Icon(FeatherIcons.ArrowLeft, contentDescription = stringResource(R.string.common_back))
                     }
                 },
                 actions = {
                     if (initial != null) {
                         IconButton(onClick = { onDelete(initial.id); onBack() }) {
-                            Icon(FeatherIcons.Trash2, contentDescription = "删除凭据", tint = MaterialTheme.colorScheme.error)
+                            Icon(FeatherIcons.Trash2, contentDescription = stringResource(R.string.credential_delete), tint = MaterialTheme.colorScheme.error)
                         }
                     }
                 }
@@ -117,14 +119,14 @@ internal fun CredentialEditorScreen(
             verticalArrangement = Arrangement.spacedBy(Spacing.md)
         ) {
             Text(
-                text = "凭据用于推送/拉取 https 远程仓库时认证。同 host 多账号时，开启「默认」的优先注入；均未开启默认则取该 host 首条。",
+                text = stringResource(R.string.credential_usage_desc),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             OutlinedTextField(
                 value = host,
                 onValueChange = { host = it },
-                label = { Text("远程主机 host") },
+                label = { Text(stringResource(R.string.credential_host)) },
                 placeholder = { Text("github.com") },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth()
@@ -132,20 +134,20 @@ internal fun CredentialEditorScreen(
             OutlinedTextField(
                 value = username,
                 onValueChange = { username = it },
-                label = { Text("用户名") },
+                label = { Text(stringResource(R.string.common_username)) },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth()
             )
             OutlinedTextField(
                 value = token,
                 onValueChange = { token = it },
-                label = { Text("访问令牌 Token / PAT") },
+                label = { Text(stringResource(R.string.credential_token)) },
                 singleLine = true,
                 visualTransformation = if (tokenVisible) VisualTransformation.None else PasswordVisualTransformation(),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                 trailingIcon = {
                     IconButton(onClick = { tokenVisible = !tokenVisible }) {
-                        Icon(if (tokenVisible) FeatherIcons.EyeOff else FeatherIcons.Eye, contentDescription = if (tokenVisible) "隐藏" else "显示")
+                        Icon(if (tokenVisible) FeatherIcons.EyeOff else FeatherIcons.Eye, contentDescription = if (tokenVisible) stringResource(R.string.common_hide) else stringResource(R.string.common_show))
                     }
                 },
                 modifier = Modifier.fillMaxWidth()
@@ -153,7 +155,7 @@ internal fun CredentialEditorScreen(
             OutlinedTextField(
                 value = label,
                 onValueChange = { label = it },
-                label = { Text("别名（可选）") },
+                label = { Text(stringResource(R.string.credential_alias)) },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth()
             )
@@ -162,9 +164,9 @@ internal fun CredentialEditorScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column(modifier = Modifier.weight(1f)) {
-                    Text("设为该 host 的默认凭据", style = MaterialTheme.typography.bodyMedium)
+                    Text(stringResource(R.string.credential_set_default), style = MaterialTheme.typography.bodyMedium)
                     Text(
-                        "同 host 多账号时，默认那条优先注入",
+                        stringResource(R.string.credential_default_hint),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -175,10 +177,10 @@ internal fun CredentialEditorScreen(
                 onClick = { saveAndBack() },
                 enabled = canSave,
                 modifier = Modifier.fillMaxWidth()
-            ) { Text(if (initial == null) "添加" else "保存") }
+            ) { Text(if (initial == null) stringResource(R.string.common_add) else stringResource(R.string.common_save)) }
             if (!canSave) {
                 Text(
-                    text = "host、用户名、Token 均不能为空",
+                    text = stringResource(R.string.credential_fields_required),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.error
                 )

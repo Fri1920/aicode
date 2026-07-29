@@ -60,6 +60,8 @@ import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import androidx.compose.ui.res.stringResource
+import com.aicode.R
 
 internal val DiffAddBg = Color(0x3322C55E)
 internal val DiffAddText = Color(0xFF22C55E)
@@ -103,7 +105,7 @@ internal fun ToolMessageBody(message: AgentUIMessage, liveOutput: String? = null
             || (todoData != null && todoData.items.isNotEmpty()) || webSearchData != null)
     var expanded by remember(message.id) { mutableStateOf(edit != null || todoData != null || webSearchData != null) }
 
-    val toolLabel = if (edit != null) edit.path.substringAfterLast('/') else (message.toolName ?: "工具")
+    val toolLabel = if (edit != null) edit.path.substringAfterLast('/') else (message.toolName ?: stringResource(R.string.common_tool))
 
     Column(modifier = Modifier.padding(horizontal = Spacing.sm, vertical = Spacing.sm)) {
         Row(
@@ -159,7 +161,7 @@ internal fun ToolMessageBody(message: AgentUIMessage, liveOutput: String? = null
             } else if (expandable) {
                 Icon(
                     if (expanded) FeatherIcons.ChevronUp else FeatherIcons.ChevronDown,
-                    contentDescription = if (expanded) "收起" else "展开",
+                    contentDescription = if (expanded) stringResource(R.string.common_collapse_action) else stringResource(R.string.common_expand),
                     tint = Brand.IconGray,
                     modifier = Modifier.size(18.dp)
                 )
@@ -192,11 +194,11 @@ internal fun ToolMessageBody(message: AgentUIMessage, liveOutput: String? = null
             } else {
                 if (!argsFull.isNullOrBlank()) {
                     Spacer(Modifier.height(Spacing.sm))
-                    ToolSection(label = "指令", content = argsFull)
+                    ToolSection(label = stringResource(R.string.tool_instruction), content = argsFull)
                 }
                 if (!resultText.isNullOrBlank()) {
                     Spacer(Modifier.height(Spacing.sm))
-                    ToolSection(label = "结果", content = resultText)
+                    ToolSection(label = stringResource(R.string.tool_result), content = resultText)
                 }
             }
         }
@@ -397,13 +399,13 @@ internal fun DiffExpandToggle(expanded: Boolean, hiddenCount: Int, onToggle: () 
     ) {
         Icon(
             if (expanded) FeatherIcons.ChevronUp else FeatherIcons.ChevronDown,
-            contentDescription = if (expanded) "收起" else "展开",
+            contentDescription = if (expanded) stringResource(R.string.common_collapse_action) else stringResource(R.string.common_expand),
             tint = Brand.IconGray,
             modifier = Modifier.size(16.dp)
         )
         Spacer(Modifier.width(Spacing.xs))
         Text(
-            text = if (expanded) "收起" else "展开剩余 $hiddenCount 行",
+            text = if (expanded) stringResource(R.string.common_collapse_action) else stringResource(R.string.tool_expand_remaining, hiddenCount),
             color = MaterialTheme.colorScheme.primary,
             style = MaterialTheme.typography.labelMedium,
             fontWeight = FontWeight.Medium

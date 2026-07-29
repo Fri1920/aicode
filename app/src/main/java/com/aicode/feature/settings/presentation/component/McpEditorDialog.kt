@@ -57,6 +57,8 @@ import com.aicode.feature.agent.domain.mcp.McpToolDescriptor
 import compose.icons.FeatherIcons
 import compose.icons.feathericons.*
 import kotlinx.serialization.json.JsonObject
+import androidx.compose.ui.res.stringResource
+import com.aicode.R
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -132,12 +134,12 @@ fun McpServerEditDialog(
                     ) {
                         Icon(
                             FeatherIcons.X,
-                            contentDescription = "关闭",
+                            contentDescription = stringResource(R.string.common_close),
                             tint = MaterialTheme.colorScheme.onSurface
                         )
                     }
                     Text(
-                        text = if (initial == null) "添加 MCP" else "编辑 MCP",
+                        text = if (initial == null) stringResource(R.string.mcp_add) else stringResource(R.string.mcp_edit),
                         style = MaterialTheme.typography.titleMedium.copy(
                             fontWeight = FontWeight.Bold,
                             fontSize = 18.sp
@@ -153,7 +155,7 @@ fun McpServerEditDialog(
                         ) {
                             Icon(
                                 FeatherIcons.FileText,
-                                contentDescription = "查看此 MCP 日志",
+                                contentDescription = stringResource(R.string.mcp_view_logs),
                                 tint = MaterialTheme.colorScheme.onSurface
                             )
                         }
@@ -164,7 +166,7 @@ fun McpServerEditDialog(
                     ) {
                         Icon(
                             FeatherIcons.RefreshCw,
-                            contentDescription = "刷新工具",
+                            contentDescription = stringResource(R.string.mcp_refresh_tools),
                             tint = MaterialTheme.colorScheme.onSurface
                         )
                     }
@@ -182,7 +184,7 @@ fun McpServerEditDialog(
                         .padding(4.dp),
                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    val tabs = listOf("基础设置", "工具")
+                    val tabs = listOf(stringResource(R.string.mcp_basic_settings), stringResource(R.string.common_tool))
                     tabs.forEachIndexed { index, title ->
                         val isSelected = selectedTab == index
                         Box(
@@ -235,7 +237,7 @@ fun McpServerEditDialog(
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Text(
-                                        text = "是否启用",
+                                        text = stringResource(R.string.mcp_enabled),
                                         style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium),
                                         color = MaterialTheme.colorScheme.onSurface,
                                         modifier = Modifier.weight(1f)
@@ -250,14 +252,14 @@ fun McpServerEditDialog(
                             // 名称字段
                             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                                 Text(
-                                    text = "名称",
+                                    text = stringResource(R.string.common_name),
                                     style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                                 OutlinedTextField(
                                     value = name,
                                     onValueChange = { name = it },
-                                    placeholder = { Text("例如：fetch、github、gitlab") },
+                                    placeholder = { Text(stringResource(R.string.mcp_name_hint)) },
                                     singleLine = true,
                                     shape = RoundedCornerShape(12.dp),
                                     modifier = Modifier.fillMaxWidth()
@@ -267,7 +269,7 @@ fun McpServerEditDialog(
                             // 传输类型选择
                             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                                 Text(
-                                    text = "传输类型",
+                                    text = stringResource(R.string.mcp_transport_type),
                                     style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -281,7 +283,7 @@ fun McpServerEditDialog(
                                         .padding(4.dp),
                                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                                 ) {
-                                    val types = listOf(false to "远程 HTTP", true to "本地 stdio")
+                                    val types = listOf(false to stringResource(R.string.mcp_remote_http), true to stringResource(R.string.mcp_local_stdio))
                                     types.forEach { (stdioFlag, label) ->
                                         val selected = isStdio == stdioFlag
                                         Box(
@@ -350,7 +352,7 @@ fun McpServerEditDialog(
                                             tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
                                         )
                                         Text(
-                                            text = if (initial == null) "请先保存并连接服务器后查看工具列表" else "未检测到工具，点击右上角刷新按钮重试",
+                                            text = if (initial == null) stringResource(R.string.mcp_save_first_hint) else stringResource(R.string.mcp_no_tools_hint),
                                             style = MaterialTheme.typography.bodyMedium,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
@@ -392,7 +394,7 @@ fun McpServerEditDialog(
                                             }
 
                                             Text(
-                                                text = tool.description ?: "无描述",
+                                                text = tool.description ?: stringResource(R.string.mcp_no_description),
                                                 style = MaterialTheme.typography.bodySmall,
                                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                                 maxLines = 3,
@@ -446,7 +448,7 @@ fun McpServerEditDialog(
                                                 )
                                                 Spacer(modifier = Modifier.width(6.dp))
                                                 Text(
-                                                    text = "需要审批",
+                                                    text = stringResource(R.string.mcp_needs_approval),
                                                     style = MaterialTheme.typography.bodyMedium,
                                                     color = MaterialTheme.colorScheme.onSurface,
                                                     modifier = Modifier.weight(1f)
@@ -512,7 +514,7 @@ fun McpServerEditDialog(
                     ) {
                         Icon(FeatherIcons.Check, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("保存", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold))
+                        Text(stringResource(R.string.common_save), style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold))
                     }
 
                     if (onDelete != null) {
@@ -523,7 +525,7 @@ fun McpServerEditDialog(
                         ) {
                             Icon(FeatherIcons.Trash2, contentDescription = null, modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(6.dp))
-                            Text("删除此 MCP 服务器")
+                            Text(stringResource(R.string.mcp_delete_server))
                     }
                 }
             }

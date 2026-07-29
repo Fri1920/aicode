@@ -22,6 +22,8 @@ import com.aicode.feature.workspace.domain.model.RemoteMount
 import com.aicode.feature.workspace.domain.model.RemoteProtocol
 import compose.icons.FeatherIcons
 import compose.icons.feathericons.*
+import androidx.compose.ui.res.stringResource
+import com.aicode.R
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -55,14 +57,14 @@ fun AddRemoteConnectionDialog(
         containerColor = MaterialTheme.colorScheme.surface,
         tonalElevation = 0.dp,
         onDismissRequest = onDismiss,
-        title = { Text(if (initialConnection != null) "编辑连接通道" else "添加连接通道", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold) },
+        title = { Text(if (initialConnection != null) stringResource(R.string.remote_edit_connection) else stringResource(R.string.remote_add_connection), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold) },
         text = {
             Column(
                 modifier = Modifier.verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("协议类型:", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
+                    Text(stringResource(R.string.remote_protocol_type), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
                     Spacer(modifier = Modifier.width(12.dp))
                     FilterChip(
                         selected = protocol == RemoteProtocol.SFTP,
@@ -79,20 +81,20 @@ fun AddRemoteConnectionDialog(
                     FilterChip(
                         selected = protocol == RemoteProtocol.LOCAL,
                         onClick = { protocol = RemoteProtocol.LOCAL; port = "0"; username = "local"; password = "" },
-                        label = { Text("本地") }
+                        label = { Text(stringResource(R.string.common_local)) }
                     )
                 }
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it },
-                    label = { Text(if (isLocal) "通道名称 (如: 内部存储镜像)" else "连接名称 (如: 腾讯云云服务器)") },
+                    label = { Text(if (isLocal) stringResource(R.string.remote_channel_name_hint) else stringResource(R.string.remote_connection_name_hint)) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
                 OutlinedTextField(
                     value = host,
                     onValueChange = { host = it },
-                    label = { Text(if (isLocal) "内部存储目标目录" else "主机地址 (IP 或域名)") },
+                    label = { Text(if (isLocal) stringResource(R.string.remote_internal_dir) else stringResource(R.string.remote_host_address)) },
                     placeholder = if (isLocal) {
                         { Text("/storage/emulated/0/AICode/projects") }
                     } else {
@@ -103,31 +105,31 @@ fun AddRemoteConnectionDialog(
                     trailingIcon = if (isLocal) {
                         {
                             IconButton(onClick = { folderPicker.launch(null) }) {
-                                Icon(FeatherIcons.Folder, contentDescription = "选择目录", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Icon(FeatherIcons.Folder, contentDescription = stringResource(R.string.remote_select_dir), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }
                     } else null
                 )
                 if (!isLocal) {
-                    OutlinedTextField(value = port, onValueChange = { port = it }, label = { Text("端口") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                    OutlinedTextField(value = username, onValueChange = { username = it }, label = { Text("用户名") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                    OutlinedTextField(value = port, onValueChange = { port = it }, label = { Text(stringResource(R.string.remote_port)) }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                    OutlinedTextField(value = username, onValueChange = { username = it }, label = { Text(stringResource(R.string.common_username)) }, singleLine = true, modifier = Modifier.fillMaxWidth())
                     OutlinedTextField(
                         value = password,
                         onValueChange = { password = it },
-                        label = { Text("密码") },
+                        label = { Text(stringResource(R.string.remote_password)) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                         visualTransformation = if (passwordVisible) androidx.compose.ui.text.input.VisualTransformation.None else androidx.compose.ui.text.input.PasswordVisualTransformation(),
                         trailingIcon = {
                             val image = if (passwordVisible) FeatherIcons.Eye else FeatherIcons.EyeOff
                             IconButton(onClick = { passwordVisible = !passwordVisible }) {
-                                Icon(image, "切换密码可见性", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Icon(image, stringResource(R.string.remote_toggle_password), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }
                     )
                 } else {
                     Text(
-                        text = "该目录作为镜像根目录。工作区会单向同步到这里，供只能访问普通目录的 App 使用。",
+                        text = stringResource(R.string.remote_internal_dir_desc),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -148,7 +150,7 @@ fun AddRemoteConnectionDialog(
                     if (isTesting) {
                         CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
                     } else {
-                        Text(if (isLocal) "测试目录" else "测试连通性")
+                        Text(if (isLocal) stringResource(R.string.remote_test_dir) else stringResource(R.string.remote_test_connection))
                     }
                 }
             }
@@ -157,12 +159,12 @@ fun AddRemoteConnectionDialog(
             Button(onClick = {
                 onAdd(name, host, port, username, password, protocol)
             }) {
-                Text(if (initialConnection != null) "保存" else "添加")
+                Text(if (initialConnection != null) stringResource(R.string.common_save) else stringResource(R.string.common_add))
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("取消", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(stringResource(R.string.common_cancel), color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     )
@@ -194,7 +196,7 @@ fun AddRemoteMountDialog(
         containerColor = MaterialTheme.colorScheme.surface,
         tonalElevation = 0.dp,
         onDismissRequest = onDismiss,
-        title = { Text(if (initialMount != null) "编辑工作区" else "添加工作区", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold) },
+        title = { Text(if (initialMount != null) stringResource(R.string.remote_edit_workspace) else stringResource(R.string.remote_add_workspace), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold) },
         text = {
             Column(
                 modifier = Modifier.verticalScroll(rememberScrollState()),
@@ -204,12 +206,12 @@ fun AddRemoteMountDialog(
                     expanded = connExpanded,
                     onExpandedChange = { connExpanded = !connExpanded }
                 ) {
-                    val selectedName = connections.find { it.id == selectedConnectionId }?.name ?: "选择远程通道"
+                    val selectedName = connections.find { it.id == selectedConnectionId }?.name ?: stringResource(R.string.remote_select_channel)
                     OutlinedTextField(
                         value = selectedName,
                         onValueChange = {},
                         readOnly = true,
-                        label = { Text("关联远程连接通道") },
+                        label = { Text(stringResource(R.string.remote_link_channel)) },
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = connExpanded) },
                         modifier = Modifier.fillMaxWidth().menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable)
                     )
@@ -237,7 +239,7 @@ fun AddRemoteMountDialog(
                     OutlinedTextField(
                         value = remotePath,
                         onValueChange = { remotePath = it },
-                        label = { Text(if (isLocalConnection) "镜像目标子目录" else "远程目标目录 (绝对路径)") },
+                        label = { Text(if (isLocalConnection) stringResource(R.string.remote_mount_subdir) else stringResource(R.string.remote_target_dir)) },
                         placeholder = if (isLocalConnection) {
                             { Text("/") }
                         } else {
@@ -251,13 +253,13 @@ fun AddRemoteMountDialog(
                         onClick = { showBrowser = true },
                         enabled = selectedConnectionId.isNotEmpty()
                     ) {
-                        Icon(FeatherIcons.Folder, contentDescription = "浏览目录", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Icon(FeatherIcons.Folder, contentDescription = stringResource(R.string.remote_browse_dir), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
 
                 if (isLocalConnection) {
                     Text(
-                        text = "本地通道的镜像根目录来自连接配置；这里填写根目录下的子目录，通常保持 / 即可。",
+                        text = stringResource(R.string.remote_local_channel_subdir_desc),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -267,12 +269,12 @@ fun AddRemoteMountDialog(
                     expanded = wsExpanded,
                     onExpandedChange = { wsExpanded = !wsExpanded }
                 ) {
-                    val selectedWsName = workspaces.find { it.path == selectedWorkspacePath }?.name ?: "选择本地工作区"
+                    val selectedWsName = workspaces.find { it.path == selectedWorkspacePath }?.name ?: stringResource(R.string.remote_select_local_workspace)
                     OutlinedTextField(
                         value = selectedWsName,
                         onValueChange = {},
                         readOnly = true,
-                        label = { Text("映射到本地工作区") },
+                        label = { Text(stringResource(R.string.remote_map_to_local)) },
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = wsExpanded) },
                         modifier = Modifier.fillMaxWidth().menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable)
                     )
@@ -294,7 +296,7 @@ fun AddRemoteMountDialog(
                 }
 
                 if (workspaces.isEmpty()) {
-                    Text("暂无本地工作区，请先在侧边栏创建一个。", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                    Text(stringResource(R.string.remote_no_local_workspace), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
                 }
 
                 Spacer(modifier = Modifier.height(4.dp))
@@ -304,8 +306,8 @@ fun AddRemoteMountDialog(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
-                        Text("应用启动时自动连接", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
-                        Text("开机自动连接并同步该工作区", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(stringResource(R.string.remote_auto_connect_on_start), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
+                        Text(stringResource(R.string.remote_auto_connect_and_sync), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     Switch(checked = autoConnect, onCheckedChange = { autoConnect = it })
                 }
@@ -318,12 +320,12 @@ fun AddRemoteMountDialog(
                 },
                 enabled = selectedWorkspacePath.isNotEmpty() && selectedConnectionId.isNotEmpty()
             ) {
-                Text(if (initialMount != null) "保存" else "添加工作区")
+                Text(if (initialMount != null) stringResource(R.string.common_save) else stringResource(R.string.remote_add_workspace))
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("取消", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(stringResource(R.string.common_cancel), color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     )
@@ -372,15 +374,15 @@ fun RemoteDirectoryBrowserDialog(
         containerColor = MaterialTheme.colorScheme.surface,
         tonalElevation = 0.dp,
         onDismissRequest = onDismiss,
-        title = { Text("选择远程目录") },
+        title = { Text(stringResource(R.string.remote_select_remote_dir)) },
         text = {
             Column(modifier = Modifier.fillMaxWidth().heightIn(min = 200.dp, max = 400.dp)) {
-                Text("当前路径: $currentPath", fontWeight = FontWeight.Bold)
+                Text(stringResource(R.string.remote_current_path, currentPath), fontWeight = FontWeight.Bold)
                 Spacer(modifier = Modifier.height(8.dp))
                 if (isLoading) {
                     CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
                 } else if (error != null) {
-                    Text("加载失败: $error", color = MaterialTheme.colorScheme.error)
+                    Text(stringResource(R.string.remote_load_failed, error!!), color = MaterialTheme.colorScheme.error)
                 } else {
                     LazyColumn {
                         if (currentPath != "/") {
@@ -391,7 +393,7 @@ fun RemoteDirectoryBrowserDialog(
                                 }) {
                                     Icon(FeatherIcons.Folder, contentDescription = null)
                                     Spacer(Modifier.width(8.dp))
-                                    Text(".. (上一级)")
+                                    Text(stringResource(R.string.remote_parent_dir))
                                 }
                             }
                         }
@@ -410,12 +412,12 @@ fun RemoteDirectoryBrowserDialog(
         },
         confirmButton = {
             Button(onClick = { onPathSelected(currentPath) }) {
-                Text("确认选择")
+                Text(stringResource(R.string.remote_confirm_select))
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("取消")
+                Text(stringResource(R.string.common_cancel))
             }
         }
     )

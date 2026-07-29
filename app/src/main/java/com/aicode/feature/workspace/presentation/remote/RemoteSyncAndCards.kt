@@ -15,6 +15,8 @@ import com.aicode.feature.workspace.domain.model.RemoteMount
 import com.aicode.feature.workspace.domain.model.RemoteProtocol
 import compose.icons.FeatherIcons
 import compose.icons.feathericons.*
+import androidx.compose.ui.res.stringResource
+import com.aicode.R
 
 @Composable
 fun SyncSettingsSection(
@@ -52,14 +54,14 @@ fun SyncSettingsSection(
                     )
                     Spacer(modifier = Modifier.width(16.dp))
                     Text(
-                        text = "目录/文件忽略列表",
+                        text = stringResource(R.string.sync_ignore_list),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Normal,
                         color = MaterialTheme.colorScheme.onSurface
                     )
                 }
                 Text(
-                    text = "多个规则请用英文逗号分隔。这些名称的目录及文件将不会被同步到远程服务器（如 node_modules）。",
+                    text = stringResource(R.string.sync_ignore_desc),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 4.dp, bottom = 12.dp)
@@ -68,17 +70,17 @@ fun SyncSettingsSection(
                     value = patternsText,
                     onValueChange = { patternsText = it },
                     modifier = Modifier.fillMaxWidth(),
-                    label = { Text("忽略规则") }
+                    label = { Text(stringResource(R.string.sync_ignore_rules)) }
                 )
                 Spacer(modifier = Modifier.height(12.dp))
                 Button(
                     onClick = {
                         onPatternsChange(patternsText)
-                        android.widget.Toast.makeText(context, "忽略规则已保存", android.widget.Toast.LENGTH_SHORT).show()
+                        android.widget.Toast.makeText(context, context.getString(R.string.sync_ignore_saved), android.widget.Toast.LENGTH_SHORT).show()
                     },
                     modifier = Modifier.align(Alignment.End)
                 ) {
-                    Text("保存规则")
+                    Text(stringResource(R.string.sync_save_rules))
                 }
             }
         }
@@ -106,13 +108,13 @@ fun SyncSettingsSection(
                     Spacer(modifier = Modifier.width(16.dp))
                     Column {
                         Text(
-                            text = "遵循 .gitignore 规则",
+                            text = stringResource(R.string.sync_follow_gitignore),
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Normal,
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
-                            text = "如果项目根目录存在 .gitignore，也会自动读取并忽略其中的文件与目录。",
+                            text = stringResource(R.string.sync_gitignore_desc),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(top = 4.dp)
@@ -123,7 +125,7 @@ fun SyncSettingsSection(
                     checked = useGitIgnore,
                     onCheckedChange = {
                         onUseGitIgnoreChange(it)
-                        android.widget.Toast.makeText(context, if (it) "已开启 .gitignore 过滤" else "已关闭 .gitignore 过滤", android.widget.Toast.LENGTH_SHORT).show()
+                        android.widget.Toast.makeText(context, if (it) context.getString(R.string.sync_gitignore_enabled) else context.getString(R.string.sync_gitignore_disabled), android.widget.Toast.LENGTH_SHORT).show()
                     }
                 )
             }
@@ -145,14 +147,14 @@ fun SyncSettingsSection(
                     )
                     Spacer(modifier = Modifier.width(16.dp))
                     Text(
-                        text = "单次最大同步队列数量",
+                        text = stringResource(R.string.sync_max_batch_size),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Normal,
                         color = MaterialTheme.colorScheme.onSurface
                     )
                 }
                 Text(
-                    text = "防止突发性大量文件修改同时请求服务端导致断开连接。超过此数量的操作将排队按批次执行（批次间稍作停顿）。",
+                    text = stringResource(R.string.sync_batch_size_desc),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 4.dp, bottom = 12.dp)
@@ -161,18 +163,18 @@ fun SyncSettingsSection(
                     value = maxBatchSizeText,
                     onValueChange = { maxBatchSizeText = it.filter { char -> char.isDigit() } },
                     modifier = Modifier.fillMaxWidth(),
-                    label = { Text("最大数量") }
+                    label = { Text(stringResource(R.string.sync_max_batch_count)) }
                 )
                 Spacer(modifier = Modifier.height(12.dp))
                 Button(
                     onClick = {
                         val size = maxBatchSizeText.toIntOrNull() ?: 50
                         onMaxSyncBatchSizeChange(size)
-                        android.widget.Toast.makeText(context, "最大队列数量已保存", android.widget.Toast.LENGTH_SHORT).show()
+                        android.widget.Toast.makeText(context, context.getString(R.string.sync_batch_size_saved), android.widget.Toast.LENGTH_SHORT).show()
                     },
                     modifier = Modifier.align(Alignment.End)
                 ) {
-                    Text("保存数量")
+                    Text(stringResource(R.string.sync_save_batch_size))
                 }
             }
         }
@@ -217,10 +219,10 @@ fun RemoteConnectionCard(
                 }
                 Row {
                     IconButton(onClick = { onEdit(conn) }) {
-                        Icon(FeatherIcons.Edit2, contentDescription = "编辑", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Icon(FeatherIcons.Edit2, contentDescription = stringResource(R.string.common_edit), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     IconButton(onClick = { onDelete(conn) }) {
-                        Icon(FeatherIcons.Trash2, contentDescription = "删除", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Icon(FeatherIcons.Trash2, contentDescription = stringResource(R.string.common_delete), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
             }
@@ -258,29 +260,29 @@ fun RemoteMountCard(
                         tint = MaterialTheme.colorScheme.onSurfaceVariant)
                     Spacer(modifier = Modifier.width(12.dp))
                     Column {
-                        Text(text = "通过: ${mount.connection?.name ?: "未知连接"}", fontWeight = FontWeight.Normal, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
+                        Text(text = stringResource(R.string.sync_via_connection, mount.connection?.name ?: stringResource(R.string.sync_unknown_connection)), fontWeight = FontWeight.Normal, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
                         if (mount.autoConnect) {
-                            Text(text = "自动连接", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+                            Text(text = stringResource(R.string.sync_auto_connect), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
                         }
                     }
                 }
                 Row {
                     IconButton(onClick = { onEdit(mount) }) {
-                        Icon(FeatherIcons.Edit2, contentDescription = "编辑", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Icon(FeatherIcons.Edit2, contentDescription = stringResource(R.string.common_edit), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     IconButton(onClick = { onDelete(mount) }) {
-                        Icon(FeatherIcons.Trash2, contentDescription = "删除", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Icon(FeatherIcons.Trash2, contentDescription = stringResource(R.string.common_delete), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
             }
 
             Spacer(modifier = Modifier.height(12.dp))
             Text(
-                text = if (isLocal) "镜像子目录: ${mount.remotePath}" else "远程路径: ${mount.remotePath}",
+                text = if (isLocal) stringResource(R.string.sync_mount_subdir, mount.remotePath) else stringResource(R.string.sync_remote_path, mount.remotePath),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            Text(text = "本地路径: ${mount.localMountPath}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(text = stringResource(R.string.sync_local_path, mount.localMountPath), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
 
             Spacer(modifier = Modifier.height(8.dp))
             Row(
@@ -289,19 +291,19 @@ fun RemoteMountCard(
             ) {
                 if (mount.isActive) {
                     TextButton(onClick = { onDisconnect(mount) }) {
-                        Text("断开连接")
+                        Text(stringResource(R.string.sync_disconnect))
                     }
                     TextButton(onClick = { onUpload(mount) }) {
-                        Text(if (isLocal) "同步全部" else "上传全部")
+                        Text(if (isLocal) stringResource(R.string.sync_all) else stringResource(R.string.sync_upload_all))
                     }
                     if (!isLocal) {
                         TextButton(onClick = { onDownload(mount) }) {
-                            Text("下载全部")
+                            Text(stringResource(R.string.sync_download_all))
                         }
                     }
                 } else {
                     Button(onClick = { onConnect(mount) }) {
-                        Text("连接并同步")
+                        Text(stringResource(R.string.sync_connect_and_sync))
                     }
                 }
             }

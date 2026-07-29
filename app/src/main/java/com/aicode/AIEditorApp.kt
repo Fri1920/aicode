@@ -11,6 +11,7 @@ import com.aicode.feature.agent.domain.container.ContainerInstaller
 import com.aicode.feature.credentials.data.GitCredentialsFileSync
 import com.aicode.feature.agent.domain.mcp.McpManager
 import com.aicode.feature.settings.data.repository.KeepaliveSettingsRepository
+import com.aicode.feature.settings.data.repository.LanguageSettingsRepository
 import com.aicode.feature.settings.data.repository.LogSettingsRepository
 import com.aicode.feature.terminal.domain.TerminalKeepaliveService
 import dagger.hilt.android.HiltAndroidApp
@@ -28,6 +29,21 @@ class AIEditorApp : Application() {
 
     private companion object {
         const val TAG = "AIEditorApp"
+        const val LANG_PREFS = "language_prefs_sync"
+        const val LANG_KEY = "language_tag"
+    }
+
+    override fun attachBaseContext(base: android.content.Context) {
+        val tag = base.getSharedPreferences(LANG_PREFS, android.content.Context.MODE_PRIVATE)
+            .getString(LANG_KEY, null)
+        val context = if (tag.isNullOrBlank()) {
+            base
+        } else {
+            val config = android.content.res.Configuration(base.resources.configuration)
+            config.setLocale(java.util.Locale.forLanguageTag(tag))
+            base.createConfigurationContext(config)
+        }
+        super.attachBaseContext(context)
     }
 
     /** Hilt 字段注入：在 [onCreate] 的 super 调用后即可用。 */
@@ -55,6 +71,10 @@ class AIEditorApp : Application() {
     /** 执行模式仓库（本地 PRoot / 远程 SSH）。 */
     @Inject
     lateinit var executionModeRepository: com.aicode.feature.settings.data.repository.ExecutionModeRepository
+
+    /** 应用语言偏好仓库：持久化用户选择的语言，供 attachBaseContext 同步读取。 */
+    @Inject
+    lateinit var languageSettings: LanguageSettingsRepository
 
     /** 执行模式同步缓存：启动时从 DataStore 读首帧注入 DI。 */
     @Inject
@@ -147,6 +167,10 @@ class AIEditorApp : Application() {
         }
         // 连接已配置的 MCP server，把其工具注册进 ToolRegistry（内部自有 scope，失败不影响启动）。
         mcpManager.start()
+        // 语言切换由 MainActivity 的 attachBaseContext + recreate() 统一管理。
+        // MainActivity 继承 ComponentActivity（非 AppCompatActivity），
+        // AppCompatDelegate.setApplicationLocales 的自动 recreate 不生效，
+        // 且两者同时设置 locale 会竞争导致偶发语言错乱。
     }
 
     /**

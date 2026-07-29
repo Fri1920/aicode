@@ -60,6 +60,10 @@ import compose.icons.feathericons.Edit3
 import compose.icons.feathericons.Plus
 import compose.icons.feathericons.RefreshCw
 import compose.icons.feathericons.Trash2
+import android.content.Context
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import com.aicode.R
 
 /**
  * 容器镜像二级页：列出内置与自定义 profile，单选切换；新建（本地镜像导入 tar.gz + 填启动参数，或远程 SSH 复用工作区通道）；
@@ -80,6 +84,7 @@ internal fun ContainerSection(
     onResetBuiltin: () -> Unit = {},
     remoteConnections: List<RemoteConnection> = emptyList()
 ) {
+    val context = LocalContext.current
     var showAddSheet by remember { mutableStateOf(false) }
     var editingProfile by remember { mutableStateOf<ContainerProfile?>(null) }
     var deletingProfile by remember { mutableStateOf<ContainerProfile?>(null) }
@@ -93,7 +98,7 @@ internal fun ContainerSection(
     ) {
         item {
             Text(
-                text = "选择一个容器镜像作为命令执行后端。本地镜像走 PRoot 容器，远程 SSH 镜像连接远程服务器执行命令。",
+                text = stringResource(R.string.container_section_desc),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(bottom = Spacing.sm)
@@ -129,14 +134,14 @@ internal fun ContainerSection(
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
-                            text = profileSubtitle(profile, remoteConnections),
+                            text = profileSubtitle(context, profile, remoteConnections),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(top = Spacing.xs)
                         )
                         if (profile.mode == ExecutionMode.LOCAL_PROOT && profile.extraBindings.isNotEmpty()) {
                             Text(
-                                text = "绑定: ${profile.extraBindings.joinToString(" ")}",
+                                text = stringResource(R.string.container_bindings, profile.extraBindings.joinToString(" ")),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -146,14 +151,14 @@ internal fun ContainerSection(
                         IconButton(onClick = { editingProfile = profile }) {
                             Icon(
                                 imageVector = FeatherIcons.Edit3,
-                                contentDescription = "编辑",
+                                contentDescription = stringResource(R.string.common_edit),
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                         IconButton(onClick = { deletingProfile = profile }) {
                             Icon(
                                 imageVector = FeatherIcons.Trash2,
-                                contentDescription = "删除",
+                                contentDescription = stringResource(R.string.common_delete),
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
@@ -161,7 +166,7 @@ internal fun ContainerSection(
                         IconButton(onClick = { pendingReset = true }) {
                             Icon(
                                 imageVector = FeatherIcons.RefreshCw,
-                                contentDescription = "重置",
+                                contentDescription = stringResource(R.string.container_reset),
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
@@ -190,7 +195,7 @@ internal fun ContainerSection(
                         tint = MaterialTheme.colorScheme.primary
                     )
                     Text(
-                        text = "添加镜像",
+                        text = stringResource(R.string.container_add_image),
                         style = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.primary
                     )
@@ -208,9 +213,9 @@ internal fun ContainerSection(
                 val id = "custom-${System.currentTimeMillis()}"
                 onSaveCustom(
                     if (profile.mode == ExecutionMode.REMOTE_SSH) {
-                        profile.copy(id = id, name = profile.name.ifBlank { "远程 SSH" })
+                        profile.copy(id = id, name = profile.name.ifBlank { context.getString(R.string.container_remote_ssh) })
                     } else {
-                        profile.copy(id = id, name = profile.name.ifBlank { "自定义镜像" })
+                        profile.copy(id = id, name = profile.name.ifBlank { context.getString(R.string.container_custom_image) })
                     }
                 )
                 showAddSheet = false
@@ -233,62 +238,62 @@ internal fun ContainerSection(
     deletingProfile?.let { deleting ->
         AlertDialog(
             onDismissRequest = { deletingProfile = null },
-            title = { Text("删除镜像配置") },
-            text = { Text("确定删除「${deleting.name}」？${if (deleting.mode == ExecutionMode.LOCAL_PROOT && !deleting.isBuiltin) "其 rootfs 目录会被一并清除。" else ""}内置 Alpine 不受影响。") },
+            title = { Text(stringResource(R.string.container_delete_config)) },
+            text = { Text(stringResource(R.string.container_delete_confirm, deleting.name, if (deleting.mode == ExecutionMode.LOCAL_PROOT && !deleting.isBuiltin) stringResource(R.string.container_rootfs_will_be_cleared) else "")) },
             confirmButton = {
                 TextButton(onClick = {
                     onDeleteCustom(deleting)
                     deletingProfile = null
-                }) { Text("删除") }
+                }) { Text(stringResource(R.string.common_delete)) }
             },
-            dismissButton = { TextButton(onClick = { deletingProfile = null }) { Text("取消") } }
+            dismissButton = { TextButton(onClick = { deletingProfile = null }) { Text(stringResource(R.string.common_cancel)) } }
         )
     }
 
     pendingSwitch?.let { target ->
         AlertDialog(
             onDismissRequest = { pendingSwitch = null },
-            title = { Text("切换容器镜像") },
-            text = { Text("切换到「${target.name}」后，当前正在运行的 AI 会话将被停止、终端标签将被关闭。是否继续切换？") },
+            title = { Text(stringResource(R.string.container_switch_image)) },
+            text = { Text(stringResource(R.string.container_switch_confirm, target.name)) },
             confirmButton = {
                 TextButton(onClick = {
                     onSwitchConfirmed()
                     onSelect(target.id)
                     pendingSwitch = null
-                }) { Text("切换") }
+                }) { Text(stringResource(R.string.common_switch)) }
             },
-            dismissButton = { TextButton(onClick = { pendingSwitch = null }) { Text("取消") } }
+            dismissButton = { TextButton(onClick = { pendingSwitch = null }) { Text(stringResource(R.string.common_cancel)) } }
         )
     }
 
     if (pendingReset) {
         AlertDialog(
             onDismissRequest = { pendingReset = false },
-            title = { Text("重置内置容器") },
-            text = { Text("将删除内置 Alpine 容器的 rootfs 目录（含已安装的工具与配置），下次启动容器时会重新解压并初始化。是否继续？") },
+            title = { Text(stringResource(R.string.container_reset_builtin)) },
+            text = { Text(stringResource(R.string.container_reset_confirm)) },
             confirmButton = {
                 TextButton(onClick = {
                     onResetBuiltin()
                     pendingReset = false
-                }) { Text("重置") }
+                }) { Text(stringResource(R.string.container_reset)) }
             },
-            dismissButton = { TextButton(onClick = { pendingReset = false }) { Text("取消") } }
+            dismissButton = { TextButton(onClick = { pendingReset = false }) { Text(stringResource(R.string.common_cancel)) } }
         )
     }
 }
 
 /** 镜像列表项副标题：按 mode 与来源类型描述。 */
-private fun profileSubtitle(profile: ContainerProfile, connections: List<RemoteConnection>): String {
+private fun profileSubtitle(context: Context, profile: ContainerProfile, connections: List<RemoteConnection>): String {
     return when {
-        profile.isBuiltin -> "内置镜像 · 自动 (bash/sh)"
+        profile.isBuiltin -> context.getString(R.string.container_builtin_auto)
         profile.mode == ExecutionMode.REMOTE_SSH -> {
             val ssh = profile.rootfsSource as? RootfsSource.RemoteSsh
             val connName = ssh?.connectionId?.let { cid -> connections.firstOrNull { it.id == cid }?.name }
-            "远程 SSH · ${connName ?: "通道已删除"} · ${ssh?.remoteWorkspacePath ?: ""}"
+            context.getString(R.string.container_remote_ssh_desc, connName ?: context.getString(R.string.container_channel_deleted), ssh?.remoteWorkspacePath ?: "")
         }
         else -> {
             val shellDesc = profile.shellPath?.ifBlank { null } ?: "/bin/sh"
-            "导入的 tar.gz · shell: $shellDesc"
+            context.getString(R.string.container_imported_desc, shellDesc)
         }
     }
 }
@@ -341,7 +346,7 @@ private fun ProfileEditSheet(
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Text(
-                text = if (initial == null) "添加镜像" else "编辑镜像",
+                text = if (initial == null) stringResource(R.string.container_add_image) else stringResource(R.string.container_edit_image),
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.onSurface
             )
@@ -351,18 +356,18 @@ private fun ProfileEditSheet(
                     selected = mode == ExecutionMode.LOCAL_PROOT,
                     onClick = { mode = ExecutionMode.LOCAL_PROOT },
                     shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
-                ) { Text("本地镜像") }
+                ) { Text(stringResource(R.string.container_local_image)) }
                 SegmentedButton(
                     selected = mode == ExecutionMode.REMOTE_SSH,
                     onClick = { mode = ExecutionMode.REMOTE_SSH },
                     shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
-                ) { Text("远程 SSH") }
+                ) { Text(stringResource(R.string.container_remote_ssh)) }
             }
 
             OutlinedTextField(
                 value = name,
                 onValueChange = { name = it },
-                label = { Text("名称") },
+                label = { Text(stringResource(R.string.common_name)) },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth()
             )
@@ -371,21 +376,21 @@ private fun ProfileEditSheet(
                 OutlinedTextField(
                     value = shellPath,
                     onValueChange = { shellPath = it },
-                    label = { Text("shell 路径（如 /bin/sh、/bin/bash）") },
+                    label = { Text(stringResource(R.string.container_shell_path)) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
                 OutlinedTextField(
                     value = bindingsText,
                     onValueChange = { bindingsText = it },
-                    label = { Text("额外绑定（空格分隔，如 /sdcard:/mnt）") },
+                    label = { Text(stringResource(R.string.container_extra_bindings)) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
                 OutlinedTextField(
                     value = argsText,
                     onValueChange = { argsText = it },
-                    label = { Text("额外 proot 参数（空格分隔）") },
+                    label = { Text(stringResource(R.string.container_extra_proot_args)) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -395,14 +400,14 @@ private fun ProfileEditSheet(
                 ) {
                     Text(
                         pickedUri?.let {
-                            if (it == initialUri) "已导入（点此重新选择）" else "已选择文件"
-                        } ?: "选择 tar.gz / tgz / tar.xz / txz 镜像文件"
+                            if (it == initialUri) stringResource(R.string.container_imported_click) else stringResource(R.string.container_file_selected)
+                        } ?: stringResource(R.string.container_select_image_file)
                     )
                 }
             } else {
                 if (sshConnections.isEmpty()) {
                     Text(
-                        text = "暂无可用的 SFTP 通道，请先在「远程服务器」页配置一个 SFTP 连接通道。",
+                        text = stringResource(R.string.container_no_sftp_channel),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.error
                     )
@@ -412,12 +417,12 @@ private fun ProfileEditSheet(
                         onExpandedChange = { connExpanded = !connExpanded }
                     ) {
                         val selectedName = sshConnections.firstOrNull { it.id == selectedConnId }?.name
-                            ?: "选择 SSH 通道"
+                            ?: stringResource(R.string.container_select_ssh_channel)
                         OutlinedTextField(
                             value = selectedName,
                             onValueChange = {},
                             readOnly = true,
-                            label = { Text("SSH 连接通道") },
+                            label = { Text(stringResource(R.string.container_ssh_channel)) },
                             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = connExpanded) },
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -444,13 +449,13 @@ private fun ProfileEditSheet(
                     OutlinedTextField(
                         value = remotePath,
                         onValueChange = { remotePath = it },
-                        label = { Text("远程工作区路径") },
+                        label = { Text(stringResource(R.string.container_remote_workspace_path)) },
                         placeholder = { Text("/home/user/workspace") },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
                     Text(
-                        text = "AI 的 ~/workspace 将映射到此远程路径。命令执行走 SSH exec，文件读写走 SFTP。",
+                        text = stringResource(R.string.container_remote_workspace_desc),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -463,7 +468,7 @@ private fun ProfileEditSheet(
                 horizontalArrangement = Arrangement.End,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                TextButton(onClick = onDismiss) { Text("取消") }
+                TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_cancel)) }
                 Spacer(Modifier.width(Spacing.sm))
                 Button(
                     onClick = {
@@ -480,7 +485,7 @@ private fun ProfileEditSheet(
                         if (profile != null) onConfirm(profile)
                     },
                     enabled = canConfirm(mode, pickedUri, selectedConnId, sshConnections)
-                ) { Text(if (initial == null) "添加" else "保存") }
+                ) { Text(if (initial == null) stringResource(R.string.common_add) else stringResource(R.string.common_save)) }
             }
         }
     }

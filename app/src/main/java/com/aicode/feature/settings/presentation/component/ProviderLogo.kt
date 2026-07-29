@@ -18,6 +18,9 @@ import com.aicode.feature.settings.domain.model.AIProviderConfig
 import compose.icons.FeatherIcons
 import compose.icons.feathericons.Cloud
 import compose.icons.feathericons.Cpu
+import android.content.Context
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 
 /**
  * 根据 provider 的 baseUrl 与 name 匹配品牌 logo drawable 资源。
@@ -66,17 +69,17 @@ fun modelBrandKey(modelName: String): String {
 }
 
 /** 品牌 key → 用户可见的显示名称 */
-fun brandDisplayName(key: String): String = when (key) {
-    "doubao" -> "豆包"
+fun brandDisplayName(context: Context, key: String): String = when (key) {
+    "doubao" -> context.getString(R.string.provider_brand_doubao)
     "moonshot" -> "Moonshot"
-    "zhipu" -> "智谱"
-    "qwen" -> "通义千问"
+    "zhipu" -> context.getString(R.string.provider_brand_zhipu)
+    "qwen" -> context.getString(R.string.provider_brand_tongyi_qianwen)
     "deepseek" -> "DeepSeek"
     "grok" -> "Grok"
     "anthropic" -> "Anthropic"
     "gemini" -> "Gemini"
     "openai" -> "OpenAI"
-    "other" -> "其他"
+    "other" -> context.getString(R.string.common_other)
     else -> key.replaceFirstChar { it.uppercase() }
 }
 
@@ -121,7 +124,7 @@ fun ProviderLogoIcon(
     } else {
         Icon(
             imageVector = FeatherIcons.Cloud,
-            contentDescription = "AI 提供商",
+            contentDescription = stringResource(R.string.common_ai_providers),
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = modifier.size(size)
         )
@@ -149,7 +152,7 @@ fun ModelLogoIcon(
     } else {
         Icon(
             imageVector = FeatherIcons.Cpu,
-            contentDescription = "模型图标",
+            contentDescription = stringResource(R.string.provider_model_icon),
             tint = Brand.IconGray,
             modifier = modifier.size(size)
         )
@@ -166,17 +169,18 @@ fun BrandLogoIcon(
     modifier: Modifier = Modifier,
     size: Dp = 22.dp
 ) {
+    val context = LocalContext.current
     val res = brandLogoRes(brandKey)
     if (res != null) {
         Image(
             painter = painterResource(res),
-            contentDescription = brandDisplayName(brandKey),
+            contentDescription = brandDisplayName(context, brandKey),
             modifier = modifier.size(size)
         )
     } else {
         Icon(
             imageVector = FeatherIcons.Cpu,
-            contentDescription = brandDisplayName(brandKey),
+            contentDescription = brandDisplayName(context, brandKey),
             tint = Brand.IconGray,
             modifier = modifier.size(size)
         )

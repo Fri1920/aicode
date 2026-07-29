@@ -77,6 +77,8 @@ import compose.icons.feathericons.Settings
 import compose.icons.feathericons.Square
 import compose.icons.feathericons.X
 import java.util.Base64
+import androidx.compose.ui.res.stringResource
+import com.aicode.R
 
 @Composable
 internal fun ChatInputBar(
@@ -192,7 +194,7 @@ internal fun ChatInputBar(
                         .heightIn(min = 44.dp, max = 140.dp),
                     placeholder = {
                         Text(
-                            "输入消息与 AI 聊天…",
+                            stringResource(R.string.chat_input_placeholder),
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     },
@@ -271,14 +273,14 @@ internal fun ChatInputBar(
                         UploadIconButton(
                             enabled = canUploadFiles && !isBusy,
                             icon = FeatherIcons.FileText,
-                            contentDescription = "上传文件",
+                            contentDescription = stringResource(R.string.chat_upload_file),
                             onClick = onUploadFile
                         )
 
                         UploadIconButton(
                             enabled = canUploadImages && !isBusy,
                             icon = FeatherIcons.Image,
-                            contentDescription = "上传图片",
+                            contentDescription = stringResource(R.string.chat_upload_image),
                             onClick = onUploadImage
                         )
                     }
@@ -344,7 +346,7 @@ private fun PendingAttachmentPreviewItem(
                 ) {
                     Icon(
                         FeatherIcons.X,
-                        contentDescription = "移除附件",
+                        contentDescription = stringResource(R.string.chat_remove_attachment),
                         tint = MaterialTheme.colorScheme.onSurface,
                         modifier = Modifier.size(14.dp)
                     )
@@ -378,7 +380,7 @@ private fun ImageThumbnail(
         if (bitmap != null) {
             ComposeImage(
                 bitmap = bitmap,
-                contentDescription = attachment.fileName.ifBlank { "图片预览" },
+                contentDescription = attachment.fileName.ifBlank { stringResource(R.string.common_image_preview) },
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize()
             )
@@ -523,7 +525,7 @@ internal fun ModelSheet(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "模型",
+                    text = stringResource(R.string.common_model),
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier.weight(1f)
@@ -531,13 +533,13 @@ internal fun ModelSheet(
                 TextButton(onClick = onManage) {
                     Icon(FeatherIcons.Settings, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(Spacing.xs))
-                    Text("管理")
+                    Text(stringResource(R.string.chat_manage))
                 }
             }
 
             if (providers.all { it.models.isEmpty() }) {
                 Text(
-                    "暂无可用模型，请在「管理」中添加",
+                    stringResource(R.string.chat_no_models_hint),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(vertical = Spacing.md)
@@ -604,7 +606,7 @@ internal fun ModelRow(
         if (selected) {
             Icon(
                 FeatherIcons.Check,
-                contentDescription = "当前",
+                contentDescription = stringResource(R.string.common_current),
                 tint = Brand.IconGray,
                 modifier = Modifier.size(20.dp)
             )
@@ -656,14 +658,14 @@ internal fun SendButton(canSend: Boolean, isBusy: Boolean, tokenProgress: Float,
             if (isBusy) {
                 Icon(
                     FeatherIcons.Square,
-                    contentDescription = "停止",
+                    contentDescription = stringResource(R.string.chat_stop),
                     tint = iconTint,
                     modifier = Modifier.size(18.dp)
                 )
             } else {
                 Icon(
                     FeatherIcons.ArrowUp,
-                    contentDescription = "发送",
+                    contentDescription = stringResource(R.string.chat_send),
                     tint = iconTint,
                     modifier = Modifier.size(18.dp)
                 )
@@ -735,9 +737,9 @@ internal fun ToolPermissionPanel(
 
             val canRemember = request.rememberablePatterns.isNotEmpty()
             val rememberLabel = when {
-                !canRemember -> request.rememberDisabledReason ?: "含命令替换/管道/重定向，无法记住，仅可单次放行"
-                request.rememberablePatterns == listOf("*") -> "「始终允许」将在本项目记住：该工具的全部调用"
-                else -> "「始终允许」将在本项目记住：" + request.rememberablePatterns.joinToString("、")
+                !canRemember -> request.rememberDisabledReason ?: stringResource(R.string.chat_perm_single_use_desc)
+                request.rememberablePatterns == listOf("*") -> stringResource(R.string.chat_perm_always_tool_desc)
+                else -> stringResource(R.string.chat_perm_always_prefix) + request.rememberablePatterns.joinToString("、")
             }
             Spacer(Modifier.height(Spacing.sm))
             Text(
@@ -749,20 +751,20 @@ internal fun ToolPermissionPanel(
             Spacer(Modifier.height(Spacing.sm))
             Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
                 AgentActionButton(
-                    text = "拒绝",
+                    text = stringResource(R.string.chat_perm_deny),
                     onClick = { onChoice(PermissionChoice.REJECT) },
                     modifier = Modifier.weight(1f),
                     tone = AgentActionTone.Danger
                 )
                 AgentActionButton(
-                    text = "始终允许",
+                    text = stringResource(R.string.chat_perm_always_allow),
                     onClick = { onChoice(PermissionChoice.ALWAYS) },
                     modifier = Modifier.weight(1f),
                     enabled = canRemember,
                     tone = AgentActionTone.Neutral
                 )
                 AgentActionButton(
-                    text = "允许",
+                    text = stringResource(R.string.common_allow),
                     onClick = { onChoice(PermissionChoice.ONCE) },
                     modifier = Modifier.weight(1f),
                     tone = AgentActionTone.Success
@@ -788,7 +790,7 @@ internal fun StatusBanner(state: com.aicode.feature.agent.presentation.AgentUISt
             )
 
             is com.aicode.feature.agent.presentation.AgentUIState.Applied -> InfoBanner(
-                text = "代码变更已应用",
+                text = stringResource(R.string.chat_code_changes_applied),
                 container = MaterialTheme.colorScheme.primaryContainer,
                 content = MaterialTheme.colorScheme.onPrimaryContainer,
                 icon = FeatherIcons.Check
@@ -840,7 +842,7 @@ fun ChangePreviewPanel(
     ) {
         Column(modifier = Modifier.padding(Spacing.md)) {
             Text(
-                "预览代码变更 · ${changes.size} 处",
+                stringResource(R.string.chat_preview_changes, changes.size),
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSurface
             )
@@ -857,13 +859,13 @@ fun ChangePreviewPanel(
 
             Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
                 AgentActionButton(
-                    text = "拒绝",
+                    text = stringResource(R.string.chat_perm_deny),
                     onClick = onReject,
                     modifier = Modifier.weight(1f),
                     tone = AgentActionTone.Danger
                 )
                 AgentActionButton(
-                    text = "应用",
+                    text = stringResource(R.string.chat_apply),
                     onClick = onApply,
                     modifier = Modifier.weight(1f),
                     tone = AgentActionTone.Success
@@ -935,7 +937,7 @@ internal fun PlanApprovalPanel(
                 )
                 Spacer(Modifier.width(Spacing.sm))
                 Text(
-                    text = "计划已完成",
+                    text = stringResource(R.string.chat_plan_completed),
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.onSurface,
                     fontWeight = FontWeight.SemiBold
@@ -954,13 +956,13 @@ internal fun PlanApprovalPanel(
             Spacer(Modifier.height(Spacing.md))
             Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
                 AgentActionButton(
-                    text = "继续反馈",
+                    text = stringResource(R.string.chat_continue_feedback),
                     onClick = onRefine,
                     modifier = Modifier.weight(1f),
                     tone = AgentActionTone.Neutral
                 )
                 AgentActionButton(
-                    text = "批准并实施",
+                    text = stringResource(R.string.chat_approve_and_implement),
                     onClick = onApprove,
                     modifier = Modifier.weight(1f),
                     tone = AgentActionTone.Success

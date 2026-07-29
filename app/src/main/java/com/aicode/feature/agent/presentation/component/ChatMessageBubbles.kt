@@ -97,6 +97,8 @@ import compose.icons.feathericons.Star
 import compose.icons.feathericons.FileText
 import compose.icons.feathericons.Image
 import kotlinx.coroutines.delay
+import androidx.compose.ui.res.stringResource
+import com.aicode.R
 
 internal class MarkdownRenderCache(
     private val maxEntries: Int = 80
@@ -228,7 +230,7 @@ internal fun AgentMessageItem(
                         ) {
                             Icon(
                                 if (copied) FeatherIcons.Check else FeatherIcons.Copy,
-                                contentDescription = if (copied) "已复制" else "复制",
+                                contentDescription = if (copied) stringResource(R.string.chat_copied) else stringResource(R.string.chat_copy),
                                 modifier = Modifier.size(14.dp),
                             )
                         }
@@ -300,7 +302,7 @@ private fun MessageImagePreview(attachment: AgentAttachment) {
     if (bitmap != null) {
         ComposeImage(
             bitmap = bitmap,
-            contentDescription = attachment.fileName.ifBlank { "图片预览" },
+            contentDescription = attachment.fileName.ifBlank { stringResource(R.string.common_image_preview) },
             contentScale = ContentScale.Crop,
             modifier = Modifier.fillMaxSize()
         )
@@ -374,7 +376,7 @@ private fun BackgroundNotificationBar(message: AgentUIMessage) {
         .find(content)?.groupValues?.getOrNull(1)?.trim()
     val isSuccess = status == "completed"
     val dotColor = if (isSuccess) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.error
-    val label = if (summary.isNullOrEmpty()) "后台命令已完成" else summary
+    val label = if (summary.isNullOrEmpty()) stringResource(R.string.chat_bg_command_done) else summary
 
     Surface(
         shape = RoundedCornerShape(Radius.md),
@@ -414,7 +416,7 @@ private fun CompactionDivider() {
     ) {
         HorizontalDivider(modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.outlineVariant)
         Text(
-            text = "上下文已压缩",
+            text = stringResource(R.string.chat_context_compressed),
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             style = MaterialTheme.typography.labelSmall
         )
@@ -620,7 +622,7 @@ internal fun CompactionProgressBubble() {
                 horizontalArrangement = Arrangement.spacedBy(Spacing.sm)
             ) {
                 Text(
-                    text = "正在压缩上下文",
+                    text = stringResource(R.string.chat_compressing_context),
                     color = MaterialTheme.colorScheme.onSurface,
                     style = MaterialTheme.typography.bodyMedium
                 )
@@ -648,7 +650,7 @@ internal fun RetryingBubble(attempt: Int, maxRetries: Int) {
                 horizontalArrangement = Arrangement.spacedBy(Spacing.sm)
             ) {
                 Text(
-                    text = "网络波动，正在重试 $attempt/$maxRetries",
+                    text = stringResource(R.string.chat_retrying, attempt, maxRetries),
                     color = MaterialTheme.colorScheme.onSurface,
                     style = MaterialTheme.typography.bodyMedium
                 )
@@ -737,14 +739,14 @@ internal fun ReasoningBubble(
                     )
                     Spacer(Modifier.width(Spacing.sm))
                     Text(
-                        text = "思考过程",
+                        text = stringResource(R.string.chat_thinking_process),
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.weight(1f)
                     )
                     Icon(
                         if (effectiveExpanded) FeatherIcons.ChevronUp else FeatherIcons.ChevronDown,
-                        contentDescription = if (effectiveExpanded) "折叠" else "展开",
+                        contentDescription = if (effectiveExpanded) stringResource(R.string.common_collapse) else stringResource(R.string.common_expand),
                         tint = Brand.IconGray,
                         modifier = Modifier.size(18.dp)
                     )
@@ -781,13 +783,13 @@ internal fun ReasoningBubble(
                     ) {
                         Icon(
                             FeatherIcons.ChevronDown,
-                            contentDescription = "展开",
+                            contentDescription = stringResource(R.string.common_expand),
                             tint = Brand.IconGray,
                             modifier = Modifier.size(16.dp)
                         )
                         Spacer(Modifier.width(Spacing.xs))
                         Text(
-                            text = "展开剩余 $hidden 行",
+                            text = stringResource(R.string.chat_expand_remaining, hidden),
                             color = MaterialTheme.colorScheme.primary,
                             style = MaterialTheme.typography.labelMedium,
                             fontWeight = FontWeight.Medium

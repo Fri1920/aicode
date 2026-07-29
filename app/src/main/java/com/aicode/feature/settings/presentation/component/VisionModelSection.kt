@@ -32,6 +32,8 @@ import com.aicode.feature.settings.domain.model.AIProviderConfig
 import com.aicode.feature.settings.domain.model.ModelMetadata
 import compose.icons.FeatherIcons
 import compose.icons.feathericons.Check
+import androidx.compose.ui.res.stringResource
+import com.aicode.R
 
 /**
  * 识图模型二级页：选择一个用于识图（viewImage）兜底的专用模型，或选择「跟随当前聊天模型」。
@@ -79,13 +81,13 @@ internal fun VisionModelSection(
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = "跟随当前聊天模型",
+                            text = stringResource(R.string.vision_follow_chat_model),
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Normal,
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
-                            text = "识图始终用当前选中的聊天模型；当其不支持 Vision 时识图不可用。",
+                            text = stringResource(R.string.vision_follow_desc),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(top = Spacing.xs)
@@ -106,7 +108,7 @@ internal fun VisionModelSection(
         if (providers.none { it.isEnabled && it.models.isNotEmpty() }) {
             item {
                 Text(
-                    text = "暂无可用模型。请在「AI 提供商」中添加并配置模型后再选识图专用模型。",
+                    text = stringResource(R.string.vision_no_models),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(Spacing.md)
@@ -171,7 +173,7 @@ private fun VisionModelRow(
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
-                    text = if (supportsVision) "支持图片输入" else "不支持图片输入（不推荐用于识图）",
+                    text = if (supportsVision) stringResource(R.string.vision_supports_images) else stringResource(R.string.vision_no_image_support),
                     style = MaterialTheme.typography.bodySmall,
                     color = if (supportsVision) MaterialTheme.colorScheme.onSurfaceVariant
                     else MaterialTheme.colorScheme.error,

@@ -24,6 +24,8 @@ import androidx.compose.ui.text.input.VisualTransformation
 import com.aicode.core.theme.Spacing
 import compose.icons.FeatherIcons
 import compose.icons.feathericons.*
+import androidx.compose.ui.res.stringResource
+import com.aicode.R
 
 /**
  * 拉取/推送缺 https 凭据时的登录弹窗。host 只读预填，用户填 username/token；填完确认回调回填，
@@ -50,13 +52,13 @@ fun CredentialPromptDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("需要 $host 的登录凭据") },
+        title = { Text(stringResource(R.string.credential_prompt_title, host)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
                 OutlinedTextField(
                     value = host,
                     onValueChange = { /* host 来自 remote，只读 */ },
-                    label = { Text("远程主机") },
+                    label = { Text(stringResource(R.string.credential_remote_host)) },
                     singleLine = true,
                     readOnly = true,
                     modifier = Modifier.fillMaxWidth()
@@ -64,14 +66,14 @@ fun CredentialPromptDialog(
                 OutlinedTextField(
                     value = username,
                     onValueChange = { username = it },
-                    label = { Text("用户名") },
+                    label = { Text(stringResource(R.string.common_username)) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
                 OutlinedTextField(
                     value = token,
                     onValueChange = { token = it },
-                    label = { Text("访问令牌 Token / PAT") },
+                    label = { Text(stringResource(R.string.credential_token)) },
                     singleLine = true,
                     visualTransformation = if (tokenVisible) VisualTransformation.None else PasswordVisualTransformation(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
@@ -79,14 +81,14 @@ fun CredentialPromptDialog(
                         IconButton(onClick = { tokenVisible = !tokenVisible }) {
                             Icon(
                                 if (tokenVisible) FeatherIcons.EyeOff else FeatherIcons.Eye,
-                                contentDescription = if (tokenVisible) "隐藏" else "显示"
+                                contentDescription = if (tokenVisible) stringResource(R.string.common_hide) else stringResource(R.string.common_show)
                             )
                         }
                     },
                     modifier = Modifier.fillMaxWidth()
                 )
                 Text(
-                    text = "填完即保存并自动重试。该凭据同时会保存到容器内 git，终端与 AI 执行裸 git 命令时也可直接使用。",
+                    text = stringResource(R.string.credential_prompt_desc),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -96,8 +98,8 @@ fun CredentialPromptDialog(
             TextButton(
                 onClick = { if (canSave) onConfirm(username.trim(), token) },
                 enabled = canSave
-            ) { Text("保存并重试") }
+            ) { Text(stringResource(R.string.credential_save_and_retry)) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } }
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_cancel)) } }
     )
 }

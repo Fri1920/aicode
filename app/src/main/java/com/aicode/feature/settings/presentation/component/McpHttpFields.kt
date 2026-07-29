@@ -29,6 +29,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import compose.icons.FeatherIcons
 import compose.icons.feathericons.*
+import androidx.compose.ui.res.stringResource
+import com.aicode.R
 
 /** HTTP 形态字段：URL + 请求头键值对（按照卡片排版规范）。 */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -40,14 +42,14 @@ internal fun McpHttpFields(
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Text(
-            text = "服务器地址",
+            text = stringResource(R.string.mcp_server_url),
             style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         OutlinedTextField(
             value = url,
             onValueChange = onUrlChange,
-            placeholder = { Text("例如：https://api.example.com/sse") },
+            placeholder = { Text(stringResource(R.string.mcp_server_url_hint)) },
             singleLine = true,
             shape = RoundedCornerShape(12.dp),
             modifier = Modifier.fillMaxWidth()
@@ -57,14 +59,14 @@ internal fun McpHttpFields(
     Spacer(modifier = Modifier.height(4.dp))
 
     Text(
-        text = "自定义请求头",
+        text = stringResource(R.string.mcp_custom_headers),
         style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
         color = MaterialTheme.colorScheme.onSurface
     )
 
     if (headers.isEmpty()) {
         Text(
-            text = "暂无配置的自定义 Header",
+            text = stringResource(R.string.mcp_no_custom_headers),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
         )
@@ -82,14 +84,14 @@ internal fun McpHttpFields(
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     Text(
-                        text = "请求头名称",
+                        text = stringResource(R.string.mcp_header_name),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     OutlinedTextField(
                         value = k,
                         onValueChange = { headers[index] = it to v },
-                        placeholder = { Text("如 Authorization") },
+                        placeholder = { Text(stringResource(R.string.mcp_header_name_hint)) },
                         singleLine = true,
                         shape = RoundedCornerShape(12.dp),
                         colors = OutlinedTextFieldDefaults.colors(
@@ -102,14 +104,14 @@ internal fun McpHttpFields(
                     )
 
                     Text(
-                        text = "请求头值",
+                        text = stringResource(R.string.mcp_header_value),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     OutlinedTextField(
                         value = v,
                         onValueChange = { headers[index] = k to it },
-                        placeholder = { Text("如 Bearer xxxxxx") },
+                        placeholder = { Text(stringResource(R.string.mcp_header_value_hint)) },
                         singleLine = true,
                         shape = RoundedCornerShape(12.dp),
                         colors = OutlinedTextFieldDefaults.colors(
@@ -131,7 +133,7 @@ internal fun McpHttpFields(
                         ) {
                             Icon(
                                 FeatherIcons.Trash2,
-                                contentDescription = "删除",
+                                contentDescription = stringResource(R.string.common_delete),
                                 tint = MaterialTheme.colorScheme.error,
                                 modifier = Modifier.size(20.dp)
                             )
@@ -160,7 +162,7 @@ internal fun McpHttpFields(
                     tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Text(
-                    text = "添加请求头",
+                    text = stringResource(R.string.mcp_add_header),
                     style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

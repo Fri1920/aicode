@@ -1,5 +1,6 @@
 package com.aicode.feature.workspace.presentation.remote
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.aicode.feature.workspace.domain.model.RemoteConnection
@@ -8,6 +9,8 @@ import com.aicode.feature.workspace.domain.model.RemoteProtocol
 import com.aicode.feature.workspace.domain.remote.RemoteAuth
 import com.aicode.feature.workspace.domain.repository.RemoteRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import com.aicode.R
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -23,6 +26,7 @@ import com.aicode.feature.workspace.domain.remote.ftp.FtpServerManager
 
 @HiltViewModel
 class RemoteServerViewModel @Inject constructor(
+    @ApplicationContext private val context: Context,
     private val repository: RemoteRepository,
     private val workspaceRepository: WorkspaceRepository,
     private val syncSettingsRepository: SyncSettingsRepository,
@@ -95,9 +99,9 @@ class RemoteServerViewModel @Inject constructor(
             val result = repository.forceUploadMount(id)
             _uiState.value = _uiState.value.copy(isLoading = false)
             if (result.isFailure) {
-                _uiState.value = _uiState.value.copy(error = "全量上传失败: ${result.exceptionOrNull()?.message}")
+                _uiState.value = _uiState.value.copy(error = context.getString(R.string.remote_upload_all_failed, result.exceptionOrNull()?.message))
             } else {
-                _uiState.value = _uiState.value.copy(error = "全量上传成功！") // 暂时复用 error 展示成功消息，或稍后单独做 toast
+                _uiState.value = _uiState.value.copy(error = context.getString(R.string.remote_upload_all_success)) // 暂时复用 error 展示成功消息，或稍后单独做 toast
             }
         }
     }
@@ -108,9 +112,9 @@ class RemoteServerViewModel @Inject constructor(
             val result = repository.forceDownloadMount(id)
             _uiState.value = _uiState.value.copy(isLoading = false)
             if (result.isFailure) {
-                _uiState.value = _uiState.value.copy(error = "全量下载失败: ${result.exceptionOrNull()?.message}")
+                _uiState.value = _uiState.value.copy(error = context.getString(R.string.remote_download_all_failed, result.exceptionOrNull()?.message))
             } else {
-                _uiState.value = _uiState.value.copy(error = "全量下载成功！")
+                _uiState.value = _uiState.value.copy(error = context.getString(R.string.remote_download_all_success))
             }
         }
     }
@@ -222,9 +226,9 @@ class RemoteServerViewModel @Inject constructor(
             val p = port.toIntOrNull() ?: defaultPort(protocol)
             val result = repository.testConnection(host, p, username, RemoteAuth.Password(password), protocol)
             if (result.isSuccess) {
-                onResult(true, "连接成功！")
+                onResult(true, context.getString(R.string.remote_connect_success))
             } else {
-                onResult(false, "连接失败: ${result.exceptionOrNull()?.message}")
+                onResult(false, context.getString(R.string.remote_connect_failed, result.exceptionOrNull()?.message))
             }
         }
     }
@@ -239,7 +243,7 @@ class RemoteServerViewModel @Inject constructor(
             if (result.isSuccess) {
                 onResult(true, result.getOrNull() ?: emptyList(), "")
             } else {
-                onResult(false, emptyList(), result.exceptionOrNull()?.message ?: "未知错误")
+                onResult(false, emptyList(), result.exceptionOrNull()?.message ?: context.getString(R.string.remote_unknown_error))
             }
         }
     }

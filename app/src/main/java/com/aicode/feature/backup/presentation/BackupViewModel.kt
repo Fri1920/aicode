@@ -1,5 +1,6 @@
 package com.aicode.feature.backup.presentation
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.aicode.feature.backup.domain.BackupDecryptionException
@@ -7,6 +8,8 @@ import com.aicode.feature.backup.domain.BackupManager
 import com.aicode.feature.backup.domain.BackupOptions
 import com.aicode.feature.backup.domain.RestoreStats
 import dagger.hilt.android.lifecycle.HiltViewModel
+import com.aicode.R
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -23,6 +26,7 @@ sealed class BackupState {
 
 @HiltViewModel
 class BackupViewModel @Inject constructor(
+    @ApplicationContext private val context: Context,
     private val backupManager: BackupManager
 ) : ViewModel() {
 
@@ -35,7 +39,7 @@ class BackupViewModel @Inject constructor(
             val pw = password.toCharArray().takeIf { it.isNotEmpty() }
             runCatching { backupManager.export(pw, options) }
                 .onSuccess { _state.value = BackupState.ExportSuccess(it) }
-                .onFailure { _state.value = BackupState.Error(it.message ?: "导出失败") }
+                .onFailure { _state.value = BackupState.Error(it.message ?: context.getString(R.string.backup_export_failed)) }
         }
     }
 
@@ -47,8 +51,8 @@ class BackupViewModel @Inject constructor(
                 .onSuccess { _state.value = BackupState.ImportSuccess(it) }
                 .onFailure {
                     val msg = when (it) {
-                        is BackupDecryptionException -> it.message ?: "备份口令错误，或加密备份文件已损坏"
-                        else -> it.message ?: "导入失败"
+                        is BackupDecryptionException -> it.message ?: context.getString(R.string.backup_wrong_password)
+                        else -> it.message ?: context.getString(R.string.backup_import_failed)
                     }
                     _state.value = BackupState.Error(msg)
                 }

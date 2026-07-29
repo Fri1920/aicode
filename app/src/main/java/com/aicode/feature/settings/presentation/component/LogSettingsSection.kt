@@ -24,6 +24,10 @@ import com.aicode.core.theme.Radius
 import com.aicode.core.theme.Spacing
 import com.aicode.core.util.LogLevel
 import com.aicode.feature.settings.presentation.LogViewerUiState
+import android.content.Context
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import com.aicode.R
 
 @Composable
 internal fun LogSection(
@@ -58,15 +62,16 @@ internal fun LogViewerSection(
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
         ) {
+    val context = LocalContext.current
             Column(modifier = Modifier.padding(Spacing.lg)) {
                 Text(
-                    text = state.filterServerName?.let { "MCP 日志：$it" } ?: "全部日志",
+                    text = state.filterServerName?.let { stringResource(R.string.log_mcp_prefix, it) } ?: stringResource(R.string.log_all),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Normal,
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
-                    text = logViewerSummary(state),
+                    text = logViewerSummary(context, state),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = Spacing.xs)
@@ -102,9 +107,9 @@ internal fun LogViewerSection(
         ) {
             val verticalScroll = rememberScrollState()
             val text = when {
-                state.loading -> "正在读取日志..."
+                state.loading -> stringResource(R.string.log_reading)
                 state.error != null -> state.error
-                state.content.isBlank() -> "当前筛选条件下没有日志"
+                state.content.isBlank() -> stringResource(R.string.log_no_match)
                 else -> state.content
             }
 
@@ -127,13 +132,13 @@ internal fun LogViewerSection(
     }
 }
 
-private fun logViewerSummary(state: LogViewerUiState): String {
-    val file = state.selectedFileName ?: "未选择文件"
-    val scope = state.filterServerName?.let { "筛选：$it" } ?: "未筛选"
+private fun logViewerSummary(context: Context, state: LogViewerUiState): String {
+    val file = state.selectedFileName ?: context.getString(R.string.log_no_file)
+    val scope = state.filterServerName?.let { context.getString(R.string.log_filter_prefix, it) } ?: context.getString(R.string.log_no_filter)
     val count = if (state.totalLines > state.shownLines) {
-        "显示最后 ${state.shownLines}/${state.totalLines} 行"
+        context.getString(R.string.log_show_last_lines, state.shownLines, state.totalLines)
     } else {
-        "显示 ${state.shownLines} 行"
+        context.getString(R.string.log_show_lines, state.shownLines)
     }
     return "$file · $scope · $count"
 }

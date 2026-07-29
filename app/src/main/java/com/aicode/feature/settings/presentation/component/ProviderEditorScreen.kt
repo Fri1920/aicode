@@ -78,6 +78,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -91,6 +92,8 @@ import com.aicode.feature.settings.presentation.FetchState
 import com.aicode.feature.settings.presentation.SettingsViewModel
 import compose.icons.FeatherIcons
 import compose.icons.feathericons.*
+import androidx.compose.ui.res.stringResource
+import com.aicode.R
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -101,6 +104,7 @@ fun ProviderEditorScreen(
     onSave: (AIProviderConfig) -> Unit,
     onDelete: (String) -> Unit
 ) {
+    val context = LocalContext.current
     var name by remember { mutableStateOf(initialProvider?.name ?: "") }
     var apiKey by remember { mutableStateOf(initialProvider?.apiKey ?: "") }
     var baseUrl by remember { mutableStateOf(initialProvider?.baseUrl ?: "") }
@@ -135,7 +139,7 @@ fun ProviderEditorScreen(
 
     fun currentConfig() = AIProviderConfig(
         id = providerId,
-        name = name.ifEmpty { "新提供商" },
+        name = name.ifEmpty { context.getString(R.string.provider_new) },
         type = type,
         apiKey = apiKey,
         baseUrl = baseUrl.ifBlank { defaultProviderBaseUrl(type) },
@@ -174,14 +178,14 @@ fun ProviderEditorScreen(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             TopAppBar(
-                title = { Text(if (initialProvider == null) "添加提供商" else "编辑提供商") },
+                title = { Text(if (initialProvider == null) stringResource(R.string.provider_add) else stringResource(R.string.provider_edit)) },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.background,
                     titleContentColor = MaterialTheme.colorScheme.onBackground
                 ),
                 navigationIcon = {
                     IconButton(onClick = { saveAndNavigateBack() }) {
-                        Icon(FeatherIcons.ArrowLeft, contentDescription = "返回")
+                        Icon(FeatherIcons.ArrowLeft, contentDescription = stringResource(R.string.common_back))
                     }
                 },
                 actions = {
@@ -189,7 +193,7 @@ fun ProviderEditorScreen(
                         IconButton(onClick = { onDelete(initialProvider.id) }) {
                             Icon(
                                 FeatherIcons.Trash2,
-                                contentDescription = "删除提供商",
+                                contentDescription = stringResource(R.string.provider_delete),
                                 tint = MaterialTheme.colorScheme.error
                             )
                         }
@@ -198,7 +202,7 @@ fun ProviderEditorScreen(
                         selectedTab = 1
                         showAddModelSheet = true
                     }) {
-                        Icon(FeatherIcons.Plus, contentDescription = "添加模型")
+                        Icon(FeatherIcons.Plus, contentDescription = stringResource(R.string.provider_add_model))
                     }
                 }
             )
@@ -209,14 +213,14 @@ fun ProviderEditorScreen(
                 tonalElevation = 0.dp
             ) {
                 NavigationBarItem(
-                    icon = { Icon(FeatherIcons.Sliders, contentDescription = "配置") },
-                    label = { Text("配置") },
+                    icon = { Icon(FeatherIcons.Sliders, contentDescription = stringResource(R.string.provider_config)) },
+                    label = { Text(stringResource(R.string.provider_config)) },
                     selected = selectedTab == 0,
                     onClick = { selectedTab = 0 }
                 )
                 NavigationBarItem(
-                    icon = { Icon(FeatherIcons.Cpu, contentDescription = "模型") },
-                    label = { Text("模型") },
+                    icon = { Icon(FeatherIcons.Cpu, contentDescription = stringResource(R.string.common_model)) },
+                    label = { Text(stringResource(R.string.common_model)) },
                     selected = selectedTab == 1,
                     onClick = { selectedTab = 1 }
                 )
@@ -239,7 +243,7 @@ fun ProviderEditorScreen(
                     OutlinedTextField(
                         value = name,
                         onValueChange = { name = it },
-                        label = { Text("名称") },
+                        label = { Text(stringResource(R.string.common_name)) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
@@ -287,9 +291,9 @@ fun ProviderEditorScreen(
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Column {
-                            Text("完整 URL")
+                            Text(stringResource(R.string.provider_full_url))
                             Text(
-                                if (useFullUrl) "开启后 Base URL 即完整请求地址，不再拼接默认路径" else "关闭后自动拼接默认路径",
+                                if (useFullUrl) stringResource(R.string.provider_full_url_on_desc) else stringResource(R.string.provider_full_url_off_desc),
                                 style = androidx.compose.material3.MaterialTheme.typography.bodySmall,
                                 color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -306,7 +310,7 @@ fun ProviderEditorScreen(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Text("Response API (新版)")
+                            Text(stringResource(R.string.provider_response_api))
                             Switch(
                                 checked = useResponseApi,
                                 onCheckedChange = { useResponseApi = it }
@@ -327,7 +331,7 @@ fun ProviderEditorScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            "模型（${models.size}）",
+                            stringResource(R.string.provider_models_count, models.size),
                             style = MaterialTheme.typography.titleSmall,
                             modifier = Modifier.weight(1f)
                         )
@@ -339,7 +343,7 @@ fun ProviderEditorScreen(
                         ) {
                             Icon(FeatherIcons.DownloadCloud, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(Modifier.width(Spacing.xs))
-                            Text("拉取模型")
+                            Text(stringResource(R.string.provider_fetch_models))
                         }
                     }
 
@@ -432,22 +436,22 @@ private fun AddModelSheet(
             verticalArrangement = Arrangement.spacedBy(Spacing.md)
         ) {
             Text(
-                text = "添加模型",
+                text = stringResource(R.string.provider_add_model),
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.onSurface
             )
             OutlinedTextField(
                 value = modelName,
                 onValueChange = { modelName = it },
-                label = { Text("模型名称") },
-                placeholder = { Text("例如 gpt-4o") },
+                label = { Text(stringResource(R.string.provider_model_name)) },
+                placeholder = { Text(stringResource(R.string.provider_model_name_hint)) },
                 singleLine = true,
                 isError = duplicate,
                 modifier = Modifier.fillMaxWidth()
             )
             if (duplicate) {
                 Text(
-                    text = "该模型已添加",
+                    text = stringResource(R.string.provider_model_already_added),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.error
                 )
@@ -458,7 +462,7 @@ private fun AddModelSheet(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 TextButton(onClick = onDismiss) {
-                    Text("取消")
+                    Text(stringResource(R.string.common_cancel))
                 }
                 TextButton(
                     enabled = canAdd,
@@ -469,7 +473,7 @@ private fun AddModelSheet(
                 ) {
                     Icon(FeatherIcons.Plus, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(Spacing.xs))
-                    Text("添加")
+                    Text(stringResource(R.string.common_add))
                 }
             }
         }
@@ -486,6 +490,7 @@ private fun FetchModelsDialog(
     onAddModel: (String) -> Unit,
     onDismiss: () -> Unit
 ) {
+    val context = LocalContext.current
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var searchQuery by remember { mutableStateOf("") }
     val collapsedBrands = remember { mutableStateMapOf<String, Boolean>() }
@@ -530,7 +535,7 @@ private fun FetchModelsDialog(
                     OutlinedTextField(
                         value = searchQuery,
                         onValueChange = { searchQuery = it },
-                        placeholder = { Text("输入模型名称筛选") },
+                        placeholder = { Text(stringResource(R.string.provider_filter_models_hint)) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(50)
@@ -546,12 +551,12 @@ private fun FetchModelsDialog(
                                 ) {
                                     CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
                                     Spacer(Modifier.width(Spacing.md))
-                                    Text("正在拉取…", style = MaterialTheme.typography.bodyMedium)
+                                    Text(stringResource(R.string.provider_fetching), style = MaterialTheme.typography.bodyMedium)
                                 }
                             }
                             is FetchState.Error -> {
                                 Text(
-                                    "拉取失败：${fetchState.message}",
+                                    stringResource(R.string.provider_fetch_failed, fetchState.message),
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = MaterialTheme.colorScheme.error
                                 )
@@ -559,11 +564,11 @@ private fun FetchModelsDialog(
                             is FetchState.Success -> {
                                 val newOnes = fetchState.models.filter { it !in existingModels && it.contains(searchQuery, ignoreCase = true) }
                                 if (newOnes.isEmpty()) {
-                                    Text("没有匹配的模型", style = MaterialTheme.typography.bodyMedium)
+                                    Text(stringResource(R.string.provider_no_matching_models), style = MaterialTheme.typography.bodyMedium)
                                 } else {
                                     // 按品牌分组，分类 header 可折叠
                                     val grouped = newOnes.groupBy { m -> modelBrandKey(m) }
-                                        .toSortedMap(compareBy { brandDisplayName(it) })
+                                        .toSortedMap(compareBy { brandDisplayName(context, it) })
 
                                     LazyColumn(
                                         modifier = Modifier.fillMaxSize(),
@@ -572,7 +577,7 @@ private fun FetchModelsDialog(
                                         grouped.forEach { (brandKey, models) ->
                                             item(key = "header_$brandKey") {
                                                 val expanded = collapsedBrands[brandKey] != true
-                                                val brandName = brandDisplayName(brandKey)
+                                                val brandName = brandDisplayName(context, brandKey)
                                                 Row(
                                                     modifier = Modifier
                                                         .fillMaxWidth()
@@ -591,7 +596,7 @@ private fun FetchModelsDialog(
                                                     )
                                                     Icon(
                                                         imageVector = if (expanded) Icons.Outlined.KeyboardArrowDown else Icons.AutoMirrored.Outlined.KeyboardArrowRight,
-                                                        contentDescription = if (expanded) "折叠$brandName" else "展开$brandName",
+                                                        contentDescription = if (expanded) stringResource(R.string.provider_collapse_brand, brandName) else stringResource(R.string.provider_expand_brand, brandName),
                                                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                                         modifier = Modifier.size(20.dp)
                                                     )
@@ -612,7 +617,7 @@ private fun FetchModelsDialog(
                             }
                             else -> {
                                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                    Text("请稍候…", style = MaterialTheme.typography.bodyMedium)
+                                    Text(stringResource(R.string.provider_please_wait), style = MaterialTheme.typography.bodyMedium)
                                 }
                             }
                         }
@@ -645,7 +650,7 @@ private fun FetchModelRow(
             ModelMetadataTags(metadata)
         }
         IconButton(onClick = onAdd, modifier = Modifier.size(32.dp)) {
-            Icon(FeatherIcons.Plus, contentDescription = "添加", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            Icon(FeatherIcons.Plus, contentDescription = stringResource(R.string.common_add), tint = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
@@ -745,13 +750,13 @@ internal fun ProviderModelRow(
                 CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
             } else {
                 TextButton(onClick = onTest, contentPadding = PaddingValues(horizontal = Spacing.sm)) {
-                    Text("测试", style = MaterialTheme.typography.labelMedium)
+                    Text(stringResource(R.string.provider_test), style = MaterialTheme.typography.labelMedium)
                 }
             }
             IconButton(onClick = onRemove, modifier = Modifier.size(32.dp)) {
                 Icon(
                     FeatherIcons.X,
-                    contentDescription = "删除",
+                    contentDescription = stringResource(R.string.common_delete),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(16.dp)
                 )

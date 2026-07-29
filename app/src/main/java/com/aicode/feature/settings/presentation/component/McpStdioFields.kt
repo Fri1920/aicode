@@ -29,6 +29,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import compose.icons.FeatherIcons
 import compose.icons.feathericons.*
+import androidx.compose.ui.res.stringResource
+import com.aicode.R
 
 /** stdio 形态字段：command + 参数列表 + 环境变量键值对（卡片排版）。 */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -41,14 +43,14 @@ internal fun McpStdioFields(
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Text(
-            text = "启动命令",
+            text = stringResource(R.string.mcp_command),
             style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         OutlinedTextField(
             value = command,
             onValueChange = onCommandChange,
-            placeholder = { Text("例如：npx") },
+            placeholder = { Text(stringResource(R.string.mcp_command_hint)) },
             singleLine = true,
             shape = RoundedCornerShape(12.dp),
             modifier = Modifier.fillMaxWidth()
@@ -58,14 +60,14 @@ internal fun McpStdioFields(
     Spacer(modifier = Modifier.height(4.dp))
 
     Text(
-        text = "命令参数",
+        text = stringResource(R.string.mcp_args),
         style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
         color = MaterialTheme.colorScheme.onSurface
     )
 
     if (args.isEmpty()) {
         Text(
-            text = "无额外命令行参数",
+            text = stringResource(R.string.mcp_no_args),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
         )
@@ -83,14 +85,14 @@ internal fun McpStdioFields(
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     Text(
-                        text = "参数值",
+                        text = stringResource(R.string.mcp_arg_value),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     OutlinedTextField(
                         value = value,
                         onValueChange = { args[index] = it },
-                        placeholder = { Text("如 -y 或 @modelcontextprotocol/server-xxx") },
+                        placeholder = { Text(stringResource(R.string.mcp_arg_hint)) },
                         singleLine = true,
                         shape = RoundedCornerShape(12.dp),
                         colors = OutlinedTextFieldDefaults.colors(
@@ -112,7 +114,7 @@ internal fun McpStdioFields(
                         ) {
                             Icon(
                                 FeatherIcons.Trash2,
-                                contentDescription = "删除",
+                                contentDescription = stringResource(R.string.common_delete),
                                 tint = MaterialTheme.colorScheme.error,
                                 modifier = Modifier.size(20.dp)
                             )
@@ -141,7 +143,7 @@ internal fun McpStdioFields(
                     tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Text(
-                    text = "添加参数",
+                    text = stringResource(R.string.mcp_add_arg),
                     style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -152,14 +154,14 @@ internal fun McpStdioFields(
     Spacer(modifier = Modifier.height(4.dp))
 
     Text(
-        text = "环境变量",
+        text = stringResource(R.string.mcp_env_vars),
         style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
         color = MaterialTheme.colorScheme.onSurface
     )
 
     if (env.isEmpty()) {
         Text(
-            text = "无自定义环境变量",
+            text = stringResource(R.string.mcp_no_env_vars),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
         )
@@ -177,14 +179,14 @@ internal fun McpStdioFields(
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     Text(
-                        text = "变量名称",
+                        text = stringResource(R.string.mcp_env_name),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     OutlinedTextField(
                         value = k,
                         onValueChange = { env[index] = it to v },
-                        placeholder = { Text("如 API_KEY") },
+                        placeholder = { Text(stringResource(R.string.mcp_env_name_hint)) },
                         singleLine = true,
                         shape = RoundedCornerShape(12.dp),
                         colors = OutlinedTextFieldDefaults.colors(
@@ -197,14 +199,14 @@ internal fun McpStdioFields(
                     )
 
                     Text(
-                        text = "变量值",
+                        text = stringResource(R.string.mcp_env_value),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     OutlinedTextField(
                         value = v,
                         onValueChange = { env[index] = k to it },
-                        placeholder = { Text("如 sk-xxxx") },
+                        placeholder = { Text(stringResource(R.string.mcp_env_value_hint)) },
                         singleLine = true,
                         shape = RoundedCornerShape(12.dp),
                         colors = OutlinedTextFieldDefaults.colors(
@@ -226,7 +228,7 @@ internal fun McpStdioFields(
                         ) {
                             Icon(
                                 FeatherIcons.Trash2,
-                                contentDescription = "删除",
+                                contentDescription = stringResource(R.string.common_delete),
                                 tint = MaterialTheme.colorScheme.error,
                                 modifier = Modifier.size(20.dp)
                             )
@@ -255,7 +257,7 @@ internal fun McpStdioFields(
                     tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Text(
-                    text = "添加环境变量",
+                    text = stringResource(R.string.mcp_add_env_var),
                     style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

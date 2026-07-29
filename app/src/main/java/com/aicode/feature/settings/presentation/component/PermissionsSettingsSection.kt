@@ -34,6 +34,8 @@ import com.aicode.feature.agent.domain.permission.PermissionDecision
 import com.aicode.feature.agent.domain.permission.PermissionRule
 import compose.icons.FeatherIcons
 import compose.icons.feathericons.Trash2
+import androidx.compose.ui.res.stringResource
+import com.aicode.R
 
 /**
  * 「工具授权」二级页：列出当前项目与全局已保存的授权规则，可逐条删除；项目规则可「提升为全局」。
@@ -61,19 +63,19 @@ internal fun PermissionsSection(
             ) {
                 Column(modifier = Modifier.padding(Spacing.md)) {
                     Text(
-                        text = "内置安全白名单",
+                        text = stringResource(R.string.perm_builtin_whitelist),
                         style = MaterialTheme.typography.titleSmall,
                         color = MaterialTheme.colorScheme.primary
                     )
                     Spacer(Modifier.height(Spacing.xs))
                     Text(
-                        text = "系统已预设白名单，对少量完全无害、只读且不派生子进程的命令（如 ls、pwd、cat、grep、ps、top、git status 等）免弹窗自动放行。",
+                        text = stringResource(R.string.perm_whitelist_desc),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Spacer(Modifier.height(Spacing.sm))
                     Text(
-                        text = "在此可管理用户在对话中选「始终允许」生成的记忆规则。精细化授权机制会按命令或路径精准匹配（如 rm temp.log、git pull）。",
+                        text = stringResource(R.string.perm_rules_desc),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -81,18 +83,18 @@ internal fun PermissionsSection(
             }
         }
 
-        item { RuleGroupHeader(if (projectName != null) "当前项目：$projectName" else "当前项目（未选择）") }
+        item { RuleGroupHeader(if (projectName != null) stringResource(R.string.perm_current_project, projectName) else stringResource(R.string.perm_current_project_none)) }
         if (projectRules.isEmpty()) {
-            item { RuleEmptyHint("本项目暂无规则") }
+            item { RuleEmptyHint(stringResource(R.string.perm_no_project_rules)) }
         } else {
             items(projectRules) { rule ->
                 RuleRow(rule = rule, onDelete = { onDeleteProject(rule) }, onPromote = { onPromote(rule) })
             }
         }
 
-        item { RuleGroupHeader("全局") }
+        item { RuleGroupHeader(stringResource(R.string.perm_global)) }
         if (globalRules.isEmpty()) {
-            item { RuleEmptyHint("暂无全局规则") }
+            item { RuleEmptyHint(stringResource(R.string.perm_no_global_rules)) }
         } else {
             items(globalRules) { rule ->
                 RuleRow(rule = rule, onDelete = { onDeleteGlobal(rule) }, onPromote = null)
@@ -141,23 +143,23 @@ internal fun RuleRow(
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = if (rule.pattern == PermissionRule.WHOLE_TOOL) "整个工具" else rule.pattern,
+                    text = if (rule.pattern == PermissionRule.WHOLE_TOOL) stringResource(R.string.perm_entire_tool) else rule.pattern,
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
                 Text(
-                    text = rule.toolName + " · " + if (rule.decision == PermissionDecision.ALLOW) "允许" else "禁止",
+                    text = rule.toolName + " · " + if (rule.decision == PermissionDecision.ALLOW) stringResource(R.string.common_allow) else stringResource(R.string.perm_deny),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
             if (onPromote != null) {
-                TextButton(onClick = onPromote) { Text("提升为全局") }
+                TextButton(onClick = onPromote) { Text(stringResource(R.string.perm_promote_to_global)) }
             }
             IconButton(onClick = onDelete) {
-                Icon(FeatherIcons.Trash2, contentDescription = "删除", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                Icon(FeatherIcons.Trash2, contentDescription = stringResource(R.string.common_delete), tint = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }

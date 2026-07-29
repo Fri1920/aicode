@@ -24,6 +24,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.aicode.core.theme.Radius
 import com.aicode.core.theme.Spacing
+import androidx.compose.ui.res.stringResource
+import com.aicode.R
 
 /**
  * git 提交署名(user.name / user.email)配置卡片。
@@ -52,13 +54,13 @@ internal fun GitUserIdentityCard(
     ) {
         Column(modifier = Modifier.padding(Spacing.lg), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
             Text(
-                text = "提交署名（git config --global）",
+                text = stringResource(R.string.git_identity_title),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Normal,
                 color = MaterialTheme.colorScheme.onSurface
             )
             Text(
-                text = "用于每次提交的 author。容器全局生效，所有工作区共用。",
+                text = stringResource(R.string.git_identity_desc),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -79,7 +81,7 @@ internal fun GitUserIdentityCard(
             OutlinedTextField(
                 value = repoUrl,
                 onValueChange = { repoUrl = it },
-                label = { Text("仓库地址 remote.origin.url") },
+                label = { Text(stringResource(R.string.git_remote_url)) },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth()
             )
@@ -89,11 +91,11 @@ internal fun GitUserIdentityCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = if (globalHint.isBlank()) "git 实际署名：(未配置)" else "git 实际署名：$globalHint",
+                    text = if (globalHint.isBlank()) stringResource(R.string.git_actual_identity_none) else stringResource(R.string.git_actual_identity, globalHint),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                Button(onClick = { onSave(name.trim(), email.trim(), repoUrl.trim()) }) { Text("保存") }
+                Button(onClick = { onSave(name.trim(), email.trim(), repoUrl.trim()) }) { Text(stringResource(R.string.common_save)) }
             }
         }
     }

@@ -59,6 +59,8 @@ import compose.icons.feathericons.Terminal
 import compose.icons.feathericons.Trash2
 import kotlin.math.roundToInt
 import kotlinx.coroutines.launch
+import androidx.compose.ui.res.stringResource
+import com.aicode.R
 
 /**
  * MCP 二级页（可视化）：全新现代化设计的 Server 列表页面。
@@ -104,12 +106,12 @@ internal fun McpSection(
                             )
                         }
                         Text(
-                            text = "还没有配置 MCP 服务器",
+                            text = stringResource(R.string.mcp_empty),
                             style = MaterialTheme.typography.titleMedium,
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
-                            text = "点击右上角 + 可以添加远程 HTTP 或本地 stdio 服务器",
+                            text = stringResource(R.string.mcp_empty_hint),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -141,13 +143,13 @@ internal fun McpServerRow(
     val isConnected = server.enabled && status?.state == McpServerStatus.State.CONNECTED
 
     val statusText = when {
-        !server.enabled -> "已禁用"
-        status == null -> "未连接"
+        !server.enabled -> stringResource(R.string.mcp_disabled)
+        status == null -> stringResource(R.string.mcp_not_connected)
         else -> when (status.state) {
-            McpServerStatus.State.CONNECTED -> "已连接"
-            McpServerStatus.State.CONNECTING -> "连接中…"
-            McpServerStatus.State.FAILED -> "连接失败"
-            McpServerStatus.State.DISABLED -> "已禁用"
+            McpServerStatus.State.CONNECTED -> stringResource(R.string.mcp_connected)
+            McpServerStatus.State.CONNECTING -> stringResource(R.string.mcp_connecting)
+            McpServerStatus.State.FAILED -> stringResource(R.string.mcp_connection_failed)
+            McpServerStatus.State.DISABLED -> stringResource(R.string.mcp_disabled)
         }
     }
 
@@ -213,13 +215,13 @@ internal fun McpServerRow(
                     ) {
                         Icon(
                             imageVector = FeatherIcons.Trash2,
-                            contentDescription = "删除",
+                            contentDescription = stringResource(R.string.common_delete),
                             tint = Color.White,
                             modifier = Modifier.size(20.dp)
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = "删除",
+                            text = stringResource(R.string.common_delete),
                             style = MaterialTheme.typography.bodyMedium.copy(
                                 fontWeight = FontWeight.SemiBold,
                                 fontSize = 15.sp
@@ -367,7 +369,7 @@ internal fun McpServerRow(
                                 .padding(horizontal = 8.dp, vertical = 2.dp)
                         ) {
                             Text(
-                                text = if (server.isStdio) "内置" else "HTTP",
+                                text = if (server.isStdio) stringResource(R.string.mcp_builtin) else "HTTP",
                                 style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -375,7 +377,7 @@ internal fun McpServerRow(
 
                         // 3. 工具数量/信息 Pill
                         val infoText = when {
-                            isConnected -> "工具: ${status?.toolCount ?: 0}/${status?.toolCount ?: 0}"
+                            isConnected -> stringResource(R.string.mcp_tools_count, status?.toolCount ?: 0, status?.toolCount ?: 0)
                             server.isStdio -> server.command.orEmpty().ifEmpty { "stdio" }
                             else -> server.url.orEmpty().ifEmpty { "HTTP" }
                         }
@@ -403,7 +405,7 @@ internal fun McpServerRow(
                 // 右侧箭头
                 Icon(
                     imageVector = FeatherIcons.ChevronRight,
-                    contentDescription = "详情",
+                    contentDescription = stringResource(R.string.mcp_details),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(20.dp)
                 )
