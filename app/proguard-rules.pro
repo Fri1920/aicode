@@ -23,12 +23,18 @@
 -dontwarn org.openjsse.**
 
 # ---- BouncyCastle (bcprov-jdk18on) ----
-# AIEditorApp.registerBouncyCastle() 在启动时注册完整版 BC 取代 Android 裁剪版，供 sshj 做 X25519 密钥交换。
-# BouncyCastleProvider 在构造时通过反射加载散布在各包下的 *Mappings 注册类，再由 JCE 框架按类名反射实例化
-# 各算法 SPI（KeyStore/Cipher/Signature/AlgorithmParameters 等）。R8 静态分析看不到这些反射引用，
-# 会把「无人调用」的 BC 类当死代码裁剪掉——release 下 BKS KeyStore 等 SPI 类被删，实例化时抛
-# KeyStoreException: BKS not found（debug 不开 R8 故正常）。故保留整个 BC 库不被裁剪/混淆。
--keep class org.bouncycastle.** { *; }
+# AIEditorApp.registerBouncyCastle() 在启动时注册 BC Provider 供 sshj 做 X25519 密钥交换。
+# BouncyCastleProvider 构造时通过反射动态加载 jcajce/jce 下的 *Mappings 类与各算法 SPI。
+# 精确保留 Provider 及 SPI 反射包，避免 R8 误删抛 KeyStoreException: BKS not found，
+# 同时允许 R8 裁剪 PQC(后量子密码学)、OpenPGP 等巨型无关模块以大幅缩减包体积。
+-keep class org.bouncycastle.jce.provider.BouncyCastleProvider { *; }
+-keep class org.bouncycastle.jcajce.provider.** { *; }
+-keep class org.bouncycastle.jce.provider.** { *; }
+-keep class org.bouncycastle.crypto.engines.** { *; }
+-keep class org.bouncycastle.crypto.digests.** { *; }
+-keep class org.bouncycastle.crypto.macs.** { *; }
+-keep class org.bouncycastle.crypto.modes.** { *; }
+-keep class org.bouncycastle.crypto.paddings.** { *; }
 -dontwarn org.bouncycastle.**
 
 # ---- Gson（Retrofit converter + AILogger 用 GsonBuilder 反射序列化）----
