@@ -314,7 +314,7 @@ private suspend fun checkUpdate(context: Context, currentVersion: String): Updat
             val tag = JsonParser.parseString(body).asJsonObject?.get("tag_name")?.asString
                 ?: return@use UpdateDialogState.Error(context.getString(R.string.about_parse_version_failed))
             val latest = parseVersionTag(tag) ?: tag
-            if (sameVersion(latest, currentVersion)) {
+            if (isUpToDate(latest, currentVersion)) {
                 UpdateDialogState.UpToDate
             } else {
                 UpdateDialogState.NewVersion(latestTag = latest)
@@ -323,16 +323,60 @@ private suspend fun checkUpdate(context: Context, currentVersion: String): Updat
     }.getOrElse { UpdateDialogState.Error(it.message ?: context.getString(R.string.about_network_error)) }
 }
 
-/** GitHub tag 形如 v1.0.0 / 1.0.0 / v1.0.0-rc1，提取出纯版本号。 */
+/** GitHub tag 形如 v1.7.0 / 1.7.0 / v1.7.0-rc1，提取出纯版本号。 */
 private fun parseVersionTag(tag: String): String? {
     val raw = tag.trim().removePrefix("v")
-    // 取第一个非空白段，去掉预发布后缀（如 -rc1）
-    val seg = raw.substringBefore(' ').substringBefore('-')
+    val seg = raw.substringBefore(' ')
     return seg.ifBlank { null }
 }
 
-/** 简单比对两段纯语义版本（x.y.z）。相等即视为同一版本。 */
-private fun sameVersion(a: String, b: String): Boolean = a == b
+/**
+ * 语义化版本比较：判断最新版本 [latest] 是否严格大于当前版本 [current]。
+ * 若 latest 不大于 current（即最新版本已安装或当前属于开发/测试版），返回 true 表示已是最新。
+ */
+private fun isUpToDate(latest: String, current: String): Boolean {
+    val cmp = compareVersions(latest, current)
+    return cmp <= 0
+}
+
+/**
+ * 语义化版本号比较器（SemVer 兼容）：
+ * 返回 >0 表示 v1 > v2，<0 表示 v1 < v2，0 表示相等。
+ * 规则：
+ * 1. 优先比较主.次.修（如 1.7.0 > 1.6.9）
+ * 2. 主次修相同时，正式版 > 预发布版（1.7.0 > 1.7.0-rc1 > 1.7.0-dev）
+ * 3. 均为预发布版时，比较修饰串（rc2 > rc1）
+ */
+private fun compareVersions(v1: String, v2: String): Int {
+    if (v1 == v2) return 0
+
+    val (base1, pre1) = splitVersion(v1)
+    val (base2, pre2) = splitVersion(v2)
+
+    val parts1 = base1.split('.').mapNotNull { it.toIntOrNull() }
+    val parts2 = base2.split('.').mapNotNull { it.toIntOrNull() }
+
+    val maxLen = maxOf(parts1.size, parts2.size)
+    for (i in 0 until maxLen) {
+        val p1 = parts1.getOrElse(i) { 0 }
+        val p2 = parts2.getOrElse(i) { 0 }
+        if (p1 != p2) return p1.compareTo(p2)
+    }
+
+    // 主版本号相同的情况下：
+    // 正式版 (pre为空) > 预发布版 (pre不为空)
+    if (pre1.isEmpty() && pre2.isNotEmpty()) return 1
+    if (pre1.isNotEmpty() && pre2.isEmpty()) return -1
+
+    return pre1.compareTo(pre2)
+}
+
+private fun splitVersion(v: String): Pair<String, String> {
+    val clean = v.substringBefore('+') // 去掉构建哈希如 +g04bc2fa
+    val base = clean.substringBefore('-')
+    val pre = if (clean.contains('-')) clean.substringAfter('-') else ""
+    return base to pre
+}
 
 private data class AppVersion(val name: String, val code: Long)
 
