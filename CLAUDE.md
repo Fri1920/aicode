@@ -33,27 +33,21 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 分支与改动工作流
 
-**原则：不在 `main` 上直接写功能，`main` 只接收已验证的分支。** 本仓库无灰度、靠 GitHub Release 分发且发出去即终态，`versionCode` 又由 git commit count 自动生成——直接在 `main` 上堆改动会污染发版线和 commit count，改坏不好回退。
+**原则：大功能/复杂改动拉分支，轻量修改/单测/修 Bug 直接在 `main` 操作。** 本仓库已全面采用 Tag 驱动发版，平时在 `main` 上的提交不会影响发布包，仅打 Tag 时才触发 GitHub Release。
 
 - **改动分档**：
-  - **新功能 / 行为变化 / 多文件改动**：新建分支 `feat/xxx`，改完走发版流程（属行为变化，发版时按新功能档升 `x.Y.0` 且须先发 RC；但提交本身**不要**动 `versionName`，见版本号规范）。
-  - **纯 bug 修复 / 重构**：新建分支 `fix/xxx`；极小且不触碰启动/容器的可在 `main` 上快速修，但优先走分支以便回退与验证。
-  - **纯文档 / typo / 资源文案**：可直接在 `main` 上改。
-- **改动前先定分支**：接到改动需求时，先判断当前所在分支是否适合承载这次改动——若当前分支主题与改动无关（如在 `fix/a` 上做 `fix/b` 的事），不要直接动手，先询问是否新建分支。同时检查已有分支（`git branch`）有没有主题相近的：若有合适的，可把改动放到那个分支而非另开新枝；若没有再新建。避免同一主题散落在多个分支、或无关改动混进当前分支。
-- **命名**：`feat/` 与 `fix/` 前缀 + 短主题，如 `feat/session-model`、`fix/provider-injection`。
-- **从哪拉分支**：从 `main` 最新拉分支，不要从一个功能分支再分岔（除非确实依赖它）。一份功能一个分支，**不要在同一分支混入不相关改动**。
-- **提交前必跑冒烟**：改完编译型代码（`.kt` / `.gradle.kts` / `AndroidManifest.xml`）→ 提交前默认 `./gradlew :app:assembleUniversalDebug` 验证可编译（**勿跑 `assembleDebug`/`assembleRelease` 三 flavor**，详见 Build and Run）。**禁止推未编译验证的分支**——历史教训：构造函数加参数却漏改 DI `@Provides` 的传参，导致整条分支编译不过。
-- **不留净效果为零的提交**：改主意用 `git commit --amend` 或 `git rebase -i` 合并精简，不要留「加了又删」的来回提交。注意 rebase/squash 会改写历史，可能让 commit count 回退，触发 CI 的 versionCode 单调校验（见版本号规范）。
-- **合并入 main**：在 GitHub 开 PR 合并，或本地确认无冲突后合回 `main` 再 push；合并前确保分支冒烟通过。
+  - **新功能 / 复杂多文件改动 / 架构重构**：新建分支 `feat/xxx` 或 `refactor/xxx`，改完验证通过后合回 `main` 并清理分支。
+  - **日常 Bug 修复 / 补单元测试 / CI与构建配置 / 纯文档 / 资源文案**：直接在 `main` 分支提交，无需新建分支，避免分支过滥。
+- **改动前先定分支**：涉及新功能开发时，先确认分支命名（如 `feat/session-model`），避免不同主题混在同一分支。
+- **提交前必跑冒烟**：改完编译型代码（`.kt` / `.gradle.kts` / `AndroidManifest.xml`）→ 提交前默认 `./gradlew :app:assembleUniversalDebug` 验证可编译（**勿跑 `assembleDebug`/`assembleRelease` 三 flavor**，详见 Build and Run）。
+- **合并入 main**：本地合并并确认无冲突后，及时清理已被合并的本地分支（`git branch -d <branch_name>`）。
 
 ## 版本号规范
 
-- **唯一来源**：`app/build.gradle.kts` 的 `versionName`（`主.次.修`，如 `1.0.0`，手写）与 `versionCode`（由 `gitCommitCount()` 从 git 提交数自动生成，无需手写）。
-- **何时递增**：**`versionName` 只在发版的那一刻改一次，平时提交一律不碰**——平时提交不要动 `versionName`，避免每次改完功能都想去改版本号（提交时碰它没意义，真正的版本号是在打 tag 发版时确定的）。要发版时按下一版要承载的内容定档：
-  - 次版本号（中间位）：本发版周期含新增功能 / 行为变化 → 升 `x.Y.0`。
-  - 修订号（末位）：本发版周期仅 bug 修复 / 纯文档 / 重构 → `x.y.Z`。
-- **`versionCode` 无需手动维护**：随每次 git 提交自动 +1（commit count 单调递增）。rebase/squash 改写历史可能让 commit count 变小，CI（`android-release.yml` 的 Verify versionCode monotonic 步骤）会校验当前 > 上个 Release 防回退。
-- **与 Release 绑定**：发版时打的 git tag 必须与 `versionName` 完全一致——tag 写 `v<versionName>`（如 versionName=`1.0.0` → tag=`v1.0.0`）。CI 触发靠 tag 名 `v*`，错了会发到错误版本号上。
+- **唯一事实源**：由 Git Tag / Commit 动态推导解析，**彻底无需手写 `app/build.gradle.kts` 中的 `versionName`**。
+  - **`versionName`**：由 `gitVersionName()` 在构建时动态解析（如 tag 为 `v1.7.0` 则为 `1.7.0`；tag 为 `v1.7.0-rc1` 则为 `1.7.0-rc1`；非 Tag 的平时提交为 `1.7.0-dev.N+<hash>`）。
+  - **`versionCode`**：由 `gitCommitCount()` 从 git 提交数自动生成，随提交单调递增，无需手动维护。
+- **与 Tag 绑定**：发版时只需直接在 `main` 节点上打 git tag，例如 `v1.7.0-rc1` 或 `v1.7.0`，CI 捕获后会自动将生成的 APK 与该版本进行匹配并发布 Release。**严禁在功能分支上打 Tag 发版**，必须先合入 `main` 再打 Tag，确保发版的代码在 `main` 主线上可追溯。
 
 ## 发版流程（RC 判定）
 
@@ -63,18 +57,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **可直接发正式**：本发版周期仅纯文档 / typo / 资源文案（定档 `x.y.Z`，无行为变化）。
 - **看改动面**：本发版周期仅纯 bug 修复（定档 `x.y.Z`）——小改直接正式，触碰启动/容器的仍先 RC。
 
-> 注：这一档只影响本发版版本号定档（`x.Y.0` vs `x.y.Z`）与是否先发 RC，**不要求在改动提交时改 `versionName`**——版本号等到实际发版时（按下面操作步骤第 1 步）一并改、commit、再打 tag。
-
 ### 操作步骤
 
-1. **此时才改 `versionName`**：按本发版周期承载的内容在 `app/build.gradle.kts` 定档（新功能/行为变化 → `x.Y.0`；仅 bug 修复/文档 → `x.y.Z`），设好 `versionName` 后 commit。这是版本号唯一的改动时机——平时功能提交不要碰它。
-2. `git tag v<versionName>-rc1`（如 `v1.2.0-rc1`）并 push。CI 校验 tag 版本部分 == `versionName`，构三 flavor 发 Release。
+1. **零代码修改发版（必须在 `main` 分支）**：无需在代码或配置中修改版本号。所有功能/修补必须先合并到 `main` 分支，在 `main` 最新的提交节点上直接打 Tag（例如 `git tag v1.7.0-rc1`）并推送：`git push origin v1.7.0-rc1`。
+2. CI 接收到 `v*` Tag 后，自动捕获 Tag 版本推导生成 APK，构建 Release 发出。
 3. **真机装 rc 包**，至少跑通 AI 对话 + 终端 + 容器启动三条主线。
-4. 有问题 -> 修 -> 升 rc 序号（`-rc2`）重发；没问题 -> `git tag v<versionName>` push 发正式。
-
-RC 与正式版共享同一 `versionName`，`versionCode` 由 commit count 自动生成，天然 rc1 < rc2 < ... < 正式版，用户从任意 rc 都能直接升级到正式版，无需手动管 versionCode。
-
-> RC 发出后必须真机验证再转正，否则 RC 无意义。
+4. 有问题 -> 修 -> 升 rc 序号打 tag（`v1.7.0-rc2`）重发；无问题 -> 直接打正式 Tag（`v1.7.0`）推远端转正。
 
 ## Build and Run
 
