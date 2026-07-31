@@ -65,6 +65,7 @@ import com.aicode.feature.agent.domain.permission.PermissionChoice
 import com.aicode.feature.agent.domain.tool.PendingToolPermission
 import com.aicode.feature.settings.domain.model.AIProviderConfig
 import com.aicode.feature.settings.presentation.component.ModelLogoIcon
+import com.aicode.feature.settings.presentation.component.ProviderLogoIcon
 import com.aicode.feature.workspace.presentation.WorkspaceViewModel
 import com.aicode.feature.workspace.presentation.component.WorkspaceIconButton
 import compose.icons.FeatherIcons
@@ -551,6 +552,8 @@ internal fun ModelSheet(
                                     modifier = Modifier.padding(top = Spacing.sm, bottom = Spacing.xs, start = Spacing.xs),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
+                                    ProviderLogoIcon(provider = p, size = 16.dp)
+                                    Spacer(Modifier.width(Spacing.xs))
                                     Text(
                                         text = p.name,
                                         style = MaterialTheme.typography.labelMedium,
@@ -588,6 +591,8 @@ internal fun ModelRow(
             .padding(horizontal = Spacing.md, vertical = Spacing.md),
         verticalAlignment = Alignment.CenterVertically
     ) {
+        ModelLogoIcon(modelName = name, size = 20.dp)
+        Spacer(Modifier.width(Spacing.md))
         Text(
             text = name,
             style = MaterialTheme.typography.bodyLarge,

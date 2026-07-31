@@ -1,5 +1,6 @@
 package com.aicode.feature.git.presentation.component
 
+import androidx.annotation.StringRes
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -835,7 +836,7 @@ private fun BranchesTab(
         if (localBranches.isNotEmpty()) {
             item {
                 RefSectionHeader(
-                    title = "Local (${localBranches.size})",
+                    title = "${stringResource(R.string.common_local)} (${localBranches.size})",
                     isExpanded = isExpanded("local"),
                     onToggle = { expanded["local"] = !isExpanded("local") },
                     onAdd = { showCreateDialog = true }
@@ -858,7 +859,7 @@ private fun BranchesTab(
         if (remoteBranches.isNotEmpty()) {
             item {
                 RefSectionHeader(
-                    title = "Remote (${remoteBranches.size})",
+                    title = "${stringResource(R.string.git_remote)} (${remoteBranches.size})",
                     isExpanded = isExpanded("remote"),
                     onToggle = { expanded["remote"] = !isExpanded("remote") }
                 )
@@ -880,7 +881,7 @@ private fun BranchesTab(
         if (tags.isNotEmpty()) {
             item {
                 RefSectionHeader(
-                    title = "Tags (${tags.size})",
+                    title = "${stringResource(R.string.git_tags)} (${tags.size})",
                     isExpanded = isExpanded("tags"),
                     onToggle = { expanded["tags"] = !isExpanded("tags") },
                     onAdd = { showCreateTagDialog = true }
@@ -1007,14 +1008,14 @@ private fun RefSectionHeader(
  * 分支/标签行可执行的操作项，用于长按弹出的操作菜单。
  */
 private sealed class RefAction(
-    val label: String,
+    @StringRes val labelRes: Int,
     val icon: ImageVector,
     val isDestructive: Boolean,
     val onClick: () -> Unit
 ) {
-    class Switch(onClick: () -> Unit) : RefAction("Switch", FeatherIcons.GitCommit, false, onClick)
-    class Rename(onClick: () -> Unit) : RefAction("Rename", FeatherIcons.Edit2, false, onClick)
-    class Delete(onClick: () -> Unit) : RefAction("Delete", FeatherIcons.Trash2, true, onClick)
+    class Switch(onClick: () -> Unit) : RefAction(R.string.common_switch, FeatherIcons.GitCommit, false, onClick)
+    class Rename(onClick: () -> Unit) : RefAction(R.string.common_rename, FeatherIcons.Edit2, false, onClick)
+    class Delete(onClick: () -> Unit) : RefAction(R.string.common_delete, FeatherIcons.Trash2, true, onClick)
 }
 
 @Composable
@@ -1144,7 +1145,7 @@ private fun RefActionSheet(
                         )
                         Spacer(Modifier.width(Spacing.lg))
                         Text(
-                            text = action.label,
+                            text = stringResource(action.labelRes),
                             style = MaterialTheme.typography.bodyLarge,
                             color = tint
                         )
