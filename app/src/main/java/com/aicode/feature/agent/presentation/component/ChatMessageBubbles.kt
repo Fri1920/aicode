@@ -94,6 +94,7 @@ import com.mikepenz.markdown.model.State as MarkdownParseState
 import dev.snipme.highlights.Highlights
 import dev.snipme.highlights.model.SyntaxThemes
 import compose.icons.FeatherIcons
+import compose.icons.feathericons.RotateCcw
 import compose.icons.feathericons.Check
 import compose.icons.feathericons.Copy
 import compose.icons.feathericons.ChevronDown
@@ -135,7 +136,8 @@ internal fun formatTokenCount(tokens: Int): String = when {
 internal fun AgentMessageItem(
     message: AgentUIMessage,
     liveOutput: String? = null,
-    markdownCache: MarkdownRenderCache? = null
+    markdownCache: MarkdownRenderCache? = null,
+    onRewindClick: ((String) -> Unit)? = null
 ) {
     if (message.isCompactionMarker) {
         CompactionDivider()
@@ -171,7 +173,25 @@ internal fun AgentMessageItem(
                 horizontalAlignment = if (isUser) Alignment.End else Alignment.Start
             ) {
                 if (hasContent || message.role == MessageRole.TOOL) {
-                    Surface(
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        if (isUser && onRewindClick != null) {
+                            IconButton(
+                                onClick = { onRewindClick(message.id) },
+                                modifier = Modifier.size(28.dp)
+                            ) {
+                                Icon(
+                                    FeatherIcons.RotateCcw,
+                                    contentDescription = stringResource(R.string.checkpoint_rewind_title),
+                                    modifier = Modifier.size(14.dp),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(Spacing.xs))
+                        }
+
+                        Surface(
                         shape = if (isUser) {
                             RoundedCornerShape(Radius.md, Radius.md, Radius.xs, Radius.md)
                         } else {
@@ -231,6 +251,7 @@ internal fun AgentMessageItem(
                             }
                         }
                     }
+                }
                 }
                 if (isUser && hasAttachments) {
                     MessageAttachmentPreviewRow(attachments = message.attachments)

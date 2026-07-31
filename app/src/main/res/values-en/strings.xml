@@ -239,6 +239,20 @@
     <string name="chat_continue_feedback">Continue feedback</string>
     <string name="chat_approve_and_implement">Approve and implement</string>
 
+    <!-- Checkpoint & Rewind -->
+    <string name="checkpoint_rewind_title">Checkpoint &amp; Rewind</string>
+    <string name="checkpoint_target_prompt">Target message: %1$s</string>
+    <string name="checkpoint_restore_code_and_conversation">Restore code and conversation</string>
+    <string name="checkpoint_restore_code_and_conversation_desc">Revert both code and conversation before this checkpoint</string>
+    <string name="checkpoint_restore_conversation">Restore conversation only</string>
+    <string name="checkpoint_restore_conversation_desc">Keep current code, truncate conversation to this point</string>
+    <string name="checkpoint_restore_code">Restore code only</string>
+    <string name="checkpoint_restore_code_desc">Revert code to snapshot before this point, keep conversation</string>
+    <string name="checkpoint_summarize_from_here">Summarize from here</string>
+    <string name="checkpoint_summarize_from_here_desc">Compress messages after this point into a summary</string>
+    <string name="checkpoint_summarize_up_to_here">Summarize up to here</string>
+    <string name="checkpoint_summarize_up_to_here_desc">Compress messages before this point into a summary</string>
+
     <!-- Chat Message Bubbles -->
     <string name="chat_copied">Copied</string>
     <string name="chat_copy">Copy</string>

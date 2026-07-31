@@ -6,6 +6,7 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.aicode.feature.agent.data.local.dao.AgentMessageDao
 import com.aicode.feature.agent.data.local.dao.ChatSessionDao
+import com.aicode.feature.agent.data.local.dao.CheckpointDao
 import com.aicode.feature.agent.data.local.dao.TodoItemDao
 import com.aicode.feature.settings.data.local.dao.AIProviderDao
 import com.aicode.feature.settings.domain.model.ProviderType
@@ -79,6 +80,12 @@ object AgentModule {
         ).addMigrations(*MigrationLoader.loadMigrations(context))
             .fallbackToDestructiveMigration(dropAllTables = false)
             .build()
+    }
+
+    @Provides
+    @Singleton
+    fun provideCheckpointDao(database: AgentDatabase): CheckpointDao {
+        return database.checkpointDao()
     }
 
     @Provides
@@ -295,7 +302,8 @@ object AgentModule {
         visionModelSettingsRepository: com.aicode.feature.settings.data.repository.VisionModelSettingsRepository,
         compactionModelSettingsRepository: com.aicode.feature.settings.data.repository.CompactionModelSettingsRepository,
         sessionUseCase: com.aicode.feature.agent.domain.session.SessionUseCase,
-        messagePersistenceUseCase: com.aicode.feature.agent.domain.session.MessagePersistenceUseCase
+        messagePersistenceUseCase: com.aicode.feature.agent.domain.session.MessagePersistenceUseCase,
+        checkpointManager: com.aicode.feature.agent.domain.checkpoint.CheckpointManager
     ): AgentWorkflow {
         return com.aicode.feature.agent.domain.workflow.StatefulAgentWorkflow(
             toolRegistry,
@@ -316,7 +324,8 @@ object AgentModule {
             visionModelSettingsRepository,
             compactionModelSettingsRepository,
             sessionUseCase,
-            messagePersistenceUseCase
+            messagePersistenceUseCase,
+            checkpointManager
         )
     }
 }

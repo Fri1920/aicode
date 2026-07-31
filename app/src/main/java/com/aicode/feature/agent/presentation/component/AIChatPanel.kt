@@ -287,6 +287,7 @@ fun AIChatPanel(
     val streamingReasoning by viewModel.streamingReasoning.collectAsStateWithLifecycle()
     val pendingPermission by viewModel.pendingToolPermission.collectAsStateWithLifecycle()
     val pendingQuestion by viewModel.pendingUserQuestion.collectAsStateWithLifecycle()
+    val targetRewindMessageId by viewModel.targetRewindMessageId.collectAsStateWithLifecycle()
     val globalActiveProvider = settingsViewModel?.activeProvider?.collectAsStateWithLifecycle()?.value
     val providers = (settingsViewModel?.providers?.collectAsStateWithLifecycle()?.value ?: emptyList()).filter { it.isEnabled }
     val modelMetadata = settingsViewModel?.modelMetadata?.collectAsStateWithLifecycle()?.value.orEmpty()
@@ -593,7 +594,8 @@ fun AIChatPanel(
                             AgentMessageItem(
                                 message = message,
                                 liveOutput = live,
-                                markdownCache = markdownCache
+                                markdownCache = markdownCache,
+                                onRewindClick = { viewModel.openRewindMenu(it) }
                             )
                         }
                         val reasoning = streamingReasoning
@@ -720,6 +722,19 @@ fun AIChatPanel(
                     } else 0f
                 }
             )
+
+            targetRewindMessageId?.let { targetId ->
+                val targetMsg = messages.find { it.id == targetId }
+                RewindOptionsBottomSheet(
+                    promptSnippet = targetMsg?.content ?: "",
+                    onOptionSelected = { option ->
+                        viewModel.executeRewindOption(targetId, option) { text ->
+                            inputText = text
+                        }
+                    },
+                    onDismissRequest = { viewModel.dismissRewindMenu() }
+                )
+            }
         }
     }
 }

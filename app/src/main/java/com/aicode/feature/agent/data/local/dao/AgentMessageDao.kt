@@ -38,8 +38,14 @@ interface AgentMessageDao {
     @Query("DELETE FROM agent_messages")
     suspend fun deleteAllMessages()
 
+    @Query("SELECT * FROM agent_messages WHERE id = :id LIMIT 1")
+    suspend fun getMessageById(id: String): AgentMessageEntity?
+
     @Query("DELETE FROM agent_messages WHERE id = :id")
-    suspend fun deleteById(id: String)
+    suspend fun deleteMessageById(id: String)
+
+    @Query("DELETE FROM agent_messages WHERE sessionId = :sessionId AND timestamp > :cutoffTimestamp")
+    suspend fun deleteMessagesAfterTimestamp(sessionId: String, cutoffTimestamp: Long)
 
     /**
      * 把残留的「执行中」工具行（content 以占位标记开头）批量收尾为「已中断」。

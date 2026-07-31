@@ -34,4 +34,5 @@ interface SlashCommandHandler {
 interface SlashCommandContext {
     fun showSessionStatus()
     fun compactCurrentSession()
+    fun openRewindConsole()
 }

@@ -5,6 +5,8 @@ import androidx.lifecycle.viewModelScope
 import com.aicode.core.util.FileLogger
 import com.aicode.core.util.toUserMessage
 import com.aicode.feature.agent.data.local.dao.AgentMessageDao
+import com.aicode.feature.agent.domain.checkpoint.CheckpointManager
+import com.aicode.feature.agent.data.local.dao.CheckpointDao
 import com.aicode.feature.agent.data.local.dao.ChatSessionDao
 import com.aicode.feature.agent.data.CodeChangeTracker
 import com.aicode.feature.agent.domain.container.ContainerInitState
@@ -30,6 +32,7 @@ import com.aicode.feature.agent.domain.command.SlashCommandContext
 import com.aicode.feature.agent.domain.command.SlashCommandRegistry
 import com.aicode.feature.agent.domain.command.SlashCommandHandler
 import com.aicode.feature.agent.presentation.AgentAttachment
+import com.aicode.feature.agent.presentation.component.RewindOption
 import com.aicode.feature.agent.presentation.component.formatTokenCount
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
@@ -67,7 +70,9 @@ class AIAgentViewModel @Inject constructor(
     private val messagePersistenceUseCase: MessagePersistenceUseCase,
     private val planApprovalManager: com.aicode.feature.agent.domain.tool.mode.PlanApprovalManager,
     private val terminalSessionManager: com.aicode.feature.terminal.domain.TerminalSessionManager,
-    private val slashCommandRegistry: SlashCommandRegistry
+    private val slashCommandRegistry: SlashCommandRegistry,
+    private val checkpointManager: CheckpointManager,
+    private val checkpointDao: CheckpointDao
 ) : ViewModel(), SlashCommandContext {
 
     private val sessionJobs = mutableMapOf<String, Job>()
@@ -369,7 +374,9 @@ class AIAgentViewModel @Inject constructor(
             val history = messagePersistenceUseCase.buildHistory(sessionId, SessionUseCase.PENDING_TOOL_MARKER)
             val isFirst = history.isEmpty()
 
-            messagePersistenceUseCase.persist(sessionId, MessageRole.USER, request, attachments = inputAttachments)
+            val userMsgId = UUID.randomUUID().toString()
+            messagePersistenceUseCase.persist(sessionId, MessageRole.USER, request, id = userMsgId, attachments = inputAttachments)
+            checkpointManager.createCheckpoint(sessionId, userMsgId, request)
             if (isFirst) sessionUseCase.updateTitle(sessionId, sessionUseCase.deriveTitle(request))
             sessionUseCase.touch(sessionId, messagePersistenceUseCase.nextTimestamp())
 
@@ -501,7 +508,9 @@ class AIAgentViewModel @Inject constructor(
             val isFirst = history.isEmpty()
 
             if (!isAutoTrigger) {
-                messagePersistenceUseCase.persist(sessionId, MessageRole.USER, request, attachments = inputAttachments)
+                val userMsgId = UUID.randomUUID().toString()
+                messagePersistenceUseCase.persist(sessionId, MessageRole.USER, request, id = userMsgId, attachments = inputAttachments)
+                checkpointManager.createCheckpoint(sessionId, userMsgId, request)
                 if (isFirst) sessionUseCase.updateTitle(sessionId, sessionUseCase.deriveTitle(request))
             }
             sessionUseCase.touch(sessionId, messagePersistenceUseCase.nextTimestamp())
@@ -780,6 +789,17 @@ class AIAgentViewModel @Inject constructor(
     /** 暴露给 UI：输入框下拉菜单展示的命令列表。 */
     val slashCommands: List<SlashCommandHandler> get() = slashCommandRegistry.all
 
+    override fun openRewindConsole() {
+        val sid = _currentSessionId.value ?: return
+        viewModelScope.launch {
+            val messages = agentMessageDao.getMessagesBySessionOnce(sid)
+            val lastUserMsg = messages.lastOrNull { it.role == "USER" }
+            if (lastUserMsg != null) {
+                openRewindMenu(lastUserMsg.id)
+            }
+        }
+    }
+
     /** /status —— 以 Markdown 表格作为 AI 气泡输出当前会话状态。 */
     override fun showSessionStatus() {
         val sid = _currentSessionId.value ?: return
@@ -865,6 +885,7 @@ class AIAgentViewModel @Inject constructor(
     }
 
     fun deleteSession(id: String) = viewModelScope.launch {
+        checkpointManager.clearSessionCheckpoints(id)
         sessionUseCase.deleteSession(id)
 
         sessionJobs[id]?.cancel()
@@ -890,6 +911,61 @@ class AIAgentViewModel @Inject constructor(
                     sessionUseCase.upsertSession(s)
                     _currentSessionId.value = s.id
                 }
+            }
+        }
+    }
+
+    /** 重命名会话标题。仅更新 title，不改 updatedAt，列表顺序保持不变。 */
+    // Checkpoint Rewind 选中的 Target Message
+    private val _targetRewindMessageId = MutableStateFlow<String?>(null)
+    val targetRewindMessageId: StateFlow<String?> = _targetRewindMessageId.asStateFlow()
+
+    fun openRewindMenu(messageId: String) {
+        _targetRewindMessageId.value = messageId
+    }
+
+    fun dismissRewindMenu() {
+        _targetRewindMessageId.value = null
+    }
+
+    fun executeRewindOption(messageId: String, option: RewindOption, onFillPrompt: (String) -> Unit) = viewModelScope.launch {
+        val sessionId = _currentSessionId.value ?: return@launch
+        val checkpoint = checkpointDao.getCheckpointByMessageId(messageId)
+        val targetMsgEntity = agentMessageDao.getMessageById(messageId) ?: return@launch
+
+        when (option) {
+            RewindOption.RESTORE_CODE_AND_CONVERSATION -> {
+                if (checkpoint != null) {
+                    checkpointManager.restoreCodeToCheckpoint(sessionId, checkpoint.id)
+                }
+                // 删除此消息之后的所有对话
+                agentMessageDao.deleteMessagesAfterTimestamp(sessionId, targetMsgEntity.timestamp)
+                agentMessageDao.deleteMessageById(messageId)
+                dismissRewindMenu()
+                onFillPrompt(targetMsgEntity.content)
+            }
+            RewindOption.RESTORE_CONVERSATION -> {
+                // 保持代码不变，删后续对话
+                agentMessageDao.deleteMessagesAfterTimestamp(sessionId, targetMsgEntity.timestamp)
+                agentMessageDao.deleteMessageById(messageId)
+                dismissRewindMenu()
+                onFillPrompt(targetMsgEntity.content)
+            }
+            RewindOption.RESTORE_CODE -> {
+                if (checkpoint != null) {
+                    checkpointManager.restoreCodeToCheckpoint(sessionId, checkpoint.id)
+                }
+                dismissRewindMenu()
+            }
+            RewindOption.SUMMARIZE_FROM_HERE -> {
+                // 手动压缩自当前节点往后的消息
+                compactCurrentSession()
+                dismissRewindMenu()
+            }
+            RewindOption.SUMMARIZE_UP_TO_HERE -> {
+                // 压缩到当前节点
+                compactCurrentSession()
+                dismissRewindMenu()
             }
         }
     }

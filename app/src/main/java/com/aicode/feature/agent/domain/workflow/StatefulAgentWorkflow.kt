@@ -9,6 +9,7 @@ import com.aicode.feature.agent.domain.model.WorkflowResult
 import com.aicode.feature.agent.domain.model.WorkflowStatus
 import com.aicode.feature.agent.domain.session.SessionUseCase
 import com.aicode.feature.agent.domain.session.MessagePersistenceUseCase
+import com.aicode.feature.agent.domain.checkpoint.CheckpointManager
 import com.aicode.feature.agent.domain.permission.PermissionChoice
 import com.aicode.feature.agent.domain.permission.PermissionScope
 import com.aicode.feature.agent.domain.permission.ToolPermissionPolicyEngine
@@ -74,7 +75,8 @@ class StatefulAgentWorkflow @Inject constructor(
     private val visionModelSettingsRepository: VisionModelSettingsRepository,
     private val compactionModelSettingsRepository: CompactionModelSettingsRepository,
     private val sessionUseCase: SessionUseCase,
-    private val messagePersistenceUseCase: MessagePersistenceUseCase
+    private val messagePersistenceUseCase: MessagePersistenceUseCase,
+    private val checkpointManager: CheckpointManager
 ) : AgentWorkflow {
 
     private companion object {
@@ -376,6 +378,14 @@ class StatefulAgentWorkflow @Inject constructor(
                         actionQueue.addLast(AgentAction.PermissionEvaluated(effect.toolCall, checkResult.approved, argsPreview, checkResult.denyReason, checkResult.errorCode))
                     }
                     is AgentSideEffect.ExecuteTool -> {
+                        val toolName = effect.toolCall.name
+                        if (toolName == "editFile" || toolName == "writeFile") {
+                            (effect.toolCall.arguments["path"] as? JsonPrimitive)?.contentOrNull?.let { path ->
+                                currentContext.sessionId?.let { sid ->
+                                    checkpointManager.beforeFileModified(sid, path)
+                                }
+                            }
+                        }
                         val tool = toolRegistry.getTool(effect.toolCall.name)
                         var runResult = runToolSync(tool, effect.toolCall, currentContext)
                         var rawResult = runResult.raw
@@ -521,6 +531,14 @@ class StatefulAgentWorkflow @Inject constructor(
                         actionQueue.addLast(AgentAction.PermissionEvaluated(effect.toolCall, checkResult.approved, argsPreview, checkResult.denyReason, checkResult.errorCode))
                     }
                     is AgentSideEffect.ExecuteTool -> {
+                        val toolName = effect.toolCall.name
+                        if (toolName == "editFile" || toolName == "writeFile") {
+                            (effect.toolCall.arguments["path"] as? JsonPrimitive)?.contentOrNull?.let { path ->
+                                currentContext.sessionId?.let { sid ->
+                                    checkpointManager.beforeFileModified(sid, path)
+                                }
+                            }
+                        }
                         val tool = toolRegistry.getTool(effect.toolCall.name)
                         var runResult = if (tool is StreamingAgentTool) {
                             runToolStream(tool, effect.toolCall, currentContext) { emit(it) }
