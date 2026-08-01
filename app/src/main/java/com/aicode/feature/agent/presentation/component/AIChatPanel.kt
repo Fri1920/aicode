@@ -1,6 +1,10 @@
 package com.aicode.feature.agent.presentation.component
 
 import android.content.Context
+import android.content.ClipData
+import androidx.compose.ui.platform.ClipEntry
+import androidx.compose.ui.platform.LocalClipboard
+import com.aicode.feature.agent.presentation.AgentUIMessage
 import android.net.Uri
 import android.provider.OpenableColumns
 import android.widget.Toast
@@ -313,6 +317,8 @@ fun AIChatPanel(
         if (inputText != inputDraft) inputText = inputDraft
     }
     var pendingAttachments by remember { mutableStateOf<List<PendingUploadAttachment>>(emptyList()) }
+    var messageForMenu by remember { mutableStateOf<AgentUIMessage?>(null) }
+    var editingMessage by remember { mutableStateOf<AgentUIMessage?>(null) }
     val listState = rememberLazyListState()
     val markdownCache = remember { MarkdownRenderCache() }
     val scope = rememberCoroutineScope()
@@ -595,7 +601,8 @@ fun AIChatPanel(
                                 message = message,
                                 liveOutput = live,
                                 markdownCache = markdownCache,
-                                onRewindClick = { viewModel.openRewindMenu(it) }
+                                onRewindClick = { viewModel.openRewindMenu(it) },
+                                onMoreClick = { messageForMenu = it }
                             )
                         }
                         val reasoning = streamingReasoning
@@ -733,6 +740,34 @@ fun AIChatPanel(
                         }
                     },
                     onDismissRequest = { viewModel.dismissRewindMenu() }
+                )
+            }
+
+            messageForMenu?.let { message ->
+                val clipboard = LocalClipboard.current
+                val copyScope = rememberCoroutineScope()
+                MessageActionsBottomSheet(
+                    message = message,
+                    onDismiss = { messageForMenu = null },
+                    onEditClick = { editingMessage = message },
+                    onCopyClick = {
+                        copyScope.launch {
+                            clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("message", message.content)))
+                        }
+                    },
+                    onRewindClick = { viewModel.openRewindMenu(message.id) },
+                    onDeleteClick = { viewModel.deleteMessage(message.id) }
+                )
+            }
+
+            editingMessage?.let { message ->
+                EditMessageDialog(
+                    initialText = message.content,
+                    onDismiss = { editingMessage = null },
+                    onConfirm = { newContent ->
+                        viewModel.updateMessageContent(message.id, newContent)
+                        editingMessage = null
+                    }
                 )
             }
         }

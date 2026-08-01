@@ -41,6 +41,9 @@ interface AgentMessageDao {
     @Query("SELECT * FROM agent_messages WHERE id = :id LIMIT 1")
     suspend fun getMessageById(id: String): AgentMessageEntity?
 
+    @Query("UPDATE agent_messages SET content = :content WHERE id = :id")
+    suspend fun updateMessageContent(id: String, content: String)
+
     @Query("DELETE FROM agent_messages WHERE id = :id")
     suspend fun deleteMessageById(id: String)
 

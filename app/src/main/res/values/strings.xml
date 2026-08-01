@@ -658,4 +658,10 @@
 
     <!-- Helper Strings -->
     <string name="container_channel_deleted">通道已删除</string>
+    <string name="chat_more_options">更多选项</string>
+    <string name="chat_action_edit">编辑消息</string>
+    <string name="chat_action_copy">复制文本</string>
+    <string name="chat_action_delete">删除消息</string>
+    <string name="chat_edit_dialog_title">编辑消息</string>
+    <string name="chat_edit_dialog_hint">请输入消息内容</string>
 </resources>

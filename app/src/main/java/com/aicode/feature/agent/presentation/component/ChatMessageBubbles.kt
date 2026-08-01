@@ -94,6 +94,7 @@ import com.mikepenz.markdown.model.State as MarkdownParseState
 import dev.snipme.highlights.Highlights
 import dev.snipme.highlights.model.SyntaxThemes
 import compose.icons.FeatherIcons
+import compose.icons.feathericons.MoreHorizontal
 import compose.icons.feathericons.RotateCcw
 import compose.icons.feathericons.Check
 import compose.icons.feathericons.Copy
@@ -137,7 +138,8 @@ internal fun AgentMessageItem(
     message: AgentUIMessage,
     liveOutput: String? = null,
     markdownCache: MarkdownRenderCache? = null,
-    onRewindClick: ((String) -> Unit)? = null
+    onRewindClick: ((String) -> Unit)? = null,
+    onMoreClick: ((AgentUIMessage) -> Unit)? = null
 ) {
     if (message.isCompactionMarker) {
         CompactionDivider()
@@ -277,6 +279,19 @@ internal fun AgentMessageItem(
                                 contentDescription = if (copied) stringResource(R.string.chat_copied) else stringResource(R.string.chat_copy),
                                 modifier = Modifier.size(14.dp),
                             )
+                        }
+                        if (onMoreClick != null) {
+                            IconButton(
+                                onClick = { onMoreClick(message) },
+                                modifier = Modifier.size(28.dp),
+                                colors = IconButtonDefaults.iconButtonColors(contentColor = iconTint),
+                            ) {
+                                Icon(
+                                    FeatherIcons.MoreHorizontal,
+                                    contentDescription = stringResource(R.string.chat_more_options),
+                                    modifier = Modifier.size(14.dp),
+                                )
+                            }
                         }
                         if (message.role == MessageRole.ASSISTANT && (message.inputTokens > 0 || message.outputTokens > 0)) {
                             val inStr = formatTokenCount(message.inputTokens)

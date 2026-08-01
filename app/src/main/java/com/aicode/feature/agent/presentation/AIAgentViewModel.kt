@@ -1067,6 +1067,22 @@ class AIAgentViewModel @Inject constructor(
         setChanges(sessionId, emptyList())
     }
 
+    fun updateMessageContent(messageId: String, newContent: String) = viewModelScope.launch {
+        try {
+            messagePersistenceUseCase.updateContent(messageId, newContent)
+        } catch (e: Exception) {
+            FileLogger.e(TAG, "更新消息失败", e)
+        }
+    }
+
+    fun deleteMessage(messageId: String) = viewModelScope.launch {
+        try {
+            messagePersistenceUseCase.deleteMessage(messageId)
+        } catch (e: Exception) {
+            FileLogger.e(TAG, "删除消息失败", e)
+        }
+    }
+
     private fun detectLanguage(filePath: String): String {
         return when (filePath.substringAfterLast(".").lowercase()) {
             "kt", "kotlin" -> "kotlin"

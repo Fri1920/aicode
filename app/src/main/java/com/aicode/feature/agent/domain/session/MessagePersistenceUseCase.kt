@@ -70,6 +70,14 @@ class MessagePersistenceUseCase @Inject constructor(
         )
     }
 
+    suspend fun updateContent(messageId: String, newContent: String) {
+        agentMessageDao.updateMessageContent(messageId, newContent)
+    }
+
+    suspend fun deleteMessage(messageId: String) {
+        agentMessageDao.deleteMessageById(messageId)
+    }
+
     /**
      * 从持久化的消息重建合法的上下文历史。
      * 关键：只保留「assistant 的 tool_call」与「tool 结果」能配对成功的部分，
