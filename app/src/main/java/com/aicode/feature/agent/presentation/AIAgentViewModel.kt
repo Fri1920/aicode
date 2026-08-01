@@ -938,33 +938,19 @@ class AIAgentViewModel @Inject constructor(
                 if (checkpoint != null) {
                     checkpointManager.restoreCodeToCheckpoint(sessionId, checkpoint.id)
                 }
-                // 删除此消息之后的所有对话
-                agentMessageDao.deleteMessagesAfterTimestamp(sessionId, targetMsgEntity.timestamp)
-                agentMessageDao.deleteMessageById(messageId)
+                agentMessageDao.deleteMessagesFromTimestamp(sessionId, targetMsgEntity.timestamp)
                 dismissRewindMenu()
-                onFillPrompt(targetMsgEntity.content)
+                withContext(Dispatchers.Main) { onFillPrompt(targetMsgEntity.content) }
             }
             RewindOption.RESTORE_CONVERSATION -> {
-                // 保持代码不变，删后续对话
-                agentMessageDao.deleteMessagesAfterTimestamp(sessionId, targetMsgEntity.timestamp)
-                agentMessageDao.deleteMessageById(messageId)
+                agentMessageDao.deleteMessagesFromTimestamp(sessionId, targetMsgEntity.timestamp)
                 dismissRewindMenu()
-                onFillPrompt(targetMsgEntity.content)
+                withContext(Dispatchers.Main) { onFillPrompt(targetMsgEntity.content) }
             }
             RewindOption.RESTORE_CODE -> {
                 if (checkpoint != null) {
                     checkpointManager.restoreCodeToCheckpoint(sessionId, checkpoint.id)
                 }
-                dismissRewindMenu()
-            }
-            RewindOption.SUMMARIZE_FROM_HERE -> {
-                // 手动压缩自当前节点往后的消息
-                compactCurrentSession()
-                dismissRewindMenu()
-            }
-            RewindOption.SUMMARIZE_UP_TO_HERE -> {
-                // 压缩到当前节点
-                compactCurrentSession()
                 dismissRewindMenu()
             }
         }
@@ -1077,7 +1063,11 @@ class AIAgentViewModel @Inject constructor(
 
     fun deleteMessage(messageId: String) = viewModelScope.launch {
         try {
-            messagePersistenceUseCase.deleteMessage(messageId)
+            val msg = agentMessageDao.getMessageById(messageId)
+            if (msg != null && msg.role == MessageRole.USER.name) {
+                agentMessageDao.deleteMessagesAfterTimestamp(msg.sessionId, msg.timestamp)
+            }
+            agentMessageDao.deleteMessageById(messageId)
         } catch (e: Exception) {
             FileLogger.e(TAG, "删除消息失败", e)
         }

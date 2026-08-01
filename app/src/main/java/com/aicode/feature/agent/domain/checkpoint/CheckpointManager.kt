@@ -23,6 +23,7 @@ class CheckpointManager @Inject constructor(
     private val baseCheckpointDir: File
         get() = File(context.filesDir, "checkpoints")
 
+    @Volatile
     private var activeCheckpointId: String? = null
 
     /**
@@ -63,8 +64,7 @@ class CheckpointManager @Inject constructor(
         val targetFile = File(filePath)
 
         // 查重：同一个 checkpointId 内对同一文件只保留最原始的一次快照
-        val existingSnapshots = checkpointDao.getFileSnapshotsForCheckpoint(checkpointId)
-        if (existingSnapshots.any { it.filePath == filePath }) {
+        if (checkpointDao.countSnapshot(checkpointId, filePath) > 0) {
             return@withContext
         }
 

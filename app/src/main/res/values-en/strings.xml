@@ -248,10 +248,6 @@
     <string name="checkpoint_restore_conversation_desc">Keep current code, truncate conversation to this point</string>
     <string name="checkpoint_restore_code">Restore code only</string>
     <string name="checkpoint_restore_code_desc">Revert code to snapshot before this point, keep conversation</string>
-    <string name="checkpoint_summarize_from_here">Summarize from here</string>
-    <string name="checkpoint_summarize_from_here_desc">Compress messages after this point into a summary</string>
-    <string name="checkpoint_summarize_up_to_here">Summarize up to here</string>
-    <string name="checkpoint_summarize_up_to_here_desc">Compress messages before this point into a summary</string>
 
     <!-- Chat Message Bubbles -->
     <string name="chat_copied">Copied</string>

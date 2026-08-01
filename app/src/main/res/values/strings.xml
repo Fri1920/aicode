@@ -248,10 +248,6 @@
     <string name="checkpoint_restore_conversation_desc">保持当前代码，将对话截断回滚至此点</string>
     <string name="checkpoint_restore_code">仅恢复代码</string>
     <string name="checkpoint_restore_code_desc">恢复代码至此点之前的快照，保持对话历史</string>
-    <string name="checkpoint_summarize_from_here">从此处开始总结</string>
-    <string name="checkpoint_summarize_from_here_desc">将此节点往后的对话压缩为摘要以释放上下文</string>
-    <string name="checkpoint_summarize_up_to_here">截止到此处总结</string>
-    <string name="checkpoint_summarize_up_to_here_desc">将此节点之前的历史对话压缩为摘要</string>
 
     <!-- Chat Message Bubbles -->
     <string name="chat_copied">已复制</string>

@@ -324,7 +324,7 @@ private suspend fun checkUpdate(context: Context, currentVersion: String): Updat
 }
 
 /** GitHub tag 形如 v1.7.0 / 1.7.0 / v1.7.0-rc1，提取出纯版本号。 */
-private fun parseVersionTag(tag: String): String? {
+internal fun parseVersionTag(tag: String): String? {
     val raw = tag.trim().removePrefix("v")
     val seg = raw.substringBefore(' ')
     return seg.ifBlank { null }
@@ -334,7 +334,7 @@ private fun parseVersionTag(tag: String): String? {
  * 语义化版本比较：判断最新版本 [latest] 是否严格大于当前版本 [current]。
  * 若 latest 不大于 current（即最新版本已安装或当前属于开发/测试版），返回 true 表示已是最新。
  */
-private fun isUpToDate(latest: String, current: String): Boolean {
+internal fun isUpToDate(latest: String, current: String): Boolean {
     val cmp = compareVersions(latest, current)
     return cmp <= 0
 }
@@ -347,7 +347,7 @@ private fun isUpToDate(latest: String, current: String): Boolean {
  * 2. 主次修相同时，正式版 > 预发布版（1.7.0 > 1.7.0-rc1 > 1.7.0-dev）
  * 3. 均为预发布版时，比较修饰串（rc2 > rc1）
  */
-private fun compareVersions(v1: String, v2: String): Int {
+internal fun compareVersions(v1: String, v2: String): Int {
     if (v1 == v2) return 0
 
     val (base1, pre1) = splitVersion(v1)
@@ -371,7 +371,7 @@ private fun compareVersions(v1: String, v2: String): Int {
     return pre1.compareTo(pre2)
 }
 
-private fun splitVersion(v: String): Pair<String, String> {
+internal fun splitVersion(v: String): Pair<String, String> {
     val clean = v.substringBefore('+') // 去掉构建哈希如 +g04bc2fa
     val base = clean.substringBefore('-')
     val pre = if (clean.contains('-')) clean.substringAfter('-') else ""

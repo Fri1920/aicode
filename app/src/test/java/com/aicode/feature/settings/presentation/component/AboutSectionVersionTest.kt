@@ -1,43 +1,114 @@
 package com.aicode.feature.settings.presentation.component
 
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class AboutSectionVersionTest {
 
-    private fun compareVersions(v1: String, v2: String): Int {
-        if (v1 == v2) return 0
+    // ---- parseVersionTag ----
 
-        val split1 = splitVersion(v1)
-        val split2 = splitVersion(v2)
-
-        val parts1 = split1.first.split('.').mapNotNull { it.toIntOrNull() }
-        val parts2 = split2.first.split('.').mapNotNull { it.toIntOrNull() }
-
-        val maxLen = maxOf(parts1.size, parts2.size)
-        for (i in 0 until maxLen) {
-            val p1 = parts1.getOrElse(i) { 0 }
-            val p2 = parts2.getOrElse(i) { 0 }
-            if (p1 != p2) return p1.compareTo(p2)
-        }
-
-        if (split1.second.isEmpty() && split2.second.isNotEmpty()) return 1
-        if (split1.second.isNotEmpty() && split2.second.isEmpty()) return -1
-
-        return split1.second.compareTo(split2.second)
+    @Test
+    fun parseVersionTag_stripsVPrefix() {
+        assertEquals("1.7.0", parseVersionTag("v1.7.0"))
+        assertEquals("1.7.0-rc1", parseVersionTag("v1.7.0-rc1"))
     }
 
-    private fun splitVersion(v: String): Pair<String, String> {
-        val clean = v.substringBefore('+')
-        val base = clean.substringBefore('-')
-        val pre = if (clean.contains('-')) clean.substringAfter('-') else ""
-        return base to pre
+    @Test
+    fun parseVersionTag_withoutVPrefix() {
+        assertEquals("1.7.0", parseVersionTag("1.7.0"))
+        assertEquals("1.7.0-dev.2", parseVersionTag("1.7.0-dev.2"))
     }
 
-    private fun isUpToDate(latest: String, current: String): Boolean {
-        return compareVersions(latest, current) <= 0
+    @Test
+    fun parseVersionTag_trimsWhitespace() {
+        assertEquals("1.7.0", parseVersionTag("  v1.7.0  "))
     }
+
+    @Test
+    fun parseVersionTag_returnsNullForBlank() {
+        assertNull(parseVersionTag(""))
+        assertNull(parseVersionTag("   "))
+    }
+
+    @Test
+    fun parseVersionTag_takesSegmentBeforeSpace() {
+        assertEquals("1.7.0", parseVersionTag("1.7.0 extra metadata"))
+    }
+
+    // ---- splitVersion ----
+
+    @Test
+    fun splitVersion_plainRelease() {
+        val (base, pre) = splitVersion("1.7.0")
+        assertEquals("1.7.0", base)
+        assertEquals("", pre)
+    }
+
+    @Test
+    fun splitVersion_preRelease() {
+        val (base, pre) = splitVersion("1.7.0-rc1")
+        assertEquals("1.7.0", base)
+        assertEquals("rc1", pre)
+    }
+
+    @Test
+    fun splitVersion_stripsBuildHash() {
+        val (base, pre) = splitVersion("1.7.0-dev.2+g04bc2fa")
+        assertEquals("1.7.0", base)
+        assertEquals("dev.2", pre)
+    }
+
+    // ---- compareVersions ----
+
+    @Test
+    fun compareVersions_equal() {
+        assertEquals(0, compareVersions("1.7.0", "1.7.0"))
+        assertEquals(0, compareVersions("1.7.0-rc1", "1.7.0-rc1"))
+    }
+
+    @Test
+    fun compareVersions_higherBaseVersion() {
+        assertTrue(compareVersions("1.7.0", "1.6.0") > 0)
+        assertTrue(compareVersions("2.0.0", "1.9.9") > 0)
+    }
+
+    @Test
+    fun compareVersions_lowerBaseVersion() {
+        assertTrue(compareVersions("1.6.0", "1.7.0") < 0)
+        assertTrue(compareVersions("1.9.9", "2.0.0") < 0)
+    }
+
+    @Test
+    fun compareVersions_releaseVsPreRelease() {
+        // 正式版 > 预发布版
+        assertTrue(compareVersions("1.7.0", "1.7.0-rc1") > 0)
+        assertTrue(compareVersions("1.7.0-rc1", "1.7.0") < 0)
+    }
+
+    @Test
+    fun compareVersions_preReleaseOrdering() {
+        // rc2 > rc1
+        assertTrue(compareVersions("1.7.0-rc2", "1.7.0-rc1") > 0)
+        assertTrue(compareVersions("1.7.0-rc1", "1.7.0-rc2") < 0)
+    }
+
+    @Test
+    fun compareVersions_devVsRc() {
+        // "dev" < "rc" (lexicographic)
+        assertTrue(compareVersions("1.7.0-rc1", "1.7.0-dev.2+g04bc2fa") > 0)
+    }
+
+    @Test
+    fun compareVersions_differentSegmentCount() {
+        // 1.7 > 1.7.0 because 1.7 maps to [1,7], 1.7.0 maps to [1,7,0]
+        // getOrElse fills missing with 0, so they're equal
+        assertEquals(0, compareVersions("1.7", "1.7.0"))
+    }
+
+    // ---- isUpToDate ----
 
     @Test
     fun sameVersion_isUpToDate() {
@@ -47,25 +118,27 @@ class AboutSectionVersionTest {
 
     @Test
     fun currentIsRc_latestIsRelease_needsUpdate() {
-        // 当前是 1.7.0-rc1，远端发布了 1.7.0 正式版 -> 需更新
         assertFalse(isUpToDate("1.7.0", "1.7.0-rc1"))
     }
 
     @Test
     fun currentIsDevBuild_latestIsRc_needsUpdate() {
-        // 开发版 1.7.0-dev.2+g04bc2fa，远端是 1.7.0-rc1（RC 优先于 dev） -> 需更新
         assertFalse(isUpToDate("1.7.0-rc1", "1.7.0-dev.2+g04bc2fa"))
     }
 
     @Test
     fun currentIsOlder_needsUpdate() {
-        // 当前是 1.6.0，远端是 1.7.0 -> 需更新
         assertFalse(isUpToDate("1.7.0", "1.6.0"))
     }
 
     @Test
     fun currentIsNewer_isUpToDate() {
-        // 当前本地已经开发 1.8.0-dev，远端最新是 1.7.0 -> 已是最新
         assertTrue(isUpToDate("1.7.0", "1.8.0-dev"))
+    }
+
+    @Test
+    fun latestEqualsCurrentWithBuildHash_isUpToDate() {
+        // 1.7.0 == 1.7.0+g04bc2fa (build hash stripped)
+        assertTrue(isUpToDate("1.7.0", "1.7.0+g04bc2fa"))
     }
 }

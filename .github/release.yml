@@ -1,4 +1,0 @@
-changelog:
-  options:
-    # 允许直接 git push 的普通 commit 也显示在 What's Changed 中
-    exclude_all_commits: false

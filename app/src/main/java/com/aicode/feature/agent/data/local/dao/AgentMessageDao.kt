@@ -47,6 +47,9 @@ interface AgentMessageDao {
     @Query("DELETE FROM agent_messages WHERE id = :id")
     suspend fun deleteMessageById(id: String)
 
+    @Query("DELETE FROM agent_messages WHERE sessionId = :sessionId AND timestamp >= :cutoffTimestamp")
+    suspend fun deleteMessagesFromTimestamp(sessionId: String, cutoffTimestamp: Long)
+
     @Query("DELETE FROM agent_messages WHERE sessionId = :sessionId AND timestamp > :cutoffTimestamp")
     suspend fun deleteMessagesAfterTimestamp(sessionId: String, cutoffTimestamp: Long)
 

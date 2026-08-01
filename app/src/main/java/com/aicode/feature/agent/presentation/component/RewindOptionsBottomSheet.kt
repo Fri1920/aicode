@@ -27,14 +27,11 @@ import compose.icons.FeatherIcons
 import compose.icons.feathericons.FileText
 import compose.icons.feathericons.MessageSquare
 import compose.icons.feathericons.RotateCcw
-import compose.icons.feathericons.Zap
 
 enum class RewindOption {
     RESTORE_CODE_AND_CONVERSATION,
     RESTORE_CONVERSATION,
-    RESTORE_CODE,
-    SUMMARIZE_FROM_HERE,
-    SUMMARIZE_UP_TO_HERE
+    RESTORE_CODE
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -100,26 +97,6 @@ fun RewindOptionsBottomSheet(
                 description = stringResource(R.string.checkpoint_restore_code_desc),
                 onClick = {
                     onOptionSelected(RewindOption.RESTORE_CODE)
-                    onDismissRequest()
-                }
-            )
-
-            OptionRow(
-                icon = FeatherIcons.Zap,
-                title = stringResource(R.string.checkpoint_summarize_from_here),
-                description = stringResource(R.string.checkpoint_summarize_from_here_desc),
-                onClick = {
-                    onOptionSelected(RewindOption.SUMMARIZE_FROM_HERE)
-                    onDismissRequest()
-                }
-            )
-
-            OptionRow(
-                icon = FeatherIcons.Zap,
-                title = stringResource(R.string.checkpoint_summarize_up_to_here),
-                description = stringResource(R.string.checkpoint_summarize_up_to_here_desc),
-                onClick = {
-                    onOptionSelected(RewindOption.SUMMARIZE_UP_TO_HERE)
                     onDismissRequest()
                 }
             )
