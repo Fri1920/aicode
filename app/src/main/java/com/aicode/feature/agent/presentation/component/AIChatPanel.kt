@@ -76,6 +76,7 @@ import com.aicode.feature.agent.presentation.AIAgentViewModel
 import com.aicode.feature.agent.presentation.hasVisibleContent
 import com.aicode.feature.agent.presentation.MessageRole
 import com.aicode.feature.settings.presentation.SettingsViewModel
+import com.aicode.feature.settings.presentation.component.ModelLogoIcon
 import com.aicode.feature.workspace.presentation.WorkspaceViewModel
 import compose.icons.FeatherIcons
 import compose.icons.feathericons.GitBranch
@@ -936,8 +937,11 @@ internal fun ChatHeader(
                     )
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(Spacing.sm)
+                        horizontalArrangement = Arrangement.spacedBy(Spacing.xs)
                     ) {
+                        if (!modelName.isNullOrBlank()) {
+                            ModelLogoIcon(modelName = modelName, size = 14.dp)
+                        }
                         Text(
                             text = modelName?.takeIf { it.isNotBlank() } ?: stringResource(R.string.chat_no_model_selected),
                             style = MaterialTheme.typography.bodySmall,

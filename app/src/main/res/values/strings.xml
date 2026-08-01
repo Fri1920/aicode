@@ -277,7 +277,7 @@
     <string name="container_reset_builtin">重置内置容器</string>
     <string name="container_reset_confirm">将删除内置 Alpine 容器的 rootfs 目录（含已安装的工具与配置），下次启动容器时会重新解压并初始化。是否继续？</string>
     <string name="container_builtin_auto">内置镜像 · 自动 (bash/sh)</string>
-    <string name="container_remote_ssh_desc">远程 SSH · ${connName ?: "通道已删除"} · ${ssh?.remoteWorkspacePath ?: ""}</string>
+    <string name="container_remote_ssh_desc">远程 SSH · %1$s · %2$s</string>
     <string name="container_imported_desc">导入的 tar.gz · shell: %1$s</string>
     <string name="container_edit_image">编辑镜像</string>
     <string name="container_local_image">本地镜像</string>
@@ -615,7 +615,7 @@
     <string name="terminal_close_tab">关闭标签</string>
     <string name="terminal_extracting_env">正在解压环境…\n已处理 %1$s 个文件</string>
     <string name="terminal_deploying_proot">正在部署 proot 运行时…</string>
-    <string name="terminal_installing_packages">正在安装 python3 / git / pip / node / npm…\n${state.line ?: ""}</string>
+    <string name="terminal_installing_packages">正在安装 python3 / git / pip / node / npm…\n%1$s</string>
     <string name="terminal_preparing_env_failed">正在准备容器环境…\n%1$s</string>
     <string name="terminal_preparing_env_first_run">正在准备容器环境…\n首次运行会解压容器，请稍候</string>
 
