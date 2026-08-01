@@ -4,6 +4,7 @@ import android.content.Context
 import com.aicode.feature.agent.data.local.dao.CheckpointDao
 import com.aicode.feature.agent.data.local.entity.CheckpointEntity
 import com.aicode.feature.agent.data.local.entity.CheckpointFileSnapshotEntity
+import com.aicode.feature.workspace.domain.FileAccessProvider
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -15,7 +16,8 @@ import javax.inject.Singleton
 @Singleton
 class CheckpointManager @Inject constructor(
     @ApplicationContext private val context: Context,
-    private val checkpointDao: CheckpointDao
+    private val checkpointDao: CheckpointDao,
+    private val fileAccess: FileAccessProvider
 ) {
     // 检查点备份根路径: <filesDir>/checkpoints/<sessionId>/<checkpointId>/
     private val baseCheckpointDir: File
@@ -71,12 +73,14 @@ class CheckpointManager @Inject constructor(
             snapshotDir.mkdirs()
         }
 
-        val changeType = if (targetFile.exists()) "MODIFY" else "CREATE"
-        val snapshotFileName = "${UUID.randomUUID()}_${targetFile.name}"
+        val exists = fileAccess.exists(filePath)
+        val changeType = if (exists) "MODIFY" else "CREATE"
+        val snapshotFileName = "${UUID.randomUUID()}_${File(filePath).name}"
         val snapshotFile = File(snapshotDir, snapshotFileName)
 
         if (changeType == "MODIFY") {
-            targetFile.copyTo(snapshotFile, overwrite = true)
+            val originalContent = fileAccess.readFile(filePath)
+            snapshotFile.writeText(originalContent)
         } else {
             snapshotFile.writeText("") // 标示创建空记录
         }
@@ -109,19 +113,18 @@ class CheckpointManager @Inject constructor(
         for (cp in checkpointsToRollback) {
             val snapshots = checkpointDao.getFileSnapshotsForCheckpoint(cp.id)
             for (snapshot in snapshots) {
-                val targetFile = File(snapshot.filePath)
                 val snapshotFile = File(baseCheckpointDir, snapshot.snapshotRelativePath)
 
                 if (snapshot.changeType == "MODIFY") {
                     if (snapshotFile.exists()) {
-                        targetFile.parentFile?.mkdirs()
-                        snapshotFile.copyTo(targetFile, overwrite = true)
+                        val content = snapshotFile.readText()
+                        fileAccess.writeFile(snapshot.filePath, content, overwrite = true)
                         restoredFileCount++
                     }
                 } else if (snapshot.changeType == "CREATE") {
                     // 若是原先新建的文件，回滚时安全删除
-                    if (targetFile.exists()) {
-                        targetFile.delete()
+                    if (fileAccess.exists(snapshot.filePath)) {
+                        fileAccess.delete(snapshot.filePath)
                         restoredFileCount++
                     }
                 }
