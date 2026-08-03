@@ -7,6 +7,7 @@ import android.content.pm.PackageManager
 import android.view.WindowManager
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
@@ -25,7 +26,10 @@ import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.platform.LocalView
@@ -55,9 +59,11 @@ import com.aicode.feature.terminal.presentation.TerminalViewModel
 import com.aicode.feature.terminal.presentation.component.TerminalScreen
 import com.aicode.feature.workspace.presentation.WorkspaceViewModel
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 import androidx.compose.ui.res.stringResource
 import com.aicode.R
@@ -253,6 +259,31 @@ fun AppNavigation() {
     val currentSessionId by agentViewModel.currentSessionId.collectAsStateWithLifecycle()
     val agentStates by agentViewModel.agentStates.collectAsStateWithLifecycle()
 
+    // ── 导出会话：SAF 保存文件 ──
+    var pendingExportBytes by remember { mutableStateOf<ByteArray?>(null) }
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val sessionExportLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/octet-stream")
+    ) { uri ->
+        val bytes = pendingExportBytes
+        if (uri != null && bytes != null) {
+            scope.launch {
+                runCatching {
+                    withContext(Dispatchers.IO) {
+                        context.contentResolver.openOutputStream(uri)?.use { it.write(bytes) }
+                    }
+                }.onSuccess {
+                    Toast.makeText(context, context.getString(R.string.chat_export_session_done), Toast.LENGTH_SHORT).show()
+                }.onFailure {
+                    Toast.makeText(context, context.getString(R.string.chat_export_session_failed), Toast.LENGTH_LONG).show()
+                }
+                pendingExportBytes = null
+            }
+        } else {
+            pendingExportBytes = null
+        }
+    }
+
     ModalNavigationDrawer(
         drawerState = drawerState,
         // 仅在聊天页启用手势滑出；其他页面禁止（但已打开时始终可关闭）。
@@ -278,6 +309,17 @@ fun AppNavigation() {
                     },
                     onDelete = { agentViewModel.deleteSession(it.id) },
                     onRename = { session, title -> agentViewModel.renameSession(session.id, title) },
+                    onExport = { session ->
+                        agentViewModel.exportSession(session.id) { bytes ->
+                            if (bytes != null && bytes.isNotEmpty()) {
+                                pendingExportBytes = bytes
+                                val safeTitle = session.title.replace(Regex("[^\\w\\u4e00-\\u9fa5\\-]"), "_")
+                                sessionExportLauncher.launch("aicode-session-$safeTitle-${System.currentTimeMillis()}.tar.gz")
+                            } else {
+                                Toast.makeText(context, context.getString(R.string.chat_export_session_empty), Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    },
                     onNavigateToSettings = {
                         scope.launch { drawerState.close() }
                         navController.navigate("settings")

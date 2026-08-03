@@ -11,6 +11,12 @@ interface BackupManager {
     suspend fun export(password: CharArray?, options: BackupOptions): ByteArray
 
     /**
+     * 导出单个会话（无密码 tar.gz）：只含该会话 + 关联消息 + todo，可由 [import] 直接还原。
+     * @return 明文 tar.gz 字节流
+     */
+    suspend fun exportSession(sessionId: String): ByteArray
+
+    /**
      * 解包并还原备份文件。
      * @param password 备份未加密时传 null 或空；加密文件必须提供正确口令。
      * @return 还原统计（各数据段条目数）；口令错误/格式不符/版本过高时返回失败。

@@ -134,6 +134,24 @@ class BackupManagerImpl @Inject constructor(
         }
     }
 
+    override suspend fun exportSession(sessionId: String): ByteArray = withContext(Dispatchers.IO) {
+        val session = chatSessionDao.getById(sessionId)
+            ?: error("Session not found: $sessionId")
+        val messages = agentMessageDao.getMessagesBySessionOnce(sessionId)
+        val todos = todoItemDao.getBySessionOnce(sessionId)
+
+        val snapshot = BackupSnapshot(
+            schemaVersion = currentSchemaVersion(),
+            appVersion = appVersionName(),
+            createdAt = System.currentTimeMillis(),
+            chatSessions = listOf(session.toDto()),
+            agentMessages = messages.map { it.toDto() },
+            todoItems = todos.map { it.toDto() }
+        )
+        val plain = json.encodeToString(BackupSnapshot.serializer(), snapshot).toByteArray(Charsets.UTF_8)
+        tarGz(plain)
+    }
+
     override suspend fun import(data: ByteArray, password: CharArray?): Result<RestoreStats> = withContext(Dispatchers.IO) {
         runCatching {
             val tarGz = if (password != null && password.isNotEmpty()) {

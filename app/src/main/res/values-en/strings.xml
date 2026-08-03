@@ -217,6 +217,10 @@
     <string name="chat_delete_session_confirm">Delete "%1$s"? All messages in this session will be cleared and cannot be undone.</string>
     <string name="chat_rename_session">Rename Session</string>
     <string name="chat_session_name">Session name</string>
+    <string name="chat_export_session">Export Session</string>
+    <string name="chat_export_session_done">Session exported</string>
+    <string name="chat_export_session_failed">Export failed</string>
+    <string name="chat_export_session_empty">This session has no messages to export</string>
 
     <!-- Chat Input Bar -->
     <string name="chat_input_placeholder">Type a message to chat with AI…</string>

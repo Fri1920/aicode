@@ -28,6 +28,7 @@ import com.aicode.feature.agent.domain.tool.question.AskUserQuestionManager
 import com.aicode.feature.agent.domain.tool.question.UserQuestionAnswer
 import com.aicode.feature.agent.domain.session.SessionUseCase
 import com.aicode.feature.agent.domain.session.MessagePersistenceUseCase
+import com.aicode.feature.backup.domain.BackupManager
 import com.aicode.feature.agent.domain.command.SlashCommandContext
 import com.aicode.feature.agent.domain.command.SlashCommandRegistry
 import com.aicode.feature.agent.domain.command.SlashCommandHandler
@@ -72,7 +73,8 @@ class AIAgentViewModel @Inject constructor(
     private val terminalSessionManager: com.aicode.feature.terminal.domain.TerminalSessionManager,
     private val slashCommandRegistry: SlashCommandRegistry,
     private val checkpointManager: CheckpointManager,
-    private val checkpointDao: CheckpointDao
+    private val checkpointDao: CheckpointDao,
+    private val backupManager: BackupManager
 ) : ViewModel(), SlashCommandContext {
 
     private val sessionJobs = mutableMapOf<String, Job>()
@@ -961,6 +963,16 @@ class AIAgentViewModel @Inject constructor(
         val trimmed = newTitle.trim()
         if (trimmed.isEmpty()) return@launch
         sessionUseCase.updateTitle(id, trimmed)
+    }
+
+    /** 导出单个会话为无密码备份格式（tar.gz）。成功回调返回字节流，失败返回 null。 */
+    fun exportSession(sessionId: String, onResult: (ByteArray?) -> Unit) = viewModelScope.launch {
+        runCatching { backupManager.exportSession(sessionId) }
+            .onSuccess { onResult(it) }
+            .onFailure {
+                FileLogger.e("AIAgentViewModel", "exportSession failed", it)
+                onResult(null)
+            }
     }
 
     private suspend fun ensureSession(): String {
