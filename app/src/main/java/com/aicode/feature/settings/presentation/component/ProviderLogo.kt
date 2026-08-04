@@ -85,7 +85,7 @@ fun brandLogoRes(key: String): Int? = when (key) {
     else -> null
 }
 
-private fun shouldTintModelLogo(key: String): Boolean = key == "grok" || key == "openai"
+private fun shouldTintModelLogo(key: String): Boolean = key == "grok" || key == "moonshot" || key == "openai"
 
 @Composable
 private fun modelLogoTint(): Color {
@@ -104,9 +104,16 @@ fun ProviderLogoIcon(
 ) {
     val res = providerLogoRes(provider)
     if (res != null) {
+        val brandKey = when (provider?.type) {
+            com.aicode.feature.settings.domain.model.ProviderType.OPENAI -> "openai"
+            com.aicode.feature.settings.domain.model.ProviderType.ANTHROPIC -> "anthropic"
+            com.aicode.feature.settings.domain.model.ProviderType.GEMINI -> "gemini"
+            else -> null
+        }
         Image(
             painter = painterResource(res),
             contentDescription = provider?.name ?: "AI Provider",
+            colorFilter = if (brandKey != null && shouldTintModelLogo(brandKey)) ColorFilter.tint(modelLogoTint()) else null,
             modifier = modifier.size(size)
         )
     } else {
@@ -141,7 +148,7 @@ fun ModelLogoIcon(
         Icon(
             imageVector = FeatherIcons.Cpu,
             contentDescription = stringResource(R.string.provider_model_icon),
-            tint = Brand.IconGray,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = modifier.size(size)
         )
     }
@@ -163,13 +170,14 @@ fun BrandLogoIcon(
         Image(
             painter = painterResource(res),
             contentDescription = brandDisplayName(context, brandKey),
+            colorFilter = if (shouldTintModelLogo(brandKey)) ColorFilter.tint(modelLogoTint()) else null,
             modifier = modifier.size(size)
         )
     } else {
         Icon(
             imageVector = FeatherIcons.Cpu,
             contentDescription = brandDisplayName(context, brandKey),
-            tint = Brand.IconGray,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = modifier.size(size)
         )
     }
