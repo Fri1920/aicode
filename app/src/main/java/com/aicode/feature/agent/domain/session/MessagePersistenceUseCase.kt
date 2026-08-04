@@ -44,6 +44,7 @@ class MessagePersistenceUseCase @Inject constructor(
         toolArgs: String? = null,
         isError: Boolean = false,
         reasoning: String? = null,
+        signature: String? = null,
         attachments: List<AgentAttachment> = emptyList(),
         inputTokens: Int = 0,
         outputTokens: Int = 0,
@@ -62,6 +63,7 @@ class MessagePersistenceUseCase @Inject constructor(
                 toolArgs = toolArgs,
                 isError = isError,
                 reasoning = reasoning,
+                signature = signature,
                 attachmentsJson = if (attachments.isNotEmpty()) json.encodeToString(attachments) else null,
                 inputTokens = inputTokens,
                 outputTokens = outputTokens,
@@ -160,7 +162,9 @@ class MessagePersistenceUseCase @Inject constructor(
                             AgentMessage.AssistantMessage(
                                 id = e.id,
                                 content = e.content.removePrefix(CONTEXT_SUMMARY_LEGACY_PREFIX).trimStart(),
-                                toolCalls = toolCalls
+                                toolCalls = toolCalls,
+                                reasoning = e.reasoning ?: "",
+                                signature = e.signature ?: ""
                             )
                         )
                     }

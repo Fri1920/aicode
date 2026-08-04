@@ -59,6 +59,7 @@ class GeminiAdapter @Inject constructor(
         if (toolDefs != null) {
             request["tools"] = toolDefs
         }
+        buildThinkingConfig(reasoningEffort)?.let { request["generationConfig"] = mapOf("thinkingConfig" to it) }
 
         val url = if (useFullUrl) {
             baseUrl
@@ -86,6 +87,7 @@ class GeminiAdapter @Inject constructor(
         AILogger.logResponse(logSessionId, "Gemini", response)
 
         var contentText = ""
+        var thinkingText = ""
         val toolCalls = mutableListOf<ToolCall>()
         var finishReason: String? = null
 
@@ -95,8 +97,10 @@ class GeminiAdapter @Inject constructor(
             val content = candidate.getAsJsonObject("content")
             content?.getAsJsonArray("parts")?.forEach { partEl ->
                 val part = partEl.asJsonObject
+                val isThought = part.get("thought")?.asBoolean == true
                 if (part.has("text")) {
-                    contentText += part.get("text").asString
+                    val text = part.get("text").asString
+                    if (isThought) thinkingText += text else contentText += text
                 }
                 if (part.has("functionCall")) {
                     val fnCall = part.getAsJsonObject("functionCall")
@@ -106,13 +110,17 @@ class GeminiAdapter @Inject constructor(
                     toolCalls.add(ToolCall(id = name, name = name, arguments = argsJson))
                 }
             }
+            // 非流式时思考也可能以 candidate.thoughts 数组返回（thought 文本 + token 数）
+            candidate.getAsJsonArray("thoughts")?.forEach { t ->
+                t.asJsonObject?.get("text")?.takeIf { !it.isJsonNull }?.asString?.let { thinkingText += it }
+            }
         }
 
         val usageMetadata = response.get("usageMetadata")?.takeIf { it.isJsonObject }?.asJsonObject
         val inputTokens = usageMetadata?.get("promptTokenCount")?.takeIf { !it.isJsonNull }?.asInt ?: 0
         val outputTokens = usageMetadata?.get("candidatesTokenCount")?.takeIf { !it.isJsonNull }?.asInt ?: 0
 
-        return AIResponse(content = contentText, toolCalls = toolCalls, stopReason = finishReason, inputTokens = inputTokens, outputTokens = outputTokens)
+        return AIResponse(content = contentText, toolCalls = toolCalls, stopReason = finishReason, reasoning = thinkingText.ifEmpty { null }, inputTokens = inputTokens, outputTokens = outputTokens)
     }
 
     override fun completeStream(
@@ -142,6 +150,7 @@ class GeminiAdapter @Inject constructor(
         if (toolDefs != null) {
             request["tools"] = toolDefs
         }
+        buildThinkingConfig(reasoningEffort)?.let { request["generationConfig"] = mapOf("thinkingConfig" to it) }
 
         val url = if (useFullUrl) {
             baseUrl
@@ -200,13 +209,20 @@ class GeminiAdapter @Inject constructor(
                                     val content = candidate.getAsJsonObject("content")
                                     content?.getAsJsonArray("parts")?.forEach { partEl ->
                                         val part = partEl.asJsonObject
+                                        val isThought = part.get("thought")?.asBoolean == true
                                         if (part.has("text")) {
                                             val text = part.get("text")?.asString ?: ""
                                             if (text.isNotEmpty()) {
-                                                textBuilder.append(text)
-                                                if (firstByteReceived.compareAndSet(false, true)) watchdog.cancel()
-                                                onProduced()
-                                                emit(AIStreamChunk.TextDelta(text))
+                                                if (isThought) {
+                                                    // 思考增量：仅 UI 实时展示，不计入正文、不触发 onProduced（不落库可安全重试）
+                                                    if (firstByteReceived.compareAndSet(false, true)) watchdog.cancel()
+                                                    emit(AIStreamChunk.ReasoningDelta(text))
+                                                } else {
+                                                    textBuilder.append(text)
+                                                    if (firstByteReceived.compareAndSet(false, true)) watchdog.cancel()
+                                                    onProduced()
+                                                    emit(AIStreamChunk.TextDelta(text))
+                                                }
                                             }
                                         }
                                         if (part.has("functionCall")) {
@@ -248,6 +264,22 @@ class GeminiAdapter @Inject constructor(
             AILogger.logResponseStream(logSessionId, "Gemini", rawSse.toString())
         }
     }.flowOn(Dispatchers.IO)
+
+    /** 思考强度 → Gemini thinkingConfig。模型名含 gemini-3 用 thinkingLevel，否则用 thinkingBudget（2.5 系）。 */
+    private fun buildThinkingConfig(reasoningEffort: String?): Map<String, Any>? {
+        if (reasoningEffort == null) return null
+        return if (model.contains("gemini-3")) {
+            mapOf("thinkingLevel" to reasoningEffort)
+        } else {
+            val budget = when (reasoningEffort) {
+                "low" -> 1024
+                "medium" -> 4096
+                "high" -> 8192
+                else -> return null
+            }
+            mapOf("thinkingBudget" to budget)
+        }
+    }
 
     private fun parseArgs(raw: String): kotlinx.serialization.json.JsonObject {
         val trimmed = raw.trim()

@@ -4,6 +4,7 @@ import com.aicode.feature.agent.data.remote.anthropic.AnthropicApi
 import com.aicode.feature.agent.data.remote.anthropic.AnthropicMessageRequest
 import com.aicode.feature.agent.data.remote.anthropic.AnthropicMessage
 import com.aicode.feature.agent.data.remote.anthropic.AnthropicContentBlock
+import com.aicode.feature.agent.data.remote.anthropic.AnthropicThinkingConfig
 import com.aicode.feature.agent.data.remote.anthropic.AnthropicToolDefinition
 import com.aicode.core.util.AILogger
 import com.aicode.feature.agent.domain.model.AgentImage
@@ -57,10 +58,13 @@ class AnthropicAdapter @Inject constructor(
         }
 
         val url = if (useFullUrl) baseUrl else joinUrl(baseUrl, defaultProviderApiPath(ProviderType.ANTHROPIC))
+        val thinking = buildThinkingConfig(reasoningEffort)
         val request = AnthropicMessageRequest(
             model = model,
             messages = anthropicMessages,
             system = systemPrompt.ifBlank { null },
+            temperature = if (thinking != null) null else 0.7f,
+            thinking = thinking,
             tools = toolDefs,
             stream = false
         )
@@ -80,11 +84,17 @@ class AnthropicAdapter @Inject constructor(
         AILogger.logResponse(logSessionId, "Anthropic", response)
 
         var contentText = ""
+        var thinkingText = ""
+        var signature: String? = null
         val toolCalls = mutableListOf<ToolCall>()
 
         for (block in response.content) {
             when (block.type) {
                 "text" -> contentText += block.text ?: ""
+                "thinking" -> {
+                    thinkingText += block.thinking ?: ""
+                    signature = block.signature ?: signature
+                }
                 "tool_use" -> {
                     val arguments = block.input?.let { mapToJson(it) } ?: JsonObject(emptyMap())
                     toolCalls.add(
@@ -98,7 +108,7 @@ class AnthropicAdapter @Inject constructor(
             }
         }
 
-        return AIResponse(content = contentText, toolCalls = toolCalls, stopReason = response.stop_reason, inputTokens = response.usage.input_tokens, outputTokens = response.usage.output_tokens)
+        return AIResponse(content = contentText, toolCalls = toolCalls, stopReason = response.stop_reason, reasoning = thinkingText.ifEmpty { null }, signature = signature, inputTokens = response.usage.input_tokens, outputTokens = response.usage.output_tokens)
     }
 
     override fun completeStream(
@@ -117,10 +127,13 @@ class AnthropicAdapter @Inject constructor(
         }
 
         val url = if (useFullUrl) baseUrl else joinUrl(baseUrl, defaultProviderApiPath(ProviderType.ANTHROPIC))
+        val thinking = buildThinkingConfig(reasoningEffort)
         val request = AnthropicMessageRequest(
             model = model,
             messages = anthropicMessages,
             system = systemPrompt.ifBlank { null },
+            temperature = if (thinking != null) null else 0.7f,
+            thinking = thinking,
             tools = toolDefs,
             stream = true
         )
@@ -138,6 +151,8 @@ class AnthropicAdapter @Inject constructor(
             var stopReason: String? = null
             var streamInputTokens = 0
             var streamOutputTokens = 0
+            // thinking block 的加密签名（signature_delta 事件携带），随 Final 上抛供工具循环回传。
+            var signature: String? = null
 
             val body = api.streamMessage(url = url, apiKey = apiKey, request = request)
 
@@ -209,6 +224,10 @@ class AnthropicAdapter @Inject constructor(
                                                 emit(AIStreamChunk.ReasoningDelta(t))
                                             }
                                         }
+                                        "signature_delta" -> {
+                                            val sig = delta.get("signature")?.asString ?: ""
+                                            if (sig.isNotEmpty()) signature = sig
+                                        }
                                         "input_json_delta" -> {
                                             val index = obj.get("index")?.asInt
                                             val partial = delta.get("partial_json")?.asString ?: ""
@@ -245,7 +264,7 @@ class AnthropicAdapter @Inject constructor(
                 ToolCall(id = acc.id, name = acc.name, arguments = parseArgs(acc.args.toString()))
             }
             onProduced()
-            emit(AIStreamChunk.Final(AIResponse(content = textBuilder.toString(), toolCalls = toolCalls, stopReason = stopReason, inputTokens = streamInputTokens, outputTokens = streamOutputTokens)))
+            emit(AIStreamChunk.Final(AIResponse(content = textBuilder.toString(), toolCalls = toolCalls, stopReason = stopReason, signature = signature, inputTokens = streamInputTokens, outputTokens = streamOutputTokens)))
                 },
                 onRetry = { attempt, max -> emit(AIStreamChunk.Retrying(attempt, max)) }
             )
@@ -265,6 +284,18 @@ class AnthropicAdapter @Inject constructor(
     /** 流式过程中按 content block index 累积的 tool_use 状态。 */
     private class ToolBlockAcc(val id: String, val name: String) {
         val args = StringBuilder()
+    }
+
+    /** 思考强度 → Anthropic thinking 预算。budget_tokens 最小 1024，且须小于 max_tokens(16384)。 */
+    private fun buildThinkingConfig(reasoningEffort: String?): AnthropicThinkingConfig? {
+        if (reasoningEffort == null) return null
+        val budget = when (reasoningEffort) {
+            "low" -> 1024
+            "medium" -> 4096
+            "high" -> 8192
+            else -> return null
+        }
+        return AnthropicThinkingConfig(budget_tokens = budget)
     }
 
     /** 把累积的工具入参 JSON 字符串解析为 JsonObject；为空或非法时回退为空对象。 */
@@ -287,6 +318,17 @@ class AnthropicAdapter @Inject constructor(
                 }
                 is AgentMessage.AssistantMessage -> {
                     val contentBlocks = mutableListOf<AnthropicContentBlock>()
+                    // 工具循环/多轮时须把上轮 thinking block（含 signature）原样回传，否则 400。
+                    // 仅当 signature 存在时回传：旧数据/备份恢复没有 signature，不回传也不会报错。
+                    if (message.signature.isNotEmpty()) {
+                        contentBlocks.add(
+                            AnthropicContentBlock(
+                                type = "thinking",
+                                thinking = message.reasoning,
+                                signature = message.signature
+                            )
+                        )
+                    }
                     if (message.content.isNotEmpty()) {
                         contentBlocks.add(AnthropicContentBlock(type = "text", text = message.content))
                     }

@@ -244,7 +244,8 @@ class StatefulAgentWorkflow @Inject constructor(
                 val assistantMsg = AgentMessage.AssistantMessage(
                     content = action.response.content,
                     toolCalls = action.response.toolCalls,
-                    reasoning = action.response.reasoning ?: ""
+                    reasoning = action.response.reasoning ?: "",
+                    signature = action.response.signature ?: ""
                 )
                 newState = state.copy(
                     messages = state.messages + assistantMsg,
@@ -512,7 +513,7 @@ class StatefulAgentWorkflow @Inject constructor(
                             } else aiResponse
 
                             if (aiResponse.content.isNotBlank() || aiResponse.toolCalls.isNotEmpty()) {
-                                emit(AgentEvent.AssistantText(aiResponse.content, aiResponse.toolCalls, reasoningAcc.toString(), aiResponse.inputTokens, aiResponse.outputTokens))
+                                emit(AgentEvent.AssistantText(aiResponse.content, aiResponse.toolCalls, reasoningAcc.toString(), aiResponse.signature ?: "", aiResponse.inputTokens, aiResponse.outputTokens))
                             }
                             actionQueue.addLast(AgentAction.LlmResponse(responseWithReasoning))
                         } catch (e: CancellationException) {

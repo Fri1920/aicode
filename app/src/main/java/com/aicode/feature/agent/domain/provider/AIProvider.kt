@@ -16,6 +16,8 @@ data class AIResponse(
     val stopReason: String? = null,
     /** 本轮模型的完整思考过程（对应 OpenAI/DeepSeek 的 reasoning_content）。非空时需回传给 API，否则 DeepSeek 思考模式会报 400。 */
     val reasoning: String? = null,
+    /** Anthropic extended thinking 的加密签名（thinking block 的 signature）。多轮/工具循环须随 thinking 原样回传，否则 400。其他 provider 为 null。 */
+    val signature: String? = null,
     /** 本轮输入 token 数（来自 API 返回的 usage）。取不到时为 0。 */
     val inputTokens: Int = 0,
     /** 本轮输出 token 数（来自 API 返回的 usage）。取不到时为 0。 */

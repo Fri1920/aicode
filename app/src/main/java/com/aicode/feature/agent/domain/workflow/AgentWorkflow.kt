@@ -17,6 +17,8 @@ sealed class AgentEvent {
         val content: String,
         val toolCalls: List<ToolCall> = emptyList(),
         val reasoning: String = "",
+        /** Anthropic extended thinking 的加密签名，随 reasoning 落库，供工具循环回传。其他 provider 为空串。 */
+        val signature: String = "",
         val inputTokens: Int = 0,
         val outputTokens: Int = 0
     ) : AgentEvent()

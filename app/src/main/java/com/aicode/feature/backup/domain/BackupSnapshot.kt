@@ -157,6 +157,7 @@ data class AgentMessageDto(
     val toolArgs: String? = null,
     val isError: Boolean = false,
     val reasoning: String? = null,
+    val signature: String? = null,
     val attachmentsJson: String? = null,
     val isCompacted: Boolean = false,
     val isContextSummary: Boolean = false,

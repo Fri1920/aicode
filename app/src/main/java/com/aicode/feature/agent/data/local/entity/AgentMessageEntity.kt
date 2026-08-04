@@ -26,8 +26,10 @@ data class AgentMessageEntity(
     val toolArgs: String? = null,
     // 仅 TOOL 行：工具是否执行失败，用于 UI 渲染状态圆点（绿/红）。
     val isError: Boolean = false,
-    // 仅 ASSISTANT 行：本轮模型的思考过程（reasoning）。仅供 UI 持久化展示，不回放进上下文；无则为 null。
+    // 仅 ASSISTANT 行：本轮模型的思考过程（reasoning）。供 UI 持久化展示；Anthropic 开启 thinking 时随 signature 一起原样回传。无则为 null。
     val reasoning: String? = null,
+    // 仅 ASSISTANT 行：Anthropic extended thinking 的加密签名。与 reasoning 一起回传（工具循环必须），否则 400。其他 provider 为 null。
+    val signature: String? = null,
     // 仅 USER 行：用户上传附件的展示元数据。内部模型提示仍不落入 content。
     val attachmentsJson: String? = null,
     /** 该消息已被上下文压缩归入摘要，不应再参与上下文回放或 UI 展示。默认 false。 */

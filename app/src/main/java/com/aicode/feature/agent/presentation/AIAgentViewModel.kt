@@ -579,6 +579,7 @@ class AIAgentViewModel @Inject constructor(
                             normalized,
                             toolCalls = event.toolCalls,
                             reasoning = reasoning,
+                            signature = event.signature.ifEmpty { null },
                             inputTokens = event.inputTokens,
                             outputTokens = event.outputTokens
                         )

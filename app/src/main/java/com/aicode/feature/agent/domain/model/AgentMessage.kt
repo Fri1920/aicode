@@ -17,7 +17,9 @@ sealed class AgentMessage {
         val content: String,
         val toolCalls: List<ToolCall> = emptyList(),
         /** 本轮模型的思考过程（对应 OpenAI/DeepSeek 的 reasoning_content）。回传上下文时需要原样发回，否则 DeepSeek 思考模式会报 400 错误。 */
-        val reasoning: String = ""
+        val reasoning: String = "",
+        /** Anthropic extended thinking 的加密签名。与 [reasoning] 一起原样回传（工具循环必须），否则 400。其他 provider 为空串。 */
+        val signature: String = ""
     ) : AgentMessage()
 
     @Serializable
