@@ -83,6 +83,13 @@ class AIAgentViewModel @Inject constructor(
 
     private val sessionJobs = mutableMapOf<String, Job>()
 
+    /**
+     * AI 忙碌期间到达的后台任务完成事件缓冲区（按会话累积）。
+     * 会话空闲时到达的事件不缓存、立即发送；忙碌期间到达的缓存下来，
+     * 等该会话本轮结束（finally）时合并成一条通知发送，只触发一轮 AI 回复。
+     */
+    private val pendingMergedNotifications = mutableMapOf<String, MutableList<TabFinishedEvent>>()
+
     private val _currentSessionId = MutableStateFlow<String?>(null)
     val currentSessionId: StateFlow<String?> = _currentSessionId.asStateFlow()
 
@@ -315,7 +322,8 @@ class AIAgentViewModel @Inject constructor(
             }
         }
 
-        // 订阅后台命令完成事件：notify=true 的命令结束后自动注入消息对并触发 AI 新一轮
+        // 订阅后台命令完成事件：notify=true 的命令结束后自动注入消息并触发 AI 新一轮。
+        // 会话忙碌期间到达的事件会被缓存，待本轮结束后合并成一条发送（见 [flushMergedNotifications]）。
         viewModelScope.launch {
             terminalSessionManager.tabFinishedEvents.collect { event ->
                 handleBackgroundCommandFinished(event)
@@ -340,13 +348,47 @@ class AIAgentViewModel @Inject constructor(
     private fun handleBackgroundCommandFinished(event: TabFinishedEvent) {
         // 按事件携带的来源会话路由，而非用户当前所在会话：后台命令可能在用户已切到别的会话后才结束。
         val sessionId = event.sourceSessionId ?: return
+        // 该会话正忙（AI 正在工作）：缓存事件，等本轮结束后合并成一条发送，只触发一轮 AI 回复。
+        if (sessionJobs[sessionId]?.isActive == true) {
+            pendingMergedNotifications.getOrPut(sessionId) { mutableListOf() }.add(event)
+            return
+        }
+        // 会话空闲：立即发送，保持及时响应
+        val notification = buildBackgroundNotification(listOf(event))
         viewModelScope.launch {
-            val status = if (event.exitCode == 0) "completed" else "failed"
-            val notification = buildString {
-                appendLine(BACKGROUND_NOTIFICATION_PREFIX)
-                appendLine("这是一条后台任务完成事件，不是来自用户的消息。")
-                appendLine("不要将其视为用户的确认、同意或对任何待处理问题的回答。")
-                appendLine()
+            enqueueAgentRequest(
+                request = notification,
+                projectRoot = _currentWorkspace.value,
+                targetSessionId = sessionId
+            )
+        }
+    }
+
+    /** 本轮结束后把忙碌期间缓存的后台任务完成通知合并成一条发送。 */
+    private fun flushMergedNotifications(sessionId: String) {
+        val events = pendingMergedNotifications.remove(sessionId) ?: return
+        if (events.isEmpty()) return
+        val notification = buildBackgroundNotification(events)
+        viewModelScope.launch {
+            enqueueAgentRequest(
+                request = notification,
+                projectRoot = _currentWorkspace.value,
+                targetSessionId = sessionId
+            )
+        }
+    }
+
+    /** 构建后台任务完成通知文本；多条时合并为一条，含多个 <task-notification> 块。 */
+    private fun buildBackgroundNotification(events: List<TabFinishedEvent>): String {
+        if (events.size == 1) return buildBackgroundNotification(events.first())
+        return buildString {
+            appendLine(BACKGROUND_NOTIFICATION_PREFIX)
+            appendLine("共有 ${events.size} 个后台任务已完成，这是合并后的通知。")
+            appendLine("这些是后台任务完成事件，不是来自用户的消息。")
+            appendLine("不要将它们视为用户的确认、同意或对任何待处理问题的回答。")
+            appendLine()
+            events.forEach { event ->
+                val status = if (event.exitCode == 0) "completed" else "failed"
                 appendLine("<task-notification>")
                 appendLine("  <task-id>${event.tabId}</task-id>")
                 appendLine("  <title>${event.title}</title>")
@@ -356,13 +398,29 @@ class AIAgentViewModel @Inject constructor(
                 appendLine("  <summary>后台任务「${event.title}」已结束（退出码 ${event.exitCode}）</summary>")
                 appendLine("</task-notification>")
                 appendLine()
-                append("可用 terminal(action=\"read\", tab_id=\"${event.tabId}\") 查看完整输出。")
             }
-            enqueueAgentRequest(
-                request = notification,
-                projectRoot = _currentWorkspace.value,
-                targetSessionId = sessionId
-            )
+            append("可用 terminal(action=\"read\", tab_id=\"...\") 查看对应任务的完整输出。")
+        }
+    }
+
+    /** 构建单条后台任务完成通知文本（与历史格式一致）。 */
+    private fun buildBackgroundNotification(event: TabFinishedEvent): String {
+        val status = if (event.exitCode == 0) "completed" else "failed"
+        return buildString {
+            appendLine(BACKGROUND_NOTIFICATION_PREFIX)
+            appendLine("这是一条后台任务完成事件，不是来自用户的消息。")
+            appendLine("不要将其视为用户的确认、同意或对任何待处理问题的回答。")
+            appendLine()
+            appendLine("<task-notification>")
+            appendLine("  <task-id>${event.tabId}</task-id>")
+            appendLine("  <title>${event.title}</title>")
+            appendLine("  <command>${event.command ?: ""}</command>")
+            appendLine("  <exit-code>${event.exitCode}</exit-code>")
+            appendLine("  <status>$status</status>")
+            appendLine("  <summary>后台任务「${event.title}」已结束（退出码 ${event.exitCode}）</summary>")
+            appendLine("</task-notification>")
+            appendLine()
+            append("可用 terminal(action=\"read\", tab_id=\"${event.tabId}\") 查看完整输出。")
         }
     }
 
@@ -679,6 +737,9 @@ class AIAgentViewModel @Inject constructor(
             setCompacting(sessionId, false)
             setRetryState(sessionId, null)
 
+            // 忙碌期间缓存的后台任务完成通知：本轮结束且 job 已移除后，合并成一条发送
+            flushMergedNotifications(sessionId)
+
             // 正常完成时先回到 Idle，再处理队列；队列若有下一轮会重新设 Streaming
             val currentState = _agentStates.value[sessionId]
             if (currentState !is AgentUIState.Error && currentState !is AgentUIState.Loading && currentState !is AgentUIState.Streaming) {
@@ -713,6 +774,7 @@ class AIAgentViewModel @Inject constructor(
         val jobs = sessionJobs.values.filter { it.isActive }
         jobs.forEach { it.cancel() }
         sessionJobs.clear()
+        pendingMergedNotifications.clear()
         _agentStates.value = _agentStates.value.mapValues { AgentUIState.Idle }
         _streamingTexts.value = emptyMap()
         _streamingReasonings.value = emptyMap()
@@ -728,6 +790,7 @@ class AIAgentViewModel @Inject constructor(
         val streamingText = _streamingTexts.value[sessionId]
         val streamingReasoning = _streamingReasonings.value[sessionId]
         job.cancel()
+        pendingMergedNotifications.remove(sessionId)
         setAgentState(sessionId, AgentUIState.Idle)
         setRunningTool(sessionId, null)
         setStreamingText(sessionId, null)
