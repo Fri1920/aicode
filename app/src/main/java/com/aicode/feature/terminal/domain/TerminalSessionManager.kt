@@ -9,6 +9,12 @@ import com.aicode.feature.workspace.data.repository.WorkspaceRepository
 import com.termux.terminal.TerminalSession
 import com.termux.view.TerminalView
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -47,6 +53,12 @@ class TerminalSessionManager @Inject constructor(
         // 无视图挂载时用于「就地启动」会话的默认终端尺寸；视图挂载后会按真实尺寸 resize。
         const val DEFAULT_COLUMNS = 80
         const val DEFAULT_ROWS = 24
+        /** 命令打印 `[command exited: N]` 后等待正常 onFinished 回调的缓冲（毫秒）。 */
+        const val EXIT_MARKER_GRACE_MS = 1_500L
+        /** 完成兜底监控轮询屏幕缓冲的间隔（毫秒）。 */
+        const val EXIT_MARKER_POLL_MS = 200L
+        /** 匹配命令退出标记 `[command exited: N]`。 */
+        val EXIT_MARKER_REGEX = Regex("\\[command exited: (\\d+)]")
     }
 
     private val _tabs = MutableStateFlow<List<TerminalTab>>(emptyList())
@@ -63,6 +75,8 @@ class TerminalSessionManager @Inject constructor(
     override val tabFinishedEvents: SharedFlow<TabFinishedEvent> = _tabFinishedEvents.asSharedFlow()
 
     private val idCounter = AtomicInteger(0)
+
+    private val monitorScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     val activeTab: TerminalTab? get() = _tabs.value.firstOrNull { it.id == _activeTabId.value }
 
@@ -144,6 +158,8 @@ class TerminalSessionManager @Inject constructor(
         )
         // 后台命令不抢占当前标签焦点：仅当没有活动标签时才设为当前。
         if (_activeTabId.value == null) _activeTabId.value = id
+
+        if (notify) monitorBackgroundExit(id)
 
         startKeepaliveService()
         FileLogger.i(TAG, "后台命令标签 $id: $command")
@@ -267,6 +283,46 @@ class TerminalSessionManager @Inject constructor(
     }
 
     private fun nextId(): String = "term-${idCounter.incrementAndGet()}"
+
+    /**
+     * 完成兜底监控：termux 的会话结束依赖 PTY 读到 EOF，而 proot 宿主进程在 Android 上可能
+     * 概率性不退出（即使其 bash 已执行 exit，proot 仍攥着 /dev/pts 不释放），导致 onFinished
+     * 永不回调、notify=true 的任务不触发通知。bash 在真正退出前必打印 `[command exited: N]`，
+     * 以此作为命令结束的可靠信号：监控到后短缓冲（给正常回调留时间），仍 Running 则强制收尾。
+     */
+    private fun monitorBackgroundExit(tabId: String) {
+        monitorScope.launch {
+            var seenMarker = false
+            while (true) {
+                val tab = tab(tabId) ?: return@launch
+                if (tab.runState !is RunState.Running) return@launch
+                val output = getTabOutput(tabId) ?: return@launch
+                if (!seenMarker) {
+                    if (EXIT_MARKER_REGEX.containsMatchIn(output)) seenMarker = true
+                } else {
+                    delay(EXIT_MARKER_GRACE_MS)
+                    // 缓冲后再查：正常 onFinished 回调若已触发，状态不再 Running，此处直接退出。
+                    val current = tab(tabId) ?: return@launch
+                    if (current.runState is RunState.Running) {
+                        val exitCode = EXIT_MARKER_REGEX.find(getTabOutput(tabId) ?: "")?.groupValues?.get(1)?.toIntOrNull() ?: 0
+                        current.runState = RunState.Finished(exitCode)
+                        bumpRevision()
+                        FileLogger.i(TAG, "兜底：标签 $tabId 检测到退出标记，强制收尾 exit=$exitCode")
+                        if (current.isBackground && _tabs.value.none { it.isBackground && it.runState is RunState.Running }) {
+                            stopKeepaliveService()
+                        }
+                        if (current.notifyOnExit) {
+                            _tabFinishedEvents.tryEmit(
+                                TabFinishedEvent(current.id, current.title, current.command, exitCode, current.sourceSessionId)
+                            )
+                        }
+                    }
+                    return@launch
+                }
+                delay(EXIT_MARKER_POLL_MS)
+            }
+        }
+    }
 
     private fun addTab(tab: TerminalTab) {
         _tabs.value = _tabs.value + tab
