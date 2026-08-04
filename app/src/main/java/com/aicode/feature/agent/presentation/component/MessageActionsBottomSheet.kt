@@ -28,11 +28,9 @@ import com.aicode.R
 import com.aicode.core.theme.Radius
 import com.aicode.core.theme.Spacing
 import com.aicode.feature.agent.presentation.AgentUIMessage
-import com.aicode.feature.agent.presentation.MessageRole
 import compose.icons.FeatherIcons
 import compose.icons.feathericons.Copy
 import compose.icons.feathericons.Edit2
-import compose.icons.feathericons.RotateCcw
 import compose.icons.feathericons.Trash2
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -42,7 +40,6 @@ internal fun MessageActionsBottomSheet(
     onDismiss: () -> Unit,
     onEditClick: () -> Unit,
     onCopyClick: () -> Unit,
-    onRewindClick: (() -> Unit)?,
     onDeleteClick: () -> Unit
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -89,18 +86,6 @@ internal fun MessageActionsBottomSheet(
                     onCopyClick()
                 }
             )
-
-            // 撤销回滚（如果是用户消息且支持撤销）
-            if (message.role == MessageRole.USER && onRewindClick != null) {
-                MessageActionItem(
-                    icon = FeatherIcons.RotateCcw,
-                    title = stringResource(R.string.checkpoint_rewind_title),
-                    onClick = {
-                        onDismiss()
-                        onRewindClick()
-                    }
-                )
-            }
 
             // 删除消息
             MessageActionItem(

@@ -756,7 +756,6 @@ fun AIChatPanel(
                             clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("message", message.content)))
                         }
                     },
-                    onRewindClick = { viewModel.openRewindMenu(message.id) },
                     onDeleteClick = { viewModel.deleteMessage(message.id) }
                 )
             }

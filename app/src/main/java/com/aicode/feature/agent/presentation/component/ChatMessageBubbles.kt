@@ -185,21 +185,6 @@ internal fun AgentMessageItem(
                     Row(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        if (isUser && onRewindClick != null) {
-                            IconButton(
-                                onClick = { onRewindClick(message.id) },
-                                modifier = Modifier.size(28.dp)
-                            ) {
-                                Icon(
-                                    FeatherIcons.RotateCcw,
-                                    contentDescription = stringResource(R.string.checkpoint_rewind_title),
-                                    modifier = Modifier.size(14.dp),
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                            Spacer(modifier = Modifier.width(Spacing.xs))
-                        }
-
                         Surface(
                         shape = if (isUser) {
                             RoundedCornerShape(Radius.md, Radius.md, Radius.xs, Radius.md)
@@ -286,6 +271,19 @@ internal fun AgentMessageItem(
                                 contentDescription = if (copied) stringResource(R.string.chat_copied) else stringResource(R.string.chat_copy),
                                 modifier = Modifier.size(14.dp),
                             )
+                        }
+                        if (isUser && onRewindClick != null) {
+                            IconButton(
+                                onClick = { onRewindClick(message.id) },
+                                modifier = Modifier.size(28.dp),
+                                colors = IconButtonDefaults.iconButtonColors(contentColor = iconTint),
+                            ) {
+                                Icon(
+                                    FeatherIcons.RotateCcw,
+                                    contentDescription = stringResource(R.string.checkpoint_rewind_title),
+                                    modifier = Modifier.size(14.dp),
+                                )
+                            }
                         }
                         if (onMoreClick != null) {
                             IconButton(
