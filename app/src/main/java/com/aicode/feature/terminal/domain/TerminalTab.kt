@@ -11,6 +11,13 @@ sealed interface RunState {
     data class Finished(val exitCode: Int) : RunState
 }
 
+/** 后台任务完成通知携带的终端输出行数。 */
+const val TAIL_LINES = 10
+
+/** 截取终端 transcript 的最后 n 行；null 输入返回 null。 */
+fun String?.takeTailLines(n: Int): String? =
+    this?.lines()?.takeLast(n)?.joinToString("\n")
+
 /**
  * 后台命令结束时 emit 的事件，供 ViewModel 订阅后通知 AI。
  */
@@ -20,7 +27,9 @@ data class TabFinishedEvent(
     val command: String?,
     val exitCode: Int,
     /** 发起该后台命令的会话 id；回调据此路由回原会话，而非用户当前所在会话。 */
-    val sourceSessionId: String?
+    val sourceSessionId: String?,
+    /** 结束时终端 transcript 的最后 [TAIL_LINES] 行快照。事件可能被缓存到会话空闲才合并发送，期间标签可能已关闭，故在 emit 处提前截取。 */
+    val tailOutput: String? = null
 )
 
 /**

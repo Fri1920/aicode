@@ -313,7 +313,10 @@ class TerminalSessionManager @Inject constructor(
                         }
                         if (current.notifyOnExit) {
                             _tabFinishedEvents.tryEmit(
-                                TabFinishedEvent(current.id, current.title, current.command, exitCode, current.sourceSessionId)
+                                TabFinishedEvent(
+                                    current.id, current.title, current.command, exitCode, current.sourceSessionId,
+                                    tailOutput = getTabOutput(current.id)?.takeTailLines(TAIL_LINES)
+                                )
                             )
                         }
                     }
@@ -361,7 +364,10 @@ class TerminalSessionManager @Inject constructor(
                     }
                     if (target.notifyOnExit) {
                         _tabFinishedEvents.tryEmit(
-                            TabFinishedEvent(target.id, target.title, target.command, finished.exitStatus, target.sourceSessionId)
+                            TabFinishedEvent(
+                                target.id, target.title, target.command, finished.exitStatus, target.sourceSessionId,
+                                tailOutput = getTabOutput(target.id)?.takeTailLines(TAIL_LINES)
+                            )
                         )
                     }
                 }

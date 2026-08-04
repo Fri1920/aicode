@@ -23,6 +23,8 @@ import com.aicode.feature.agent.domain.model.WorkflowStatus
 import com.aicode.feature.agent.domain.permission.PermissionChoice
 import com.aicode.feature.agent.domain.workflow.AgentWorkflow
 import com.aicode.feature.terminal.domain.TabFinishedEvent
+import com.aicode.feature.terminal.domain.TAIL_LINES
+import com.aicode.feature.terminal.domain.takeTailLines
 import com.aicode.feature.agent.domain.workflow.AgentEvent
 import com.aicode.feature.agent.domain.tool.ToolPermissionManager
 import com.aicode.feature.agent.domain.tool.ToolRegistry
@@ -400,10 +402,11 @@ class AIAgentViewModel @Inject constructor(
                 appendLine("  <exit-code>${event.exitCode}</exit-code>")
                 appendLine("  <status>$status</status>")
                 appendLine("  <summary>后台任务「${event.title}」已结束（退出码 ${event.exitCode}）</summary>")
+                appendTailOutput(event)
                 appendLine("</task-notification>")
                 appendLine()
             }
-            append("可用 terminal(action=\"read\", tab_id=\"...\") 查看对应任务的完整输出。")
+            append("通知已携带各终端最后 $TAIL_LINES 行输出；如需完整日志可用 terminal(action=\"read\", tab_id=\"...\") 读取对应任务。")
         }
     }
 
@@ -422,11 +425,22 @@ class AIAgentViewModel @Inject constructor(
             appendLine("  <exit-code>${event.exitCode}</exit-code>")
             appendLine("  <status>$status</status>")
             appendLine("  <summary>后台任务「${event.title}」已结束（退出码 ${event.exitCode}）</summary>")
+            appendTailOutput(event)
             appendLine("</task-notification>")
             appendLine()
-            append("可用 terminal(action=\"read\", tab_id=\"${event.tabId}\") 查看完整输出。")
+            append("通知已携带该终端最后 $TAIL_LINES 行输出；如需完整日志可用 terminal(action=\"read\", tab_id=\"${event.tabId}\") 读取。")
         }
     }
+
+    /** 追加 <tail-output> 块；空白输出跳过。转义尖括号防止 <status>/<summary> 等字样污染提示条的正则提取。 */
+    private fun StringBuilder.appendTailOutput(event: TabFinishedEvent) {
+        event.tailOutput?.takeIf { it.isNotBlank() }?.let { tail ->
+            appendLine("  <tail-output>${escapeXml(tail)}</tail-output>")
+        }
+    }
+
+    private fun escapeXml(text: String): String =
+        text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
     fun executeAgentRequest(
         request: String,
