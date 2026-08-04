@@ -43,7 +43,8 @@ class OpenAIAdapter @Inject constructor(
     override suspend fun complete(
         systemPrompt: String,
         messages: List<AgentMessage>,
-        tools: List<AgentTool>
+        tools: List<AgentTool>,
+        reasoningEffort: String?
     ): AIResponse {
         val openAIMessages = buildList {
             if (systemPrompt.isNotBlank()) {
@@ -65,11 +66,12 @@ class OpenAIAdapter @Inject constructor(
 
         val url = if (useFullUrl) baseUrl else joinUrl(baseUrl, defaultProviderApiPath(ProviderType.OPENAI))
         if (useResponseApi) {
-            val request = mapOf(
+            val request = mutableMapOf<String, Any?>(
                 "model" to model,
                 "input" to openAIMessages,
                 "tools" to toolDefs
             )
+            reasoningEffort?.let { request["reasoning"] = mapOf("effort" to it) }
             AILogger.logRequest(logSessionId, "OpenAI", model, "POST", url, request)
 
             val response = try {
@@ -118,6 +120,7 @@ class OpenAIAdapter @Inject constructor(
         val request = ChatCompletionRequest(
             model = model,
             messages = openAIMessages,
+            reasoning_effort = reasoningEffort,
             tools = toolDefs,
             tool_choice = if (toolDefs != null) "auto" else null,
             stream = false
@@ -150,7 +153,8 @@ class OpenAIAdapter @Inject constructor(
     override fun completeStream(
         systemPrompt: String,
         messages: List<AgentMessage>,
-        tools: List<AgentTool>
+        tools: List<AgentTool>,
+        reasoningEffort: String?
     ): Flow<AIStreamChunk> = flow {
         val openAIMessages = buildList {
             if (systemPrompt.isNotBlank()) {
@@ -172,12 +176,13 @@ class OpenAIAdapter @Inject constructor(
         val url = if (useFullUrl) baseUrl else joinUrl(baseUrl, defaultProviderApiPath(ProviderType.OPENAI))
         
         if (useResponseApi) {
-            val request = mapOf(
+            val request = mutableMapOf<String, Any?>(
                 "model" to model,
                 "input" to openAIMessages,
                 "tools" to toolDefs,
                 "stream" to true
             )
+            reasoningEffort?.let { request["reasoning"] = mapOf("effort" to it) }
             AILogger.logRequest(logSessionId, "OpenAI", model, "POST", url, request)
             val rawSse = StringBuilder()
             try {
@@ -288,6 +293,7 @@ class OpenAIAdapter @Inject constructor(
         val request = ChatCompletionRequest(
             model = model,
             messages = openAIMessages,
+            reasoning_effort = reasoningEffort,
             tools = toolDefs,
             tool_choice = if (toolDefs != null) "auto" else null,
             stream = true,

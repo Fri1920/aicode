@@ -134,6 +134,14 @@ class AIAgentViewModel @Inject constructor(
         list.find { it.id == id }?.mode ?: com.aicode.feature.agent.domain.model.AgentMode.BUILD
     }.stateIn(viewModelScope, SharingStarted.Eagerly, com.aicode.feature.agent.domain.model.AgentMode.BUILD)
 
+    /** 当前会话的思考强度（默认 MEDIUM）。 */
+    val currentSessionReasoningEffort: StateFlow<com.aicode.feature.agent.domain.model.ReasoningEffort> =
+        kotlinx.coroutines.flow.combine(
+            _currentSessionId, sessions
+        ) { id, list ->
+            list.find { it.id == id }?.reasoningEffort ?: com.aicode.feature.agent.domain.model.ReasoningEffort.MEDIUM
+        }.stateIn(viewModelScope, SharingStarted.Eagerly, com.aicode.feature.agent.domain.model.ReasoningEffort.MEDIUM)
+
     /** 当前会话绑定的 providerId/model（null 表示未绑定，回退全局 active provider）。 */
     val currentSessionProviderModel: StateFlow<Pair<String?, String?>> = kotlinx.coroutines.flow.combine(
         _currentSessionId, sessions
@@ -384,7 +392,8 @@ class AIAgentViewModel @Inject constructor(
             sessionUseCase.touch(sessionId, messagePersistenceUseCase.nextTimestamp())
 
             val sessionEntity = sessionUseCase.getSessionById(sessionId)
-            val mode = sessionEntity?.toDomain()?.mode ?: com.aicode.feature.agent.domain.model.AgentMode.BUILD
+            val sessionDomain = sessionEntity?.toDomain()
+            val mode = sessionDomain?.mode ?: com.aicode.feature.agent.domain.model.AgentMode.BUILD
 
             val context = AgentContext(
                 currentFile = currentFile,
@@ -394,7 +403,8 @@ class AIAgentViewModel @Inject constructor(
                 history = history,
                 inputImages = inputImages,
                 sessionId = sessionId,
-                mode = mode
+                mode = mode,
+                reasoningEffort = sessionDomain?.reasoningEffort?.apiValue
             )
 
             val result = agentWorkflow.execute(
@@ -519,7 +529,8 @@ class AIAgentViewModel @Inject constructor(
             sessionUseCase.touch(sessionId, messagePersistenceUseCase.nextTimestamp())
 
             val sessionEntity = sessionUseCase.getSessionById(sessionId)
-            val mode = sessionEntity?.toDomain()?.mode ?: com.aicode.feature.agent.domain.model.AgentMode.BUILD
+            val sessionDomain = sessionEntity?.toDomain()
+            val mode = sessionDomain?.mode ?: com.aicode.feature.agent.domain.model.AgentMode.BUILD
 
             val context = AgentContext(
                 currentFile = currentFile,
@@ -529,7 +540,8 @@ class AIAgentViewModel @Inject constructor(
                 history = history,
                 inputImages = inputImages,
                 sessionId = sessionId,
-                mode = mode
+                mode = mode,
+                reasoningEffort = sessionDomain?.reasoningEffort?.apiValue
             )
 
             agentWorkflow.executeEvents(
@@ -777,6 +789,13 @@ class AIAgentViewModel @Inject constructor(
         val sid = _currentSessionId.value ?: return
         viewModelScope.launch {
             sessionUseCase.updateMode(sid, mode.name)
+        }
+    }
+
+    fun setSessionReasoningEffort(effort: com.aicode.feature.agent.domain.model.ReasoningEffort) {
+        val sid = _currentSessionId.value ?: return
+        viewModelScope.launch {
+            sessionUseCase.updateReasoningEffort(sid, effort.name)
         }
     }
 

@@ -374,7 +374,7 @@ class StatefulAgentWorkflow @Inject constructor(
                             // 避免切换模型后图片上下文原样发送导致 API 报错。识图轮 provider 必支持 vision。
                             val supportsVision = state.pendingVisionRound || activeModelSupportsVision(currentContext.sessionId)
                             val messagesToSend = sanitizeImagesForModel(compactedMessages, supportsVision)
-                            val aiResponse = providerInUse.complete(systemPrompt, messagesToSend, currentTools)
+                            val aiResponse = providerInUse.complete(systemPrompt, messagesToSend, currentTools, currentContext.reasoningEffort)
                             actionQueue.addLast(AgentAction.LlmResponse(aiResponse))
                         } catch (e: Exception) {
                             actionQueue.addLast(AgentAction.LlmError("LLM 调用失败: ${e.message}"))
@@ -487,7 +487,7 @@ class StatefulAgentWorkflow @Inject constructor(
                             // 发送前按实际模型的视觉能力处理图片（同 execute 路径）。
                             val supportsVision = state.pendingVisionRound || activeModelSupportsVision(currentContext.sessionId)
                             val messagesToSend = sanitizeImagesForModel(compactedMessages, supportsVision)
-                            providerInUse.completeStream(systemPrompt, messagesToSend, currentTools).collect { chunk ->
+                            providerInUse.completeStream(systemPrompt, messagesToSend, currentTools, currentContext.reasoningEffort).collect { chunk ->
                                 when (chunk) {
                                     is AIStreamChunk.TextDelta -> {
                                         acc.append(chunk.text)

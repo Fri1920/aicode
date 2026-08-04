@@ -43,7 +43,8 @@ class AnthropicAdapter @Inject constructor(
     override suspend fun complete(
         systemPrompt: String,
         messages: List<AgentMessage>,
-        tools: List<AgentTool>
+        tools: List<AgentTool>,
+        reasoningEffort: String?
     ): AIResponse {
         val anthropicMessages = convertToAnthropicMessages(messages)
 
@@ -103,7 +104,8 @@ class AnthropicAdapter @Inject constructor(
     override fun completeStream(
         systemPrompt: String,
         messages: List<AgentMessage>,
-        tools: List<AgentTool>
+        tools: List<AgentTool>,
+        reasoningEffort: String?
     ): Flow<AIStreamChunk> = flow {
         val anthropicMessages = convertToAnthropicMessages(messages)
         val toolDefs = tools.takeIf { it.isNotEmpty() }?.map { tool ->

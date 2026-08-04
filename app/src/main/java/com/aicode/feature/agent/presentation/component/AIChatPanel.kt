@@ -332,6 +332,7 @@ fun AIChatPanel(
     val activeModelMetadata = modelMetadata[activeModel]
     val canUploadFiles = projectRoot.isNotBlank() && activeModelMetadata?.supportsTools == true
     val canUploadImages = projectRoot.isNotBlank()
+    val reasoningEffort by viewModel.currentSessionReasoningEffort.collectAsStateWithLifecycle()
 
     LaunchedEffect(activeProvider?.type, activeModel) {
         val provider = activeProvider ?: return@LaunchedEffect
@@ -385,6 +386,32 @@ fun AIChatPanel(
     }
     val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
         handlePickedAttachments(uris, images = true)
+    }
+
+    // 拍照：输出到 cache 临时文件（FileProvider 授权 uri），拍完按图片附件处理。
+    var cameraPhotoUri by remember { mutableStateOf<Uri?>(null) }
+    val takePictureLauncher = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { success ->
+        val uri = cameraPhotoUri
+        cameraPhotoUri = null
+        if (success && uri != null) {
+            handlePickedAttachments(listOf(uri), images = true)
+        }
+    }
+    fun takePhoto() {
+        val photoFile = File(context.cacheDir, "camera_${System.currentTimeMillis()}.jpg")
+        val uri = runCatching {
+            androidx.core.content.FileProvider.getUriForFile(
+                context,
+                "${context.packageName}.fileprovider",
+                photoFile
+            )
+        }.getOrNull()
+        if (uri == null) {
+            Toast.makeText(context, unreadableFileMessage(context), Toast.LENGTH_SHORT).show()
+            return
+        }
+        cameraPhotoUri = uri
+        takePictureLauncher.launch(uri)
     }
 
     // 自动滚动跟随
@@ -716,12 +743,15 @@ fun AIChatPanel(
                 onNavigateToSettings = onNavigateToSettings,
                 currentMode = currentMode,
                 onToggleMode = { viewModel.setSessionMode(it) },
+                reasoningEffort = reasoningEffort,
+                onReasoningEffortChange = { viewModel.setSessionReasoningEffort(it) },
                 pendingAttachments = pendingAttachments,
                 onRemoveAttachment = ::removePendingAttachment,
                 canUploadFiles = canUploadFiles,
                 canUploadImages = canUploadImages,
                 onUploadFile = { filePicker.launch(arrayOf("*/*")) },
                 onUploadImage = { imagePicker.launch(arrayOf("image/*")) },
+                onTakePhoto = ::takePhoto,
                 slashCommands = viewModel.slashCommands,
                 tokenProgress = run {
                     val contextLimit = activeModelMetadata?.contextTokens ?: 0

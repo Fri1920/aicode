@@ -35,7 +35,8 @@ class GeminiAdapter @Inject constructor(
     override suspend fun complete(
         systemPrompt: String,
         messages: List<AgentMessage>,
-        tools: List<AgentTool>
+        tools: List<AgentTool>,
+        reasoningEffort: String?
     ): AIResponse {
         val geminiContents = convertToGeminiContents(messages)
         val toolDefs = tools.takeIf { it.isNotEmpty() }?.map { tool ->
@@ -117,7 +118,8 @@ class GeminiAdapter @Inject constructor(
     override fun completeStream(
         systemPrompt: String,
         messages: List<AgentMessage>,
-        tools: List<AgentTool>
+        tools: List<AgentTool>,
+        reasoningEffort: String?
     ): Flow<AIStreamChunk> = flow {
         val geminiContents = convertToGeminiContents(messages)
         val toolDefs = tools.takeIf { it.isNotEmpty() }?.map { tool ->

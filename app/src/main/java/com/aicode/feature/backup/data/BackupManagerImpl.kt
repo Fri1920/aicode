@@ -480,8 +480,8 @@ class BackupManagerImpl @Inject constructor(
     private fun RemoteMountEntity.toDto() = RemoteMountDto(id, connectionId, remotePath, localMountPath, isActive, autoConnect)
     private fun RemoteMountDto.toEntity() = RemoteMountEntity(id, connectionId, remotePath, localMountPath, isActive, autoConnect)
 
-    private fun ChatSessionEntity.toDto() = ChatSessionDto(id, title, createdAt, updatedAt, workspacePath, mode, providerId, model)
-    private fun ChatSessionDto.toEntity() = ChatSessionEntity(id, title, createdAt, updatedAt, workspacePath, mode, providerId, model)
+    private fun ChatSessionEntity.toDto() = ChatSessionDto(id, title, createdAt, updatedAt, workspacePath, mode, reasoningEffort, providerId, model)
+    private fun ChatSessionDto.toEntity() = ChatSessionEntity(id, title, createdAt, updatedAt, workspacePath, mode, reasoningEffort, providerId, model)
 
     private fun AgentMessageEntity.toDto() = AgentMessageDto(
         id, sessionId, role, content, timestamp, toolCallsJson, toolCallId, toolName, toolArgs,

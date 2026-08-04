@@ -125,6 +125,12 @@
     <string name="chat_unsupported_image_type">无法识别图片类型，仅支持 jpg/png/gif/webp</string>
     <string name="chat_new_session_btn">新会话</string>
     <string name="chat_open_sidebar">打开侧边栏</string>
+    <string name="chat_add_attachment">添加附件</string>
+    <string name="chat_take_photo">拍照</string>
+    <string name="chat_reasoning_effort">思考强度</string>
+    <string name="chat_reasoning_effort_low">低</string>
+    <string name="chat_reasoning_effort_medium">中</string>
+    <string name="chat_reasoning_effort_high">高</string>
     <string name="chat_open_file_failed">文件不存在或无法访问</string>
     <string name="chat_open_file_no_app">没有可打开该文件的应用</string>
     <string name="chat_open_apk_permission">安装应用需要授权，请在跳转的设置中允许来自此来源的应用</string>

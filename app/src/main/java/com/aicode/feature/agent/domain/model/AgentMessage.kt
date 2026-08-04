@@ -55,5 +55,7 @@ data class AgentContext(
     val inputImages: List<AgentImage> = emptyList(),
     /** 当前会话 id：用于把本轮所有 AI 请求/响应落到该会话的日志文件（[com.aicode.core.util.AILogger]）。 */
     val sessionId: String? = null,
-    val mode: AgentMode = AgentMode.BUILD
+    val mode: AgentMode = AgentMode.BUILD,
+    /** 思考强度（"low"/"medium"/"high"），随每次 LLM 请求传给支持的 provider。 */
+    val reasoningEffort: String? = null
 )
