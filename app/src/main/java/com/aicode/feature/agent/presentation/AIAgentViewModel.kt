@@ -8,10 +8,12 @@ import com.aicode.feature.agent.data.local.dao.AgentMessageDao
 import com.aicode.feature.agent.domain.checkpoint.CheckpointManager
 import com.aicode.feature.agent.data.local.dao.CheckpointDao
 import com.aicode.feature.agent.data.local.dao.ChatSessionDao
+import com.aicode.feature.agent.data.local.entity.ChatSessionEntity
 import com.aicode.feature.agent.data.CodeChangeTracker
 import com.aicode.feature.agent.domain.container.ContainerInitState
 import com.aicode.feature.agent.domain.container.LinuxContainerEngine
 import com.aicode.feature.settings.domain.repository.AIProviderRepository
+import com.aicode.feature.settings.data.repository.DefaultModelSettingsRepository
 import com.aicode.feature.agent.domain.model.AgentContext
 import com.aicode.feature.agent.domain.model.AgentImage
 import com.aicode.feature.agent.domain.model.AgentMessage
@@ -65,6 +67,7 @@ class AIAgentViewModel @Inject constructor(
     private val agentMessageDao: AgentMessageDao,
     private val chatSessionDao: ChatSessionDao,
     private val aiProviderRepository: AIProviderRepository,
+    private val defaultModelSettingsRepository: DefaultModelSettingsRepository,
     private val toolPermissionManager: ToolPermissionManager,
     private val askUserQuestionManager: AskUserQuestionManager,
     private val containerEngine: LinuxContainerEngine,
@@ -305,7 +308,7 @@ class AIAgentViewModel @Inject constructor(
                 _currentSessionId.value = if (existing != null) {
                     existing.id // ORDER BY updatedAt DESC：最近一条
                 } else {
-                    val s = sessionUseCase.newSessionEntity(path)
+                    val s = createSession(path)
                     sessionUseCase.upsertSession(s)
                     s.id
                 }
@@ -776,7 +779,7 @@ class AIAgentViewModel @Inject constructor(
             setChanges(curId, emptyList())
             return@launch
         }
-        val s = sessionUseCase.newSessionEntity(_currentWorkspace.value)
+        val s = createSession(_currentWorkspace.value)
         sessionUseCase.upsertSession(s)
         _currentSessionId.value = s.id
     }
@@ -804,6 +807,10 @@ class AIAgentViewModel @Inject constructor(
         val sid = _currentSessionId.value ?: return
         viewModelScope.launch {
             sessionUseCase.updateProviderModel(sid, providerId, model)
+            // 空会话中的选择视为「新会话默认模型」，供下次新建会话沿用
+            if (sessionUseCase.isSessionEmpty(sid)) {
+                defaultModelSettingsRepository.setDefaultModel(providerId, model)
+            }
         }
     }
 
@@ -931,7 +938,7 @@ class AIAgentViewModel @Inject constructor(
                 if (remaining != null) {
                     _currentSessionId.value = remaining.id
                 } else {
-                    val s = sessionUseCase.newSessionEntity(ws)
+                    val s = createSession(ws)
                     sessionUseCase.upsertSession(s)
                     _currentSessionId.value = s.id
                 }
@@ -1006,12 +1013,26 @@ class AIAgentViewModel @Inject constructor(
         if (ws.isBlank()) return ""
         val existing = sessionUseCase.getFirstSessionOfWorkspace(ws)
         val id = if (existing != null) existing.id else {
-            val s = sessionUseCase.newSessionEntity(_currentWorkspace.value)
+            val s = createSession(_currentWorkspace.value)
             sessionUseCase.upsertSession(s)
             s.id
         }
         _currentSessionId.value = id
         return id
+    }
+
+    /**
+     * 创建新会话并按「新会话默认模型」绑定 provider/model；未设置默认时回退全局 active provider。
+     * 所有新建会话的入口（冷启动、新建、删除兜底、ensureSession）都走这里。
+     */
+    private suspend fun createSession(workspacePath: String): ChatSessionEntity {
+        val s = sessionUseCase.newSessionEntity(workspacePath)
+        val providerId = defaultModelSettingsRepository.getDefaultProviderId()
+        val model = defaultModelSettingsRepository.getDefaultModel()
+        if (providerId.isNotBlank() && model.isNotBlank()) {
+            sessionUseCase.updateProviderModel(s.id, providerId, model)
+        }
+        return s
     }
 
     // endregion
