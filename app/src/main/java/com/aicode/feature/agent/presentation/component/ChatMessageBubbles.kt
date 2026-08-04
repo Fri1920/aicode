@@ -494,13 +494,24 @@ private fun calculateMessageAttachmentSampleSize(width: Int, height: Int, reqWid
 @Composable
 private fun BackgroundNotificationBar(message: AgentUIMessage) {
     val content = message.content
-    val status = Regex("<status>(.*?)</status>")
-        .find(content)?.groupValues?.getOrNull(1)?.trim()?.lowercase()
-    val summary = Regex("<summary>(.*?)</summary>")
-        .find(content)?.groupValues?.getOrNull(1)?.trim()
-    val isSuccess = status == "completed"
+    val statuses = Regex("<status>(.*?)</status>")
+        .findAll(content).map { it.groupValues.getOrNull(1)?.trim()?.lowercase() }.filterNotNull().toList()
+    val summaries = Regex("<summary>(.*?)</summary>")
+        .findAll(content).map { it.groupValues.getOrNull(1)?.trim() }.filterNotNull().toList()
+    val isSuccess = statuses.all { it == "completed" }
     val dotColor = if (isSuccess) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.error
-    val label = if (summary.isNullOrEmpty()) stringResource(R.string.chat_bg_command_done) else summary
+    val label = when {
+        summaries.size <= 1 -> summaries.firstOrNull() ?: stringResource(R.string.chat_bg_command_done)
+        else -> {
+            val failedCount = statuses.count { it != "completed" }
+            val namePart = summaries.joinToString("、") { s -> s.removePrefix("后台任务「").substringBefore("」") }
+            if (failedCount > 0) {
+                stringResource(R.string.chat_bg_commands_partial_failed, summaries.size, failedCount, namePart)
+            } else {
+                stringResource(R.string.chat_bg_commands_done, summaries.size, namePart)
+            }
+        }
+    }
 
     Surface(
         shape = RoundedCornerShape(Radius.md),

@@ -265,6 +265,8 @@
     <string name="chat_copied">Copied</string>
     <string name="chat_copy">Copy</string>
     <string name="chat_bg_command_done">Background command completed</string>
+    <string name="chat_bg_commands_done">%1$d background tasks completed: %2$s</string>
+    <string name="chat_bg_commands_partial_failed">%1$d background tasks finished, %2$d failed: %3$s</string>
     <string name="chat_context_compressed">Context compressed</string>
     <string name="chat_compressing_context">Compressing context</string>
     <string name="chat_retrying">Network issue, retrying %1$s/%2$s</string>
