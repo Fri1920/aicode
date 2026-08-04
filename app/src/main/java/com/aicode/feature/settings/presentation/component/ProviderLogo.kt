@@ -44,6 +44,8 @@ fun modelBrandKey(modelName: String): String {
     val target = modelName.lowercase()
     return when {
         target.contains("doubao") || target.contains("豆包") -> "doubao"
+        // minimax 必须排在 grok 之前：minimaxai 等名称含 "xai"，否则会被 grok 规则误匹配
+        target.contains("minimax") || target.contains("abab") -> "minimax"
         target.contains("moonshot") || target.contains("kimi") -> "moonshot"
         target.contains("zhipu") || target.contains("智谱") || target.contains("bigmodel") || target.contains("glm") -> "zhipu"
         target.contains("qwen") || target.contains("通义") -> "qwen"
@@ -59,6 +61,7 @@ fun modelBrandKey(modelName: String): String {
 /** 品牌 key → 用户可见的显示名称 */
 fun brandDisplayName(context: Context, key: String): String = when (key) {
     "doubao" -> context.getString(R.string.provider_brand_doubao)
+    "minimax" -> "MiniMax"
     "moonshot" -> "Moonshot"
     "zhipu" -> context.getString(R.string.provider_brand_zhipu)
     "qwen" -> context.getString(R.string.provider_brand_tongyi_qianwen)
@@ -74,6 +77,7 @@ fun brandDisplayName(context: Context, key: String): String = when (key) {
 /** 品牌 key → 对应 logo drawable 资源，无匹配时返回 null */
 fun brandLogoRes(key: String): Int? = when (key) {
     "doubao" -> R.drawable.logo_doubao
+    "minimax" -> R.drawable.logo_minimax
     "moonshot" -> R.drawable.logo_moonshot
     "zhipu" -> R.drawable.logo_zhipu
     "qwen" -> R.drawable.logo_qwen
