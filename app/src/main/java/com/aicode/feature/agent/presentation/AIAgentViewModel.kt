@@ -52,6 +52,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.io.File
+import java.io.OutputStream
 import java.util.UUID
 import javax.inject.Inject
 
@@ -965,14 +966,17 @@ class AIAgentViewModel @Inject constructor(
         sessionUseCase.updateTitle(id, trimmed)
     }
 
-    /** 导出单个会话为无密码备份格式（tar.gz）。成功回调返回字节流，失败返回 null。 */
-    fun exportSession(sessionId: String, onResult: (ByteArray?) -> Unit) = viewModelScope.launch {
-        runCatching { backupManager.exportSession(sessionId) }
-            .onSuccess { onResult(it) }
-            .onFailure {
-                FileLogger.e("AIAgentViewModel", "exportSession failed", it)
-                onResult(null)
-            }
+    /** 导出单个会话为无密码备份格式（tar.gz），流式写入 [output]（调用方打开，本方法负责关闭）。成功回调 true，失败回调 false。 */
+    fun exportSession(sessionId: String, output: OutputStream, onResult: (Boolean) -> Unit) = viewModelScope.launch {
+        try {
+            backupManager.exportSession(sessionId, output)
+            onResult(true)
+        } catch (e: Exception) {
+            FileLogger.e("AIAgentViewModel", "exportSession failed", e)
+            onResult(false)
+        } finally {
+            runCatching { output.close() }
+        }
     }
 
     private suspend fun ensureSession(): String {

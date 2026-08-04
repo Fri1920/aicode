@@ -35,6 +35,51 @@ data class BackupSnapshot(
     val syncSettings: SyncSettingsSnapshot? = null
 )
 
+/**
+ * 流式备份的元数据分片（tar 内 metadata.json）：不含聊天大表，大表走各 *.jsonl。
+ * 与 [BackupSnapshot] 的元数据字段一一对应，导入时合并 jsonl 还原完整数据。
+ */
+@Serializable
+data class BackupMetadata(
+    val schemaVersion: Int,
+    val appVersion: String = "",
+    val createdAt: Long,
+    val providers: List<ProviderDto> = emptyList(),
+    val gitCredentials: List<GitCredentialDto> = emptyList(),
+    val remoteConnections: List<RemoteConnectionDto> = emptyList(),
+    val remoteMounts: List<RemoteMountDto> = emptyList(),
+    val mcpServers: List<McpServerConfig> = emptyList(),
+    val globalPermissionRules: List<PermissionRule> = emptyList(),
+    val themeMode: String? = null,
+    val keepaliveEnabled: Boolean = false,
+    val logLevel: String? = null,
+    val visionProviderId: String = "",
+    val visionModel: String = "",
+    val compactionProviderId: String = "",
+    val compactionModel: String = "",
+    val syncSettings: SyncSettingsSnapshot? = null
+)
+
+fun BackupSnapshot.toMetadata() = BackupMetadata(
+    schemaVersion = schemaVersion,
+    appVersion = appVersion,
+    createdAt = createdAt,
+    providers = providers,
+    gitCredentials = gitCredentials,
+    remoteConnections = remoteConnections,
+    remoteMounts = remoteMounts,
+    mcpServers = mcpServers,
+    globalPermissionRules = globalPermissionRules,
+    themeMode = themeMode,
+    keepaliveEnabled = keepaliveEnabled,
+    logLevel = logLevel,
+    visionProviderId = visionProviderId,
+    visionModel = visionModel,
+    compactionProviderId = compactionProviderId,
+    compactionModel = compactionModel,
+    syncSettings = syncSettings
+)
+
 @Serializable
 data class ProviderDto(
     val id: String,

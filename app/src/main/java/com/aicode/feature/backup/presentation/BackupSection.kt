@@ -1,5 +1,6 @@
 package com.aicode.feature.backup.presentation
 
+import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -61,25 +62,25 @@ internal fun BackupSection(viewModel: BackupViewModel) {
 
     var password by remember { mutableStateOf("") }
     var pendingAction by remember { mutableStateOf<PendingAction?>(null) }
-    var pendingImportData by remember { mutableStateOf<ByteArray?>(null) }
+    var pendingImportUri by remember { mutableStateOf<Uri?>(null) }
+    var pendingExportPassword by remember { mutableStateOf("") }
+    var pendingExportOptions by remember { mutableStateOf(BackupOptions()) }
     var exportOptions by remember { mutableStateOf(BackupOptions()) }
 
     val exportLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/octet-stream")
     ) { uri ->
-        val bytes = (state as? BackupState.ExportSuccess)?.bytes
-        if (uri != null && bytes != null) {
+        if (uri != null) {
+            val pw = pendingExportPassword
+            val opts = pendingExportOptions
             scope.launch {
-                runCatching {
-                    withContext(Dispatchers.IO) {
-                        context.contentResolver.openOutputStream(uri)?.use { it.write(bytes) }
-                    }
-                }.onSuccess {
-                    Toast.makeText(context, context.getString(R.string.backup_exported), Toast.LENGTH_SHORT).show()
-                }.onFailure {
-                    Toast.makeText(context, context.getString(R.string.backup_write_failed, it.message), Toast.LENGTH_LONG).show()
+                val os = withContext(Dispatchers.IO) { context.contentResolver.openOutputStream(uri) }
+                if (os != null) {
+                    viewModel.export(pw, opts, os)
+                } else {
+                    Toast.makeText(context, context.getString(R.string.backup_write_failed, ""), Toast.LENGTH_LONG).show()
+                    viewModel.reset()
                 }
-                viewModel.reset()
             }
         } else {
             viewModel.reset()
@@ -93,19 +94,7 @@ internal fun BackupSection(viewModel: BackupViewModel) {
             pendingAction = null
             return@rememberLauncherForActivityResult
         }
-        scope.launch {
-            val data = runCatching {
-                withContext(Dispatchers.IO) {
-                    context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
-                }
-            }.getOrNull()
-            if (data == null) {
-                Toast.makeText(context, context.getString(R.string.backup_read_failed), Toast.LENGTH_LONG).show()
-                pendingAction = null
-            } else {
-                pendingImportData = data
-            }
-        }
+        pendingImportUri = uri
     }
 
     Column(
@@ -158,11 +147,11 @@ internal fun BackupSection(viewModel: BackupViewModel) {
             password = password,
             onPasswordChange = { password = it },
             onConfirm = {
-                val pw = password
-                val opts = exportOptions
+                pendingExportPassword = password
+                pendingExportOptions = exportOptions
                 password = ""
                 pendingAction = null
-                viewModel.export(pw, opts)
+                exportLauncher.launch("aicode-backup-${System.currentTimeMillis()}.tar.gz")
             },
             onDismiss = {
                 password = ""
@@ -171,8 +160,8 @@ internal fun BackupSection(viewModel: BackupViewModel) {
         )
     }
 
-    // 导入口令弹窗（SAF 选完文件、字节就绪后弹出）
-    if (pendingAction == PendingAction.Import && pendingImportData != null) {
+    // 导入口令弹窗（SAF 选完文件后弹出）
+    if (pendingAction == PendingAction.Import && pendingImportUri != null) {
         PasswordDialog(
             title = stringResource(R.string.backup_password_input),
             subtitle = stringResource(R.string.backup_password_optional_hint),
@@ -181,24 +170,25 @@ internal fun BackupSection(viewModel: BackupViewModel) {
             onPasswordChange = { password = it },
             onConfirm = {
                 val pw = password
-                val data = pendingImportData
+                val uri = pendingImportUri
                 password = ""
                 pendingAction = null
-                pendingImportData = null
-                if (data != null) viewModel.import(data, pw)
+                pendingImportUri = null
+                if (uri != null) viewModel.import(uri, pw)
             },
             onDismiss = {
                 password = ""
                 pendingAction = null
-                pendingImportData = null
+                pendingImportUri = null
             }
         )
     }
 
-    // 导出成功 → 启动 SAF 选保存位置
+    // 导出完成 → 提示并复位
     LaunchedEffect(state) {
-        if (state is BackupState.ExportSuccess) {
-            exportLauncher.launch("aicode-backup-${System.currentTimeMillis()}.tar.gz")
+        if (state is BackupState.ExportDone) {
+            Toast.makeText(context, context.getString(R.string.backup_exported), Toast.LENGTH_SHORT).show()
+            viewModel.reset()
         }
     }
 

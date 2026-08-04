@@ -363,7 +363,11 @@ class StatefulAgentWorkflow @Inject constructor(
                             state = state.copy(messages = compactedMessages)
                         }
                         try {
-                            val aiResponse = providerInUse.complete(systemPrompt, compactedMessages, currentTools)
+                            // 发送前按实际模型的视觉能力处理图片：非多模态模型剥离历史/输入中的图片，
+                            // 避免切换模型后图片上下文原样发送导致 API 报错。识图轮 provider 必支持 vision。
+                            val supportsVision = state.pendingVisionRound || activeModelSupportsVision(currentContext.sessionId)
+                            val messagesToSend = sanitizeImagesForModel(compactedMessages, supportsVision)
+                            val aiResponse = providerInUse.complete(systemPrompt, messagesToSend, currentTools)
                             actionQueue.addLast(AgentAction.LlmResponse(aiResponse))
                         } catch (e: Exception) {
                             actionQueue.addLast(AgentAction.LlmError("LLM 调用失败: ${e.message}"))
@@ -473,7 +477,10 @@ class StatefulAgentWorkflow @Inject constructor(
                         var finalResponse: AIResponse? = null
 
                         try {
-                            providerInUse.completeStream(systemPrompt, compactedMessages, currentTools).collect { chunk ->
+                            // 发送前按实际模型的视觉能力处理图片（同 execute 路径）。
+                            val supportsVision = state.pendingVisionRound || activeModelSupportsVision(currentContext.sessionId)
+                            val messagesToSend = sanitizeImagesForModel(compactedMessages, supportsVision)
+                            providerInUse.completeStream(systemPrompt, messagesToSend, currentTools).collect { chunk ->
                                 when (chunk) {
                                     is AIStreamChunk.TextDelta -> {
                                         acc.append(chunk.text)
@@ -669,6 +676,31 @@ class StatefulAgentWorkflow @Inject constructor(
         val metadata = modelMetadataService.resolve(config.type, config.effectiveModel)
         return metadata.supportsVision
     }
+
+    /**
+     * 发送前按模型视觉能力处理消息中的图片：
+     * - 支持 vision：原样返回。
+     * - 不支持：剥离所有图片（仅影响本次发送，不动持久化数据），历史/输入中的图片不会原样发给
+     *   非多模态模型导致请求失败；切回多模态模型后图片上下文仍可正常使用。
+     */
+    private fun sanitizeImagesForModel(
+        messages: List<AgentMessage>,
+        supportsVision: Boolean
+    ): List<AgentMessage> {
+        if (supportsVision) return messages
+        return messages.map { msg ->
+            when (msg) {
+                is AgentMessage.UserMessage ->
+                    if (msg.images.isEmpty()) msg
+                    else msg.copy(images = emptyList(), content = msg.content.ifBlank { "（图片已省略：当前模型不支持图片输入）" })
+                is AgentMessage.ToolResultMessage ->
+                    if (msg.images.isEmpty()) msg else msg.copy(images = emptyList())
+                is AgentMessage.AssistantMessage -> msg
+            }
+        }
+    }
+
+
 
     /**
      * 识图专用兜底模型是否可用：已配置 providerId 且指向的 provider/model 存在、有 apiKey、且其

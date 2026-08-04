@@ -260,27 +260,30 @@ fun AppNavigation() {
     val agentStates by agentViewModel.agentStates.collectAsStateWithLifecycle()
 
     // ── 导出会话：SAF 保存文件 ──
-    var pendingExportBytes by remember { mutableStateOf<ByteArray?>(null) }
+    var pendingExportSessionId by remember { mutableStateOf<String?>(null) }
     val context = androidx.compose.ui.platform.LocalContext.current
     val sessionExportLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/octet-stream")
     ) { uri ->
-        val bytes = pendingExportBytes
-        if (uri != null && bytes != null) {
+        val sessionId = pendingExportSessionId
+        if (uri != null && sessionId != null) {
             scope.launch {
-                runCatching {
-                    withContext(Dispatchers.IO) {
-                        context.contentResolver.openOutputStream(uri)?.use { it.write(bytes) }
+                val os = withContext(Dispatchers.IO) { context.contentResolver.openOutputStream(uri) }
+                if (os != null) {
+                    agentViewModel.exportSession(sessionId, os) { success ->
+                        Toast.makeText(
+                            context,
+                            context.getString(if (success) R.string.chat_export_session_done else R.string.chat_export_session_failed),
+                            if (success) Toast.LENGTH_SHORT else Toast.LENGTH_LONG
+                        ).show()
                     }
-                }.onSuccess {
-                    Toast.makeText(context, context.getString(R.string.chat_export_session_done), Toast.LENGTH_SHORT).show()
-                }.onFailure {
+                } else {
                     Toast.makeText(context, context.getString(R.string.chat_export_session_failed), Toast.LENGTH_LONG).show()
                 }
-                pendingExportBytes = null
+                pendingExportSessionId = null
             }
         } else {
-            pendingExportBytes = null
+            pendingExportSessionId = null
         }
     }
 
@@ -310,15 +313,9 @@ fun AppNavigation() {
                     onDelete = { agentViewModel.deleteSession(it.id) },
                     onRename = { session, title -> agentViewModel.renameSession(session.id, title) },
                     onExport = { session ->
-                        agentViewModel.exportSession(session.id) { bytes ->
-                            if (bytes != null && bytes.isNotEmpty()) {
-                                pendingExportBytes = bytes
-                                val safeTitle = session.title.replace(Regex("[^\\w\\u4e00-\\u9fa5\\-]"), "_")
-                                sessionExportLauncher.launch("aicode-session-$safeTitle-${System.currentTimeMillis()}.tar.gz")
-                            } else {
-                                Toast.makeText(context, context.getString(R.string.chat_export_session_empty), Toast.LENGTH_SHORT).show()
-                            }
-                        }
+                        pendingExportSessionId = session.id
+                        val safeTitle = session.title.replace(Regex("[^\\w\\u4e00-\\u9fa5\\-]"), "_")
+                        sessionExportLauncher.launch("aicode-session-$safeTitle-${System.currentTimeMillis()}.tar.gz")
                     },
                     onNavigateToSettings = {
                         scope.launch { drawerState.close() }

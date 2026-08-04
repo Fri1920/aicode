@@ -220,7 +220,6 @@
     <string name="chat_export_session">导出会话</string>
     <string name="chat_export_session_done">会话已导出</string>
     <string name="chat_export_session_failed">导出失败</string>
-    <string name="chat_export_session_empty">该会话没有消息，无需导出</string>
 
     <!-- Chat Input Bar -->
     <string name="chat_input_placeholder">输入消息与 AI 聊天…</string>
