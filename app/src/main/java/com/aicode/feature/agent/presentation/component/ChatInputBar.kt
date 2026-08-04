@@ -646,7 +646,7 @@ private fun ReasoningEffortSelector(
             Icon(
                 FeatherIcons.Zap,
                 contentDescription = stringResource(effort.labelRes()),
-                tint = if (enabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f),
+                tint = if (enabled) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f),
                 modifier = Modifier.size(20.dp)
             )
         }
