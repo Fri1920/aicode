@@ -1,6 +1,10 @@
 package com.aicode.feature.agent.presentation.component
 
 import android.content.Context
+import android.content.ClipData
+import androidx.compose.ui.platform.ClipEntry
+import androidx.compose.ui.platform.LocalClipboard
+import com.aicode.feature.agent.presentation.AgentUIMessage
 import android.net.Uri
 import android.provider.OpenableColumns
 import android.widget.Toast
@@ -288,6 +292,8 @@ fun AIChatPanel(
     val streamingReasoning by viewModel.streamingReasoning.collectAsStateWithLifecycle()
     val pendingPermission by viewModel.pendingToolPermission.collectAsStateWithLifecycle()
     val pendingQuestion by viewModel.pendingUserQuestion.collectAsStateWithLifecycle()
+    val queuedRequests by viewModel.queuedRequests.collectAsStateWithLifecycle()
+    val targetRewindMessageId by viewModel.targetRewindMessageId.collectAsStateWithLifecycle()
     val globalActiveProvider = settingsViewModel?.activeProvider?.collectAsStateWithLifecycle()?.value
     val providers = (settingsViewModel?.providers?.collectAsStateWithLifecycle()?.value ?: emptyList()).filter { it.isEnabled }
     val modelMetadata = settingsViewModel?.modelMetadata?.collectAsStateWithLifecycle()?.value.orEmpty()
@@ -313,6 +319,8 @@ fun AIChatPanel(
         if (inputText != inputDraft) inputText = inputDraft
     }
     var pendingAttachments by remember { mutableStateOf<List<PendingUploadAttachment>>(emptyList()) }
+    var messageForMenu by remember { mutableStateOf<AgentUIMessage?>(null) }
+    var editingMessage by remember { mutableStateOf<AgentUIMessage?>(null) }
     val listState = rememberLazyListState()
     val markdownCache = remember { MarkdownRenderCache() }
     val scope = rememberCoroutineScope()
@@ -325,6 +333,7 @@ fun AIChatPanel(
     val activeModelMetadata = modelMetadata[activeModel]
     val canUploadFiles = projectRoot.isNotBlank() && activeModelMetadata?.supportsTools == true
     val canUploadImages = projectRoot.isNotBlank()
+    val reasoningEffort by viewModel.currentSessionReasoningEffort.collectAsStateWithLifecycle()
 
     LaunchedEffect(activeProvider?.type, activeModel) {
         val provider = activeProvider ?: return@LaunchedEffect
@@ -378,6 +387,32 @@ fun AIChatPanel(
     }
     val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
         handlePickedAttachments(uris, images = true)
+    }
+
+    // 拍照：输出到 cache 临时文件（FileProvider 授权 uri），拍完按图片附件处理。
+    var cameraPhotoUri by remember { mutableStateOf<Uri?>(null) }
+    val takePictureLauncher = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { success ->
+        val uri = cameraPhotoUri
+        cameraPhotoUri = null
+        if (success && uri != null) {
+            handlePickedAttachments(listOf(uri), images = true)
+        }
+    }
+    fun takePhoto() {
+        val photoFile = File(context.cacheDir, "camera_${System.currentTimeMillis()}.jpg")
+        val uri = runCatching {
+            androidx.core.content.FileProvider.getUriForFile(
+                context,
+                "${context.packageName}.fileprovider",
+                photoFile
+            )
+        }.getOrNull()
+        if (uri == null) {
+            Toast.makeText(context, unreadableFileMessage(context), Toast.LENGTH_SHORT).show()
+            return
+        }
+        cameraPhotoUri = uri
+        takePictureLauncher.launch(uri)
     }
 
     // 自动滚动跟随
@@ -462,40 +497,29 @@ fun AIChatPanel(
 
     val sendMessage: () -> Unit = {
         val text = inputText.trim()
-        if ((text.isNotEmpty() || pendingAttachments.isNotEmpty()) && !isBusy) {
-            val command = viewModel.findSlashCommand(text)
-            if (command != null) {
-                command.execute(viewModel)
-                inputText = ""
-                viewModel.clearInputDraft()
-                pendingAttachments = emptyList()
-                followBottom = true
-                scope.launch {
-                    kotlinx.coroutines.delay(0)
-                    snapToBottomInstant()
-                }
-            } else {
-                val attachments = pendingAttachments
-                val modelRequest = appendAttachmentsToRequest(context, text, attachments)
-                val modelSupportsVision = activeModelMetadata?.supportsVision == true
-                val images = if (modelSupportsVision) attachments.toAgentImages() else emptyList()
-                viewModel.executeAgentRequestStream(
-                    request = text,
-                    modelRequest = modelRequest,
-                    currentFile = currentFile,
-                    selectedCode = selectedCode,
-                    projectRoot = projectRoot,
-                    inputImages = images,
-                    inputAttachments = attachments.toAgentAttachments()
-                )
-                inputText = ""
-                viewModel.clearInputDraft()
-                pendingAttachments = emptyList()
-                followBottom = true
-                scope.launch {
-                    kotlinx.coroutines.delay(0)
-                    snapToBottomInstant()
-                }
+        if (text.isNotEmpty() || pendingAttachments.isNotEmpty()) {
+            val attachments = pendingAttachments
+            val modelRequest = appendAttachmentsToRequest(context, text, attachments)
+            val modelSupportsVision = activeModelMetadata?.supportsVision == true
+            val images = if (modelSupportsVision) attachments.toAgentImages() else emptyList()
+            // 统一走队列：AI 忙时入队（等本轮结束后自动发送下一条），空闲时直接发送。
+            // 斜杠命令在 ViewModel 内（agent workflow 之前）分流执行，无需在此区分。
+            viewModel.enqueueAgentRequest(
+                request = text,
+                modelRequest = modelRequest,
+                currentFile = currentFile,
+                selectedCode = selectedCode,
+                projectRoot = projectRoot,
+                inputImages = images,
+                inputAttachments = attachments.toAgentAttachments()
+            )
+            inputText = ""
+            viewModel.clearInputDraft()
+            pendingAttachments = emptyList()
+            followBottom = true
+            scope.launch {
+                kotlinx.coroutines.delay(0)
+                snapToBottomInstant()
             }
         }
     }
@@ -594,7 +618,9 @@ fun AIChatPanel(
                             AgentMessageItem(
                                 message = message,
                                 liveOutput = live,
-                                markdownCache = markdownCache
+                                markdownCache = markdownCache,
+                                onRewindClick = { viewModel.openRewindMenu(it) },
+                                onMoreClick = { messageForMenu = it }
                             )
                         }
                         val reasoning = streamingReasoning
@@ -707,13 +733,18 @@ fun AIChatPanel(
                 onNavigateToSettings = onNavigateToSettings,
                 currentMode = currentMode,
                 onToggleMode = { viewModel.setSessionMode(it) },
+                reasoningEffort = reasoningEffort,
+                onReasoningEffortChange = { viewModel.setSessionReasoningEffort(it) },
                 pendingAttachments = pendingAttachments,
                 onRemoveAttachment = ::removePendingAttachment,
                 canUploadFiles = canUploadFiles,
                 canUploadImages = canUploadImages,
                 onUploadFile = { filePicker.launch(arrayOf("*/*")) },
                 onUploadImage = { imagePicker.launch(arrayOf("image/*")) },
+                onTakePhoto = ::takePhoto,
                 slashCommands = viewModel.slashCommands,
+                queuedRequests = queuedRequests,
+                onRemoveQueued = { viewModel.removeQueuedRequest(it) },
                 tokenProgress = run {
                     val contextLimit = activeModelMetadata?.contextTokens ?: 0
                     if (contextLimit > 0) {
@@ -721,6 +752,46 @@ fun AIChatPanel(
                     } else 0f
                 }
             )
+
+            targetRewindMessageId?.let { targetId ->
+                val targetMsg = messages.find { it.id == targetId }
+                RewindOptionsBottomSheet(
+                    promptSnippet = targetMsg?.content ?: "",
+                    onOptionSelected = { option ->
+                        viewModel.executeRewindOption(targetId, option) { text ->
+                            inputText = text
+                        }
+                    },
+                    onDismissRequest = { viewModel.dismissRewindMenu() }
+                )
+            }
+
+            messageForMenu?.let { message ->
+                val clipboard = LocalClipboard.current
+                val copyScope = rememberCoroutineScope()
+                MessageActionsBottomSheet(
+                    message = message,
+                    onDismiss = { messageForMenu = null },
+                    onEditClick = { editingMessage = message },
+                    onCopyClick = {
+                        copyScope.launch {
+                            clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("message", message.content)))
+                        }
+                    },
+                    onDeleteClick = { viewModel.deleteMessage(message.id) }
+                )
+            }
+
+            editingMessage?.let { message ->
+                EditMessageDialog(
+                    initialText = message.content,
+                    onDismiss = { editingMessage = null },
+                    onConfirm = { newContent ->
+                        viewModel.updateMessageContent(message.id, newContent)
+                        editingMessage = null
+                    }
+                )
+            }
         }
     }
 }

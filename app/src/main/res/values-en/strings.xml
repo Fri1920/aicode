@@ -125,6 +125,15 @@
     <string name="chat_unsupported_image_type">Unrecognized image type, only jpg/png/gif/webp supported</string>
     <string name="chat_new_session_btn">New Chat</string>
     <string name="chat_open_sidebar">Open sidebar</string>
+    <string name="chat_add_attachment">Add attachment</string>
+    <string name="chat_take_photo">Take photo</string>
+    <string name="chat_reasoning_effort">Reasoning effort</string>
+    <string name="chat_reasoning_effort_low">Low</string>
+    <string name="chat_reasoning_effort_medium">Medium</string>
+    <string name="chat_reasoning_effort_high">High</string>
+    <string name="chat_open_file_failed">File not found or inaccessible</string>
+    <string name="chat_open_file_no_app">No app available to open this file</string>
+    <string name="chat_open_apk_permission">Installing apps requires permission. Allow installs from this source in the settings that just opened</string>
     <string name="chat_no_model_selected">No model selected</string>
     <string name="chat_open_git">Open version control</string>
     <string name="chat_open_terminal">Open terminal</string>
@@ -217,9 +226,15 @@
     <string name="chat_delete_session_confirm">Delete "%1$s"? All messages in this session will be cleared and cannot be undone.</string>
     <string name="chat_rename_session">Rename Session</string>
     <string name="chat_session_name">Session name</string>
+    <string name="chat_export_session">Export Session</string>
+    <string name="chat_export_session_done">Session exported</string>
+    <string name="chat_export_session_failed">Export failed</string>
 
     <!-- Chat Input Bar -->
     <string name="chat_input_placeholder">Type a message to chat with AI…</string>
+    <string name="chat_queue_hint">AI is busy, press enter to queue the message</string>
+    <string name="chat_queue_title">Queue (%1$d)</string>
+    <string name="chat_queue_remove">Remove from queue</string>
     <string name="chat_upload_file">Upload File</string>
     <string name="chat_upload_image">Upload Image</string>
     <string name="chat_remove_attachment">Remove attachment</string>
@@ -239,10 +254,22 @@
     <string name="chat_continue_feedback">Continue feedback</string>
     <string name="chat_approve_and_implement">Approve and implement</string>
 
+    <!-- Checkpoint & Rewind -->
+    <string name="checkpoint_rewind_title">Checkpoint &amp; Rewind</string>
+    <string name="checkpoint_target_prompt">Target message: %1$s</string>
+    <string name="checkpoint_restore_code_and_conversation">Restore code and conversation</string>
+    <string name="checkpoint_restore_code_and_conversation_desc">Revert both code and conversation before this checkpoint</string>
+    <string name="checkpoint_restore_conversation">Restore conversation only</string>
+    <string name="checkpoint_restore_conversation_desc">Keep current code, truncate conversation to this point</string>
+    <string name="checkpoint_restore_code">Restore code only</string>
+    <string name="checkpoint_restore_code_desc">Revert code to snapshot before this point, keep conversation</string>
+
     <!-- Chat Message Bubbles -->
     <string name="chat_copied">Copied</string>
     <string name="chat_copy">Copy</string>
     <string name="chat_bg_command_done">Background command completed</string>
+    <string name="chat_bg_commands_done">%1$d background tasks completed: %2$s</string>
+    <string name="chat_bg_commands_partial_failed">%1$d background tasks finished, %2$d failed: %3$s</string>
     <string name="chat_context_compressed">Context compressed</string>
     <string name="chat_compressing_context">Compressing context</string>
     <string name="chat_retrying">Network issue, retrying %1$s/%2$s</string>
@@ -644,4 +671,10 @@
 
     <!-- Helper Strings -->
     <string name="container_channel_deleted">Channel deleted</string>
+    <string name="chat_more_options">More Options</string>
+    <string name="chat_action_edit">Edit Message</string>
+    <string name="chat_action_copy">Copy Text</string>
+    <string name="chat_action_delete">Delete Message</string>
+    <string name="chat_edit_dialog_title">Edit Message</string>
+    <string name="chat_edit_dialog_hint">Enter message content</string>
 </resources>

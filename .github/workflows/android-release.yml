@@ -141,12 +141,55 @@ jobs:
             echo "tag=manual-${GITHUB_RUN_NUMBER}" >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Determine prerelease flag
+        id: prerelease
+        run: |
+          tag="${{ steps.release.outputs.tag }}"
+          if [[ "$tag" =~ -(rc|dev|beta|alpha)([.0-9]*)?$ ]]; then
+            echo "is_prerelease=true" >> "$GITHUB_OUTPUT"
+            echo "检测到预发布后缀，标记为 pre-release"
+          else
+            echo "is_prerelease=false" >> "$GITHUB_OUTPUT"
+            echo "正式版，不标记 pre-release"
+          fi
+
+      # GitHub 的 generate_release_notes 只列 merged PR，直接 push 的 commit 不会出现。
+      # 本仓库在 main 上直接 commit，不走 PR 流程，所以手动用 git log 生成 changelog。
+      - name: Generate changelog from git log
+        id: changelog
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          cur_tag="${GITHUB_REF_NAME}"
+          prev_tag=$(git tag --sort=-creatordate | grep -vE "^${cur_tag}$" | head -1)
+          if [[ -z "$prev_tag" ]]; then
+            echo "无历史 tag，列出最近 30 条提交"
+            log=$(git log --oneline --no-decorate -30)
+          else
+            echo "生成 ${prev_tag}..${cur_tag} 的 changelog"
+            log=$(git log --oneline --no-decorate "${prev_tag}..HEAD")
+          fi
+          # 转义为 GitHub Actions 输出（多行用 EOF 分隔符）
+          delimiter="EOF_$(date +%s)"
+          echo "body<<${delimiter}" >> "$GITHUB_OUTPUT"
+          echo "## What's Changed" >> "$GITHUB_OUTPUT"
+          echo "" >> "$GITHUB_OUTPUT"
+          echo "$log" | while IFS= read -r line; do
+            # 提取 commit hash 和 message，格式化为列表项
+            sha=$(echo "$line" | cut -d' ' -f1)
+            msg=$(echo "$line" | cut -d' ' -f2-)
+            echo "- ${msg} (${sha})" >> "$GITHUB_OUTPUT"
+          done
+          echo "" >> "$GITHUB_OUTPUT"
+          echo "**Full Changelog**: https://github.com/${{ github.repository }}/compare/${prev_tag}...${cur_tag}" >> "$GITHUB_OUTPUT"
+          echo "${delimiter}" >> "$GITHUB_OUTPUT"
+
       - name: Create GitHub Release & Upload assets
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.release.outputs.tag }}
           name: Release ${{ steps.release.outputs.tag }}
-          generate_release_notes: true
+          body: ${{ steps.changelog.outputs.body }}
+          prerelease: ${{ steps.prerelease.outputs.is_prerelease }}
           # 产物名约定 aicode-<abi>-<版本>.apk（见 Rename 步骤），故 glob 把 ABI 段放 aicode- 紧后、版本段用 * 兜底。
           # 不要写成 aicode-*-<abi>.apk——那会把 abi 误放末段，与 aicode-<abi>-<ver> 永远匹配不上（rc3 翻车原因）。
           files: |

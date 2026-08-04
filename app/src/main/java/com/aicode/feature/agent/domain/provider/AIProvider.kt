@@ -16,6 +16,8 @@ data class AIResponse(
     val stopReason: String? = null,
     /** 本轮模型的完整思考过程（对应 OpenAI/DeepSeek 的 reasoning_content）。非空时需回传给 API，否则 DeepSeek 思考模式会报 400。 */
     val reasoning: String? = null,
+    /** Anthropic extended thinking 的加密签名（thinking block 的 signature）。多轮/工具循环须随 thinking 原样回传，否则 400。其他 provider 为 null。 */
+    val signature: String? = null,
     /** 本轮输入 token 数（来自 API 返回的 usage）。取不到时为 0。 */
     val inputTokens: Int = 0,
     /** 本轮输出 token 数（来自 API 返回的 usage）。取不到时为 0。 */
@@ -56,22 +58,27 @@ interface AIProvider {
     /**
      * 单轮补全。[tools] 会以提供商的 function-calling 格式真正发给模型，
      * 模型若决定调用工具，结果会出现在返回的 [AIResponse.toolCalls] 中。
+     * [reasoningEffort] 为思考强度（"low"/"medium"/"high"），仅 OpenAI 系生效；
+     * Anthropic/Gemini 与不支持该参数的模型忽略。
      */
     suspend fun complete(
         systemPrompt: String,
         messages: List<AgentMessage>,
-        tools: List<AgentTool> = emptyList()
+        tools: List<AgentTool> = emptyList(),
+        reasoningEffort: String? = null
     ): AIResponse
 
     /**
      * 流式单轮补全：以 SSE 逐字接收模型回复。文字以 [AIStreamChunk.TextDelta] 增量推送，
      * 本轮结束时以 [AIStreamChunk.Final] 给出聚合后的完整 [AIResponse]（含工具调用）。
      * 工具调用的 function-calling 语义与 [complete] 一致。
+     * [reasoningEffort] 同 [complete]。
      */
     fun completeStream(
         systemPrompt: String,
         messages: List<AgentMessage>,
-        tools: List<AgentTool> = emptyList()
+        tools: List<AgentTool> = emptyList(),
+        reasoningEffort: String? = null
     ): Flow<AIStreamChunk>
 }
 

@@ -5,11 +5,15 @@ import androidx.lifecycle.viewModelScope
 import com.aicode.core.util.FileLogger
 import com.aicode.core.util.toUserMessage
 import com.aicode.feature.agent.data.local.dao.AgentMessageDao
+import com.aicode.feature.agent.domain.checkpoint.CheckpointManager
+import com.aicode.feature.agent.data.local.dao.CheckpointDao
 import com.aicode.feature.agent.data.local.dao.ChatSessionDao
+import com.aicode.feature.agent.data.local.entity.ChatSessionEntity
 import com.aicode.feature.agent.data.CodeChangeTracker
 import com.aicode.feature.agent.domain.container.ContainerInitState
 import com.aicode.feature.agent.domain.container.LinuxContainerEngine
 import com.aicode.feature.settings.domain.repository.AIProviderRepository
+import com.aicode.feature.settings.data.repository.DefaultModelSettingsRepository
 import com.aicode.feature.agent.domain.model.AgentContext
 import com.aicode.feature.agent.domain.model.AgentImage
 import com.aicode.feature.agent.domain.model.AgentMessage
@@ -19,6 +23,8 @@ import com.aicode.feature.agent.domain.model.WorkflowStatus
 import com.aicode.feature.agent.domain.permission.PermissionChoice
 import com.aicode.feature.agent.domain.workflow.AgentWorkflow
 import com.aicode.feature.terminal.domain.TabFinishedEvent
+import com.aicode.feature.terminal.domain.TAIL_LINES
+import com.aicode.feature.terminal.domain.takeTailLines
 import com.aicode.feature.agent.domain.workflow.AgentEvent
 import com.aicode.feature.agent.domain.tool.ToolPermissionManager
 import com.aicode.feature.agent.domain.tool.ToolRegistry
@@ -26,10 +32,12 @@ import com.aicode.feature.agent.domain.tool.question.AskUserQuestionManager
 import com.aicode.feature.agent.domain.tool.question.UserQuestionAnswer
 import com.aicode.feature.agent.domain.session.SessionUseCase
 import com.aicode.feature.agent.domain.session.MessagePersistenceUseCase
+import com.aicode.feature.backup.domain.BackupManager
 import com.aicode.feature.agent.domain.command.SlashCommandContext
 import com.aicode.feature.agent.domain.command.SlashCommandRegistry
 import com.aicode.feature.agent.domain.command.SlashCommandHandler
 import com.aicode.feature.agent.presentation.AgentAttachment
+import com.aicode.feature.agent.presentation.component.RewindOption
 import com.aicode.feature.agent.presentation.component.formatTokenCount
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
@@ -48,6 +56,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.io.File
+import java.io.OutputStream
 import java.util.UUID
 import javax.inject.Inject
 
@@ -60,6 +69,7 @@ class AIAgentViewModel @Inject constructor(
     private val agentMessageDao: AgentMessageDao,
     private val chatSessionDao: ChatSessionDao,
     private val aiProviderRepository: AIProviderRepository,
+    private val defaultModelSettingsRepository: DefaultModelSettingsRepository,
     private val toolPermissionManager: ToolPermissionManager,
     private val askUserQuestionManager: AskUserQuestionManager,
     private val containerEngine: LinuxContainerEngine,
@@ -67,10 +77,20 @@ class AIAgentViewModel @Inject constructor(
     private val messagePersistenceUseCase: MessagePersistenceUseCase,
     private val planApprovalManager: com.aicode.feature.agent.domain.tool.mode.PlanApprovalManager,
     private val terminalSessionManager: com.aicode.feature.terminal.domain.TerminalSessionManager,
-    private val slashCommandRegistry: SlashCommandRegistry
+    private val slashCommandRegistry: SlashCommandRegistry,
+    private val checkpointManager: CheckpointManager,
+    private val checkpointDao: CheckpointDao,
+    private val backupManager: BackupManager
 ) : ViewModel(), SlashCommandContext {
 
     private val sessionJobs = mutableMapOf<String, Job>()
+
+    /**
+     * AI 忙碌期间到达的后台任务完成事件缓冲区（按会话累积）。
+     * 会话空闲时到达的事件不缓存、立即发送；忙碌期间到达的缓存下来，
+     * 等该会话本轮结束（finally）时合并成一条通知发送，只触发一轮 AI 回复。
+     */
+    private val pendingMergedNotifications = mutableMapOf<String, MutableList<TabFinishedEvent>>()
 
     private val _currentSessionId = MutableStateFlow<String?>(null)
     val currentSessionId: StateFlow<String?> = _currentSessionId.asStateFlow()
@@ -125,6 +145,14 @@ class AIAgentViewModel @Inject constructor(
     ) { id, list ->
         list.find { it.id == id }?.mode ?: com.aicode.feature.agent.domain.model.AgentMode.BUILD
     }.stateIn(viewModelScope, SharingStarted.Eagerly, com.aicode.feature.agent.domain.model.AgentMode.BUILD)
+
+    /** 当前会话的思考强度（默认 MEDIUM）。 */
+    val currentSessionReasoningEffort: StateFlow<com.aicode.feature.agent.domain.model.ReasoningEffort> =
+        kotlinx.coroutines.flow.combine(
+            _currentSessionId, sessions
+        ) { id, list ->
+            list.find { it.id == id }?.reasoningEffort ?: com.aicode.feature.agent.domain.model.ReasoningEffort.MEDIUM
+        }.stateIn(viewModelScope, SharingStarted.Eagerly, com.aicode.feature.agent.domain.model.ReasoningEffort.MEDIUM)
 
     /** 当前会话绑定的 providerId/model（null 表示未绑定，回退全局 active provider）。 */
     val currentSessionProviderModel: StateFlow<Pair<String?, String?>> = kotlinx.coroutines.flow.combine(
@@ -248,6 +276,10 @@ class AIAgentViewModel @Inject constructor(
     val pendingUserQuestion = askUserQuestionManager.pendingQuestion
 
     private val _queuedRequests = MutableStateFlow<Map<String, List<QueuedRequest>>>(emptyMap())
+    // 正在执行斜杠命令的会话集合：命令执行期间同样视为 busy（
+    // 不注册 sessionJobs，否则 /compress 等命令内部的自检会误判为运行中），
+    // 用于 enqueueAgentRequest 判断新消息应入队而非并行执行。
+    private val _runningCommandSessions = MutableStateFlow<Set<String>>(emptySet())
     val queuedRequests: StateFlow<List<QueuedRequest>> = _currentSessionId
         .flatMapLatest { id ->
             if (id == null) flowOf(emptyList())
@@ -289,14 +321,15 @@ class AIAgentViewModel @Inject constructor(
                 _currentSessionId.value = if (existing != null) {
                     existing.id // ORDER BY updatedAt DESC：最近一条
                 } else {
-                    val s = sessionUseCase.newSessionEntity(path)
+                    val s = createSession(path)
                     sessionUseCase.upsertSession(s)
                     s.id
                 }
             }
         }
 
-        // 订阅后台命令完成事件：notify=true 的命令结束后自动注入消息对并触发 AI 新一轮
+        // 订阅后台命令完成事件：notify=true 的命令结束后自动注入消息并触发 AI 新一轮。
+        // 会话忙碌期间到达的事件会被缓存，待本轮结束后合并成一条发送（见 [flushMergedNotifications]）。
         viewModelScope.launch {
             terminalSessionManager.tabFinishedEvents.collect { event ->
                 handleBackgroundCommandFinished(event)
@@ -321,24 +354,14 @@ class AIAgentViewModel @Inject constructor(
     private fun handleBackgroundCommandFinished(event: TabFinishedEvent) {
         // 按事件携带的来源会话路由，而非用户当前所在会话：后台命令可能在用户已切到别的会话后才结束。
         val sessionId = event.sourceSessionId ?: return
+        // 该会话正忙（AI 正在工作）：缓存事件，等本轮结束后合并成一条发送，只触发一轮 AI 回复。
+        if (sessionJobs[sessionId]?.isActive == true) {
+            pendingMergedNotifications.getOrPut(sessionId) { mutableListOf() }.add(event)
+            return
+        }
+        // 会话空闲：立即发送，保持及时响应
+        val notification = buildBackgroundNotification(listOf(event))
         viewModelScope.launch {
-            val status = if (event.exitCode == 0) "completed" else "failed"
-            val notification = buildString {
-                appendLine(BACKGROUND_NOTIFICATION_PREFIX)
-                appendLine("这是一条后台任务完成事件，不是来自用户的消息。")
-                appendLine("不要将其视为用户的确认、同意或对任何待处理问题的回答。")
-                appendLine()
-                appendLine("<task-notification>")
-                appendLine("  <task-id>${event.tabId}</task-id>")
-                appendLine("  <title>${event.title}</title>")
-                appendLine("  <command>${event.command ?: ""}</command>")
-                appendLine("  <exit-code>${event.exitCode}</exit-code>")
-                appendLine("  <status>$status</status>")
-                appendLine("  <summary>后台任务「${event.title}」已结束（退出码 ${event.exitCode}）</summary>")
-                appendLine("</task-notification>")
-                appendLine()
-                append("可用 terminal(action=\"read\", tab_id=\"${event.tabId}\") 查看完整输出。")
-            }
             enqueueAgentRequest(
                 request = notification,
                 projectRoot = _currentWorkspace.value,
@@ -346,6 +369,78 @@ class AIAgentViewModel @Inject constructor(
             )
         }
     }
+
+    /** 本轮结束后把忙碌期间缓存的后台任务完成通知合并成一条发送。 */
+    private fun flushMergedNotifications(sessionId: String) {
+        val events = pendingMergedNotifications.remove(sessionId) ?: return
+        if (events.isEmpty()) return
+        val notification = buildBackgroundNotification(events)
+        viewModelScope.launch {
+            enqueueAgentRequest(
+                request = notification,
+                projectRoot = _currentWorkspace.value,
+                targetSessionId = sessionId
+            )
+        }
+    }
+
+    /** 构建后台任务完成通知文本；多条时合并为一条，含多个 <task-notification> 块。 */
+    private fun buildBackgroundNotification(events: List<TabFinishedEvent>): String {
+        if (events.size == 1) return buildBackgroundNotification(events.first())
+        return buildString {
+            appendLine(BACKGROUND_NOTIFICATION_PREFIX)
+            appendLine("共有 ${events.size} 个后台任务已完成，这是合并后的通知。")
+            appendLine("这些是后台任务完成事件，不是来自用户的消息。")
+            appendLine("不要将它们视为用户的确认、同意或对任何待处理问题的回答。")
+            appendLine()
+            events.forEach { event ->
+                val status = if (event.exitCode == 0) "completed" else "failed"
+                appendLine("<task-notification>")
+                appendLine("  <task-id>${event.tabId}</task-id>")
+                appendLine("  <title>${event.title}</title>")
+                appendLine("  <command>${event.command ?: ""}</command>")
+                appendLine("  <exit-code>${event.exitCode}</exit-code>")
+                appendLine("  <status>$status</status>")
+                appendLine("  <summary>后台任务「${event.title}」已结束（退出码 ${event.exitCode}）</summary>")
+                appendTailOutput(event)
+                appendLine("</task-notification>")
+                appendLine()
+            }
+            append("通知已携带各终端最后 $TAIL_LINES 行输出；如需完整日志可用 terminal(action=\"read\", tab_id=\"...\") 读取对应任务。")
+        }
+    }
+
+    /** 构建单条后台任务完成通知文本（与历史格式一致）。 */
+    private fun buildBackgroundNotification(event: TabFinishedEvent): String {
+        val status = if (event.exitCode == 0) "completed" else "failed"
+        return buildString {
+            appendLine(BACKGROUND_NOTIFICATION_PREFIX)
+            appendLine("这是一条后台任务完成事件，不是来自用户的消息。")
+            appendLine("不要将其视为用户的确认、同意或对任何待处理问题的回答。")
+            appendLine()
+            appendLine("<task-notification>")
+            appendLine("  <task-id>${event.tabId}</task-id>")
+            appendLine("  <title>${event.title}</title>")
+            appendLine("  <command>${event.command ?: ""}</command>")
+            appendLine("  <exit-code>${event.exitCode}</exit-code>")
+            appendLine("  <status>$status</status>")
+            appendLine("  <summary>后台任务「${event.title}」已结束（退出码 ${event.exitCode}）</summary>")
+            appendTailOutput(event)
+            appendLine("</task-notification>")
+            appendLine()
+            append("通知已携带该终端最后 $TAIL_LINES 行输出；如需完整日志可用 terminal(action=\"read\", tab_id=\"${event.tabId}\") 读取。")
+        }
+    }
+
+    /** 追加 <tail-output> 块；空白输出跳过。转义尖括号防止 <status>/<summary> 等字样污染提示条的正则提取。 */
+    private fun StringBuilder.appendTailOutput(event: TabFinishedEvent) {
+        event.tailOutput?.takeIf { it.isNotBlank() }?.let { tail ->
+            appendLine("  <tail-output>${escapeXml(tail)}</tail-output>")
+        }
+    }
+
+    private fun escapeXml(text: String): String =
+        text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
     fun executeAgentRequest(
         request: String,
@@ -369,12 +464,15 @@ class AIAgentViewModel @Inject constructor(
             val history = messagePersistenceUseCase.buildHistory(sessionId, SessionUseCase.PENDING_TOOL_MARKER)
             val isFirst = history.isEmpty()
 
-            messagePersistenceUseCase.persist(sessionId, MessageRole.USER, request, attachments = inputAttachments)
+            val userMsgId = UUID.randomUUID().toString()
+            messagePersistenceUseCase.persist(sessionId, MessageRole.USER, request, id = userMsgId, attachments = inputAttachments)
+            checkpointManager.createCheckpoint(sessionId, userMsgId, request)
             if (isFirst) sessionUseCase.updateTitle(sessionId, sessionUseCase.deriveTitle(request))
             sessionUseCase.touch(sessionId, messagePersistenceUseCase.nextTimestamp())
 
             val sessionEntity = sessionUseCase.getSessionById(sessionId)
-            val mode = sessionEntity?.toDomain()?.mode ?: com.aicode.feature.agent.domain.model.AgentMode.BUILD
+            val sessionDomain = sessionEntity?.toDomain()
+            val mode = sessionDomain?.mode ?: com.aicode.feature.agent.domain.model.AgentMode.BUILD
 
             val context = AgentContext(
                 currentFile = currentFile,
@@ -384,7 +482,8 @@ class AIAgentViewModel @Inject constructor(
                 history = history,
                 inputImages = inputImages,
                 sessionId = sessionId,
-                mode = mode
+                mode = mode,
+                reasoningEffort = sessionDomain?.reasoningEffort?.apiValue
             )
 
             val result = agentWorkflow.execute(
@@ -428,7 +527,8 @@ class AIAgentViewModel @Inject constructor(
         targetSessionId: String? = null
     ) {
         val sid = targetSessionId ?: _currentSessionId.value
-        val isCurrentRunning = sid != null && sessionJobs[sid]?.isActive == true
+        val isCurrentRunning = sid != null &&
+            (sessionJobs[sid]?.isActive == true || sid in _runningCommandSessions.value)
         if (isCurrentRunning) {
             val req = QueuedRequest(
                 id = UUID.randomUUID().toString(),
@@ -458,6 +558,13 @@ class AIAgentViewModel @Inject constructor(
         }
     }
 
+    /** 从当前会话队列移除指定条目（队列面板删除按钮）。 */
+    fun removeQueuedRequest(id: String) {
+        val sid = _currentSessionId.value ?: return
+        val queue = _queuedRequests.value[sid] ?: return
+        _queuedRequests.value = _queuedRequests.value + (sid to queue.filterNot { it.id == id })
+    }
+
     private fun processNextInQueue(sessionId: String) {
         val queue = _queuedRequests.value[sessionId] ?: return
         val next = queue.firstOrNull() ?: return
@@ -473,6 +580,24 @@ class AIAgentViewModel @Inject constructor(
             targetSessionId = sessionId,
             isAutoTrigger = next.isAutoTrigger
         )
+    }
+
+    /**
+     * 执行斜杠命令：先把命令文本作为用户消息落库（进入对话上下文），再执行 handler。
+     * 执行期间标记为命令占用（防新消息并行执行），结束后接续队列中排队的下一条。
+     */
+    private fun runSlashCommand(command: SlashCommandHandler, input: String, sessionId: String) {
+        viewModelScope.launch {
+            _runningCommandSessions.value = _runningCommandSessions.value + sessionId
+            try {
+                messagePersistenceUseCase.persist(sessionId, MessageRole.USER, input)
+                sessionUseCase.touch(sessionId, messagePersistenceUseCase.nextTimestamp())
+                command.execute(this@AIAgentViewModel)
+            } finally {
+                _runningCommandSessions.value = _runningCommandSessions.value - sessionId
+                processNextInQueue(sessionId)
+            }
+        }
     }
 
     fun executeAgentRequestStream(
@@ -491,6 +616,13 @@ class AIAgentViewModel @Inject constructor(
             FileLogger.w(TAG, "工作区未就绪，跳过请求")
             return@launch
         }
+        // 命令分流：完全相等匹配到斜杠命令时，不走 agent workflow，直接执行命令操作
+        // （命令文本已作为用户消息落库，进入对话上下文）。不注册 sessionJobs，
+        // 因此 isRunning 保持 false，/compress 等命令内部的自检可以正常工作。
+        slashCommandRegistry.findExact(request)?.let { command ->
+            runSlashCommand(command, request, sessionId)
+            return@launch
+        }
         sessionJobs[sessionId] = coroutineContext[Job]!!
         setAgentState(sessionId, AgentUIState.Streaming)
 
@@ -501,13 +633,16 @@ class AIAgentViewModel @Inject constructor(
             val isFirst = history.isEmpty()
 
             if (!isAutoTrigger) {
-                messagePersistenceUseCase.persist(sessionId, MessageRole.USER, request, attachments = inputAttachments)
+                val userMsgId = UUID.randomUUID().toString()
+                messagePersistenceUseCase.persist(sessionId, MessageRole.USER, request, id = userMsgId, attachments = inputAttachments)
+                checkpointManager.createCheckpoint(sessionId, userMsgId, request)
                 if (isFirst) sessionUseCase.updateTitle(sessionId, sessionUseCase.deriveTitle(request))
             }
             sessionUseCase.touch(sessionId, messagePersistenceUseCase.nextTimestamp())
 
             val sessionEntity = sessionUseCase.getSessionById(sessionId)
-            val mode = sessionEntity?.toDomain()?.mode ?: com.aicode.feature.agent.domain.model.AgentMode.BUILD
+            val sessionDomain = sessionEntity?.toDomain()
+            val mode = sessionDomain?.mode ?: com.aicode.feature.agent.domain.model.AgentMode.BUILD
 
             val context = AgentContext(
                 currentFile = currentFile,
@@ -517,7 +652,8 @@ class AIAgentViewModel @Inject constructor(
                 history = history,
                 inputImages = inputImages,
                 sessionId = sessionId,
-                mode = mode
+                mode = mode,
+                reasoningEffort = sessionDomain?.reasoningEffort?.apiValue
             )
 
             agentWorkflow.executeEvents(
@@ -555,6 +691,7 @@ class AIAgentViewModel @Inject constructor(
                             normalized,
                             toolCalls = event.toolCalls,
                             reasoning = reasoning,
+                            signature = event.signature.ifEmpty { null },
                             inputTokens = event.inputTokens,
                             outputTokens = event.outputTokens
                         )
@@ -605,7 +742,8 @@ class AIAgentViewModel @Inject constructor(
                             toolCallId = event.id,
                             toolName = event.toolName,
                             toolArgs = event.argsPreview ?: toolArgsByMsgId[msgId],
-                            isError = event.isError
+                            isError = event.isError,
+                            attachments = event.attachments
                         )
                         toolArgsByMsgId.remove(msgId)
                         if (_runningTools.value[sessionId]?.messageId == msgId) {
@@ -650,6 +788,9 @@ class AIAgentViewModel @Inject constructor(
             setCompacting(sessionId, false)
             setRetryState(sessionId, null)
 
+            // 忙碌期间缓存的后台任务完成通知：本轮结束且 job 已移除后，合并成一条发送
+            flushMergedNotifications(sessionId)
+
             // 正常完成时先回到 Idle，再处理队列；队列若有下一轮会重新设 Streaming
             val currentState = _agentStates.value[sessionId]
             if (currentState !is AgentUIState.Error && currentState !is AgentUIState.Loading && currentState !is AgentUIState.Streaming) {
@@ -684,6 +825,9 @@ class AIAgentViewModel @Inject constructor(
         val jobs = sessionJobs.values.filter { it.isActive }
         jobs.forEach { it.cancel() }
         sessionJobs.clear()
+        pendingMergedNotifications.clear()
+        _queuedRequests.value = emptyMap()
+        _runningCommandSessions.value = emptySet()
         _agentStates.value = _agentStates.value.mapValues { AgentUIState.Idle }
         _streamingTexts.value = emptyMap()
         _streamingReasonings.value = emptyMap()
@@ -699,6 +843,7 @@ class AIAgentViewModel @Inject constructor(
         val streamingText = _streamingTexts.value[sessionId]
         val streamingReasoning = _streamingReasonings.value[sessionId]
         job.cancel()
+        pendingMergedNotifications.remove(sessionId)
         setAgentState(sessionId, AgentUIState.Idle)
         setRunningTool(sessionId, null)
         setStreamingText(sessionId, null)
@@ -736,6 +881,8 @@ class AIAgentViewModel @Inject constructor(
             setStreamingReasoning(sessionId, null)
             setCompacting(sessionId, false)
             setRetryState(sessionId, null)
+            // 点「停止」= 跳过当前轮，立即执行队列下一条
+            processNextInQueue(sessionId)
         }
     }
 
@@ -750,7 +897,7 @@ class AIAgentViewModel @Inject constructor(
             setChanges(curId, emptyList())
             return@launch
         }
-        val s = sessionUseCase.newSessionEntity(_currentWorkspace.value)
+        val s = createSession(_currentWorkspace.value)
         sessionUseCase.upsertSession(s)
         _currentSessionId.value = s.id
     }
@@ -767,15 +914,23 @@ class AIAgentViewModel @Inject constructor(
         }
     }
 
+    fun setSessionReasoningEffort(effort: com.aicode.feature.agent.domain.model.ReasoningEffort) {
+        val sid = _currentSessionId.value ?: return
+        viewModelScope.launch {
+            sessionUseCase.updateReasoningEffort(sid, effort.name)
+        }
+    }
+
     fun setSessionProviderModel(providerId: String, model: String) {
         val sid = _currentSessionId.value ?: return
         viewModelScope.launch {
             sessionUseCase.updateProviderModel(sid, providerId, model)
+            // 空会话中的选择视为「新会话默认模型」，供下次新建会话沿用
+            if (sessionUseCase.isSessionEmpty(sid)) {
+                defaultModelSettingsRepository.setDefaultModel(providerId, model)
+            }
         }
     }
-
-    /** 暴露给 UI：发送时完全匹配查找斜杠命令。 */
-    fun findSlashCommand(input: String) = slashCommandRegistry.findExact(input)
 
     /** 暴露给 UI：输入框下拉菜单展示的命令列表。 */
     val slashCommands: List<SlashCommandHandler> get() = slashCommandRegistry.all
@@ -835,6 +990,8 @@ class AIAgentViewModel @Inject constructor(
                 )
             } finally {
                 setCompacting(sid, false)
+                // 压缩是异步流程，结束后接续队列中排队的下一条
+                processNextInQueue(sid)
             }
         }
         sessionJobs[sid] = job
@@ -865,6 +1022,7 @@ class AIAgentViewModel @Inject constructor(
     }
 
     fun deleteSession(id: String) = viewModelScope.launch {
+        checkpointManager.clearSessionCheckpoints(id)
         sessionUseCase.deleteSession(id)
 
         sessionJobs[id]?.cancel()
@@ -886,10 +1044,51 @@ class AIAgentViewModel @Inject constructor(
                 if (remaining != null) {
                     _currentSessionId.value = remaining.id
                 } else {
-                    val s = sessionUseCase.newSessionEntity(ws)
+                    val s = createSession(ws)
                     sessionUseCase.upsertSession(s)
                     _currentSessionId.value = s.id
                 }
+            }
+        }
+    }
+
+    /** 重命名会话标题。仅更新 title，不改 updatedAt，列表顺序保持不变。 */
+    // Checkpoint Rewind 选中的 Target Message
+    private val _targetRewindMessageId = MutableStateFlow<String?>(null)
+    val targetRewindMessageId: StateFlow<String?> = _targetRewindMessageId.asStateFlow()
+
+    fun openRewindMenu(messageId: String) {
+        _targetRewindMessageId.value = messageId
+    }
+
+    fun dismissRewindMenu() {
+        _targetRewindMessageId.value = null
+    }
+
+    fun executeRewindOption(messageId: String, option: RewindOption, onFillPrompt: (String) -> Unit) = viewModelScope.launch {
+        val sessionId = _currentSessionId.value ?: return@launch
+        val checkpoint = checkpointDao.getCheckpointByMessageId(messageId)
+        val targetMsgEntity = agentMessageDao.getMessageById(messageId) ?: return@launch
+
+        when (option) {
+            RewindOption.RESTORE_CODE_AND_CONVERSATION -> {
+                if (checkpoint != null) {
+                    checkpointManager.restoreCodeToCheckpoint(sessionId, checkpoint.id)
+                }
+                agentMessageDao.deleteMessagesFromTimestamp(sessionId, targetMsgEntity.timestamp)
+                dismissRewindMenu()
+                withContext(Dispatchers.Main) { onFillPrompt(targetMsgEntity.content) }
+            }
+            RewindOption.RESTORE_CONVERSATION -> {
+                agentMessageDao.deleteMessagesFromTimestamp(sessionId, targetMsgEntity.timestamp)
+                dismissRewindMenu()
+                withContext(Dispatchers.Main) { onFillPrompt(targetMsgEntity.content) }
+            }
+            RewindOption.RESTORE_CODE -> {
+                if (checkpoint != null) {
+                    checkpointManager.restoreCodeToCheckpoint(sessionId, checkpoint.id)
+                }
+                dismissRewindMenu()
             }
         }
     }
@@ -901,18 +1100,45 @@ class AIAgentViewModel @Inject constructor(
         sessionUseCase.updateTitle(id, trimmed)
     }
 
+    /** 导出单个会话为无密码备份格式（tar.gz），流式写入 [output]（调用方打开，本方法负责关闭）。成功回调 true，失败回调 false。 */
+    fun exportSession(sessionId: String, output: OutputStream, onResult: (Boolean) -> Unit) = viewModelScope.launch {
+        try {
+            backupManager.exportSession(sessionId, output)
+            onResult(true)
+        } catch (e: Exception) {
+            FileLogger.e("AIAgentViewModel", "exportSession failed", e)
+            onResult(false)
+        } finally {
+            runCatching { output.close() }
+        }
+    }
+
     private suspend fun ensureSession(): String {
         _currentSessionId.value?.let { return it }
         val ws = _currentWorkspace.value
         if (ws.isBlank()) return ""
         val existing = sessionUseCase.getFirstSessionOfWorkspace(ws)
         val id = if (existing != null) existing.id else {
-            val s = sessionUseCase.newSessionEntity(_currentWorkspace.value)
+            val s = createSession(_currentWorkspace.value)
             sessionUseCase.upsertSession(s)
             s.id
         }
         _currentSessionId.value = id
         return id
+    }
+
+    /**
+     * 创建新会话并按「新会话默认模型」绑定 provider/model；未设置默认时回退全局 active provider。
+     * 所有新建会话的入口（冷启动、新建、删除兜底、ensureSession）都走这里。
+     */
+    private suspend fun createSession(workspacePath: String): ChatSessionEntity {
+        val s = sessionUseCase.newSessionEntity(workspacePath)
+        val providerId = defaultModelSettingsRepository.getDefaultProviderId()
+        val model = defaultModelSettingsRepository.getDefaultModel()
+        if (providerId.isNotBlank() && model.isNotBlank()) {
+            sessionUseCase.updateProviderModel(s.id, providerId, model)
+        }
+        return s
     }
 
     // endregion
@@ -989,6 +1215,26 @@ class AIAgentViewModel @Inject constructor(
         val sessionId = _currentSessionId.value ?: return
         setAgentState(sessionId, AgentUIState.Idle)
         setChanges(sessionId, emptyList())
+    }
+
+    fun updateMessageContent(messageId: String, newContent: String) = viewModelScope.launch {
+        try {
+            messagePersistenceUseCase.updateContent(messageId, newContent)
+        } catch (e: Exception) {
+            FileLogger.e(TAG, "更新消息失败", e)
+        }
+    }
+
+    fun deleteMessage(messageId: String) = viewModelScope.launch {
+        try {
+            val msg = agentMessageDao.getMessageById(messageId)
+            if (msg != null && msg.role == MessageRole.USER.name) {
+                agentMessageDao.deleteMessagesAfterTimestamp(msg.sessionId, msg.timestamp)
+            }
+            agentMessageDao.deleteMessageById(messageId)
+        } catch (e: Exception) {
+            FileLogger.e(TAG, "删除消息失败", e)
+        }
     }
 
     private fun detectLanguage(filePath: String): String {

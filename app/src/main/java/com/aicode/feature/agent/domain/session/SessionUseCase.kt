@@ -93,6 +93,10 @@ class SessionUseCase @Inject constructor(
         chatSessionDao.updateProviderModel(sessionId, providerId, model)
     }
 
+    suspend fun updateReasoningEffort(sessionId: String, effort: String) {
+        chatSessionDao.updateReasoningEffort(sessionId, effort)
+    }
+
     suspend fun isSessionEmpty(sessionId: String): Boolean {
         return agentMessageDao.getMessagesBySessionOnce(sessionId).isEmpty()
     }

@@ -25,7 +25,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -52,6 +55,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -61,8 +65,10 @@ import com.aicode.core.theme.Spacing
 import com.aicode.core.ui.rememberImeBottomInset
 import com.aicode.feature.agent.domain.command.SlashCommandHandler
 import com.aicode.feature.agent.domain.model.AgentMode
+import com.aicode.feature.agent.domain.model.ReasoningEffort
 import com.aicode.feature.agent.domain.permission.PermissionChoice
 import com.aicode.feature.agent.domain.tool.PendingToolPermission
+import com.aicode.feature.agent.presentation.QueuedRequest
 import com.aicode.feature.settings.domain.model.AIProviderConfig
 import com.aicode.feature.settings.presentation.component.ModelLogoIcon
 import com.aicode.feature.settings.presentation.component.ProviderLogoIcon
@@ -71,12 +77,15 @@ import com.aicode.feature.workspace.presentation.component.WorkspaceIconButton
 import compose.icons.FeatherIcons
 import compose.icons.feathericons.AlertCircle
 import compose.icons.feathericons.ArrowUp
+import compose.icons.feathericons.Camera
 import compose.icons.feathericons.Check
 import compose.icons.feathericons.FileText
 import compose.icons.feathericons.Image
+import compose.icons.feathericons.Plus
 import compose.icons.feathericons.Settings
 import compose.icons.feathericons.Square
 import compose.icons.feathericons.X
+import compose.icons.feathericons.Zap
 import java.util.Base64
 import androidx.compose.ui.res.stringResource
 import com.aicode.R
@@ -97,16 +106,22 @@ internal fun ChatInputBar(
     onNavigateToSettings: () -> Unit,
     currentMode: AgentMode,
     onToggleMode: (AgentMode) -> Unit,
+    reasoningEffort: ReasoningEffort,
+    onReasoningEffortChange: (ReasoningEffort) -> Unit,
     pendingAttachments: List<PendingUploadAttachment>,
     onRemoveAttachment: (Int) -> Unit,
     canUploadFiles: Boolean,
     canUploadImages: Boolean,
     onUploadFile: () -> Unit,
     onUploadImage: () -> Unit,
+    onTakePhoto: () -> Unit,
     slashCommands: List<SlashCommandHandler> = emptyList(),
+    queuedRequests: List<QueuedRequest> = emptyList(),
+    onRemoveQueued: (String) -> Unit = {},
     tokenProgress: Float = 0f
 ) {
     val canSend = (value.isNotBlank() || pendingAttachments.isNotEmpty()) && !isBusy
+    var showAttachmentSheet by remember { mutableStateOf(false) }
     val showSlashMenu = !isBusy && slashCommands.isNotEmpty() &&
         value.startsWith("/") && !value.contains("\n")
     val filteredCommands = if (showSlashMenu) {
@@ -170,6 +185,13 @@ internal fun ChatInputBar(
                 }
             }
 
+            if (queuedRequests.isNotEmpty()) {
+                QueuedRequestPanel(
+                    queuedRequests = queuedRequests,
+                    onRemoveQueued = onRemoveQueued
+                )
+            }
+
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -195,11 +217,13 @@ internal fun ChatInputBar(
                         .heightIn(min = 44.dp, max = 140.dp),
                     placeholder = {
                         Text(
-                            stringResource(R.string.chat_input_placeholder),
+                            stringResource(if (isBusy) R.string.chat_queue_hint else R.string.chat_input_placeholder),
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     },
-                    enabled = !isBusy,
+                    enabled = true,
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+                    keyboardActions = KeyboardActions(onSend = { onSend() }),
                     colors = TextFieldDefaults.colors(
                         focusedContainerColor = Color.Transparent,
                         unfocusedContainerColor = Color.Transparent,
@@ -241,20 +265,20 @@ internal fun ChatInputBar(
                         ) {
                             Box(
                                 modifier = Modifier
-                                    .width(58.dp)
-                                    .padding(vertical = 6.dp),
+                                    .width(46.dp)
+                                    .padding(vertical = 4.dp),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text(
                                     text = currentMode.name,
-                                    style = MaterialTheme.typography.labelMedium.copy(
+                                    style = MaterialTheme.typography.labelSmall.copy(
                                         fontWeight = FontWeight.Bold,
                                         color = modeTextColor
                                     )
                                 )
                             }
                         }
-                        Spacer(Modifier.width(Spacing.sm))
+                        Spacer(Modifier.width(Spacing.xs))
 
                         ModelIconButton(
                             provider = activeProvider,
@@ -267,25 +291,126 @@ internal fun ChatInputBar(
                             WorkspaceIconButton(
                                 viewModel = workspaceViewModel,
                                 hasRunningSessions = hasRunningSessions,
-                                onSwitchConfirmed = onSwitchWorkspaceConfirmed
+                                onSwitchConfirmed = onSwitchWorkspaceConfirmed,
+                                modifier = Modifier.size(36.dp),
+                                iconSize = 20.dp
                             )
                         }
 
-                        UploadIconButton(
-                            enabled = canUploadFiles && !isBusy,
-                            icon = FeatherIcons.FileText,
-                            contentDescription = stringResource(R.string.chat_upload_file),
-                            onClick = onUploadFile
-                        )
-
-                        UploadIconButton(
-                            enabled = canUploadImages && !isBusy,
-                            icon = FeatherIcons.Image,
-                            contentDescription = stringResource(R.string.chat_upload_image),
-                            onClick = onUploadImage
+                        ReasoningEffortSelector(
+                            effort = reasoningEffort,
+                            onChange = onReasoningEffortChange,
+                            enabled = !isBusy
                         )
                     }
+                    UploadIconButton(
+                        enabled = !isBusy,
+                        icon = FeatherIcons.Plus,
+                        contentDescription = stringResource(R.string.chat_add_attachment),
+                        onClick = { showAttachmentSheet = true }
+                    )
                     SendButton(canSend = canSend, isBusy = isBusy, tokenProgress = tokenProgress, onSend = onSend, onStop = onStop)
+                }
+            }
+        }
+    }
+
+    if (showAttachmentSheet) {
+        AttachmentSheet(
+            canUploadFiles = canUploadFiles && !isBusy,
+            canUploadImages = canUploadImages && !isBusy,
+            onUploadFile = {
+                showAttachmentSheet = false
+                onUploadFile()
+            },
+            onUploadImage = {
+                showAttachmentSheet = false
+                onUploadImage()
+            },
+            onTakePhoto = {
+                showAttachmentSheet = false
+                onTakePhoto()
+            },
+            onDismiss = { showAttachmentSheet = false }
+        )
+    }
+}
+
+/**
+ * 待发送队列面板：AI 忙时排队的消息，风格与斜杠命令菜单一致。
+ * 内容过长时在面板内部滚动（heightIn 限制 + LazyColumn），可逐条删除。
+ */
+@Composable
+private fun QueuedRequestPanel(
+    queuedRequests: List<QueuedRequest>,
+    onRemoveQueued: (String) -> Unit
+) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = Spacing.sm),
+        shape = RoundedCornerShape(Radius.lg),
+        color = MaterialTheme.colorScheme.surface,
+        border = androidx.compose.foundation.BorderStroke(
+            1.dp, MaterialTheme.colorScheme.outlineVariant
+        )
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = Spacing.sm, vertical = Spacing.xs)
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = Spacing.md, vertical = Spacing.xs),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = stringResource(R.string.chat_queue_title, queuedRequests.size),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            LazyColumn(
+                modifier = Modifier.heightIn(max = 160.dp),
+                verticalArrangement = Arrangement.spacedBy(Spacing.xs)
+            ) {
+                itemsIndexed(queuedRequests, key = { _, req -> req.id }) { index, req ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(Radius.sm))
+                            .padding(horizontal = Spacing.md, vertical = Spacing.xs),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "${index + 1}",
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(Modifier.width(Spacing.sm))
+                        Text(
+                            text = req.request,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.weight(1f),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        IconButton(
+                            onClick = { onRemoveQueued(req.id) },
+                            modifier = Modifier.size(28.dp)
+                        ) {
+                            Icon(
+                                FeatherIcons.X,
+                                contentDescription = stringResource(R.string.chat_queue_remove),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(14.dp)
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -455,12 +580,14 @@ internal fun UploadIconButton(
 ) {
     IconButton(
         onClick = onClick,
-        enabled = enabled
+        enabled = enabled,
+        modifier = Modifier.size(36.dp)
     ) {
         Icon(
             icon,
             contentDescription = contentDescription,
             tint = if (enabled) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f),
+            modifier = Modifier.size(20.dp)
         )
     }
 }
@@ -477,8 +604,8 @@ internal fun ModelIconButton(
 ) {
     var showSheet by remember { mutableStateOf(false) }
 
-    IconButton(onClick = { showSheet = true }) {
-        ModelLogoIcon(modelName = provider?.effectiveModel.orEmpty(), size = 22.dp)
+    IconButton(onClick = { showSheet = true }, modifier = Modifier.size(36.dp)) {
+        ModelLogoIcon(modelName = provider?.effectiveModel.orEmpty(), size = 20.dp)
     }
 
     if (showSheet) {
@@ -495,6 +622,188 @@ internal fun ModelIconButton(
                 showSheet = false
             },
             onDismiss = { showSheet = false }
+        )
+    }
+}
+
+/**
+ * 思考强度选择器：独立图标按钮，点击弹出底部三档选择（低/中/高）。
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ReasoningEffortSelector(
+    effort: ReasoningEffort,
+    onChange: (ReasoningEffort) -> Unit,
+    enabled: Boolean
+) {
+    var showSheet by remember { mutableStateOf(false) }
+    Box {
+        IconButton(
+            onClick = { showSheet = true },
+            enabled = enabled,
+            modifier = Modifier.size(36.dp)
+        ) {
+            Icon(
+                FeatherIcons.Zap,
+                contentDescription = stringResource(effort.labelRes()),
+                tint = if (enabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f),
+                modifier = Modifier.size(20.dp)
+            )
+        }
+    }
+
+    if (showSheet) {
+        val sheetState = rememberModalBottomSheetState()
+        ModalBottomSheet(
+            onDismissRequest = { showSheet = false },
+            sheetState = sheetState,
+            containerColor = MaterialTheme.colorScheme.surface
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = Spacing.lg)
+                    .padding(bottom = Spacing.xl)
+            ) {
+                Text(
+                    text = stringResource(com.aicode.R.string.chat_reasoning_effort),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.padding(bottom = Spacing.sm)
+                )
+                ReasoningEffort.entries.forEach { e ->
+                    val selected = e == effort
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(Radius.sm))
+                            .clickable {
+                                showSheet = false
+                                onChange(e)
+                            }
+                            .padding(horizontal = Spacing.md, vertical = Spacing.md),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            FeatherIcons.Zap,
+                            contentDescription = null,
+                            tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(Modifier.width(Spacing.md))
+                        Text(
+                            text = stringResource(e.labelRes()),
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.weight(1f),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        if (selected) {
+                            Icon(
+                                FeatherIcons.Check,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+private fun ReasoningEffort.labelRes(): Int = when (this) {
+    ReasoningEffort.LOW -> com.aicode.R.string.chat_reasoning_effort_low
+    ReasoningEffort.MEDIUM -> com.aicode.R.string.chat_reasoning_effort_medium
+    ReasoningEffort.HIGH -> com.aicode.R.string.chat_reasoning_effort_high
+}
+
+/**
+ * 加号底部弹层：文件 / 图片 / 拍照上传入口。
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun AttachmentSheet(
+    canUploadFiles: Boolean,
+    canUploadImages: Boolean,
+    onUploadFile: () -> Unit,
+    onUploadImage: () -> Unit,
+    onTakePhoto: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    val sheetState = rememberModalBottomSheetState()
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = MaterialTheme.colorScheme.surface
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = Spacing.lg)
+                .padding(bottom = Spacing.xl)
+        ) {
+            Text(
+                text = stringResource(com.aicode.R.string.chat_add_attachment),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.padding(bottom = Spacing.sm)
+            )
+            AttachmentSheetItem(
+                icon = FeatherIcons.FileText,
+                title = stringResource(com.aicode.R.string.chat_upload_file),
+                enabled = canUploadFiles,
+                onClick = onUploadFile
+            )
+            AttachmentSheetItem(
+                icon = FeatherIcons.Image,
+                title = stringResource(com.aicode.R.string.chat_upload_image),
+                enabled = canUploadImages,
+                onClick = onUploadImage
+            )
+            AttachmentSheetItem(
+                icon = FeatherIcons.Camera,
+                title = stringResource(com.aicode.R.string.chat_take_photo),
+                enabled = canUploadImages,
+                onClick = onTakePhoto
+            )
+        }
+    }
+}
+
+@Composable
+private fun AttachmentSheetItem(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    title: String,
+    enabled: Boolean,
+    onClick: () -> Unit
+) {
+    val tint = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(Radius.sm))
+            .clickable(enabled = enabled, onClick = onClick)
+            .padding(horizontal = Spacing.md, vertical = Spacing.md),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            icon,
+            contentDescription = null,
+            tint = if (enabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f),
+            modifier = Modifier.size(20.dp)
+        )
+        Spacer(Modifier.width(Spacing.md))
+        Text(
+            text = title,
+            style = MaterialTheme.typography.bodyLarge,
+            color = tint,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
         )
     }
 }

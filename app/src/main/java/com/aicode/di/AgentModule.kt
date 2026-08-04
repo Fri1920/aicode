@@ -6,9 +6,9 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.aicode.feature.agent.data.local.dao.AgentMessageDao
 import com.aicode.feature.agent.data.local.dao.ChatSessionDao
+import com.aicode.feature.agent.data.local.dao.CheckpointDao
 import com.aicode.feature.agent.data.local.dao.TodoItemDao
 import com.aicode.feature.settings.data.local.dao.AIProviderDao
-import com.aicode.feature.settings.domain.model.ProviderType
 import com.aicode.feature.settings.domain.repository.AIProviderRepository
 import com.aicode.feature.agent.data.local.database.AgentDatabase
 import com.aicode.feature.agent.data.CodeChangeTracker
@@ -16,9 +16,6 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import com.aicode.feature.agent.data.remote.anthropic.AnthropicApi
 import com.aicode.feature.agent.data.remote.gemini.GeminiApi
 import com.aicode.feature.agent.data.remote.openai.OpenAIApi
-import com.aicode.feature.agent.domain.provider.AIProvider
-import com.aicode.feature.agent.domain.provider.AnthropicAdapter
-import com.aicode.feature.agent.domain.provider.OpenAIAdapter
 import com.aicode.feature.agent.domain.container.CommandEngine
 import com.aicode.feature.agent.domain.container.DelegatingCommandEngine
 import com.aicode.feature.agent.domain.container.LinuxContainerEngine
@@ -27,6 +24,7 @@ import com.aicode.feature.agent.domain.container.RemoteSshEngine
 import com.aicode.feature.settings.data.repository.ExecutionMode
 import com.aicode.feature.settings.data.repository.ExecutionModeHolder
 import com.aicode.feature.agent.domain.tool.file.ReadFileTool
+import com.aicode.feature.agent.domain.tool.file.SendFileTool
 import com.aicode.feature.agent.domain.tool.file.ViewImageTool
 import com.aicode.feature.agent.domain.tool.file.WriteFileTool
 import com.aicode.feature.agent.domain.tool.editor.EditFileTool
@@ -79,6 +77,12 @@ object AgentModule {
         ).addMigrations(*MigrationLoader.loadMigrations(context))
             .fallbackToDestructiveMigration(dropAllTables = false)
             .build()
+    }
+
+    @Provides
+    @Singleton
+    fun provideCheckpointDao(database: AgentDatabase): CheckpointDao {
+        return database.checkpointDao()
     }
 
     @Provides
@@ -182,27 +186,6 @@ object AgentModule {
 
     @Provides
     @Singleton
-    @Named("OpenAIProvider")
-    fun provideOpenAIProvider(api: OpenAIApi): AIProvider {
-        return OpenAIAdapter(api)
-    }
-
-    @Provides
-    @Singleton
-    @Named("AnthropicProvider")
-    fun provideAnthropicProvider(api: AnthropicApi): AIProvider {
-        return AnthropicAdapter(api)
-    }
-
-    @Provides
-    @Singleton
-    @Named("GeminiProvider")
-    fun provideGeminiProvider(api: com.aicode.feature.agent.data.remote.gemini.GeminiApi): AIProvider {
-        return com.aicode.feature.agent.domain.provider.GeminiAdapter(api)
-    }
-
-    @Provides
-    @Singleton
     fun provideCommandEngine(delegate: DelegatingCommandEngine): CommandEngine = delegate
 
     @Provides
@@ -232,6 +215,7 @@ object AgentModule {
     @Singleton
     fun provideToolRegistry(
         readFileTool: ReadFileTool,
+        sendFileTool: SendFileTool,
         viewImageTool: ViewImageTool,
         writeFileTool: WriteFileTool,
         editFileTool: EditFileTool,
@@ -250,6 +234,7 @@ object AgentModule {
     ): ToolRegistry {
         return ToolRegistry().apply {
             register("readFile", readFileTool)
+            register("sendFile", sendFileTool)
             register("viewImage", viewImageTool)
             register("writeFile", writeFileTool)
             register("editFile", editFileTool)
@@ -279,9 +264,6 @@ object AgentModule {
     fun provideAgentWorkflow(
         toolRegistry: ToolRegistry,
         aiProviderRepository: AIProviderRepository,
-        @Named("OpenAIProvider") openAIProvider: AIProvider,
-        @Named("AnthropicProvider") anthropicProvider: AIProvider,
-        @Named("GeminiProvider") geminiProvider: AIProvider,
         openAIApi: OpenAIApi,
         anthropicApi: AnthropicApi,
         geminiApi: GeminiApi,
@@ -295,14 +277,12 @@ object AgentModule {
         visionModelSettingsRepository: com.aicode.feature.settings.data.repository.VisionModelSettingsRepository,
         compactionModelSettingsRepository: com.aicode.feature.settings.data.repository.CompactionModelSettingsRepository,
         sessionUseCase: com.aicode.feature.agent.domain.session.SessionUseCase,
-        messagePersistenceUseCase: com.aicode.feature.agent.domain.session.MessagePersistenceUseCase
+        messagePersistenceUseCase: com.aicode.feature.agent.domain.session.MessagePersistenceUseCase,
+        checkpointManager: com.aicode.feature.agent.domain.checkpoint.CheckpointManager
     ): AgentWorkflow {
         return com.aicode.feature.agent.domain.workflow.StatefulAgentWorkflow(
             toolRegistry,
             aiProviderRepository,
-            openAIProvider,
-            anthropicProvider,
-            geminiProvider,
             openAIApi,
             anthropicApi,
             geminiApi,
@@ -316,7 +296,8 @@ object AgentModule {
             visionModelSettingsRepository,
             compactionModelSettingsRepository,
             sessionUseCase,
-            messagePersistenceUseCase
+            messagePersistenceUseCase,
+            checkpointManager
         )
     }
 }

@@ -125,6 +125,15 @@
     <string name="chat_unsupported_image_type">无法识别图片类型，仅支持 jpg/png/gif/webp</string>
     <string name="chat_new_session_btn">新会话</string>
     <string name="chat_open_sidebar">打开侧边栏</string>
+    <string name="chat_add_attachment">添加附件</string>
+    <string name="chat_take_photo">拍照</string>
+    <string name="chat_reasoning_effort">思考强度</string>
+    <string name="chat_reasoning_effort_low">低</string>
+    <string name="chat_reasoning_effort_medium">中</string>
+    <string name="chat_reasoning_effort_high">高</string>
+    <string name="chat_open_file_failed">文件不存在或无法访问</string>
+    <string name="chat_open_file_no_app">没有可打开该文件的应用</string>
+    <string name="chat_open_apk_permission">安装应用需要授权，请在跳转的设置中允许来自此来源的应用</string>
     <string name="chat_no_model_selected">未选择模型</string>
     <string name="chat_open_git">打开版本控制</string>
     <string name="chat_open_terminal">打开终端</string>
@@ -217,9 +226,15 @@
     <string name="chat_delete_session_confirm">确定删除「%1$s」？该会话的所有消息都将被清除，且无法恢复。</string>
     <string name="chat_rename_session">重命名会话</string>
     <string name="chat_session_name">会话名</string>
+    <string name="chat_export_session">导出会话</string>
+    <string name="chat_export_session_done">会话已导出</string>
+    <string name="chat_export_session_failed">导出失败</string>
 
     <!-- Chat Input Bar -->
     <string name="chat_input_placeholder">输入消息与 AI 聊天…</string>
+    <string name="chat_queue_hint">AI 工作中，回车发送将自动排队</string>
+    <string name="chat_queue_title">待发送队列（%1$d）</string>
+    <string name="chat_queue_remove">移除排队消息</string>
     <string name="chat_upload_file">上传文件</string>
     <string name="chat_upload_image">上传图片</string>
     <string name="chat_remove_attachment">移除附件</string>
@@ -239,10 +254,22 @@
     <string name="chat_continue_feedback">继续反馈</string>
     <string name="chat_approve_and_implement">批准并实施</string>
 
+    <!-- Checkpoint & Rewind -->
+    <string name="checkpoint_rewind_title">检查点与撤销</string>
+    <string name="checkpoint_target_prompt">目标消息：%1$s</string>
+    <string name="checkpoint_restore_code_and_conversation">恢复代码与对话</string>
+    <string name="checkpoint_restore_code_and_conversation_desc">将代码与对话均回滚至此检查点之前</string>
+    <string name="checkpoint_restore_conversation">仅恢复对话</string>
+    <string name="checkpoint_restore_conversation_desc">保持当前代码，将对话截断回滚至此点</string>
+    <string name="checkpoint_restore_code">仅恢复代码</string>
+    <string name="checkpoint_restore_code_desc">恢复代码至此点之前的快照，保持对话历史</string>
+
     <!-- Chat Message Bubbles -->
     <string name="chat_copied">已复制</string>
     <string name="chat_copy">复制</string>
     <string name="chat_bg_command_done">后台命令已完成</string>
+    <string name="chat_bg_commands_done">%1$d 个后台任务已完成：%2$s</string>
+    <string name="chat_bg_commands_partial_failed">%1$d 个后台任务结束，%2$d 个失败：%3$s</string>
     <string name="chat_context_compressed">上下文已压缩</string>
     <string name="chat_compressing_context">正在压缩上下文</string>
     <string name="chat_retrying">网络波动，正在重试 %1$s/%2$s</string>
@@ -644,4 +671,10 @@
 
     <!-- Helper Strings -->
     <string name="container_channel_deleted">通道已删除</string>
+    <string name="chat_more_options">更多选项</string>
+    <string name="chat_action_edit">编辑消息</string>
+    <string name="chat_action_copy">复制文本</string>
+    <string name="chat_action_delete">删除消息</string>
+    <string name="chat_edit_dialog_title">编辑消息</string>
+    <string name="chat_edit_dialog_hint">请输入消息内容</string>
 </resources>

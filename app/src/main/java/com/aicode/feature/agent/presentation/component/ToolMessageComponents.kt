@@ -36,6 +36,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.SpanStyle
@@ -211,6 +212,14 @@ internal fun ToolMessageBody(message: AgentUIMessage, liveOutput: String? = null
                     }
                 }
             }
+        }
+        // 文件卡片：工具结束后常显在消息底部，点击用系统 app 打开。
+        if (!running && message.attachments.isNotEmpty()) {
+            val context = LocalContext.current
+            MessageAttachmentPreviewRow(
+                attachments = message.attachments,
+                onClick = { openAttachment(context, it) }
+            )
         }
     }
 }

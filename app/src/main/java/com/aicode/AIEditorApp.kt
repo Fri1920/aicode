@@ -34,6 +34,12 @@ class AIEditorApp : Application() {
     }
 
     override fun attachBaseContext(base: android.content.Context) {
+        // 最早入口：在任何 Hilt 注入/业务初始化之前就绪日志与崩溃落盘。
+        // 启动早期（如 Hilt 注入链实例化 @Singleton 工具）的崩溃若发生在 FileLogger 初始化之前
+        // 会不留任何痕迹，故把日志与全局崩溃处理器提到 attachBaseContext 最前。
+        FileLogger.init(base)
+        AILogger.init(base)
+        installCrashHandler()
         val tag = base.getSharedPreferences(LANG_PREFS, android.content.Context.MODE_PRIVATE)
             .getString(LANG_KEY, null)
         val context = if (tag.isNullOrBlank()) {
@@ -94,9 +100,6 @@ class AIEditorApp : Application() {
     override fun onCreate() {
         super.onCreate()
         registerBouncyCastle()
-        FileLogger.init(this)
-        AILogger.init(this)
-        installCrashHandler()
         createNotificationChannels()
         // 主线程启动凭据请求监听（FileObserver 必须主线程创建与 startWatching），
         // 监听容器内 credential helper 写来的 cred-req-* → 全局弹窗回填 → 回喂 git 续跑。

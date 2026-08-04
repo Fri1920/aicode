@@ -263,7 +263,10 @@ class RemoteTerminalSessionManager @Inject constructor(
                 bumpRevision()
                 if (target.notifyOnExit) {
                     _tabFinishedEvents.tryEmit(
-                        TabFinishedEvent(target.id, target.title, target.command, 0, target.sourceSessionId)
+                        TabFinishedEvent(
+                            target.id, target.title, target.command, 0, target.sourceSessionId,
+                            tailOutput = getTabOutput(target.id)?.takeTailLines(TAIL_LINES)
+                        )
                     )
                 }
             }

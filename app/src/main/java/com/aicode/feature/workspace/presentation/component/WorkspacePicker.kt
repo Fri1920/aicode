@@ -38,6 +38,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.aicode.core.theme.Radius
 import com.aicode.core.theme.Spacing
@@ -140,7 +141,8 @@ fun WorkspaceIconButton(
     viewModel: WorkspaceViewModel,
     hasRunningSessions: () -> Boolean = { false },
     onSwitchConfirmed: () -> Unit = {},
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    iconSize: Dp = 24.dp
 ) {
     val workspaces by viewModel.workspaces.collectAsStateWithLifecycle()
     val current by viewModel.current.collectAsStateWithLifecycle()
@@ -155,7 +157,8 @@ fun WorkspaceIconButton(
         Icon(
             FeatherIcons.Folder,
             contentDescription = stringResource(R.string.workspace_open),
-            tint = MaterialTheme.colorScheme.onSurfaceVariant
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(iconSize)
         )
     }
 

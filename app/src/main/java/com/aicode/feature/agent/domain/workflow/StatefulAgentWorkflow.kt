@@ -9,6 +9,7 @@ import com.aicode.feature.agent.domain.model.WorkflowResult
 import com.aicode.feature.agent.domain.model.WorkflowStatus
 import com.aicode.feature.agent.domain.session.SessionUseCase
 import com.aicode.feature.agent.domain.session.MessagePersistenceUseCase
+import com.aicode.feature.agent.domain.checkpoint.CheckpointManager
 import com.aicode.feature.agent.domain.permission.PermissionChoice
 import com.aicode.feature.agent.domain.permission.PermissionScope
 import com.aicode.feature.agent.domain.permission.ToolPermissionPolicyEngine
@@ -28,6 +29,7 @@ import com.aicode.feature.agent.domain.tool.ToolResult
 import com.aicode.feature.agent.domain.tool.ToolOutputStore
 import com.aicode.feature.agent.domain.tool.ToolStreamEvent
 import com.aicode.feature.agent.domain.tool.toTransportString
+import com.aicode.feature.agent.presentation.AgentAttachment
 import com.aicode.feature.settings.data.remote.ModelMetadataService
 import com.aicode.feature.settings.data.repository.CompactionModelSettingsRepository
 import com.aicode.feature.settings.data.repository.VisionModelSettingsRepository
@@ -44,10 +46,14 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.flow
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.longOrNull
 import javax.inject.Inject
 
 /**
@@ -58,9 +64,6 @@ import javax.inject.Inject
 class StatefulAgentWorkflow @Inject constructor(
     private val toolRegistry: ToolRegistry,
     private val aiProviderRepository: AIProviderRepository,
-    @param:javax.inject.Named("OpenAIProvider") private val openAIProvider: AIProvider,
-    @param:javax.inject.Named("AnthropicProvider") private val anthropicProvider: AIProvider,
-    @param:javax.inject.Named("GeminiProvider") private val geminiProvider: AIProvider,
     private val openAIApi: OpenAIApi,
     private val anthropicApi: AnthropicApi,
     private val geminiApi: GeminiApi,
@@ -74,7 +77,8 @@ class StatefulAgentWorkflow @Inject constructor(
     private val visionModelSettingsRepository: VisionModelSettingsRepository,
     private val compactionModelSettingsRepository: CompactionModelSettingsRepository,
     private val sessionUseCase: SessionUseCase,
-    private val messagePersistenceUseCase: MessagePersistenceUseCase
+    private val messagePersistenceUseCase: MessagePersistenceUseCase,
+    private val checkpointManager: CheckpointManager
 ) : AgentWorkflow {
 
     private companion object {
@@ -126,7 +130,9 @@ class StatefulAgentWorkflow @Inject constructor(
     private data class ToolRunResult(
         val raw: String,
         val isError: Boolean,
-        val images: List<AgentImage> = emptyList()
+        val images: List<AgentImage> = emptyList(),
+        /** 仅 sendFile 等展示型工具：随结果附带的文件卡片元数据，供 UI 渲染，不回放进模型上下文。 */
+        val attachments: List<com.aicode.feature.agent.presentation.AgentAttachment> = emptyList()
     )
 
     /** 需要在外部环境中执行的副作用 (SideEffect) */
@@ -141,7 +147,7 @@ class StatefulAgentWorkflow @Inject constructor(
             ?: throw IllegalStateException("尚未配置 AI 提供商，请到设置中添加并选择一个")
         if (config.apiKey.isBlank()) throw IllegalStateException("「${config.name}」未填写 API Key")
         if (config.effectiveModel.isBlank()) throw IllegalStateException("「${config.name}」未选择模型")
-        return getProviderFor(config, sessionId)
+        return createStandaloneProvider(config, sessionId)
     }
 
     /**
@@ -168,7 +174,7 @@ class StatefulAgentWorkflow @Inject constructor(
             ?: throw IllegalStateException("尚未配置 AI 提供商，请到设置中添加并选择一个")
         if (config.apiKey.isBlank()) throw IllegalStateException("「${config.name}」未填写 API Key")
         if (config.effectiveModel.isBlank()) throw IllegalStateException("「${config.name}」未选择模型")
-        val provider = getProviderFor(config, sessionId)
+        val provider = createStandaloneProvider(config, sessionId)
         val history = messagePersistenceUseCase.buildHistory(sessionId, "__manual_compress__")
         if (history.size <= 2) return false
         val compactionProvider = resolveCompactionFallbackProvider() ?: provider
@@ -185,29 +191,6 @@ class StatefulAgentWorkflow @Inject constructor(
             ProviderType.ANTHROPIC -> AnthropicAdapter(anthropicApi)
             ProviderType.GEMINI -> GeminiAdapter(geminiApi)
             else -> OpenAIAdapter(openAIApi)
-        }
-        provider.apiKey = config.apiKey
-        provider.baseUrl = config.baseUrl
-        provider.model = config.effectiveModel
-        provider.useFullUrl = config.useFullUrl
-        provider.useResponseApi = config.useResponseApi
-        provider.logSessionId = sessionId
-        return provider
-    }
-
-    /**
-     * 据 [config] 选定对应的 provider 单例实例并填入其连接字段后返回。
-     * 复用于「当前聊天模型」与「识图专用模型」两条路径。
-     *
-     * 注意：三个 provider 实例是注入的单例且字段可变（apiKey/baseUrl/useFullUrl/useResponseApi/model/logSessionId），
-     * 调用方在用本方法切换到不同于当前的 provider 后，必须在发送请求的 try/finally 里保存并恢复所有可变字段，
-     * 以免污染后续轮次——见 effect 执行层识图轮的 save/Restore。
-     */
-    private fun getProviderFor(config: AIProviderConfig, sessionId: String?): AIProvider {
-        val provider = when (config.type) {
-            ProviderType.ANTHROPIC -> anthropicProvider
-            ProviderType.GEMINI -> geminiProvider
-            else -> openAIProvider
         }
         provider.apiKey = config.apiKey
         provider.baseUrl = config.baseUrl
@@ -235,7 +218,8 @@ class StatefulAgentWorkflow @Inject constructor(
                 val assistantMsg = AgentMessage.AssistantMessage(
                     content = action.response.content,
                     toolCalls = action.response.toolCalls,
-                    reasoning = action.response.reasoning ?: ""
+                    reasoning = action.response.reasoning ?: "",
+                    signature = action.response.signature ?: ""
                 )
                 newState = state.copy(
                     messages = state.messages + assistantMsg,
@@ -365,7 +349,7 @@ class StatefulAgentWorkflow @Inject constructor(
                             // 避免切换模型后图片上下文原样发送导致 API 报错。识图轮 provider 必支持 vision。
                             val supportsVision = state.pendingVisionRound || activeModelSupportsVision(currentContext.sessionId)
                             val messagesToSend = sanitizeImagesForModel(compactedMessages, supportsVision)
-                            val aiResponse = providerInUse.complete(systemPrompt, messagesToSend, currentTools)
+                            val aiResponse = providerInUse.complete(systemPrompt, messagesToSend, currentTools, currentContext.reasoningEffort)
                             actionQueue.addLast(AgentAction.LlmResponse(aiResponse))
                         } catch (e: Exception) {
                             actionQueue.addLast(AgentAction.LlmError("LLM 调用失败: ${e.message}"))
@@ -380,6 +364,14 @@ class StatefulAgentWorkflow @Inject constructor(
                         actionQueue.addLast(AgentAction.PermissionEvaluated(effect.toolCall, checkResult.approved, argsPreview, checkResult.denyReason, checkResult.errorCode))
                     }
                     is AgentSideEffect.ExecuteTool -> {
+                        val toolName = effect.toolCall.name
+                        if (toolName == "editFile" || toolName == "writeFile") {
+                            (effect.toolCall.arguments["path"] as? JsonPrimitive)?.contentOrNull?.let { path ->
+                                currentContext.sessionId?.let { sid ->
+                                    checkpointManager.beforeFileModified(sid, path)
+                                }
+                            }
+                        }
                         val tool = toolRegistry.getTool(effect.toolCall.name)
                         var runResult = runToolSync(tool, effect.toolCall, currentContext)
                         var rawResult = runResult.raw
@@ -470,7 +462,7 @@ class StatefulAgentWorkflow @Inject constructor(
                             // 发送前按实际模型的视觉能力处理图片（同 execute 路径）。
                             val supportsVision = state.pendingVisionRound || activeModelSupportsVision(currentContext.sessionId)
                             val messagesToSend = sanitizeImagesForModel(compactedMessages, supportsVision)
-                            providerInUse.completeStream(systemPrompt, messagesToSend, currentTools).collect { chunk ->
+                            providerInUse.completeStream(systemPrompt, messagesToSend, currentTools, currentContext.reasoningEffort).collect { chunk ->
                                 when (chunk) {
                                     is AIStreamChunk.TextDelta -> {
                                         acc.append(chunk.text)
@@ -495,7 +487,7 @@ class StatefulAgentWorkflow @Inject constructor(
                             } else aiResponse
 
                             if (aiResponse.content.isNotBlank() || aiResponse.toolCalls.isNotEmpty()) {
-                                emit(AgentEvent.AssistantText(aiResponse.content, aiResponse.toolCalls, reasoningAcc.toString(), aiResponse.inputTokens, aiResponse.outputTokens))
+                                emit(AgentEvent.AssistantText(aiResponse.content, aiResponse.toolCalls, reasoningAcc.toString(), aiResponse.signature ?: "", aiResponse.inputTokens, aiResponse.outputTokens))
                             }
                             actionQueue.addLast(AgentAction.LlmResponse(responseWithReasoning))
                         } catch (e: CancellationException) {
@@ -528,6 +520,14 @@ class StatefulAgentWorkflow @Inject constructor(
                         actionQueue.addLast(AgentAction.PermissionEvaluated(effect.toolCall, checkResult.approved, argsPreview, checkResult.denyReason, checkResult.errorCode))
                     }
                     is AgentSideEffect.ExecuteTool -> {
+                        val toolName = effect.toolCall.name
+                        if (toolName == "editFile" || toolName == "writeFile") {
+                            (effect.toolCall.arguments["path"] as? JsonPrimitive)?.contentOrNull?.let { path ->
+                                currentContext.sessionId?.let { sid ->
+                                    checkpointManager.beforeFileModified(sid, path)
+                                }
+                            }
+                        }
                         val tool = toolRegistry.getTool(effect.toolCall.name)
                         var runResult = if (tool is StreamingAgentTool) {
                             runToolStream(tool, effect.toolCall, currentContext) { emit(it) }
@@ -562,7 +562,7 @@ class StatefulAgentWorkflow @Inject constructor(
                                 systemPrompt = promptProvider.build(currentContext)
                             }
                         }
-                        emit(AgentEvent.ToolCallFinished(effect.toolCall.id, effect.toolCall.name, rawResult, isError))
+                        emit(AgentEvent.ToolCallFinished(effect.toolCall.id, effect.toolCall.name, rawResult, isError, attachments = runResult.attachments))
                         actionQueue.addLast(AgentAction.ToolFinished(effect.toolCall.id, effect.toolCall.name, rawResult, isError, runResult.images))
                     }
                 }
@@ -601,9 +601,14 @@ class StatefulAgentWorkflow @Inject constructor(
             }
             val result = tool.executeWithContext(toolCall.arguments, context)
             val images = if (name == "viewImage") extractInlineImages(result) else emptyList()
-            val transportResult = if (images.isNotEmpty()) stripInlineImages(result) else result
+            val attachments = if (name == "sendFile") extractAttachments(result) else emptyList()
+            val transportResult = when {
+                images.isNotEmpty() -> stripInlineImages(result)
+                attachments.isNotEmpty() -> stripAttachments(result)
+                else -> result
+            }
             val processed = toolOutputStore.process(name, toolCall.id, transportResult)
-            ToolRunResult(processed.toTransportString(), processed is ToolResult.Error, images)
+            ToolRunResult(processed.toTransportString(), processed is ToolResult.Error, images, attachments)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -788,6 +793,46 @@ class StatefulAgentWorkflow @Inject constructor(
         val path = image["path"]?.jsonPrimitive?.contentOrNull.orEmpty()
         if (!mimeType.startsWith("image/") || base64Data.isBlank()) return emptyList()
         return listOf(AgentImage(mimeType = mimeType, base64Data = base64Data, path = path))
+    }
+
+    /**
+     * 从 sendFile 工具结果的 `files` 数组提取文件卡片元数据（含宿主本地路径，供 UI 打开文件用）。
+     * 任一文件缺关键字段则整体返回空（与 sendFile 的原子语义一致）。
+     */
+    private fun extractAttachments(result: ToolResult): List<AgentAttachment> {
+        val data = (result as? ToolResult.Success)?.data as? JsonObject ?: return emptyList()
+        val files = data["files"] as? JsonArray ?: return emptyList()
+        val attachments = files.mapNotNull { elem ->
+            val obj = elem as? JsonObject ?: return@mapNotNull null
+            val path = obj["path"]?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
+            val localPath = obj["local_path"]?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
+            val name = obj["name"]?.jsonPrimitive?.contentOrNull ?: path.substringAfterLast('/')
+            val mimeType = obj["mime_type"]?.jsonPrimitive?.contentOrNull ?: "application/octet-stream"
+            AgentAttachment(
+                fileName = name,
+                containerPath = path,
+                localPath = localPath,
+                mimeType = mimeType,
+                sizeBytes = obj["size_bytes"]?.jsonPrimitive?.longOrNull ?: 0L,
+                isImage = obj["is_image"]?.jsonPrimitive?.booleanOrNull ?: mimeType.startsWith("image/")
+            )
+        }
+        return if (attachments.size == files.size) attachments else emptyList()
+    }
+
+    /** 从回传给模型的 sendFile 结果中剥离宿主本地路径（模型只应看到容器路径）。 */
+    private fun stripAttachments(result: ToolResult): ToolResult {
+        val success = result as? ToolResult.Success ?: return result
+        val data = success.data as? JsonObject ?: return result
+        val strippedFiles = (data["files"] as? JsonArray)?.map { elem ->
+            val obj = elem as? JsonObject ?: return@map elem
+            JsonObject(obj.toMutableMap().apply { remove("local_path") })
+        } ?: return result
+        val strippedData = data.toMutableMap().apply {
+            this["files"] = JsonArray(strippedFiles)
+            this["files_attached"] = JsonPrimitive(true)
+        }
+        return ToolResult.Success(JsonObject(strippedData))
     }
 
     private fun stripInlineImages(result: ToolResult): ToolResult {

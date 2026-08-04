@@ -21,6 +21,10 @@ interface ChatSessionDao {
     @Query("SELECT * FROM chat_sessions")
     suspend fun getAllOnce(): List<ChatSessionEntity>
 
+    /** 分页读取（keyset：按 updatedAt,id 字典序取 [limit] 条），供备份流式导出。 */
+    @Query("SELECT * FROM chat_sessions WHERE updatedAt > :lastUpdatedAt OR (updatedAt = :lastUpdatedAt AND id > :lastId) ORDER BY updatedAt ASC, id ASC LIMIT :limit")
+    suspend fun getPageAfter(lastUpdatedAt: Long, lastId: String, limit: Int): List<ChatSessionEntity>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertAll(sessions: List<ChatSessionEntity>)
 
@@ -38,6 +42,9 @@ interface ChatSessionDao {
 
     @Query("UPDATE chat_sessions SET providerId = :providerId, model = :model WHERE id = :id")
     suspend fun updateProviderModel(id: String, providerId: String?, model: String?)
+
+    @Query("UPDATE chat_sessions SET reasoningEffort = :effort WHERE id = :id")
+    suspend fun updateReasoningEffort(id: String, effort: String)
 
     @Query("UPDATE chat_sessions SET totalInputTokens = totalInputTokens + :inputTokens, totalOutputTokens = totalOutputTokens + :outputTokens WHERE id = :id")
     suspend fun addTokenUsage(id: String, inputTokens: Int, outputTokens: Int)

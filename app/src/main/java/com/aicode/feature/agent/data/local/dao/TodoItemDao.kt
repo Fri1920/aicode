@@ -24,6 +24,14 @@ interface TodoItemDao {
     @Query("SELECT * FROM todo_items")
     suspend fun getAllOnce(): List<TodoItemEntity>
 
+    /** 分页读取（keyset：按 createdAt,id 字典序取 [limit] 条），供备份流式导出。 */
+    @Query("SELECT * FROM todo_items WHERE createdAt > :lastCreatedAt OR (createdAt = :lastCreatedAt AND id > :lastId) ORDER BY createdAt ASC, id ASC LIMIT :limit")
+    suspend fun getPageAfter(lastCreatedAt: Long, lastId: String, limit: Int): List<TodoItemEntity>
+
+    /** 按会话分页读取（keyset），供单会话备份流式导出。 */
+    @Query("SELECT * FROM todo_items WHERE sessionId = :sessionId AND (createdAt > :lastCreatedAt OR (createdAt = :lastCreatedAt AND id > :lastId)) ORDER BY createdAt ASC, id ASC LIMIT :limit")
+    suspend fun getBySessionPageAfter(sessionId: String, lastCreatedAt: Long, lastId: String, limit: Int): List<TodoItemEntity>
+
     @Query("DELETE FROM todo_items WHERE id = :id")
     suspend fun delete(id: String)
 

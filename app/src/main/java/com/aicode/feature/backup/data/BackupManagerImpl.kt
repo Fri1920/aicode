@@ -13,7 +13,9 @@ import com.aicode.feature.agent.domain.mcp.McpManager
 import com.aicode.feature.agent.domain.permission.PermissionRulesRepository
 import com.aicode.feature.backup.domain.AgentMessageDto
 import com.aicode.feature.backup.domain.BackupCrypto
+import com.aicode.feature.backup.domain.BackupDecryptionException
 import com.aicode.feature.backup.domain.BackupManager
+import com.aicode.feature.backup.domain.BackupMetadata
 import com.aicode.feature.backup.domain.BackupOptions
 import com.aicode.feature.backup.domain.BackupSnapshot
 import com.aicode.feature.backup.domain.ChatSessionDto
@@ -23,6 +25,7 @@ import com.aicode.feature.backup.domain.RemoteConnectionDto
 import com.aicode.feature.backup.domain.RemoteMountDto
 import com.aicode.feature.backup.domain.RestoreStats
 import com.aicode.feature.backup.domain.TodoItemDto
+import com.aicode.feature.backup.domain.toMetadata
 import com.aicode.feature.credentials.data.local.dao.GitCredentialDao
 import com.aicode.feature.credentials.data.local.entity.GitCredentialEntity
 import com.aicode.feature.settings.data.local.dao.AIProviderDao
@@ -41,13 +44,20 @@ import com.aicode.feature.workspace.domain.model.RemoteProtocol
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.KSerializer
 import kotlinx.serialization.json.Json
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry
+import org.apache.commons.compress.archivers.tar.TarArchiveInputStream
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream
 import org.apache.commons.compress.compressors.gzip.GzipCompressorInputStream
 import org.apache.commons.compress.compressors.gzip.GzipCompressorOutputStream
-import java.io.ByteArrayInputStream
+import java.io.BufferedInputStream
 import java.io.ByteArrayOutputStream
+import java.io.File
+import java.io.FileInputStream
+import java.io.FileOutputStream
+import java.io.InputStream
+import java.io.OutputStream
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -84,119 +94,307 @@ class BackupManagerImpl @Inject constructor(
         context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: ""
     }.getOrDefault("")
 
-    override suspend fun export(password: CharArray?, options: BackupOptions): ByteArray = withContext(Dispatchers.IO) {
-        val providers = if (options.providers) aiProviderDao.getAllProvidersOnce().map { it.toDto() } else emptyList()
-        val credentials = if (options.gitCredentials) gitCredentialDao.getAllOnce().map { it.toDto() } else emptyList()
-        val connections = if (options.remoteConnections) remoteConnectionDao.getAllConnectionsOnce().map { it.toDto() } else emptyList()
-        val mounts = if (options.remoteConnections) remoteConnectionDao.getAllMountsOnce().map { it.toDto() } else emptyList()
-        val sessions = if (options.chatHistory) chatSessionDao.getAllOnce().map { it.toDto() } else emptyList()
-        val messages = if (options.chatHistory) agentMessageDao.getAllOnce().map { it.toDto() } else emptyList()
-        val todos = if (options.chatHistory) todoItemDao.getAllOnce().map { it.toDto() } else emptyList()
-        val mcpServers = if (options.mcpServers) mcpConfigRepository.getServers() else emptyList()
-        val globalRules = if (options.permissionRules) permissionRulesRepository.getGlobalRulesOnce() else emptyList()
-        val themeMode = if (options.appSettings) themeSettingsRepository.snapshot() else null
-        val keepalive = if (options.appSettings) keepaliveSettingsRepository.snapshot() else false
-        val logLevel = if (options.appSettings) logSettingsRepository.snapshot() else null
-        val visionProviderId = if (options.appSettings) visionModelSettingsRepository.getVisionProviderId() else ""
-        val visionModel = if (options.appSettings) visionModelSettingsRepository.getVisionModel() else ""
-        val compactionProviderId = if (options.appSettings) compactionModelSettingsRepository.getCompactionProviderId() else ""
-        val compactionModel = if (options.appSettings) compactionModelSettingsRepository.getCompactionModel() else ""
-        val syncSettings = if (options.appSettings) syncSettingsRepository.snapshot() else null
-
-        val snapshot = BackupSnapshot(
-            schemaVersion = currentSchemaVersion(),
-            appVersion = appVersionName(),
-            createdAt = System.currentTimeMillis(),
-            providers = providers,
-            gitCredentials = credentials,
-            remoteConnections = connections,
-            remoteMounts = mounts,
-            chatSessions = sessions,
-            agentMessages = messages,
-            todoItems = todos,
-            mcpServers = mcpServers,
-            globalPermissionRules = globalRules,
-            themeMode = themeMode,
-            keepaliveEnabled = keepalive,
-            logLevel = logLevel,
-            visionProviderId = visionProviderId,
-            visionModel = visionModel,
-            compactionProviderId = compactionProviderId,
-            compactionModel = compactionModel,
-            syncSettings = syncSettings
-        )
-        val plain = json.encodeToString(BackupSnapshot.serializer(), snapshot).toByteArray(Charsets.UTF_8)
-        val tarGz = tarGz(plain)
-        if (password != null && password.isNotEmpty()) {
-            BackupCrypto.encryptWithHeader(tarGz, password)
-        } else {
-            tarGz
-        }
-    }
-
-    override suspend fun import(data: ByteArray, password: CharArray?): Result<RestoreStats> = withContext(Dispatchers.IO) {
-        runCatching {
-            val tarGz = if (password != null && password.isNotEmpty()) {
-                BackupCrypto.decryptWithHeader(data, password)
-            } else {
-                data
-            }
-            val plain = unTarGz(tarGz)
-                ?: error(
-                    if (password != null && password.isNotEmpty()) {
-                        "备份文件已损坏，或口令与备份文件不匹配"
+    override suspend fun export(password: CharArray?, options: BackupOptions, output: OutputStream) {
+        withContext(Dispatchers.IO) {
+            val temp = createTempFile()
+            try {
+                writeTarGz(temp, options)
+                val pw = password?.takeIf { it.isNotEmpty() }
+                FileInputStream(temp).use { input ->
+                    if (pw != null) {
+                        BackupCrypto.encryptStream(input, output, pw)
                     } else {
-                        "不是有效的 AiCode 备份文件；如果这是加密备份，请输入导出口令"
+                        input.copyTo(output)
                     }
-                )
-            val snapshot = json.decodeFromString(BackupSnapshot.serializer(), String(plain, Charsets.UTF_8))
-            if (snapshot.schemaVersion > currentSchemaVersion()) {
-                error("备份的数据库版本 v${snapshot.schemaVersion} 高于本应用 v${currentSchemaVersion()}，请升级应用")
-            }
-            restore(snapshot)
-        }
-    }
-
-    private fun tarGz(content: ByteArray): ByteArray {
-        val baos = ByteArrayOutputStream()
-        GzipCompressorOutputStream(baos).use { gz ->
-            TarArchiveOutputStream(gz).use { tar ->
-                tar.putArchiveEntry(TarArchiveEntry("snapshot.json").apply { size = content.size.toLong() })
-                tar.write(content)
-                tar.closeArchiveEntry()
-            }
-        }
-        return baos.toByteArray()
-    }
-
-    private fun unTarGz(data: ByteArray): ByteArray? = runCatching {
-        GzipCompressorInputStream(ByteArrayInputStream(data)).use { gz ->
-            org.apache.commons.compress.archivers.tar.TarArchiveInputStream(gz).use { tar ->
-                var entry = tar.nextEntry
-                while (entry != null) {
-                    if (entry.name == "snapshot.json") {
-                        return@use tar.readBytes()
-                    }
-                    entry = tar.nextEntry
                 }
-                null
+            } finally {
+                temp.delete()
             }
         }
-    }.getOrNull()
+    }
 
-    private suspend fun restore(snapshot: BackupSnapshot): RestoreStats {
-        if (snapshot.providers.isNotEmpty()) {
-            aiProviderDao.insertAllProviders(snapshot.providers.map { it.toEntity() })
+    override suspend fun exportSession(sessionId: String, output: OutputStream) {
+        withContext(Dispatchers.IO) {
+            val session = chatSessionDao.getById(sessionId) ?: error("Session not found: $sessionId")
+            val temp = createTempFile()
+            try {
+                FileOutputStream(temp).use { fos ->
+                    GzipCompressorOutputStream(fos).use { gz ->
+                        TarArchiveOutputStream(gz).use { tar ->
+                            writeMetadataEntry(tar, BackupMetadata(
+                                schemaVersion = currentSchemaVersion(),
+                                appVersion = appVersionName(),
+                                createdAt = System.currentTimeMillis()
+                            ))
+                            writeJsonlFileEntry(tar, FILE_SESSIONS) { writer ->
+                                writer.writeLine(json.encodeToString(ChatSessionDto.serializer(), session.toDto()))
+                            }
+                            writeJsonlFileEntry(tar, FILE_MESSAGES) { writer ->
+                                var lastTs = 0L
+                                var lastId = ""
+                                while (true) {
+                                    val batch = agentMessageDao.getPageBySessionAfter(sessionId, lastTs, lastId, PAGE_SIZE)
+                                    if (batch.isEmpty()) break
+                                    batch.forEach { writer.writeLine(json.encodeToString(AgentMessageDto.serializer(), it.toDto())) }
+                                    lastTs = batch.last().timestamp
+                                    lastId = batch.last().id
+                                }
+                            }
+                            writeJsonlFileEntry(tar, FILE_TODOS) { writer ->
+                                var lastTs = 0L
+                                var lastId = ""
+                                while (true) {
+                                    val batch = todoItemDao.getBySessionPageAfter(sessionId, lastTs, lastId, PAGE_SIZE)
+                                    if (batch.isEmpty()) break
+                                    batch.forEach { writer.writeLine(json.encodeToString(TodoItemDto.serializer(), it.toDto())) }
+                                    lastTs = batch.last().createdAt
+                                    lastId = batch.last().id
+                                }
+                            }
+                        }
+                    }
+                }
+                FileInputStream(temp).use { it.copyTo(output) }
+            } finally {
+                temp.delete()
+            }
         }
-        if (snapshot.gitCredentials.isNotEmpty()) {
-            gitCredentialDao.upsertAll(snapshot.gitCredentials.map { it.toEntity() })
+    }
+
+    override suspend fun import(input: InputStream, password: CharArray?): Result<RestoreStats> {
+        val pw = password?.takeIf { it.isNotEmpty() }
+        return withContext(Dispatchers.IO) {
+            runCatching {
+                if (pw != null) {
+                    val temp = createTempFile()
+                    try {
+                        BufferedInputStream(input).use { src ->
+                            FileOutputStream(temp).use { dst -> BackupCrypto.decryptStream(src, dst, pw) }
+                        }
+                        FileInputStream(temp).use { p ->
+                            GzipCompressorInputStream(p).use { gz ->
+                                TarArchiveInputStream(gz).use { tar -> restoreFromTar(tar) }
+                            }
+                        }
+                    } finally {
+                        temp.delete()
+                    }
+                } else {
+                    BufferedInputStream(input).use { p ->
+                        GzipCompressorInputStream(p).use { gz ->
+                            TarArchiveInputStream(gz).use { tar -> restoreFromTar(tar) }
+                        }
+                    }
+                }
+            }.recoverCatching { e ->
+                when (e) {
+                    is BackupDecryptionException -> throw e
+                    is IllegalStateException -> throw e
+                    else -> throw IllegalArgumentException(
+                        if (pw != null) {
+                            "备份文件已损坏，或口令与备份文件不匹配"
+                        } else {
+                            "不是有效的 AiCode 备份文件；如果这是加密备份，请输入导出口令"
+                        },
+                        e
+                    )
+                }
+            }
         }
-        if (snapshot.remoteConnections.isNotEmpty()) {
-            remoteConnectionDao.insertAllConnections(snapshot.remoteConnections.map { it.toEntity() })
+    }
+
+    // ── 导出辅助 ──────────────────────────────────────────────
+
+    private suspend fun writeTarGz(file: File, options: BackupOptions) {
+        FileOutputStream(file).use { fos ->
+            GzipCompressorOutputStream(fos).use { gz ->
+                TarArchiveOutputStream(gz).use { tar ->
+                    writeMetadataEntry(tar, buildMetadata(options))
+                    if (options.chatHistory) {
+                        writeJsonlFileEntry(tar, FILE_SESSIONS) { writer ->
+                            var lastTs = 0L
+                            var lastId = ""
+                            while (true) {
+                                val batch = chatSessionDao.getPageAfter(lastTs, lastId, PAGE_SIZE)
+                                if (batch.isEmpty()) break
+                                batch.forEach { writer.writeLine(json.encodeToString(ChatSessionDto.serializer(), it.toDto())) }
+                                lastTs = batch.last().updatedAt
+                                lastId = batch.last().id
+                            }
+                        }
+                        writeJsonlFileEntry(tar, FILE_MESSAGES) { writer ->
+                            var lastTs = 0L
+                            var lastId = ""
+                            while (true) {
+                                val batch = agentMessageDao.getPageAfter(lastTs, lastId, PAGE_SIZE)
+                                if (batch.isEmpty()) break
+                                batch.forEach { writer.writeLine(json.encodeToString(AgentMessageDto.serializer(), it.toDto())) }
+                                lastTs = batch.last().timestamp
+                                lastId = batch.last().id
+                            }
+                        }
+                        writeJsonlFileEntry(tar, FILE_TODOS) { writer ->
+                            var lastTs = 0L
+                            var lastId = ""
+                            while (true) {
+                                val batch = todoItemDao.getPageAfter(lastTs, lastId, PAGE_SIZE)
+                                if (batch.isEmpty()) break
+                                batch.forEach { writer.writeLine(json.encodeToString(TodoItemDto.serializer(), it.toDto())) }
+                                lastTs = batch.last().createdAt
+                                lastId = batch.last().id
+                            }
+                        }
+                    }
+                }
+            }
         }
-        if (snapshot.remoteMounts.isNotEmpty()) {
-            remoteConnectionDao.insertAllMounts(snapshot.remoteMounts.map { it.toEntity() })
+    }
+
+    private suspend fun buildMetadata(options: BackupOptions): BackupMetadata = BackupMetadata(
+        schemaVersion = currentSchemaVersion(),
+        appVersion = appVersionName(),
+        createdAt = System.currentTimeMillis(),
+        providers = if (options.providers) aiProviderDao.getAllProvidersOnce().map { it.toDto() } else emptyList(),
+        gitCredentials = if (options.gitCredentials) gitCredentialDao.getAllOnce().map { it.toDto() } else emptyList(),
+        remoteConnections = if (options.remoteConnections) remoteConnectionDao.getAllConnectionsOnce().map { it.toDto() } else emptyList(),
+        remoteMounts = if (options.remoteConnections) remoteConnectionDao.getAllMountsOnce().map { it.toDto() } else emptyList(),
+        mcpServers = if (options.mcpServers) mcpConfigRepository.getServers() else emptyList(),
+        globalPermissionRules = if (options.permissionRules) permissionRulesRepository.getGlobalRulesOnce() else emptyList(),
+        themeMode = if (options.appSettings) themeSettingsRepository.snapshot() else null,
+        keepaliveEnabled = if (options.appSettings) keepaliveSettingsRepository.snapshot() else false,
+        logLevel = if (options.appSettings) logSettingsRepository.snapshot() else null,
+        visionProviderId = if (options.appSettings) visionModelSettingsRepository.getVisionProviderId() else "",
+        visionModel = if (options.appSettings) visionModelSettingsRepository.getVisionModel() else "",
+        compactionProviderId = if (options.appSettings) compactionModelSettingsRepository.getCompactionProviderId() else "",
+        compactionModel = if (options.appSettings) compactionModelSettingsRepository.getCompactionModel() else "",
+        syncSettings = if (options.appSettings) syncSettingsRepository.snapshot() else null
+    )
+
+    private fun writeMetadataEntry(tar: TarArchiveOutputStream, metadata: BackupMetadata) {
+        val content = json.encodeToString(BackupMetadata.serializer(), metadata).toByteArray(Charsets.UTF_8)
+        writeTarEntry(tar, FILE_METADATA, content)
+    }
+
+    private fun writeTarEntry(tar: TarArchiveOutputStream, name: String, content: ByteArray) {
+        val entry = TarArchiveEntry(name).apply { size = content.size.toLong() }
+        tar.putArchiveEntry(entry)
+        tar.write(content)
+        tar.closeArchiveEntry()
+    }
+
+    /**
+     * 先将 jsonl 写入一个临时文件，获取确切的 [File.length] 设置 TarArchiveEntry.size，
+     * 然后流式拷入 TarArchiveOutputStream，避免在 Header 中 size 设为 0 导致写入越界异常。
+     */
+    private suspend fun writeJsonlFileEntry(
+        tar: TarArchiveOutputStream,
+        entryName: String,
+        block: suspend (JsonlWriter) -> Unit
+    ) {
+        val tmp = createTempFile()
+        try {
+            FileOutputStream(tmp).use { fos ->
+                val writer = JsonlWriter(fos)
+                block(writer)
+                writer.flush()
+            }
+            val entry = TarArchiveEntry(entryName).apply { size = tmp.length() }
+            tar.putArchiveEntry(entry)
+            FileInputStream(tmp).use { fis -> fis.copyTo(tar) }
+            tar.closeArchiveEntry()
+        } finally {
+            tmp.delete()
         }
+    }
+
+    // ── 导入辅助 ──────────────────────────────────────────────
+
+    private suspend fun restoreFromTar(tar: TarArchiveInputStream): RestoreStats {
+        var metadata: BackupMetadata? = null
+        var stats = RestoreStats()
+        var entry = tar.nextEntry
+        while (entry != null) {
+            when (entry.name) {
+                FILE_LEGACY_SNAPSHOT -> {
+                    val plain = tar.readBytes()
+                    val snapshot = json.decodeFromString(BackupSnapshot.serializer(), String(plain, Charsets.UTF_8))
+                    checkVersion(snapshot.schemaVersion)
+                    return restoreLegacy(snapshot)
+                }
+                FILE_METADATA -> {
+                    val plain = tar.readBytes()
+                    metadata = json.decodeFromString(BackupMetadata.serializer(), String(plain, Charsets.UTF_8))
+                    checkVersion(metadata.schemaVersion)
+                }
+                FILE_SESSIONS -> {
+                    val currentWorkspacePath = workspaceRepository.currentPath()
+                    stats += RestoreStats(chatSessions = restoreJsonl(tar, ChatSessionDto.serializer()) { dtos ->
+                        chatSessionDao.upsertAll(dtos.map { it.copy(workspacePath = currentWorkspacePath).toEntity() })
+                    })
+                }
+                FILE_MESSAGES -> {
+                    stats += RestoreStats(agentMessages = restoreJsonl(tar, AgentMessageDto.serializer()) { dtos ->
+                        agentMessageDao.insertAll(dtos.map { it.toEntity() })
+                    })
+                }
+                FILE_TODOS -> {
+                    stats += RestoreStats(todoItems = restoreJsonl(tar, TodoItemDto.serializer()) { dtos ->
+                        todoItemDao.upsertAll(dtos.map { it.toEntity() })
+                    })
+                }
+            }
+            entry = tar.nextEntry
+        }
+        val meta = metadata ?: error("不是有效的 AiCode 备份文件：缺少 metadata.json")
+        return stats + restoreMeta(meta)
+    }
+
+    /** 逐行解析 jsonl 条目，每 [PAGE_SIZE] 条回调一次批量插入；返回该文件的总条数。 */
+    private suspend fun <T> restoreJsonl(tar: TarArchiveInputStream, serializer: KSerializer<T>, insert: suspend (List<T>) -> Unit): Int {
+        val buffer = ByteArray(64 * 1024)
+        val line = ByteArrayOutputStream(16 * 1024)
+        val batch = ArrayList<T>(PAGE_SIZE)
+        var count = 0
+        while (true) {
+            val n = tar.read(buffer)
+            if (n < 0) break
+            for (i in 0 until n) {
+                if (buffer[i] == '\n'.code.toByte()) {
+                    if (line.size() > 0) {
+                        batch.add(json.decodeFromString(serializer, line.toString(Charsets.UTF_8)))
+                        line.reset()
+                        if (batch.size >= PAGE_SIZE) {
+                            count += batch.size
+                            insert(batch.toList())
+                            batch.clear()
+                        }
+                    } else {
+                        line.reset()
+                    }
+                } else {
+                    line.write(buffer[i].toInt())
+                }
+            }
+        }
+        if (line.size() > 0) {
+            batch.add(json.decodeFromString(serializer, line.toString(Charsets.UTF_8)))
+        }
+        if (batch.isNotEmpty()) {
+            count += batch.size
+            insert(batch.toList())
+        }
+        return count
+    }
+
+    private fun checkVersion(schemaVersion: Int) {
+        if (schemaVersion > currentSchemaVersion()) {
+            error("备份的数据库版本 v$schemaVersion 高于本应用 v${currentSchemaVersion()}，请升级应用")
+        }
+    }
+
+    /** 旧格式（单文件 snapshot.json 完整快照）还原。 */
+    private suspend fun restoreLegacy(snapshot: BackupSnapshot): RestoreStats {
+        var stats = restoreMeta(snapshot.toMetadata())
         if (snapshot.chatSessions.isNotEmpty()) {
             val currentWorkspacePath = workspaceRepository.currentPath()
             chatSessionDao.upsertAll(snapshot.chatSessions.map { it.copy(workspacePath = currentWorkspacePath).toEntity() })
@@ -207,36 +405,56 @@ class BackupManagerImpl @Inject constructor(
         if (snapshot.todoItems.isNotEmpty()) {
             todoItemDao.upsertAll(snapshot.todoItems.map { it.toEntity() })
         }
-        if (snapshot.mcpServers.isNotEmpty()) {
-            mcpConfigRepository.setServers(snapshot.mcpServers)
-            mcpManager.reload()
-        }
-        if (snapshot.globalPermissionRules.isNotEmpty()) {
-            permissionRulesRepository.setGlobalRules(snapshot.globalPermissionRules)
-        }
-        snapshot.themeMode?.let { themeSettingsRepository.restore(it) }
-        keepaliveSettingsRepository.restore(snapshot.keepaliveEnabled)
-        logSettingsRepository.restore(snapshot.logLevel)
-        if (snapshot.visionProviderId.isNotBlank() || snapshot.visionModel.isNotBlank()) {
-            visionModelSettingsRepository.setVisionModel(snapshot.visionProviderId, snapshot.visionModel)
-        }
-        if (snapshot.compactionProviderId.isNotBlank() || snapshot.compactionModel.isNotBlank()) {
-            compactionModelSettingsRepository.setCompactionModel(snapshot.compactionProviderId, snapshot.compactionModel)
-        }
-        snapshot.syncSettings?.let { syncSettingsRepository.restore(it) }
-
-        return RestoreStats(
-            providers = snapshot.providers.size,
-            gitCredentials = snapshot.gitCredentials.size,
-            remoteConnections = snapshot.remoteConnections.size,
-            remoteMounts = snapshot.remoteMounts.size,
+        return stats + RestoreStats(
             chatSessions = snapshot.chatSessions.size,
             agentMessages = snapshot.agentMessages.size,
-            todoItems = snapshot.todoItems.size,
-            mcpServers = snapshot.mcpServers.size,
-            globalPermissionRules = snapshot.globalPermissionRules.size
+            todoItems = snapshot.todoItems.size
         )
     }
+
+    /** 元数据段还原（小表 + 应用设置），新旧格式共用。 */
+    private suspend fun restoreMeta(meta: BackupMetadata): RestoreStats {
+        if (meta.providers.isNotEmpty()) {
+            aiProviderDao.insertAllProviders(meta.providers.map { it.toEntity() })
+        }
+        if (meta.gitCredentials.isNotEmpty()) {
+            gitCredentialDao.upsertAll(meta.gitCredentials.map { it.toEntity() })
+        }
+        if (meta.remoteConnections.isNotEmpty()) {
+            remoteConnectionDao.insertAllConnections(meta.remoteConnections.map { it.toEntity() })
+        }
+        if (meta.remoteMounts.isNotEmpty()) {
+            remoteConnectionDao.insertAllMounts(meta.remoteMounts.map { it.toEntity() })
+        }
+        if (meta.mcpServers.isNotEmpty()) {
+            mcpConfigRepository.setServers(meta.mcpServers)
+            mcpManager.reload()
+        }
+        if (meta.globalPermissionRules.isNotEmpty()) {
+            permissionRulesRepository.setGlobalRules(meta.globalPermissionRules)
+        }
+        meta.themeMode?.let { themeSettingsRepository.restore(it) }
+        keepaliveSettingsRepository.restore(meta.keepaliveEnabled)
+        logSettingsRepository.restore(meta.logLevel)
+        if (meta.visionProviderId.isNotBlank() || meta.visionModel.isNotBlank()) {
+            visionModelSettingsRepository.setVisionModel(meta.visionProviderId, meta.visionModel)
+        }
+        if (meta.compactionProviderId.isNotBlank() || meta.compactionModel.isNotBlank()) {
+            compactionModelSettingsRepository.setCompactionModel(meta.compactionProviderId, meta.compactionModel)
+        }
+        meta.syncSettings?.let { syncSettingsRepository.restore(it) }
+
+        return RestoreStats(
+            providers = meta.providers.size,
+            gitCredentials = meta.gitCredentials.size,
+            remoteConnections = meta.remoteConnections.size,
+            remoteMounts = meta.remoteMounts.size,
+            mcpServers = meta.mcpServers.size,
+            globalPermissionRules = meta.globalPermissionRules.size
+        )
+    }
+
+    private fun createTempFile(): File = File.createTempFile("backup", ".tmp", context.cacheDir)
 
     // ── Entity ↔ DTO 转换 ──────────────────────────────────────
 
@@ -262,19 +480,44 @@ class BackupManagerImpl @Inject constructor(
     private fun RemoteMountEntity.toDto() = RemoteMountDto(id, connectionId, remotePath, localMountPath, isActive, autoConnect)
     private fun RemoteMountDto.toEntity() = RemoteMountEntity(id, connectionId, remotePath, localMountPath, isActive, autoConnect)
 
-    private fun ChatSessionEntity.toDto() = ChatSessionDto(id, title, createdAt, updatedAt, workspacePath, mode, providerId, model)
-    private fun ChatSessionDto.toEntity() = ChatSessionEntity(id, title, createdAt, updatedAt, workspacePath, mode, providerId, model)
+    private fun ChatSessionEntity.toDto() = ChatSessionDto(id, title, createdAt, updatedAt, workspacePath, mode, reasoningEffort, providerId, model)
+    private fun ChatSessionDto.toEntity() = ChatSessionEntity(id, title, createdAt, updatedAt, workspacePath, mode, reasoningEffort, providerId, model)
 
     private fun AgentMessageEntity.toDto() = AgentMessageDto(
         id, sessionId, role, content, timestamp, toolCallsJson, toolCallId, toolName, toolArgs,
-        isError, reasoning, attachmentsJson, isCompacted, isContextSummary, isCompactionMarker
+        isError, reasoning, signature, attachmentsJson, isCompacted, isContextSummary, isCompactionMarker
     )
 
     private fun AgentMessageDto.toEntity() = AgentMessageEntity(
         id, sessionId, role, content, timestamp, toolCallsJson, toolCallId, toolName, toolArgs,
-        isError, reasoning, attachmentsJson, isCompacted, isContextSummary, isCompactionMarker
+        isError, reasoning, signature, attachmentsJson, isCompacted, isContextSummary, isCompactionMarker
     )
 
     private fun TodoItemEntity.toDto() = TodoItemDto(id, sessionId, subject, description, status, priority, order, createdAt, updatedAt)
     private fun TodoItemDto.toEntity() = TodoItemEntity(id, sessionId, subject, description, status, priority, order, createdAt, updatedAt)
+
+    private companion object {
+        const val PAGE_SIZE = 500
+        const val FILE_METADATA = "metadata.json"
+        const val FILE_SESSIONS = "chatSessions.jsonl"
+        const val FILE_MESSAGES = "messages.jsonl"
+        const val FILE_TODOS = "todoItems.jsonl"
+        const val FILE_LEGACY_SNAPSHOT = "snapshot.json"
+    }
+}
+
+/** 带内部缓冲的 jsonl 写入器：行缓冲满 64KB 时刷入 tar 流，避免逐行写系统调用。 */
+private class JsonlWriter(private val out: OutputStream) {
+    private val buffer = ByteArrayOutputStream(64 * 1024)
+
+    fun writeLine(line: String) {
+        buffer.write(line.toByteArray(Charsets.UTF_8))
+        buffer.write('\n'.code)
+        if (buffer.size() >= 64 * 1024) flush()
+    }
+
+    fun flush() {
+        buffer.writeTo(out)
+        buffer.reset()
+    }
 }

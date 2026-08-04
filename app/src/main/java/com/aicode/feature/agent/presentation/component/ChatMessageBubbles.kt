@@ -1,6 +1,11 @@
 package com.aicode.feature.agent.presentation.component
 
+import android.content.Context
+import android.content.Intent
 import android.graphics.BitmapFactory
+import android.net.Uri
+import android.provider.Settings
+import android.widget.Toast
 import androidx.compose.foundation.Image as ComposeImage
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.StartOffset
@@ -94,6 +99,8 @@ import com.mikepenz.markdown.model.State as MarkdownParseState
 import dev.snipme.highlights.Highlights
 import dev.snipme.highlights.model.SyntaxThemes
 import compose.icons.FeatherIcons
+import compose.icons.feathericons.MoreHorizontal
+import compose.icons.feathericons.RotateCcw
 import compose.icons.feathericons.Check
 import compose.icons.feathericons.Copy
 import compose.icons.feathericons.ChevronDown
@@ -103,7 +110,9 @@ import compose.icons.feathericons.FileText
 import compose.icons.feathericons.Image
 import kotlinx.coroutines.delay
 import androidx.compose.ui.res.stringResource
+import androidx.core.content.FileProvider
 import com.aicode.R
+import java.io.File
 
 internal class MarkdownRenderCache(
     private val maxEntries: Int = 80
@@ -135,7 +144,9 @@ internal fun formatTokenCount(tokens: Int): String = when {
 internal fun AgentMessageItem(
     message: AgentUIMessage,
     liveOutput: String? = null,
-    markdownCache: MarkdownRenderCache? = null
+    markdownCache: MarkdownRenderCache? = null,
+    onRewindClick: ((String) -> Unit)? = null,
+    onMoreClick: ((AgentUIMessage) -> Unit)? = null
 ) {
     if (message.isCompactionMarker) {
         CompactionDivider()
@@ -171,7 +182,10 @@ internal fun AgentMessageItem(
                 horizontalAlignment = if (isUser) Alignment.End else Alignment.Start
             ) {
                 if (hasContent || message.role == MessageRole.TOOL) {
-                    Surface(
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Surface(
                         shape = if (isUser) {
                             RoundedCornerShape(Radius.md, Radius.md, Radius.xs, Radius.md)
                         } else {
@@ -232,6 +246,7 @@ internal fun AgentMessageItem(
                         }
                     }
                 }
+                }
                 if (isUser && hasAttachments) {
                     MessageAttachmentPreviewRow(attachments = message.attachments)
                 }
@@ -257,6 +272,32 @@ internal fun AgentMessageItem(
                                 modifier = Modifier.size(14.dp),
                             )
                         }
+                        if (isUser && onRewindClick != null) {
+                            IconButton(
+                                onClick = { onRewindClick(message.id) },
+                                modifier = Modifier.size(28.dp),
+                                colors = IconButtonDefaults.iconButtonColors(contentColor = iconTint),
+                            ) {
+                                Icon(
+                                    FeatherIcons.RotateCcw,
+                                    contentDescription = stringResource(R.string.checkpoint_rewind_title),
+                                    modifier = Modifier.size(14.dp),
+                                )
+                            }
+                        }
+                        if (onMoreClick != null) {
+                            IconButton(
+                                onClick = { onMoreClick(message) },
+                                modifier = Modifier.size(28.dp),
+                                colors = IconButtonDefaults.iconButtonColors(contentColor = iconTint),
+                            ) {
+                                Icon(
+                                    FeatherIcons.MoreHorizontal,
+                                    contentDescription = stringResource(R.string.chat_more_options),
+                                    modifier = Modifier.size(14.dp),
+                                )
+                            }
+                        }
                         if (message.role == MessageRole.ASSISTANT && (message.inputTokens > 0 || message.outputTokens > 0)) {
                             val inStr = formatTokenCount(message.inputTokens)
                             val outStr = formatTokenCount(message.outputTokens)
@@ -281,7 +322,10 @@ internal fun AgentMessageItem(
 }
 
 @Composable
-private fun MessageAttachmentPreviewRow(attachments: List<AgentAttachment>) {
+internal fun MessageAttachmentPreviewRow(
+    attachments: List<AgentAttachment>,
+    onClick: ((AgentAttachment) -> Unit)? = null
+) {
     Row(
         modifier = Modifier
             .horizontalScroll(rememberScrollState())
@@ -289,18 +333,26 @@ private fun MessageAttachmentPreviewRow(attachments: List<AgentAttachment>) {
         horizontalArrangement = Arrangement.spacedBy(Spacing.sm)
     ) {
         attachments.forEach { attachment ->
-            MessageAttachmentPreviewItem(attachment = attachment)
+            MessageAttachmentPreviewItem(attachment = attachment, onClick = onClick)
         }
     }
 }
 
 @Composable
-private fun MessageAttachmentPreviewItem(attachment: AgentAttachment) {
+private fun MessageAttachmentPreviewItem(
+    attachment: AgentAttachment,
+    onClick: ((AgentAttachment) -> Unit)? = null
+) {
+    val clickModifier = if (onClick != null) {
+        Modifier.clickable { onClick(attachment) }
+    } else {
+        Modifier
+    }
     Surface(
         shape = RoundedCornerShape(Radius.md),
         color = MaterialTheme.colorScheme.surfaceVariant,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-        modifier = Modifier.size(76.dp)
+        modifier = clickModifier.size(76.dp)
     ) {
         if (attachment.isImage) {
             MessageImagePreview(attachment = attachment)
@@ -308,6 +360,56 @@ private fun MessageAttachmentPreviewItem(attachment: AgentAttachment) {
             MessageFilePreview(attachment = attachment)
         }
     }
+}
+
+/**
+ * 用系统对应 app 打开附件文件（FileProvider 授权 URI）。
+ * 文件不存在或无匹配 app 时 toast 提示。
+ */
+internal fun openAttachment(context: Context, attachment: AgentAttachment) {
+    val file = File(attachment.localPath)
+    if (!file.exists() || !file.isFile) {
+        Toast.makeText(context, context.getString(R.string.chat_open_file_failed), Toast.LENGTH_SHORT).show()
+        return
+    }
+    // APK 安装包：系统安装器要求「允许安装未知应用」授权，未授权时引导用户去设置页开启，
+    // 否则点击只会弹出「没有权限安装」的拒绝提示。
+    if (isApk(attachment)) {
+        if (!context.packageManager.canRequestPackageInstalls()) {
+            Toast.makeText(context, context.getString(R.string.chat_open_apk_permission), Toast.LENGTH_LONG).show()
+            try {
+                context.startActivity(
+                    Intent(
+                        Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                        Uri.parse("package:${context.packageName}")
+                    )
+                )
+            } catch (e: Exception) {
+                Toast.makeText(context, context.getString(R.string.chat_open_file_no_app), Toast.LENGTH_SHORT).show()
+            }
+            return
+        }
+    }
+    val uri: Uri = try {
+        FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+    } catch (e: Exception) {
+        Toast.makeText(context, context.getString(R.string.chat_open_file_failed), Toast.LENGTH_SHORT).show()
+        return
+    }
+    val intent = Intent(Intent.ACTION_VIEW)
+        .setDataAndType(uri, attachment.mimeType.ifBlank { "*/*" })
+        .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    try {
+        context.startActivity(intent)
+    } catch (e: Exception) {
+        Toast.makeText(context, context.getString(R.string.chat_open_file_no_app), Toast.LENGTH_SHORT).show()
+    }
+}
+
+private fun isApk(attachment: AgentAttachment): Boolean {
+    if (attachment.mimeType.equals("application/vnd.android.package-archive", ignoreCase = true)) return true
+    val name = attachment.fileName.lowercase()
+    return name.endsWith(".apk") || name.endsWith(".apks") || name.endsWith(".xapk")
 }
 
 @Composable
@@ -392,13 +494,24 @@ private fun calculateMessageAttachmentSampleSize(width: Int, height: Int, reqWid
 @Composable
 private fun BackgroundNotificationBar(message: AgentUIMessage) {
     val content = message.content
-    val status = Regex("<status>(.*?)</status>")
-        .find(content)?.groupValues?.getOrNull(1)?.trim()?.lowercase()
-    val summary = Regex("<summary>(.*?)</summary>")
-        .find(content)?.groupValues?.getOrNull(1)?.trim()
-    val isSuccess = status == "completed"
+    val statuses = Regex("<status>(.*?)</status>")
+        .findAll(content).map { it.groupValues.getOrNull(1)?.trim()?.lowercase() }.filterNotNull().toList()
+    val summaries = Regex("<summary>(.*?)</summary>")
+        .findAll(content).map { it.groupValues.getOrNull(1)?.trim() }.filterNotNull().toList()
+    val isSuccess = statuses.all { it == "completed" }
     val dotColor = if (isSuccess) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.error
-    val label = if (summary.isNullOrEmpty()) stringResource(R.string.chat_bg_command_done) else summary
+    val label = when {
+        summaries.size <= 1 -> summaries.firstOrNull() ?: stringResource(R.string.chat_bg_command_done)
+        else -> {
+            val failedCount = statuses.count { it != "completed" }
+            val namePart = summaries.joinToString("、") { s -> s.removePrefix("后台任务「").substringBefore("」") }
+            if (failedCount > 0) {
+                stringResource(R.string.chat_bg_commands_partial_failed, summaries.size, failedCount, namePart)
+            } else {
+                stringResource(R.string.chat_bg_commands_done, summaries.size, namePart)
+            }
+        }
+    }
 
     Surface(
         shape = RoundedCornerShape(Radius.md),

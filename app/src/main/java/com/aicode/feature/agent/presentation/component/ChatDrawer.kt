@@ -70,6 +70,7 @@ fun ChatDrawerContent(
     onCreate: () -> Unit,
     onDelete: (ChatSession) -> Unit,
     onRename: (ChatSession, String) -> Unit,
+    onExport: (ChatSession) -> Unit,
     onNavigateToSettings: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -206,6 +207,10 @@ fun ChatDrawerContent(
                 menuSession = null
                 pendingRename = session
             },
+            onExport = {
+                menuSession = null
+                onExport(session)
+            },
             onDelete = {
                 menuSession = null
                 pendingDelete = session
@@ -252,6 +257,7 @@ fun ChatDrawerContent(
 private fun SessionActionSheet(
     session: ChatSession,
     onRename: () -> Unit,
+    onExport: () -> Unit,
     onDelete: () -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -295,6 +301,30 @@ private fun SessionActionSheet(
                     Spacer(Modifier.width(Spacing.lg))
                     Text(
                         text = stringResource(R.string.common_rename),
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+            }
+            Surface(onClick = {
+                onDismiss()
+                onExport()
+            }, color = Color.Transparent) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = Spacing.lg, vertical = Spacing.md),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = FeatherIcons.Download,
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp),
+                        tint = MaterialTheme.colorScheme.onSurface
+                    )
+                    Spacer(Modifier.width(Spacing.lg))
+                    Text(
+                        text = stringResource(R.string.chat_export_session),
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurface
                     )

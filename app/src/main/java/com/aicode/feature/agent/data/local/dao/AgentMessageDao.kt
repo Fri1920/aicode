@@ -38,8 +38,20 @@ interface AgentMessageDao {
     @Query("DELETE FROM agent_messages")
     suspend fun deleteAllMessages()
 
+    @Query("SELECT * FROM agent_messages WHERE id = :id LIMIT 1")
+    suspend fun getMessageById(id: String): AgentMessageEntity?
+
+    @Query("UPDATE agent_messages SET content = :content WHERE id = :id")
+    suspend fun updateMessageContent(id: String, content: String)
+
     @Query("DELETE FROM agent_messages WHERE id = :id")
-    suspend fun deleteById(id: String)
+    suspend fun deleteMessageById(id: String)
+
+    @Query("DELETE FROM agent_messages WHERE sessionId = :sessionId AND timestamp >= :cutoffTimestamp")
+    suspend fun deleteMessagesFromTimestamp(sessionId: String, cutoffTimestamp: Long)
+
+    @Query("DELETE FROM agent_messages WHERE sessionId = :sessionId AND timestamp > :cutoffTimestamp")
+    suspend fun deleteMessagesAfterTimestamp(sessionId: String, cutoffTimestamp: Long)
 
     /**
      * 把残留的「执行中」工具行（content 以占位标记开头）批量收尾为「已中断」。
@@ -58,4 +70,12 @@ interface AgentMessageDao {
 
     @Query("SELECT * FROM agent_messages ORDER BY timestamp ASC")
     suspend fun getAllOnce(): List<AgentMessageEntity>
+
+    /** 分页读取（keyset：按 timestamp,id 字典序取 [limit] 条），供备份流式导出。 */
+    @Query("SELECT * FROM agent_messages WHERE timestamp > :lastTimestamp OR (timestamp = :lastTimestamp AND id > :lastId) ORDER BY timestamp ASC, id ASC LIMIT :limit")
+    suspend fun getPageAfter(lastTimestamp: Long, lastId: String, limit: Int): List<AgentMessageEntity>
+
+    /** 按会话分页读取（keyset），供单会话备份流式导出。 */
+    @Query("SELECT * FROM agent_messages WHERE sessionId = :sessionId AND (timestamp > :lastTimestamp OR (timestamp = :lastTimestamp AND id > :lastId)) ORDER BY timestamp ASC, id ASC LIMIT :limit")
+    suspend fun getPageBySessionAfter(sessionId: String, lastTimestamp: Long, lastId: String, limit: Int): List<AgentMessageEntity>
 }
