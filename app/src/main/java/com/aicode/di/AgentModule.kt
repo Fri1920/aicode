@@ -9,7 +9,6 @@ import com.aicode.feature.agent.data.local.dao.ChatSessionDao
 import com.aicode.feature.agent.data.local.dao.CheckpointDao
 import com.aicode.feature.agent.data.local.dao.TodoItemDao
 import com.aicode.feature.settings.data.local.dao.AIProviderDao
-import com.aicode.feature.settings.domain.model.ProviderType
 import com.aicode.feature.settings.domain.repository.AIProviderRepository
 import com.aicode.feature.agent.data.local.database.AgentDatabase
 import com.aicode.feature.agent.data.CodeChangeTracker
@@ -17,9 +16,6 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import com.aicode.feature.agent.data.remote.anthropic.AnthropicApi
 import com.aicode.feature.agent.data.remote.gemini.GeminiApi
 import com.aicode.feature.agent.data.remote.openai.OpenAIApi
-import com.aicode.feature.agent.domain.provider.AIProvider
-import com.aicode.feature.agent.domain.provider.AnthropicAdapter
-import com.aicode.feature.agent.domain.provider.OpenAIAdapter
 import com.aicode.feature.agent.domain.container.CommandEngine
 import com.aicode.feature.agent.domain.container.DelegatingCommandEngine
 import com.aicode.feature.agent.domain.container.LinuxContainerEngine
@@ -190,27 +186,6 @@ object AgentModule {
 
     @Provides
     @Singleton
-    @Named("OpenAIProvider")
-    fun provideOpenAIProvider(api: OpenAIApi): AIProvider {
-        return OpenAIAdapter(api)
-    }
-
-    @Provides
-    @Singleton
-    @Named("AnthropicProvider")
-    fun provideAnthropicProvider(api: AnthropicApi): AIProvider {
-        return AnthropicAdapter(api)
-    }
-
-    @Provides
-    @Singleton
-    @Named("GeminiProvider")
-    fun provideGeminiProvider(api: com.aicode.feature.agent.data.remote.gemini.GeminiApi): AIProvider {
-        return com.aicode.feature.agent.domain.provider.GeminiAdapter(api)
-    }
-
-    @Provides
-    @Singleton
     fun provideCommandEngine(delegate: DelegatingCommandEngine): CommandEngine = delegate
 
     @Provides
@@ -289,9 +264,6 @@ object AgentModule {
     fun provideAgentWorkflow(
         toolRegistry: ToolRegistry,
         aiProviderRepository: AIProviderRepository,
-        @Named("OpenAIProvider") openAIProvider: AIProvider,
-        @Named("AnthropicProvider") anthropicProvider: AIProvider,
-        @Named("GeminiProvider") geminiProvider: AIProvider,
         openAIApi: OpenAIApi,
         anthropicApi: AnthropicApi,
         geminiApi: GeminiApi,
@@ -311,9 +283,6 @@ object AgentModule {
         return com.aicode.feature.agent.domain.workflow.StatefulAgentWorkflow(
             toolRegistry,
             aiProviderRepository,
-            openAIProvider,
-            anthropicProvider,
-            geminiProvider,
             openAIApi,
             anthropicApi,
             geminiApi,

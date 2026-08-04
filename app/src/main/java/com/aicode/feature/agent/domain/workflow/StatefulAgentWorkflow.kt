@@ -64,9 +64,6 @@ import javax.inject.Inject
 class StatefulAgentWorkflow @Inject constructor(
     private val toolRegistry: ToolRegistry,
     private val aiProviderRepository: AIProviderRepository,
-    @param:javax.inject.Named("OpenAIProvider") private val openAIProvider: AIProvider,
-    @param:javax.inject.Named("AnthropicProvider") private val anthropicProvider: AIProvider,
-    @param:javax.inject.Named("GeminiProvider") private val geminiProvider: AIProvider,
     private val openAIApi: OpenAIApi,
     private val anthropicApi: AnthropicApi,
     private val geminiApi: GeminiApi,
@@ -150,7 +147,7 @@ class StatefulAgentWorkflow @Inject constructor(
             ?: throw IllegalStateException("尚未配置 AI 提供商，请到设置中添加并选择一个")
         if (config.apiKey.isBlank()) throw IllegalStateException("「${config.name}」未填写 API Key")
         if (config.effectiveModel.isBlank()) throw IllegalStateException("「${config.name}」未选择模型")
-        return getProviderFor(config, sessionId)
+        return createStandaloneProvider(config, sessionId)
     }
 
     /**
@@ -177,7 +174,7 @@ class StatefulAgentWorkflow @Inject constructor(
             ?: throw IllegalStateException("尚未配置 AI 提供商，请到设置中添加并选择一个")
         if (config.apiKey.isBlank()) throw IllegalStateException("「${config.name}」未填写 API Key")
         if (config.effectiveModel.isBlank()) throw IllegalStateException("「${config.name}」未选择模型")
-        val provider = getProviderFor(config, sessionId)
+        val provider = createStandaloneProvider(config, sessionId)
         val history = messagePersistenceUseCase.buildHistory(sessionId, "__manual_compress__")
         if (history.size <= 2) return false
         val compactionProvider = resolveCompactionFallbackProvider() ?: provider
@@ -194,29 +191,6 @@ class StatefulAgentWorkflow @Inject constructor(
             ProviderType.ANTHROPIC -> AnthropicAdapter(anthropicApi)
             ProviderType.GEMINI -> GeminiAdapter(geminiApi)
             else -> OpenAIAdapter(openAIApi)
-        }
-        provider.apiKey = config.apiKey
-        provider.baseUrl = config.baseUrl
-        provider.model = config.effectiveModel
-        provider.useFullUrl = config.useFullUrl
-        provider.useResponseApi = config.useResponseApi
-        provider.logSessionId = sessionId
-        return provider
-    }
-
-    /**
-     * 据 [config] 选定对应的 provider 单例实例并填入其连接字段后返回。
-     * 复用于「当前聊天模型」与「识图专用模型」两条路径。
-     *
-     * 注意：三个 provider 实例是注入的单例且字段可变（apiKey/baseUrl/useFullUrl/useResponseApi/model/logSessionId），
-     * 调用方在用本方法切换到不同于当前的 provider 后，必须在发送请求的 try/finally 里保存并恢复所有可变字段，
-     * 以免污染后续轮次——见 effect 执行层识图轮的 save/Restore。
-     */
-    private fun getProviderFor(config: AIProviderConfig, sessionId: String?): AIProvider {
-        val provider = when (config.type) {
-            ProviderType.ANTHROPIC -> anthropicProvider
-            ProviderType.GEMINI -> geminiProvider
-            else -> openAIProvider
         }
         provider.apiKey = config.apiKey
         provider.baseUrl = config.baseUrl
