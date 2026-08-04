@@ -453,11 +453,18 @@ class OpenAIAdapter @Inject constructor(
                     val toolCalls = if (message.toolCalls.isNotEmpty()) {
                         message.toolCalls.map { convertToOpenAIToolCall(it) }
                     } else null
+                    // DeepSeek 思考模式要求 assistant 消息的 reasoning_content 字段必须存在
+                    // （即使是空串也要带上），否则工具调用轮回传时 API 报 400。
+                    val reasoningContent = if (model.contains("deepseek", ignoreCase = true)) {
+                        message.reasoning
+                    } else {
+                        message.reasoning.ifEmpty { null }
+                    }
                     OpenAIChatMessage(
                         role = "assistant",
                         content = message.content,
                         tool_calls = toolCalls,
-                        reasoning_content = message.reasoning.ifEmpty { null }
+                        reasoning_content = reasoningContent
                     )
                 }
                 is AgentMessage.ToolResultMessage -> OpenAIChatMessage(
