@@ -481,23 +481,38 @@ class OpenAIAdapter @Inject constructor(
             }
         }
 
-        // 防御性清理：确保每个 role: "tool" 消息的前驱 assistant 消息包含对应的 tool_calls。
-        // 上下文压缩可能导致 assistant(toolCalls) + tool 的配对断裂，产生孤立 tool 消息，
-        // OpenAI API 对此会报 400: "Messages with role 'tool' must be a response to a preceding
-        // message with 'tool_calls'"。
+        // 防御性清理：保证 assistant(tool_calls) 与其 tool 响应消息一一配对，避免上游 400。
+        // 1) 孤立 tool 消息（前驱 assistant 无 tool_calls，如上下文压缩导致配对断裂）→ 跳过；
+        //    否则 OpenAI 报 "Messages with role 'tool' must be a response to a preceding
+        //    message with 'tool_calls'"。
+        // 2) assistant 声明的 tool_calls 多于紧随其后的 tool 响应数（如用户拒绝导致部分调用
+        //    未执行、tool 结果缺失）→ 裁剪多余 tool_calls，否则 OpenAI 报
+        //    "insufficient tool messages following tool_calls message"。
         val cleaned = mutableListOf<OpenAIChatMessage>()
-        var lastAssistantHadToolCalls = false
-        for (msg in raw) {
-            if (msg.role == "tool" && !lastAssistantHadToolCalls) {
-                // 孤立 tool 消息，跳过
-                continue
+        var i = 0
+        while (i < raw.size) {
+            val msg = raw[i]
+            if (msg.role == "assistant" && msg.tool_calls?.isNotEmpty() == true) {
+                var toolCount = 0
+                var j = i + 1
+                while (j < raw.size && raw[j].role == "tool") {
+                    toolCount++
+                    j++
+                }
+                val calls = msg.tool_calls!!
+                if (toolCount < calls.size) {
+                    cleaned.add(msg.copy(tool_calls = calls.take(toolCount).ifEmpty { null }))
+                } else {
+                    cleaned.add(msg)
+                }
+                repeat(toolCount) { cleaned.add(raw[i + 1 + it]) }
+                i = j
+            } else if (msg.role == "tool") {
+                i++ // 孤立 tool 消息，跳过
+            } else {
+                cleaned.add(msg)
+                i++
             }
-            if (msg.role == "assistant") {
-                lastAssistantHadToolCalls = msg.tool_calls?.isNotEmpty() == true
-            } else if (msg.role != "tool") {
-                lastAssistantHadToolCalls = false
-            }
-            cleaned.add(msg)
         }
         return cleaned
     }

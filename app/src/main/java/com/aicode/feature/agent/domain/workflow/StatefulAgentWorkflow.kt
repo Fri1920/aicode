@@ -251,12 +251,25 @@ class StatefulAgentWorkflow @Inject constructor(
                 } else {
                     val rawResult = ToolResult.Error(action.denyReason, action.errorCode).toTransportString()
                     if (action.errorCode == USER_REJECTED_CODE) {
+                        // 模型一次可能返回多个 tool_calls。用户拒绝当前调用后，剩余未执行的
+                        // tool_call 也必须补上 tool 响应，否则 assistant(toolCalls=N) 后只有部分
+                        // tool 消息，OpenAI 会报 400 "insufficient tool messages following tool_calls"。
+                        val unexecuted = newState.pendingToolCalls.map { pending ->
+                            AgentMessage.ToolResultMessage(
+                                id = pending.id,
+                                toolName = pending.name,
+                                result = ToolResult.Error(
+                                    "用户拒绝了本轮工具调用，该调用未执行。",
+                                    USER_REJECTED_CODE
+                                ).toTransportString()
+                            )
+                        }
                         newState = state.copy(
                             messages = state.messages + AgentMessage.ToolResultMessage(
                                 id = action.toolCall.id,
                                 toolName = action.toolCall.name,
                                 result = rawResult
-                            ),
+                            ) + unexecuted,
                             pendingToolCalls = emptyList(),
                             executingToolCall = null,
                             isFinished = true
