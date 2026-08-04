@@ -125,6 +125,9 @@
     <string name="chat_unsupported_image_type">Unrecognized image type, only jpg/png/gif/webp supported</string>
     <string name="chat_new_session_btn">New Chat</string>
     <string name="chat_open_sidebar">Open sidebar</string>
+    <string name="chat_open_file_failed">File not found or inaccessible</string>
+    <string name="chat_open_file_no_app">No app available to open this file</string>
+    <string name="chat_open_apk_permission">Installing apps requires permission. Allow installs from this source in the settings that just opened</string>
     <string name="chat_no_model_selected">No model selected</string>
     <string name="chat_open_git">Open version control</string>
     <string name="chat_open_terminal">Open terminal</string>

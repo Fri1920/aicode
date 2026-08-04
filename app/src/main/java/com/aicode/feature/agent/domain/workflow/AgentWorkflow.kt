@@ -39,7 +39,9 @@ sealed class AgentEvent {
         val toolName: String,
         val result: String,
         val isError: Boolean,
-        val argsPreview: String? = null
+        val argsPreview: String? = null,
+        /** 仅 sendFile 等展示型工具：随结果附带的文件卡片元数据，落库供 UI 渲染，不回放进模型上下文。 */
+        val attachments: List<com.aicode.feature.agent.presentation.AgentAttachment> = emptyList()
     ) : AgentEvent()
 
     /** 网络请求正在重试（首字节前失败触发自动重试）。仅用于 UI 实时展示，不落库。 */

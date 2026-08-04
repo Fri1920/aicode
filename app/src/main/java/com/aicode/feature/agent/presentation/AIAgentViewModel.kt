@@ -617,7 +617,8 @@ class AIAgentViewModel @Inject constructor(
                             toolCallId = event.id,
                             toolName = event.toolName,
                             toolArgs = event.argsPreview ?: toolArgsByMsgId[msgId],
-                            isError = event.isError
+                            isError = event.isError,
+                            attachments = event.attachments
                         )
                         toolArgsByMsgId.remove(msgId)
                         if (_runningTools.value[sessionId]?.messageId == msgId) {

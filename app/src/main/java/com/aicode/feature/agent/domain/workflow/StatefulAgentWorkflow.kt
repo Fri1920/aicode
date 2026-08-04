@@ -29,6 +29,7 @@ import com.aicode.feature.agent.domain.tool.ToolResult
 import com.aicode.feature.agent.domain.tool.ToolOutputStore
 import com.aicode.feature.agent.domain.tool.ToolStreamEvent
 import com.aicode.feature.agent.domain.tool.toTransportString
+import com.aicode.feature.agent.presentation.AgentAttachment
 import com.aicode.feature.settings.data.remote.ModelMetadataService
 import com.aicode.feature.settings.data.repository.CompactionModelSettingsRepository
 import com.aicode.feature.settings.data.repository.VisionModelSettingsRepository
@@ -45,10 +46,14 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.flow
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.longOrNull
 import javax.inject.Inject
 
 /**
@@ -128,7 +133,9 @@ class StatefulAgentWorkflow @Inject constructor(
     private data class ToolRunResult(
         val raw: String,
         val isError: Boolean,
-        val images: List<AgentImage> = emptyList()
+        val images: List<AgentImage> = emptyList(),
+        /** 仅 sendFile 等展示型工具：随结果附带的文件卡片元数据，供 UI 渲染，不回放进模型上下文。 */
+        val attachments: List<com.aicode.feature.agent.presentation.AgentAttachment> = emptyList()
     )
 
     /** 需要在外部环境中执行的副作用 (SideEffect) */
@@ -580,7 +587,7 @@ class StatefulAgentWorkflow @Inject constructor(
                                 systemPrompt = promptProvider.build(currentContext)
                             }
                         }
-                        emit(AgentEvent.ToolCallFinished(effect.toolCall.id, effect.toolCall.name, rawResult, isError))
+                        emit(AgentEvent.ToolCallFinished(effect.toolCall.id, effect.toolCall.name, rawResult, isError, attachments = runResult.attachments))
                         actionQueue.addLast(AgentAction.ToolFinished(effect.toolCall.id, effect.toolCall.name, rawResult, isError, runResult.images))
                     }
                 }
@@ -619,9 +626,14 @@ class StatefulAgentWorkflow @Inject constructor(
             }
             val result = tool.executeWithContext(toolCall.arguments, context)
             val images = if (name == "viewImage") extractInlineImages(result) else emptyList()
-            val transportResult = if (images.isNotEmpty()) stripInlineImages(result) else result
+            val attachments = if (name == "sendFile") extractAttachments(result) else emptyList()
+            val transportResult = when {
+                images.isNotEmpty() -> stripInlineImages(result)
+                attachments.isNotEmpty() -> stripAttachments(result)
+                else -> result
+            }
             val processed = toolOutputStore.process(name, toolCall.id, transportResult)
-            ToolRunResult(processed.toTransportString(), processed is ToolResult.Error, images)
+            ToolRunResult(processed.toTransportString(), processed is ToolResult.Error, images, attachments)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -808,6 +820,46 @@ class StatefulAgentWorkflow @Inject constructor(
         val path = image["path"]?.jsonPrimitive?.contentOrNull.orEmpty()
         if (!mimeType.startsWith("image/") || base64Data.isBlank()) return emptyList()
         return listOf(AgentImage(mimeType = mimeType, base64Data = base64Data, path = path))
+    }
+
+    /**
+     * 从 sendFile 工具结果的 `files` 数组提取文件卡片元数据（含宿主本地路径，供 UI 打开文件用）。
+     * 任一文件缺关键字段则整体返回空（与 sendFile 的原子语义一致）。
+     */
+    private fun extractAttachments(result: ToolResult): List<AgentAttachment> {
+        val data = (result as? ToolResult.Success)?.data as? JsonObject ?: return emptyList()
+        val files = data["files"] as? JsonArray ?: return emptyList()
+        val attachments = files.mapNotNull { elem ->
+            val obj = elem as? JsonObject ?: return@mapNotNull null
+            val path = obj["path"]?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
+            val localPath = obj["local_path"]?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
+            val name = obj["name"]?.jsonPrimitive?.contentOrNull ?: path.substringAfterLast('/')
+            val mimeType = obj["mime_type"]?.jsonPrimitive?.contentOrNull ?: "application/octet-stream"
+            AgentAttachment(
+                fileName = name,
+                containerPath = path,
+                localPath = localPath,
+                mimeType = mimeType,
+                sizeBytes = obj["size_bytes"]?.jsonPrimitive?.longOrNull ?: 0L,
+                isImage = obj["is_image"]?.jsonPrimitive?.booleanOrNull ?: mimeType.startsWith("image/")
+            )
+        }
+        return if (attachments.size == files.size) attachments else emptyList()
+    }
+
+    /** 从回传给模型的 sendFile 结果中剥离宿主本地路径（模型只应看到容器路径）。 */
+    private fun stripAttachments(result: ToolResult): ToolResult {
+        val success = result as? ToolResult.Success ?: return result
+        val data = success.data as? JsonObject ?: return result
+        val strippedFiles = (data["files"] as? JsonArray)?.map { elem ->
+            val obj = elem as? JsonObject ?: return@map elem
+            JsonObject(obj.toMutableMap().apply { remove("local_path") })
+        } ?: return result
+        val strippedData = data.toMutableMap().apply {
+            this["files"] = JsonArray(strippedFiles)
+            this["files_attached"] = JsonPrimitive(true)
+        }
+        return ToolResult.Success(JsonObject(strippedData))
     }
 
     private fun stripInlineImages(result: ToolResult): ToolResult {

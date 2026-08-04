@@ -28,6 +28,7 @@ import com.aicode.feature.agent.domain.container.RemoteSshEngine
 import com.aicode.feature.settings.data.repository.ExecutionMode
 import com.aicode.feature.settings.data.repository.ExecutionModeHolder
 import com.aicode.feature.agent.domain.tool.file.ReadFileTool
+import com.aicode.feature.agent.domain.tool.file.SendFileTool
 import com.aicode.feature.agent.domain.tool.file.ViewImageTool
 import com.aicode.feature.agent.domain.tool.file.WriteFileTool
 import com.aicode.feature.agent.domain.tool.editor.EditFileTool
@@ -239,6 +240,7 @@ object AgentModule {
     @Singleton
     fun provideToolRegistry(
         readFileTool: ReadFileTool,
+        sendFileTool: SendFileTool,
         viewImageTool: ViewImageTool,
         writeFileTool: WriteFileTool,
         editFileTool: EditFileTool,
@@ -257,6 +259,7 @@ object AgentModule {
     ): ToolRegistry {
         return ToolRegistry().apply {
             register("readFile", readFileTool)
+            register("sendFile", sendFileTool)
             register("viewImage", viewImageTool)
             register("writeFile", writeFileTool)
             register("editFile", editFileTool)
