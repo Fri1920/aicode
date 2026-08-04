@@ -54,20 +54,50 @@ class MessagePersistenceUseCase @Inject constructor(
                 id = id,
                 sessionId = sessionId,
                 role = role.name,
-                content = content,
+                content = sanitizeContent(content),
                 timestamp = nextTimestamp(),
                 toolCallsJson = if (toolCalls.isNotEmpty()) json.encodeToString(toolCalls) else null,
                 toolCallId = toolCallId,
                 toolName = toolName,
                 toolArgs = toolArgs,
                 isError = isError,
-                reasoning = reasoning,
+                reasoning = reasoning?.let { sanitizeContent(it) },
                 attachmentsJson = if (attachments.isNotEmpty()) json.encodeToString(attachments) else null,
                 inputTokens = inputTokens,
                 outputTokens = outputTokens,
                 isCompacted = isCompacted
             )
         )
+    }
+
+    companion object {
+        /**
+         * 单条消息字段持久化上限（字符数）。远小于 SQLite CursorWindow 单行约 2MB 的硬限制，
+         * 防止生图/多模态模型返回的超大 base64 图片撑爆数据行，导致读取消息时抛
+         * [android.database.sqlite.SQLiteBlobTooBigException] 使应用启动即崩。
+         */
+        const val MAX_CONTENT_CHARS = 200_000
+        const val IMAGE_OMITTED_MARKER = "[图片已省略：内嵌图片数据过大]"
+        const val CONTENT_TRUNCATED_MARKER = "…[内容过长，已截断]"
+
+        /** 内嵌 base64 图片 data URL（`data:image/...;base64,...`）。 */
+        private val INLINE_BASE64_IMAGE = Regex("""data:image/[a-zA-Z0-9.+-]+;base64,[A-Za-z0-9+/=\r\n]+""")
+
+        /**
+         * 落库前的内容净化，为所有 provider/模型提供统一兜底防线：
+         * 1. 剥离内嵌的 base64 图片 data URL（替换为占位说明），此类内容本不该进数据库文本；
+         * 2. 剥离后仍超长的内容截断到 [MAX_CONTENT_CHARS]，避免任何超大行触发 CursorWindow 崩溃。
+         */
+        internal fun sanitizeContent(raw: String): String {
+            if (raw.length <= MAX_CONTENT_CHARS && !raw.contains("data:image/", ignoreCase = true)) {
+                return raw
+            }
+            var text = INLINE_BASE64_IMAGE.replace(raw, IMAGE_OMITTED_MARKER)
+            if (text.length > MAX_CONTENT_CHARS) {
+                text = text.take(MAX_CONTENT_CHARS) + CONTENT_TRUNCATED_MARKER
+            }
+            return text
+        }
     }
 
     /**

@@ -534,10 +534,51 @@ class OpenAIAdapter @Inject constructor(
         }
     }
 
+    /**
+     * OpenAI chat completion 返回的 content 可能是字符串或数组（多模态/生图模型）。
+     * 数组元素里可能含 image_url 的 base64 data URL（几 MB），直接 toString() 会把整段 base64
+     * 当成 assistant 文本落库，撑爆 SQLite CursorWindow 导致启动崩溃。这里只提取文本部分，
+     * 图片只保留说明/远程 URL 引用，绝不把 base64 写进 content。
+     */
     private fun Any?.asTextContent(): String = when (this) {
         null -> ""
         is String -> this
+        is List<*> -> extractTextFromContentParts(this)
         else -> toString()
+    }
+
+    private fun extractTextFromContentParts(parts: List<*>): String {
+        val text = StringBuilder()
+        for (part in parts) {
+            when (part) {
+                is Map<*, *> -> {
+                    when (val type = part["type"] as? String) {
+                        "text", "input_text", "output_text" -> {
+                            (part["text"] as? String)?.let { text.append(it) }
+                        }
+                        "image_url" -> {
+                            val url = when (val img = part["image_url"]) {
+                                is String -> img
+                                is Map<*, *> -> img["url"] as? String
+                                else -> null
+                            }
+                            if (url != null && url.startsWith("data:image", ignoreCase = true)) {
+                                text.append("\n[图片已省略：内嵌图片数据过大]")
+                            } else if (!url.isNullOrBlank()) {
+                                text.append("\n[图片：").append(url).append("]")
+                            }
+                        }
+                        "input_image" -> {
+                            text.append("\n[图片已省略：内嵌图片数据过大]")
+                        }
+                        else -> {}
+                    }
+                }
+                is String -> text.append(part)
+                else -> {}
+            }
+        }
+        return text.toString()
     }
 
     private fun convertToToolCall(openAIToolCall: OpenAIToolCall): ToolCall {

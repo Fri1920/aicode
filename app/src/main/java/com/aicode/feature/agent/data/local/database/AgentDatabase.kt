@@ -30,6 +30,6 @@ abstract class AgentDatabase : RoomDatabase() {
     abstract fun gitCredentialDao(): GitCredentialDao
 
     companion object {
-        const val SCHEMA_VERSION = 26
+        const val SCHEMA_VERSION = 27
     }
 }

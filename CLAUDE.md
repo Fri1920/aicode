@@ -108,6 +108,7 @@ To update the database schema:
 1. Increment the database version in `AgentDatabase.kt`.
 2. Create a new SQL file in `app/src/main/assets/migrations/` named `{VERSION}_description.sql` (e.g., `8_add_remote_servers.sql`、`26_add_session_last_input_tokens.sql`).
 3. Add the necessary DDL/SQL statements to this file. The system will automatically execute it on startup and record it in the `migration_history` table.
+   - ⚠️ **Warning**: the migration file is split by `;` (see `MigrationLoader`), so **no `;` may appear inside SQL string literals** (e.g. don't write `';base64,'`) — it would split the statement and fail the whole migration. Use `char(59)` if you need a literal semicolon.
 
 ### AI Agent & Tools
 
