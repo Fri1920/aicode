@@ -25,7 +25,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -52,6 +55,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -64,6 +68,7 @@ import com.aicode.feature.agent.domain.model.AgentMode
 import com.aicode.feature.agent.domain.model.ReasoningEffort
 import com.aicode.feature.agent.domain.permission.PermissionChoice
 import com.aicode.feature.agent.domain.tool.PendingToolPermission
+import com.aicode.feature.agent.presentation.QueuedRequest
 import com.aicode.feature.settings.domain.model.AIProviderConfig
 import com.aicode.feature.settings.presentation.component.ModelLogoIcon
 import com.aicode.feature.settings.presentation.component.ProviderLogoIcon
@@ -111,6 +116,8 @@ internal fun ChatInputBar(
     onUploadImage: () -> Unit,
     onTakePhoto: () -> Unit,
     slashCommands: List<SlashCommandHandler> = emptyList(),
+    queuedRequests: List<QueuedRequest> = emptyList(),
+    onRemoveQueued: (String) -> Unit = {},
     tokenProgress: Float = 0f
 ) {
     val canSend = (value.isNotBlank() || pendingAttachments.isNotEmpty()) && !isBusy
@@ -178,6 +185,13 @@ internal fun ChatInputBar(
                 }
             }
 
+            if (queuedRequests.isNotEmpty()) {
+                QueuedRequestPanel(
+                    queuedRequests = queuedRequests,
+                    onRemoveQueued = onRemoveQueued
+                )
+            }
+
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -203,11 +217,13 @@ internal fun ChatInputBar(
                         .heightIn(min = 44.dp, max = 140.dp),
                     placeholder = {
                         Text(
-                            stringResource(R.string.chat_input_placeholder),
+                            stringResource(if (isBusy) R.string.chat_queue_hint else R.string.chat_input_placeholder),
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     },
-                    enabled = !isBusy,
+                    enabled = true,
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+                    keyboardActions = KeyboardActions(onSend = { onSend() }),
                     colors = TextFieldDefaults.colors(
                         focusedContainerColor = Color.Transparent,
                         unfocusedContainerColor = Color.Transparent,
@@ -317,6 +333,87 @@ internal fun ChatInputBar(
             },
             onDismiss = { showAttachmentSheet = false }
         )
+    }
+}
+
+/**
+ * 待发送队列面板：AI 忙时排队的消息，风格与斜杠命令菜单一致。
+ * 内容过长时在面板内部滚动（heightIn 限制 + LazyColumn），可逐条删除。
+ */
+@Composable
+private fun QueuedRequestPanel(
+    queuedRequests: List<QueuedRequest>,
+    onRemoveQueued: (String) -> Unit
+) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = Spacing.sm),
+        shape = RoundedCornerShape(Radius.lg),
+        color = MaterialTheme.colorScheme.surface,
+        border = androidx.compose.foundation.BorderStroke(
+            1.dp, MaterialTheme.colorScheme.outlineVariant
+        )
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = Spacing.sm, vertical = Spacing.xs)
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = Spacing.md, vertical = Spacing.xs),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = stringResource(R.string.chat_queue_title, queuedRequests.size),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            LazyColumn(
+                modifier = Modifier.heightIn(max = 160.dp),
+                verticalArrangement = Arrangement.spacedBy(Spacing.xs)
+            ) {
+                itemsIndexed(queuedRequests, key = { _, req -> req.id }) { index, req ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(Radius.sm))
+                            .padding(horizontal = Spacing.md, vertical = Spacing.xs),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "${index + 1}",
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(Modifier.width(Spacing.sm))
+                        Text(
+                            text = req.request,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.weight(1f),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        IconButton(
+                            onClick = { onRemoveQueued(req.id) },
+                            modifier = Modifier.size(28.dp)
+                        ) {
+                            Icon(
+                                FeatherIcons.X,
+                                contentDescription = stringResource(R.string.chat_queue_remove),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(14.dp)
+                            )
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 

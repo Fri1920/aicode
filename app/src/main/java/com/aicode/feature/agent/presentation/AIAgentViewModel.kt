@@ -274,6 +274,10 @@ class AIAgentViewModel @Inject constructor(
     val pendingUserQuestion = askUserQuestionManager.pendingQuestion
 
     private val _queuedRequests = MutableStateFlow<Map<String, List<QueuedRequest>>>(emptyMap())
+    // 正在执行斜杠命令的会话集合：命令执行期间同样视为 busy（
+    // 不注册 sessionJobs，否则 /compress 等命令内部的自检会误判为运行中），
+    // 用于 enqueueAgentRequest 判断新消息应入队而非并行执行。
+    private val _runningCommandSessions = MutableStateFlow<Set<String>>(emptySet())
     val queuedRequests: StateFlow<List<QueuedRequest>> = _currentSessionId
         .flatMapLatest { id ->
             if (id == null) flowOf(emptyList())
@@ -509,7 +513,8 @@ class AIAgentViewModel @Inject constructor(
         targetSessionId: String? = null
     ) {
         val sid = targetSessionId ?: _currentSessionId.value
-        val isCurrentRunning = sid != null && sessionJobs[sid]?.isActive == true
+        val isCurrentRunning = sid != null &&
+            (sessionJobs[sid]?.isActive == true || sid in _runningCommandSessions.value)
         if (isCurrentRunning) {
             val req = QueuedRequest(
                 id = UUID.randomUUID().toString(),
@@ -539,6 +544,13 @@ class AIAgentViewModel @Inject constructor(
         }
     }
 
+    /** 从当前会话队列移除指定条目（队列面板删除按钮）。 */
+    fun removeQueuedRequest(id: String) {
+        val sid = _currentSessionId.value ?: return
+        val queue = _queuedRequests.value[sid] ?: return
+        _queuedRequests.value = _queuedRequests.value + (sid to queue.filterNot { it.id == id })
+    }
+
     private fun processNextInQueue(sessionId: String) {
         val queue = _queuedRequests.value[sessionId] ?: return
         val next = queue.firstOrNull() ?: return
@@ -556,6 +568,24 @@ class AIAgentViewModel @Inject constructor(
         )
     }
 
+    /**
+     * 执行斜杠命令：先把命令文本作为用户消息落库（进入对话上下文），再执行 handler。
+     * 执行期间标记为命令占用（防新消息并行执行），结束后接续队列中排队的下一条。
+     */
+    private fun runSlashCommand(command: SlashCommandHandler, input: String, sessionId: String) {
+        viewModelScope.launch {
+            _runningCommandSessions.value = _runningCommandSessions.value + sessionId
+            try {
+                messagePersistenceUseCase.persist(sessionId, MessageRole.USER, input)
+                sessionUseCase.touch(sessionId, messagePersistenceUseCase.nextTimestamp())
+                command.execute(this@AIAgentViewModel)
+            } finally {
+                _runningCommandSessions.value = _runningCommandSessions.value - sessionId
+                processNextInQueue(sessionId)
+            }
+        }
+    }
+
     fun executeAgentRequestStream(
         request: String,
         modelRequest: String = request,
@@ -570,6 +600,13 @@ class AIAgentViewModel @Inject constructor(
         val sessionId = targetSessionId ?: ensureSession()
         if (sessionId.isBlank()) {
             FileLogger.w(TAG, "工作区未就绪，跳过请求")
+            return@launch
+        }
+        // 命令分流：完全相等匹配到斜杠命令时，不走 agent workflow，直接执行命令操作
+        // （命令文本已作为用户消息落库，进入对话上下文）。不注册 sessionJobs，
+        // 因此 isRunning 保持 false，/compress 等命令内部的自检可以正常工作。
+        slashCommandRegistry.findExact(request)?.let { command ->
+            runSlashCommand(command, request, sessionId)
             return@launch
         }
         sessionJobs[sessionId] = coroutineContext[Job]!!
@@ -775,6 +812,8 @@ class AIAgentViewModel @Inject constructor(
         jobs.forEach { it.cancel() }
         sessionJobs.clear()
         pendingMergedNotifications.clear()
+        _queuedRequests.value = emptyMap()
+        _runningCommandSessions.value = emptySet()
         _agentStates.value = _agentStates.value.mapValues { AgentUIState.Idle }
         _streamingTexts.value = emptyMap()
         _streamingReasonings.value = emptyMap()
@@ -828,6 +867,8 @@ class AIAgentViewModel @Inject constructor(
             setStreamingReasoning(sessionId, null)
             setCompacting(sessionId, false)
             setRetryState(sessionId, null)
+            // 点「停止」= 跳过当前轮，立即执行队列下一条
+            processNextInQueue(sessionId)
         }
     }
 
@@ -877,22 +918,8 @@ class AIAgentViewModel @Inject constructor(
         }
     }
 
-    /** 暴露给 UI：发送时完全匹配查找斜杠命令。 */
-    fun findSlashCommand(input: String) = slashCommandRegistry.findExact(input)
-
     /** 暴露给 UI：输入框下拉菜单展示的命令列表。 */
     val slashCommands: List<SlashCommandHandler> get() = slashCommandRegistry.all
-
-    override fun openRewindConsole() {
-        val sid = _currentSessionId.value ?: return
-        viewModelScope.launch {
-            val messages = agentMessageDao.getMessagesBySessionOnce(sid)
-            val lastUserMsg = messages.lastOrNull { it.role == "USER" }
-            if (lastUserMsg != null) {
-                openRewindMenu(lastUserMsg.id)
-            }
-        }
-    }
 
     /** /status —— 以 Markdown 表格作为 AI 气泡输出当前会话状态。 */
     override fun showSessionStatus() {
@@ -949,6 +976,8 @@ class AIAgentViewModel @Inject constructor(
                 )
             } finally {
                 setCompacting(sid, false)
+                // 压缩是异步流程，结束后接续队列中排队的下一条
+                processNextInQueue(sid)
             }
         }
         sessionJobs[sid] = job

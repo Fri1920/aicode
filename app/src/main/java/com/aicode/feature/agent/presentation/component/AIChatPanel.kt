@@ -292,6 +292,7 @@ fun AIChatPanel(
     val streamingReasoning by viewModel.streamingReasoning.collectAsStateWithLifecycle()
     val pendingPermission by viewModel.pendingToolPermission.collectAsStateWithLifecycle()
     val pendingQuestion by viewModel.pendingUserQuestion.collectAsStateWithLifecycle()
+    val queuedRequests by viewModel.queuedRequests.collectAsStateWithLifecycle()
     val targetRewindMessageId by viewModel.targetRewindMessageId.collectAsStateWithLifecycle()
     val globalActiveProvider = settingsViewModel?.activeProvider?.collectAsStateWithLifecycle()?.value
     val providers = (settingsViewModel?.providers?.collectAsStateWithLifecycle()?.value ?: emptyList()).filter { it.isEnabled }
@@ -496,40 +497,29 @@ fun AIChatPanel(
 
     val sendMessage: () -> Unit = {
         val text = inputText.trim()
-        if ((text.isNotEmpty() || pendingAttachments.isNotEmpty()) && !isBusy) {
-            val command = viewModel.findSlashCommand(text)
-            if (command != null) {
-                command.execute(viewModel)
-                inputText = ""
-                viewModel.clearInputDraft()
-                pendingAttachments = emptyList()
-                followBottom = true
-                scope.launch {
-                    kotlinx.coroutines.delay(0)
-                    snapToBottomInstant()
-                }
-            } else {
-                val attachments = pendingAttachments
-                val modelRequest = appendAttachmentsToRequest(context, text, attachments)
-                val modelSupportsVision = activeModelMetadata?.supportsVision == true
-                val images = if (modelSupportsVision) attachments.toAgentImages() else emptyList()
-                viewModel.executeAgentRequestStream(
-                    request = text,
-                    modelRequest = modelRequest,
-                    currentFile = currentFile,
-                    selectedCode = selectedCode,
-                    projectRoot = projectRoot,
-                    inputImages = images,
-                    inputAttachments = attachments.toAgentAttachments()
-                )
-                inputText = ""
-                viewModel.clearInputDraft()
-                pendingAttachments = emptyList()
-                followBottom = true
-                scope.launch {
-                    kotlinx.coroutines.delay(0)
-                    snapToBottomInstant()
-                }
+        if (text.isNotEmpty() || pendingAttachments.isNotEmpty()) {
+            val attachments = pendingAttachments
+            val modelRequest = appendAttachmentsToRequest(context, text, attachments)
+            val modelSupportsVision = activeModelMetadata?.supportsVision == true
+            val images = if (modelSupportsVision) attachments.toAgentImages() else emptyList()
+            // 统一走队列：AI 忙时入队（等本轮结束后自动发送下一条），空闲时直接发送。
+            // 斜杠命令在 ViewModel 内（agent workflow 之前）分流执行，无需在此区分。
+            viewModel.enqueueAgentRequest(
+                request = text,
+                modelRequest = modelRequest,
+                currentFile = currentFile,
+                selectedCode = selectedCode,
+                projectRoot = projectRoot,
+                inputImages = images,
+                inputAttachments = attachments.toAgentAttachments()
+            )
+            inputText = ""
+            viewModel.clearInputDraft()
+            pendingAttachments = emptyList()
+            followBottom = true
+            scope.launch {
+                kotlinx.coroutines.delay(0)
+                snapToBottomInstant()
             }
         }
     }
@@ -753,6 +743,8 @@ fun AIChatPanel(
                 onUploadImage = { imagePicker.launch(arrayOf("image/*")) },
                 onTakePhoto = ::takePhoto,
                 slashCommands = viewModel.slashCommands,
+                queuedRequests = queuedRequests,
+                onRemoveQueued = { viewModel.removeQueuedRequest(it) },
                 tokenProgress = run {
                     val contextLimit = activeModelMetadata?.contextTokens ?: 0
                     if (contextLimit > 0) {
