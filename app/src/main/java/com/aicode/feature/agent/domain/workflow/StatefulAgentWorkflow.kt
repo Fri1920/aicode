@@ -505,7 +505,7 @@ class StatefulAgentWorkflow @Inject constructor(
                             actionQueue.addLast(AgentAction.LlmResponse(responseWithReasoning))
                         } catch (e: CancellationException) {
                             throw e
-                        } catch (e: Throwable) {
+                        } catch (e: Exception) {
                             val partial = acc.toString()
                             val reasoning = reasoningAcc.toString()
                             // 流式被中断时也要落库已收到的思考：否则下方 finally 会清空流式思考气泡，
