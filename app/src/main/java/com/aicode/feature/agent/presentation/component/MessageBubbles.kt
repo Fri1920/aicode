@@ -92,7 +92,7 @@ internal fun AgentMessageItem(
         verticalArrangement = Arrangement.spacedBy(Spacing.xs)
     ) {
         if (hasReasoning) {
-            ReasoningBubble(text = message.reasoning.orEmpty(), initiallyExpanded = false)
+            ReasoningBubble(text = message.reasoning.orEmpty(), initiallyExpanded = false, cache = markdownCache)
         }
         if (hasContent || hasAttachments || message.role != MessageRole.ASSISTANT) {
             Column(

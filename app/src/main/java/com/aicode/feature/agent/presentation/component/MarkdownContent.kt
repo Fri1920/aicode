@@ -65,7 +65,8 @@ internal fun MarkdownContent(
     text: String,
     color: Color,
     modifier: Modifier = Modifier,
-    cache: MarkdownRenderCache? = null
+    cache: MarkdownRenderCache? = null,
+    compact: Boolean = false
 ) {
     val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
 
@@ -78,18 +79,22 @@ internal fun MarkdownContent(
     )
 
     val typography = MaterialTheme.typography
+    // compact：正文、列表用 bodySmall，标题降一档，用于思考气泡等次要文本区域
+    val body = if (compact) typography.bodySmall else typography.bodyMedium
+    val bodyLineHeight = if (compact) 18.sp else 20.sp
+    val codeSize = if (compact) 12.sp else 13.sp
     val mdTypography = markdownTypography(
-        h1 = typography.headlineSmall.copy(fontWeight = FontWeight.Bold, color = color),
-        h2 = typography.titleLarge.copy(fontWeight = FontWeight.Bold, color = color),
-        h3 = typography.titleMedium.copy(fontWeight = FontWeight.SemiBold, color = color),
-        h4 = typography.titleSmall.copy(fontWeight = FontWeight.SemiBold, color = color),
-        h5 = typography.bodyLarge.copy(fontWeight = FontWeight.Medium, color = color),
-        h6 = typography.bodyMedium.copy(fontWeight = FontWeight.Medium, color = color),
-        paragraph = typography.bodyMedium.copy(color = color, lineHeight = 20.sp),
-        code = TextStyle(fontFamily = FontFamily.Monospace, fontSize = 13.sp, color = if (isDark) Color(0xFFE2E8F0) else Color(0xFF1E293B)),
+        h1 = (if (compact) typography.titleMedium else typography.headlineSmall).copy(fontWeight = FontWeight.Bold, color = color),
+        h2 = (if (compact) typography.titleSmall else typography.titleLarge).copy(fontWeight = FontWeight.Bold, color = color),
+        h3 = (if (compact) typography.bodyLarge else typography.titleMedium).copy(fontWeight = FontWeight.SemiBold, color = color),
+        h4 = (if (compact) typography.bodyMedium else typography.titleSmall).copy(fontWeight = FontWeight.SemiBold, color = color),
+        h5 = (if (compact) typography.bodySmall else typography.bodyLarge).copy(fontWeight = FontWeight.Medium, color = color),
+        h6 = (if (compact) typography.bodySmall else typography.bodyMedium).copy(fontWeight = FontWeight.Medium, color = color),
+        paragraph = body.copy(color = color, lineHeight = bodyLineHeight),
+        code = TextStyle(fontFamily = FontFamily.Monospace, fontSize = codeSize, color = if (isDark) Color(0xFFE2E8F0) else Color(0xFF1E293B)),
         inlineCode = TextStyle(fontFamily = FontFamily.Monospace, color = if (isDark) Color(0xFFE2E8F0) else Color(0xFF1E293B)),
-        ordered = typography.bodyMedium.copy(color = color, lineHeight = 20.sp),
-        bullet = typography.bodyMedium.copy(color = color, lineHeight = 20.sp),
+        ordered = body.copy(color = color, lineHeight = bodyLineHeight),
+        bullet = body.copy(color = color, lineHeight = bodyLineHeight),
         table = typography.bodySmall.copy(color = color),
     )
 

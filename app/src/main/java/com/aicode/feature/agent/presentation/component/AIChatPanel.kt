@@ -57,7 +57,6 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
 internal val brandGradient = Brush.linearGradient(listOf(Brand.Blue, Brand.Sky))
-private const val REASONING_SCROLL_BUCKET_CHARS = 120
 
 /**
  * 流式尾巴的三种状态，用于 [when] 分支分发。
@@ -70,16 +69,13 @@ private enum class TailKind { THINKING, STREAMING, COMPACTING, RETRYING, NONE }
 
 private data class AutoScrollSignal(
     val streamingTextLength: Int,
-    val streamingReasoningBucket: Int,
+    val streamingReasoningLength: Int,
     val runningToolMessageId: String?,
     val runningToolTextLength: Int,
     val isCompacting: Boolean,
-    val messageCount: Int
+    val messageCount: Int,
+    val thinkingTail: Boolean
 )
-
-private fun reasoningScrollBucket(text: String?): Int =
-    text?.length?.let { (it / REASONING_SCROLL_BUCKET_CHARS) + 1 } ?: 0
-
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -258,11 +254,13 @@ fun AIChatPanel(
     val autoScrollSignal by rememberUpdatedState(
         AutoScrollSignal(
             streamingTextLength = streamingText?.length ?: 0,
-            streamingReasoningBucket = reasoningScrollBucket(streamingReasoning),
+            streamingReasoningLength = streamingReasoning?.length ?: 0,
             runningToolMessageId = runningTool.firstOrNull()?.messageId,
             runningToolTextLength = runningTool.firstOrNull()?.text?.length ?: 0,
             isCompacting = isCompacting,
-            messageCount = messages.size
+            messageCount = messages.size,
+            // 思考阶段：__reasoning__ 气泡存在且无正文流式时，尾部 __active__ 是空 Box。
+            thinkingTail = streamingReasoning?.isNotEmpty() == true && streamingText?.hasVisibleContent() != true
         )
     )
 
@@ -284,37 +282,28 @@ fun AIChatPanel(
         }
     }
 
-    fun lastItemBottomOffset(): Int {
+    fun lastItemBottomOffset(index: Int): Int {
         val layout = listState.layoutInfo
-        val lastIndex = layout.totalItemsCount - 1
         val viewportH = layout.viewportEndOffset - layout.viewportStartOffset
-        val lastSize = layout.visibleItemsInfo.firstOrNull { it.index == lastIndex }?.size ?: 0
-        return lastSize - viewportH
+        val size = layout.visibleItemsInfo.firstOrNull { it.index == index }?.size ?: 0
+        return size - viewportH
     }
 
-    suspend fun ensureLastItemMeasured(lastIndex: Int) {
-        if (listState.layoutInfo.visibleItemsInfo.none { it.index == lastIndex }) {
-            listState.scrollToItem(lastIndex)
+    suspend fun ensureLastItemMeasured(index: Int) {
+        if (listState.layoutInfo.visibleItemsInfo.none { it.index == index }) {
+            listState.scrollToItem(index)
             withFrameNanos { }
         }
     }
 
-    // 平滑贴底跟随。末条流式消息可能高于一屏，必须滚到末项底部；
-    // 只 animateScrollToItem(lastIndex) 会把末项顶部对齐到视口顶部。
-    val snapToBottom: suspend () -> Unit = {
-        val lastIndex = listState.layoutInfo.totalItemsCount - 1
-        if (lastIndex >= 0) {
-            ensureLastItemMeasured(lastIndex)
-            listState.animateScrollToItem(lastIndex, lastItemBottomOffset())
-        }
-    }
-
-    // 瞬时贴底（用于发送消息、会话切换等需要立刻到位、不留动画的场景）。
-    val snapToBottomInstant: suspend () -> Unit = {
-        val lastIndex = listState.layoutInfo.totalItemsCount - 1
-        if (lastIndex >= 0) {
-            ensureLastItemMeasured(lastIndex)
-            listState.scrollToItem(lastIndex, lastItemBottomOffset())
+    // 贴底跟随：与正文流式一致，用 animateScrollToItem 平滑滚动，collectLatest 自动取消
+    // 上一个未跑完的动画、新动画从当前位置平滑接管，视觉连续。
+    // 末条流式消息可能高于一屏，必须滚到末项底部；只 animateScrollToItem(lastIndex)
+    // 会把末项顶部对齐到视口顶部。
+    val snapToBottom: suspend (Int) -> Unit = { index ->
+        if (index >= 0) {
+            ensureLastItemMeasured(index)
+            listState.animateScrollToItem(index, lastItemBottomOffset(index))
         }
     }
 
@@ -342,7 +331,7 @@ fun AIChatPanel(
             followBottom = true
             scope.launch {
                 kotlinx.coroutines.delay(0)
-                snapToBottomInstant()
+                snapToBottom(listState.layoutInfo.totalItemsCount - 1)
             }
         }
     }
@@ -357,25 +346,29 @@ fun AIChatPanel(
             return@LaunchedEffect
         }
         if (positionedSession != currentSessionId) {
-            snapToBottomInstant()
+            snapToBottom(listState.layoutInfo.totalItemsCount - 1)
             positionedSession = currentSessionId
             followBottom = true
         }
     }
 
     // 流式贴底跟随（聊天标准做法）。
-    // 监听 (流式文本长度, 消息条数) 元组：每个吐字 delta（length 变）和每次落库（size 变）
-    // 都触发一次 animateScrollToItem —— collectLatest 自动取消上一个未跑完的动画，
-    // 新动画立刻从当前位置平滑接管，视觉上形成连续流畅的底部跟随。
+    // 监听 (流式文本长度/思考长度, 消息条数) 元组：每个吐字 delta（length 变）和每次落库
+    // （size 变）都触发一次瞬时贴底（scrollToItem）。思考与正文都按字符粒度触发，
+    // 内容增长多少立即滚多少，气泡始终贴底，无动画滞后与周期感。
     // 注意：不能用 distinctUntilChanged() 包布尔谓词，只触发一次后去重，不再跟随（旧根因）。
     // 注意：不能删 __active__ item（让 totalItemsCount 突减），anchor clamp 上跳（旧根因）。
     LaunchedEffect(listState, messagesReady) {
         if (!messagesReady) return@LaunchedEffect
-        snapshotFlow { autoScrollSignal }.collectLatest {
+        snapshotFlow { autoScrollSignal }.collectLatest { signal ->
             if (!followBottom) return@collectLatest
-            // 等一帧让新文本/新落库消息完成测量，animateScrollToItem 读到正确布局。
+            // 等一帧让新文本/新落库消息完成测量，scrollToItem 读到正确布局。
             kotlinx.coroutines.delay(0)
-            snapToBottom()
+            val lastIndex = listState.layoutInfo.totalItemsCount - 1
+            // 思考阶段：尾部 __active__ 是空 Box，跟随目标改为思考内容（倒数第二），
+            // 让持续增长的思考文本始终贴底可见，避免跟随被顶出视口的空 Box 反复预跳抖动。
+            val target = if (lastIndex > 0 && signal.thinkingTail) lastIndex - 1 else lastIndex
+            snapToBottom(target)
         }
     }
 
@@ -450,7 +443,7 @@ fun AIChatPanel(
                         if (showReasoning) {
                             item(key = "__reasoning__", contentType = "tail") {
                                 // 流式实时：短文本默认展开边想边看，过长（超 REASONING_COLLAPSE_LINE_LIMIT）时由气泡内部自动折叠，不刷屏
-                                ReasoningBubble(text = reasoning.orEmpty(), initiallyExpanded = true)
+                                ReasoningBubble(text = reasoning.orEmpty(), initiallyExpanded = true, cache = markdownCache)
                             }
                         }
                         val streaming = streamingText

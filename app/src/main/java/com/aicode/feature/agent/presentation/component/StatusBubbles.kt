@@ -173,7 +173,8 @@ internal const val REASONING_COLLAPSE_LINE_LIMIT = 8
 @Composable
 internal fun ReasoningBubble(
     text: String,
-    initiallyExpanded: Boolean = true
+    initiallyExpanded: Boolean = true,
+    cache: MarkdownRenderCache? = null
 ) {
     var userToggled by remember { mutableStateOf(false) }
     var expanded by remember { mutableStateOf(initiallyExpanded) }
@@ -222,10 +223,11 @@ internal fun ReasoningBubble(
                 }
                 if (effectiveExpanded) {
                     Spacer(Modifier.height(Spacing.sm))
-                    Text(
+                    MarkdownContent(
                         text = text,
-                        style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        cache = cache,
+                        compact = true,
                         modifier = Modifier.pointerInput(text) {
                             detectTapGestures(
                                 onDoubleTap = {
