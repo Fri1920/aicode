@@ -23,10 +23,8 @@ keystore.properties
 /.kotlin/
 /.agents/
 /.aicode/
-/skills-lock.json
-/AGENTS.md
-/CLAUDE.md
 
 # 临时调试文件
 /*.log
 *.apk
+/test
