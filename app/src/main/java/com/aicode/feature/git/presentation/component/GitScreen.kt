@@ -1008,7 +1008,7 @@ private fun RefSectionHeader(
  * 分支/标签行可执行的操作项，用于长按弹出的操作菜单。
  */
 private sealed class RefAction(
-    @StringRes val labelRes: Int,
+    @param:StringRes val labelRes: Int,
     val icon: ImageVector,
     val isDestructive: Boolean,
     val onClick: () -> Unit

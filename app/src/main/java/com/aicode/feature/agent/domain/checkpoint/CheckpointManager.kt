@@ -15,7 +15,7 @@ import javax.inject.Singleton
 
 @Singleton
 class CheckpointManager @Inject constructor(
-    @ApplicationContext private val context: Context,
+    @param:ApplicationContext private val context: Context,
     private val checkpointDao: CheckpointDao,
     private val fileAccess: FileAccessProvider
 ) {

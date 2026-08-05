@@ -30,7 +30,7 @@ sealed class BackupState {
 
 @HiltViewModel
 class BackupViewModel @Inject constructor(
-    @ApplicationContext private val context: Context,
+    @param:ApplicationContext private val context: Context,
     private val backupManager: BackupManager
 ) : ViewModel() {
 

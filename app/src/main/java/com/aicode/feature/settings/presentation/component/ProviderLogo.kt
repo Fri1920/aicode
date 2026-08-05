@@ -31,7 +31,6 @@ fun providerLogoRes(provider: AIProviderConfig?): Int? {
         com.aicode.feature.settings.domain.model.ProviderType.OPENAI -> R.drawable.logo_openai
         com.aicode.feature.settings.domain.model.ProviderType.ANTHROPIC -> R.drawable.logo_anthropic
         com.aicode.feature.settings.domain.model.ProviderType.GEMINI -> R.drawable.logo_gemini
-        else -> null
     }
 }
 

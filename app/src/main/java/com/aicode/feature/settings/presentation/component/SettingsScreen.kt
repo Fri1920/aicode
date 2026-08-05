@@ -61,7 +61,7 @@ import compose.icons.FeatherIcons
 import compose.icons.feathericons.*
 
 /** 设置页内部二级菜单分区。Menu 为首页菜单，其余为各自的二级页。 */
-internal enum class SettingsSection(@StringRes val titleRes: Int) {
+internal enum class SettingsSection(@param:StringRes val titleRes: Int) {
     Menu(R.string.settings_title),
     Providers(R.string.settings_providers),
     ProviderEditor(R.string.settings_provider_editor),

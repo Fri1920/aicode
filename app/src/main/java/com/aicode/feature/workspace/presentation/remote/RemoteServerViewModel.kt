@@ -26,7 +26,7 @@ import com.aicode.feature.workspace.domain.remote.ftp.FtpServerManager
 
 @HiltViewModel
 class RemoteServerViewModel @Inject constructor(
-    @ApplicationContext private val context: Context,
+    @param:ApplicationContext private val context: Context,
     private val repository: RemoteRepository,
     private val workspaceRepository: WorkspaceRepository,
     private val syncSettingsRepository: SyncSettingsRepository,
