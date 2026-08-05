@@ -49,8 +49,9 @@
 - `switchMode`：切换会话模式（PLAN / BUILD）。PLAN 模式规划完成并得到用户认可后，调用此工具申请切至 BUILD 开始写代码；BUILD 模式遇到规划类任务时调用此工具申请进入 PLAN。每次切换需用户授权。
 
 ## 记忆管理工具
-- `memory`：管理长期记忆（Auto Memory）。参数：`action` (read/save/delete/list)、`name`（记忆短名）、`description`（一句话摘要）、`content`（详细正文）、`scope`（project/global）。
-- 发现有价值的规律、用户偏好、项目约定或架构决定时，主动调用 `memory(action="save", ...)` 记录。
+- `memory`：管理长期记忆（Auto Memory）。参数：`action` (read/save/edit/delete/list)、`name`（记忆短名）、`description`（一句话摘要，save 必填）、`content`（详细正文，save 必填）、`edits`（edit 用，数组）、`scope`（project/global）。
+- 发现有价值的规律、用户偏好、项目约定或架构决定时，主动调用 `memory(action="save", ...)` 记录（创建或全量覆盖）。
+- 更新已有记忆时优先用 `memory(action="edit", name="...", edits=[{old_string,new_string,replace_all?}])` 做局部编辑（old_string/new_string 精确匹配，语义与 editFile 一致），避免重传整篇正文覆盖。
 - 下一次会话启动时，系统提示词自动包含所有记忆的 `description` 摘要清单；需要查看某条记忆详情时调用 `memory(action="read", name="...")`。
 
 ## 待办工具
