@@ -179,10 +179,8 @@ class PermissionRulesRepository @Inject constructor(
         FileLogger.i(TAG, "记忆授权规则[$scope]: ${rule.toolName} ${rule.pattern}")
     }
 
-    /** 删除全局规则。 */
     suspend fun removeGlobalRule(rule: PermissionRule) = editGlobal { it.remove(rule) }
 
-    /** 删除指定项目的规则。 */
     suspend fun removeProjectRule(projectName: String, rule: PermissionRule) {
         val workspacePath = workspaceRepository.currentPath()
         editProject(workspacePath) { it.remove(rule) }

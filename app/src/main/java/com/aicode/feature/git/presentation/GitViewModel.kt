@@ -67,7 +67,6 @@ class GitViewModel @Inject constructor(
         val hasRemote: Boolean = false,
         /** 是否已配置全局署名 user.name（git config --global），控制提交按钮可用性；无署名提交会成为失败提交。 */
         val hasIdentity: Boolean = false,
-        /** 已展开的提交 hash 集合。 */
         val expandedCommits: Set<String> = emptySet(),
         /** 已懒加载的提交文件清单，按 hash 缓存。 */
         val commitFiles: Map<String, List<GitFileChange>> = emptyMap(),

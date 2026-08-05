@@ -38,7 +38,6 @@ class MemoryRepository @Inject constructor(
         return globalMemorySource.loadContent(name)
     }
 
-    /** 保存记忆 */
     fun saveMemory(name: String, description: String, content: String, scope: MemoryScope, projectRoot: String?): Boolean {
         return when (scope) {
             MemoryScope.GLOBAL -> globalMemorySource.saveMemory(name, description, content)
@@ -49,7 +48,6 @@ class MemoryRepository @Inject constructor(
         }
     }
 
-    /** 删除记忆 */
     fun deleteMemory(name: String, scope: MemoryScope, projectRoot: String?): Boolean {
         return when (scope) {
             MemoryScope.GLOBAL -> globalMemorySource.deleteMemory(name)
