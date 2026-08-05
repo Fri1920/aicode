@@ -1,13 +1,16 @@
 package com.aicode.feature.credentials.presentation
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.aicode.R
 import com.aicode.core.util.FileLogger
 import com.aicode.feature.credentials.data.GitCredentialsFileSync
 import com.aicode.feature.credentials.domain.model.GitCredential
 import com.aicode.feature.credentials.domain.repository.CredentialRepository
 import com.aicode.feature.git.domain.GitRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -28,7 +31,8 @@ import javax.inject.Inject
 class CredentialViewModel @Inject constructor(
     private val credentialRepository: CredentialRepository,
     private val gitRepository: GitRepository,
-    private val fileSync: GitCredentialsFileSync
+    private val fileSync: GitCredentialsFileSync,
+    @param:ApplicationContext private val context: Context
 ) : ViewModel() {
 
     private companion object { const val TAG = "CredentialViewModel" }
@@ -94,10 +98,10 @@ class CredentialViewModel @Inject constructor(
             try {
                 credentialRepository.save(credential)
                 fileSync.syncAll() // 落盘到容器持久挂载，UI/终端/AI 三端共用
-                toast("凭据已保存")
+                toast(context.getString(R.string.credential_toast_saved))
             } catch (e: Exception) {
                 FileLogger.e(TAG, "保存凭据失败", e)
-                toast("保存失败: ${e.message}")
+                toast(context.getString(R.string.credential_toast_save_failed, e.message))
             }
         }
     }
@@ -106,7 +110,7 @@ class CredentialViewModel @Inject constructor(
         viewModelScope.launch {
             credentialRepository.delete(id)
             fileSync.syncAll() // 删凭据后从落盘文件移除，否则终端/AI 仍能用旧凭据
-            toast("凭据已删除")
+            toast(context.getString(R.string.credential_toast_deleted))
         }
     }
 
@@ -124,10 +128,10 @@ class CredentialViewModel @Inject constructor(
                 gitRepository.setUserIdentity(name, email)
                 gitRepository.setRepoUrl(repoUrl)
                 refreshIdentity()
-                toast("署名与仓库地址已保存")
+                toast(context.getString(R.string.credential_toast_identity_saved))
             } catch (e: Exception) {
                 FileLogger.e(TAG, "保存署名失败", e)
-                toast("保存失败: ${e.message}")
+                toast(context.getString(R.string.credential_toast_save_failed, e.message))
             }
         }
     }
