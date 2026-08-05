@@ -259,8 +259,8 @@ fun AIChatPanel(
         AutoScrollSignal(
             streamingTextLength = streamingText?.length ?: 0,
             streamingReasoningBucket = reasoningScrollBucket(streamingReasoning),
-            runningToolMessageId = runningTool?.messageId,
-            runningToolTextLength = runningTool?.text?.length ?: 0,
+            runningToolMessageId = runningTool.firstOrNull()?.messageId,
+            runningToolTextLength = runningTool.firstOrNull()?.text?.length ?: 0,
             isCompacting = isCompacting,
             messageCount = messages.size
         )
@@ -436,7 +436,7 @@ fun AIChatPanel(
                         verticalArrangement = Arrangement.spacedBy(Spacing.sm)
                     ) {
                         items(messages, key = { it.id }, contentType = { it.role.name }) { message ->
-                            val live = runningTool?.takeIf { it.messageId == message.id }?.text
+                            val live = runningTool.firstOrNull { it.messageId == message.id }?.text
                             AgentMessageItem(
                                 message = message,
                                 liveOutput = live,
@@ -455,7 +455,7 @@ fun AIChatPanel(
                         }
                         val streaming = streamingText
                         val showStreaming = streaming != null && streaming.hasVisibleContent()
-                        val showThinking = !showReasoning && !showStreaming && !isCompacting && isBusy && runningTool == null && pendingPermission == null && pendingQuestion == null
+                        val showThinking = !showReasoning && !showStreaming && !isCompacting && isBusy && runningTool.isEmpty() && pendingPermission == null && pendingQuestion == null
                         val showRetrying = retryState != null && isBusy && !isCompacting && !showStreaming && !showReasoning
                         val tailKind = when {
                             showStreaming -> TailKind.STREAMING

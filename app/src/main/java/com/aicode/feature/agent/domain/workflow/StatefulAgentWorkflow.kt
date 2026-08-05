@@ -5,8 +5,6 @@ import com.aicode.feature.agent.domain.model.AgentContext
 import com.aicode.feature.agent.domain.model.AgentImage
 import com.aicode.feature.agent.domain.model.AgentMessage
 import com.aicode.feature.agent.domain.model.AgentMode
-import com.aicode.feature.agent.domain.model.WorkflowResult
-import com.aicode.feature.agent.domain.model.WorkflowStatus
 import com.aicode.feature.agent.domain.session.SessionUseCase
 import com.aicode.feature.agent.domain.session.MessagePersistenceUseCase
 import com.aicode.feature.agent.domain.checkpoint.CheckpointManager
@@ -43,9 +41,11 @@ import com.aicode.feature.agent.domain.provider.OpenAIAdapter
 import com.aicode.feature.settings.domain.model.ProviderType
 import com.aicode.feature.settings.domain.repository.AIProviderRepository
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.FlowCollector
-import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.channelFlow
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -94,8 +94,14 @@ class StatefulAgentWorkflow @Inject constructor(
         val iterations: Int = 0,
         val isFinished: Boolean = false,
         val error: String? = null,
-        val pendingToolCalls: List<ToolCall> = emptyList(),
-        val executingToolCall: ToolCall? = null,
+        /** 本批模型返回的 toolCalls（原始顺序，用于最后按序组装 tool 响应） */
+        val batchToolCalls: List<ToolCall> = emptyList(),
+        /** 待请求权限的 toolCall（逐个弹窗收集） */
+        val pendingPermissionCalls: List<ToolCall> = emptyList(),
+        /** 已批准、待并行执行的 toolCall */
+        val approvedToolCalls: List<ToolCall> = emptyList(),
+        /** 被策略/系统拒绝（非用户拒绝）的 tool 结果，key = toolCall.id */
+        val rejectedToolResults: Map<String, ToolBatchResult> = emptyMap(),
         /** 标记下一轮 CallLlm 用于识图——若当前聊天模型不支持 vision 则临时切到识图专用模型发送。 */
         val pendingVisionRound: Boolean = false
     )
@@ -112,12 +118,8 @@ class StatefulAgentWorkflow @Inject constructor(
             val denyReason: String = "用户拒绝执行该工具",
             val errorCode: String = "USER_REJECTED"
         ) : AgentAction
-        data class ToolFinished(
-            val id: String,
-            val toolName: String,
-            val result: String,
-            val isError: Boolean,
-            val images: List<AgentImage> = emptyList()
+        data class ToolBatchFinished(
+            val results: List<ToolBatchResult>
         ) : AgentAction
     }
 
@@ -135,11 +137,23 @@ class StatefulAgentWorkflow @Inject constructor(
         val attachments: List<com.aicode.feature.agent.presentation.AgentAttachment> = emptyList()
     )
 
+    /** 批量工具执行结果：携带 toolCall 元信息，供最后按原始顺序组装 ToolResultMessage。 */
+    data class ToolBatchResult(
+        val id: String,
+        val toolName: String,
+        val result: String,
+        val isError: Boolean,
+        val images: List<AgentImage> = emptyList(),
+        /** 仅 sendFile 等展示型工具：随结果附带的文件卡片元数据，供 UI 渲染，不回放进模型上下文。 */
+        val attachments: List<com.aicode.feature.agent.presentation.AgentAttachment> = emptyList()
+    )
+
     /** 需要在外部环境中执行的副作用 (SideEffect) */
     sealed interface AgentSideEffect {
         object CallLlm : AgentSideEffect
         data class RequestPermission(val toolCall: ToolCall) : AgentSideEffect
-        data class ExecuteTool(val toolCall: ToolCall, val argsPreview: String) : AgentSideEffect
+        /** 批量并行执行已批准的工具；传入空列表表示本批无工具可执行，直接进入收尾。 */
+        data class ExecuteToolBatch(val toolCalls: List<ToolCall>) : AgentSideEffect
     }
 
     private suspend fun getActiveProvider(sessionId: String?): AIProvider {
@@ -236,10 +250,16 @@ class StatefulAgentWorkflow @Inject constructor(
                         newState = newState.copy(isFinished = true)
                     }
                 } else {
-                    val pending = action.response.toolCalls.toList()
-                    val nextTool = pending.first()
-                    newState = newState.copy(pendingToolCalls = pending.drop(1), executingToolCall = nextTool)
-                    effects.add(AgentSideEffect.RequestPermission(nextTool))
+                    // 本批多个 tool_call：全部进入待权限队列，逐个弹窗收集批准；
+                    // 全部批准后才进入并行执行阶段（见 PermissionEvaluated / ToolBatchFinished）。
+                    val toolCalls = action.response.toolCalls.toList()
+                    newState = newState.copy(
+                        batchToolCalls = toolCalls,
+                        pendingPermissionCalls = toolCalls,
+                        approvedToolCalls = emptyList(),
+                        rejectedToolResults = emptyMap()
+                    )
+                    effects.add(AgentSideEffect.RequestPermission(toolCalls.first()))
                 }
             }
             is AgentAction.LlmError -> {
@@ -247,14 +267,25 @@ class StatefulAgentWorkflow @Inject constructor(
             }
             is AgentAction.PermissionEvaluated -> {
                 if (action.approved) {
-                    effects.add(AgentSideEffect.ExecuteTool(action.toolCall, action.argsPreview))
+                    // 批准：当前 toolCall 移入已批准集合；若还有待请求权限的则继续弹窗，否则开始并行执行。
+                    val remaining = newState.pendingPermissionCalls.filterNot { it.id == action.toolCall.id }
+                    val approved = newState.approvedToolCalls + action.toolCall
+                    newState = newState.copy(
+                        pendingPermissionCalls = remaining,
+                        approvedToolCalls = approved
+                    )
+                    if (remaining.isNotEmpty()) {
+                        effects.add(AgentSideEffect.RequestPermission(remaining.first()))
+                    } else {
+                        effects.add(AgentSideEffect.ExecuteToolBatch(approved))
+                    }
                 } else {
                     val rawResult = ToolResult.Error(action.denyReason, action.errorCode).toTransportString()
                     if (action.errorCode == USER_REJECTED_CODE) {
                         // 模型一次可能返回多个 tool_calls。用户拒绝当前调用后，剩余未执行的
-                        // tool_call 也必须补上 tool 响应，否则 assistant(toolCalls=N) 后只有部分
-                        // tool 消息，OpenAI 会报 400 "insufficient tool messages following tool_calls"。
-                        val unexecuted = newState.pendingToolCalls.map { pending ->
+                        // tool_call（含已批准未执行、未请求权限的）也必须补上 tool 响应，否则
+                        // assistant(toolCalls=N) 后只有部分 tool 消息，OpenAI 会报 400。
+                        val unexecuted = (newState.pendingPermissionCalls + newState.approvedToolCalls).map { pending ->
                             AgentMessage.ToolResultMessage(
                                 id = pending.id,
                                 toolName = pending.name,
@@ -270,169 +301,81 @@ class StatefulAgentWorkflow @Inject constructor(
                                 toolName = action.toolCall.name,
                                 result = rawResult
                             ) + unexecuted,
-                            pendingToolCalls = emptyList(),
-                            executingToolCall = null,
+                            pendingPermissionCalls = emptyList(),
+                            approvedToolCalls = emptyList(),
                             isFinished = true
                         )
                         return newState to emptyList()
                     }
-                    return reduce(state, AgentAction.ToolFinished(action.toolCall.id, action.toolCall.name, rawResult, true))
-                }
-            }
-            is AgentAction.ToolFinished -> {
-                val toolResultMsg = AgentMessage.ToolResultMessage(
-                    id = action.id,
-                    toolName = action.toolName,
-                    result = action.result,
-                    images = action.images
-                )
-                val appendedMessages = if (action.images.isEmpty()) {
-                    listOf(toolResultMsg)
-                } else {
-                    listOf(
-                        toolResultMsg,
-                        AgentMessage.UserMessage(
-                            content = "已附加 ${action.toolName} 读取的图片，供下一轮视觉分析使用。",
-                            images = action.images
+                    // 策略/系统拒绝（如 PLAN 模式禁止执行）：记录拒绝结果，继续收集后续权限。
+                    val remaining = newState.pendingPermissionCalls.filterNot { it.id == action.toolCall.id }
+                    newState = newState.copy(
+                        pendingPermissionCalls = remaining,
+                        rejectedToolResults = newState.rejectedToolResults + (
+                            action.toolCall.id to ToolBatchResult(
+                                id = action.toolCall.id,
+                                toolName = action.toolCall.name,
+                                result = rawResult,
+                                isError = true
+                            )
                         )
                     )
+                    if (remaining.isNotEmpty()) {
+                        effects.add(AgentSideEffect.RequestPermission(remaining.first()))
+                    } else {
+                        effects.add(AgentSideEffect.ExecuteToolBatch(newState.approvedToolCalls))
+                    }
+                }
+            }
+            is AgentAction.ToolBatchFinished -> {
+                // 本批工具全部执行完，按 batchToolCalls 原始顺序组装 tool 响应：
+                // 优先取策略拒绝结果，其次取并行执行结果，保证与 assistant(toolCalls) 顺序一致。
+                val resultsById = action.results.associateBy { it.id }
+                val appendedMessages = mutableListOf<AgentMessage>()
+                var hasImages = false
+                newState.batchToolCalls.forEach { call ->
+                    val batchResult = newState.rejectedToolResults[call.id] ?: resultsById[call.id] ?: return@forEach
+                    appendedMessages.add(
+                        AgentMessage.ToolResultMessage(
+                            id = batchResult.id,
+                            toolName = batchResult.toolName,
+                            result = batchResult.result,
+                            images = batchResult.images
+                        )
+                    )
+                    if (batchResult.images.isNotEmpty()) {
+                        hasImages = true
+                        appendedMessages.add(
+                            AgentMessage.UserMessage(
+                                content = "已附加 ${batchResult.toolName} 读取的图片，供下一轮视觉分析使用。",
+                                images = batchResult.images
+                            )
+                        )
+                    }
                 }
                 newState = state.copy(
                     messages = state.messages + appendedMessages,
-                    executingToolCall = null
+                    batchToolCalls = emptyList(),
+                    pendingPermissionCalls = emptyList(),
+                    approvedToolCalls = emptyList(),
+                    rejectedToolResults = emptyMap()
                 )
-                
-                if (newState.pendingToolCalls.isNotEmpty()) {
-                    val nextTool = newState.pendingToolCalls.first()
-                    newState = newState.copy(pendingToolCalls = newState.pendingToolCalls.drop(1), executingToolCall = nextTool)
-                    effects.add(AgentSideEffect.RequestPermission(nextTool))
-                } else {
-                    // 本批工具已全部执行完，即将发给 LLM；若本次 viewImage 产出了图片，标记下一轮为识图轮。
-                    if (action.images.isNotEmpty()) {
-                        newState = newState.copy(pendingVisionRound = true)
-                    }
-                    effects.add(AgentSideEffect.CallLlm)
+                // 本批 viewImage 产出了图片，标记下一轮为识图轮。
+                if (hasImages) {
+                    newState = newState.copy(pendingVisionRound = true)
                 }
+                effects.add(AgentSideEffect.CallLlm)
             }
         }
         
         return Pair(newState, effects)
     }
 
-    override suspend fun execute(
-        userRequest: String,
-        context: AgentContext,
-        tools: List<AgentTool>
-    ): WorkflowResult {
-        var currentContext = context
-        var state = AgentSessionState()
-        var currentTools = tools
-        val actionQueue = ArrayDeque<AgentAction>()
-        actionQueue.addLast(
-            AgentAction.InitRequest(
-                currentContext.history + AgentMessage.UserMessage(
-                    content = userRequest,
-                    images = currentContext.inputImages
-                )
-            )
-        )
-
-        var systemPrompt = promptProvider.build(currentContext)
-        val aiProvider = getActiveProvider(currentContext.sessionId)
-
-        while (!state.isFinished && actionQueue.isNotEmpty()) {
-            val action = actionQueue.removeFirst()
-            val (newState, effects) = reduce(state, action)
-            state = newState
-
-            for (effect in effects) {
-                when (effect) {
-                    is AgentSideEffect.CallLlm -> {
-                        // 识图轮：若当前聊天模型无 vision，使用独立识图模型发送
-                        val visionProvider = if (state.pendingVisionRound) resolveVisionFallbackProvider(currentContext.sessionId) else null
-                        val providerInUse = visionProvider ?: aiProvider
-                        // 压缩轮：若配置了压缩专用模型，使用独立压缩模型压缩
-                        val compactionProvider = resolveCompactionFallbackProvider(currentContext.sessionId) ?: providerInUse
-                        val compactedMessages = contextCompactor.compactIfNeeded(state.messages, compactionProvider, context.sessionId)
-                        if (compactedMessages !== state.messages) {
-                            state = state.copy(messages = compactedMessages)
-                        }
-                        try {
-                            // 发送前按实际模型的视觉能力处理图片：非多模态模型剥离历史/输入中的图片，
-                            // 避免切换模型后图片上下文原样发送导致 API 报错。识图轮 provider 必支持 vision。
-                            val supportsVision = state.pendingVisionRound || activeModelSupportsVision(currentContext.sessionId)
-                            val messagesToSend = sanitizeImagesForModel(compactedMessages, supportsVision)
-                            val aiResponse = providerInUse.complete(systemPrompt, messagesToSend, currentTools, currentContext.reasoningEffort)
-                            actionQueue.addLast(AgentAction.LlmResponse(aiResponse))
-                        } catch (e: Exception) {
-                            actionQueue.addLast(AgentAction.LlmError("LLM 调用失败: ${e.message}"))
-                        } finally {
-                            if (state.pendingVisionRound) state = state.copy(pendingVisionRound = false)
-                        }
-                    }
-                    is AgentSideEffect.RequestPermission -> {
-                        val tool = toolRegistry.getTool(effect.toolCall.name)
-                        val argsPreview = JsonObject(effect.toolCall.arguments).toString().take(500)
-                        val checkResult = requestPermissionIfNeeded(tool, effect.toolCall.id, effect.toolCall.arguments, argsPreview, currentContext.mode)
-                        actionQueue.addLast(AgentAction.PermissionEvaluated(effect.toolCall, checkResult.approved, argsPreview, checkResult.denyReason, checkResult.errorCode))
-                    }
-                    is AgentSideEffect.ExecuteTool -> {
-                        val toolName = effect.toolCall.name
-                        if (toolName == "editFile" || toolName == "writeFile") {
-                            (effect.toolCall.arguments["path"] as? JsonPrimitive)?.contentOrNull?.let { path ->
-                                currentContext.sessionId?.let { sid ->
-                                    checkpointManager.beforeFileModified(sid, path)
-                                }
-                            }
-                        }
-                        val tool = toolRegistry.getTool(effect.toolCall.name)
-                        var runResult = runToolSync(tool, effect.toolCall, currentContext)
-                        var rawResult = runResult.raw
-                        var isError = runResult.isError
-                        val (newCtx, updated) = checkAndUpdateMode(effect.toolCall, isError, currentContext)
-                        if (updated) {
-                            val reason = (effect.toolCall.arguments["reason"] as? JsonPrimitive)?.content?.trim()
-                                ?: effect.toolCall.arguments["reason"]?.toString()?.replace("\"", "")?.trim()
-                                ?: ""
-
-                            // PLAN→BUILD 时挂起 workflow，等待用户在计划审查面板批准后才继续
-                            if (newCtx.mode == AgentMode.BUILD) {
-                                val choice = planApprovalManager.awaitApproval(reason, currentContext.sessionId)
-                                if (choice == PlanApprovalChoice.APPROVE) {
-                                    currentContext = newCtx
-                                    systemPrompt = promptProvider.build(currentContext)
-                                } else {
-                                    // 用户选择继续反馈，回滚到 PLAN 模式，修正工具结果让 AI 知道切换被取消
-                                    currentContext = currentContext.copy(mode = AgentMode.PLAN)
-                                    systemPrompt = promptProvider.build(currentContext)
-                                    rawResult = ToolResult.Error("用户拒绝了模式切换请求，请继续在 PLAN 模式下完善方案，待用户认可后再次申请切换。", "MODE_SWITCH_REJECTED").toTransportString()
-                                    isError = true
-                                }
-                            } else {
-                                currentContext = newCtx
-                                systemPrompt = promptProvider.build(currentContext)
-                            }
-                        }
-                        actionQueue.addLast(AgentAction.ToolFinished(effect.toolCall.id, effect.toolCall.name, rawResult, isError, runResult.images))
-                    }
-                }
-            }
-        }
-
-        return WorkflowResult(
-            status = if (state.error == null) WorkflowStatus.SUCCESS else WorkflowStatus.FAILED,
-            result = extractFinalContent(state),
-            changes = emptyList(),
-            errors = listOfNotNull(state.error),
-            messages = state.messages
-        )
-    }
-
     override fun executeEvents(
         userRequest: String,
         context: AgentContext,
         tools: List<AgentTool>
-    ): Flow<AgentEvent> = flow {
+    ): Flow<AgentEvent> = channelFlow {
         var currentContext = context
         var state = AgentSessionState()
         var currentTools = tools
@@ -462,7 +405,7 @@ class StatefulAgentWorkflow @Inject constructor(
                         val providerInUse = visionProvider ?: aiProvider
                         // 压缩轮：若配置了压缩专用模型，使用独立压缩模型压缩
                         val compactionProvider = resolveCompactionFallbackProvider(currentContext.sessionId) ?: providerInUse
-                        val compactedMessages = contextCompactor.compactIfNeeded(state.messages, compactionProvider, context.sessionId) { emit(it) }
+                        val compactedMessages = contextCompactor.compactIfNeeded(state.messages, compactionProvider, context.sessionId) { send(it) }
                         if (compactedMessages !== state.messages) {
                             state = state.copy(messages = compactedMessages)
                         }
@@ -479,16 +422,16 @@ class StatefulAgentWorkflow @Inject constructor(
                                 when (chunk) {
                                     is AIStreamChunk.TextDelta -> {
                                         acc.append(chunk.text)
-                                        emit(AgentEvent.AssistantDelta(acc.toString()))
+                                        send(AgentEvent.AssistantDelta(acc.toString()))
                                     }
                                     is AIStreamChunk.ReasoningDelta -> {
                                         reasoningAcc.append(chunk.text)
-                                        emit(AgentEvent.ReasoningDelta(reasoningAcc.toString()))
+                                        send(AgentEvent.ReasoningDelta(reasoningAcc.toString()))
                                     }
                                     is AIStreamChunk.Retrying -> {
                                         acc.setLength(0)
                                         reasoningAcc.setLength(0)
-                                        emit(AgentEvent.Retrying(chunk.attempt, chunk.maxRetries))
+                                        send(AgentEvent.Retrying(chunk.attempt, chunk.maxRetries))
                                     }
                                     is AIStreamChunk.Final -> finalResponse = chunk.response
                                 }
@@ -500,7 +443,7 @@ class StatefulAgentWorkflow @Inject constructor(
                             } else aiResponse
 
                             if (aiResponse.content.isNotBlank() || aiResponse.toolCalls.isNotEmpty()) {
-                                emit(AgentEvent.AssistantText(aiResponse.content, aiResponse.toolCalls, reasoningAcc.toString(), aiResponse.signature ?: "", aiResponse.inputTokens, aiResponse.outputTokens))
+                                send(AgentEvent.AssistantText(aiResponse.content, aiResponse.toolCalls, reasoningAcc.toString(), aiResponse.signature ?: "", aiResponse.inputTokens, aiResponse.outputTokens))
                             }
                             actionQueue.addLast(AgentAction.LlmResponse(responseWithReasoning))
                         } catch (e: CancellationException) {
@@ -512,7 +455,7 @@ class StatefulAgentWorkflow @Inject constructor(
                             // 而落库的接力消息又没产生，表现为「思考显示后凭空消失且无报错」。
                             // 有正文或有思考其一即落库；两者皆空则不写空消息。
                             if (partial.isNotEmpty() || reasoning.isNotBlank()) {
-                                emit(AgentEvent.AssistantText(partial, emptyList(), reasoning))
+                                send(AgentEvent.AssistantText(partial, emptyList(), reasoning))
                             }
                             actionQueue.addLast(AgentAction.LlmError("LLM 调用失败: ${e.message}"))
                         } finally {
@@ -526,64 +469,90 @@ class StatefulAgentWorkflow @Inject constructor(
 
                         if (!checkResult.approved) {
                             val rawResult = ToolResult.Error(checkResult.denyReason, checkResult.errorCode).toTransportString()
-                            emit(AgentEvent.ToolCallFinished(effect.toolCall.id, effect.toolCall.name, rawResult, true, argsPreview))
+                            send(AgentEvent.ToolCallFinished(effect.toolCall.id, effect.toolCall.name, rawResult, true, argsPreview))
                         } else {
-                            emit(AgentEvent.ToolCallStarted(effect.toolCall.id, effect.toolCall.name, argsPreview))
+                            send(AgentEvent.ToolCallStarted(effect.toolCall.id, effect.toolCall.name, argsPreview))
                         }
                         actionQueue.addLast(AgentAction.PermissionEvaluated(effect.toolCall, checkResult.approved, argsPreview, checkResult.denyReason, checkResult.errorCode))
                     }
-                    is AgentSideEffect.ExecuteTool -> {
-                        val toolName = effect.toolCall.name
-                        if (toolName == "editFile" || toolName == "writeFile") {
-                            (effect.toolCall.arguments["path"] as? JsonPrimitive)?.contentOrNull?.let { path ->
-                                currentContext.sessionId?.let { sid ->
-                                    checkpointManager.beforeFileModified(sid, path)
+                    is AgentSideEffect.ExecuteToolBatch -> {
+                        // 并行执行本批已批准的工具。先统一记录 checkpoint（editFile/writeFile 修改前快照），
+                        // 再并行执行；mode 切换检查在结果收集后于主协程串行处理（planApproval 单例）。
+                        val toolCalls = effect.toolCalls
+                        toolCalls.forEach { toolCall ->
+                            if (toolCall.name == "editFile" || toolCall.name == "writeFile") {
+                                (toolCall.arguments["path"] as? JsonPrimitive)?.contentOrNull?.let { path ->
+                                    currentContext.sessionId?.let { sid ->
+                                        checkpointManager.beforeFileModified(sid, path)
+                                    }
                                 }
                             }
                         }
-                        val tool = toolRegistry.getTool(effect.toolCall.name)
-                        var runResult = if (tool is StreamingAgentTool) {
-                            runToolStream(tool, effect.toolCall, currentContext) { emit(it) }
-                        } else {
-                            // 同步兜底
-                            runToolSync(tool, effect.toolCall, currentContext)
-                        }
-                        var rawResult = runResult.raw
-                        var isError = runResult.isError
-                        val (newCtx, updated) = checkAndUpdateMode(effect.toolCall, isError, currentContext)
-                        if (updated) {
-                            val reason = (effect.toolCall.arguments["reason"] as? JsonPrimitive)?.content?.trim()
-                                ?: effect.toolCall.arguments["reason"]?.toString()?.replace("\"", "")?.trim()
-                                ?: ""
-                            emit(AgentEvent.ModeChanged(newCtx.mode, reason))
 
-                            // PLAN→BUILD 时挂起 workflow，等待用户在计划审查面板批准后才继续
-                            if (newCtx.mode == AgentMode.BUILD) {
-                                val choice = planApprovalManager.awaitApproval(reason, currentContext.sessionId)
-                                if (choice == PlanApprovalChoice.APPROVE) {
+                        val runResults = if (toolCalls.isEmpty()) {
+                            emptyList()
+                        } else {
+                            coroutineScope {
+                                toolCalls.map { toolCall ->
+                                    async {
+                                        val tool = toolRegistry.getTool(toolCall.name)
+                                        if (tool is StreamingAgentTool) {
+                                            runToolStream(tool, toolCall, currentContext) { send(it) }
+                                        } else {
+                                            runToolSync(tool, toolCall, currentContext)
+                                        }
+                                    }
+                                }.awaitAll()
+                            }
+                        }
+
+                        // 串行处理 mode 切换并组装批量结果。
+                        val batchResults = mutableListOf<ToolBatchResult>()
+                        toolCalls.forEachIndexed { index, toolCall ->
+                            val runResult = runResults.getOrNull(index)
+                                ?: ToolRunResult(ToolResult.Error("工具未执行", "TOOL_NOT_EXECUTED").toTransportString(), true)
+                            var rawResult = runResult.raw
+                            var isError = runResult.isError
+                            val (newCtx, updated) = checkAndUpdateMode(toolCall, isError, currentContext)
+                            if (updated) {
+                                val reason = (toolCall.arguments["reason"] as? JsonPrimitive)?.content?.trim()
+                                    ?: toolCall.arguments["reason"]?.toString()?.replace("\"", "")?.trim()
+                                    ?: ""
+                                send(AgentEvent.ModeChanged(newCtx.mode, reason))
+
+                                // PLAN→BUILD 时挂起 workflow，等待用户在计划审查面板批准后才继续
+                                if (newCtx.mode == AgentMode.BUILD) {
+                                    val choice = planApprovalManager.awaitApproval(reason, currentContext.sessionId)
+                                    if (choice == PlanApprovalChoice.APPROVE) {
+                                        currentContext = newCtx
+                                        systemPrompt = promptProvider.build(currentContext)
+                                    } else {
+                                        // 用户选择继续反馈，回滚到 PLAN 模式，修正工具结果让 AI 知道切换被取消
+                                        currentContext = currentContext.copy(mode = AgentMode.PLAN)
+                                        systemPrompt = promptProvider.build(currentContext)
+                                        rawResult = ToolResult.Error("用户拒绝了模式切换请求，请继续在 PLAN 模式下完善方案，待用户认可后再次申请切换。", "MODE_SWITCH_REJECTED").toTransportString()
+                                        isError = true
+                                    }
+                                } else {
                                     currentContext = newCtx
                                     systemPrompt = promptProvider.build(currentContext)
-                                } else {
-                                    // 用户选择继续反馈，回滚到 PLAN 模式，修正工具结果让 AI 知道切换被取消
-                                    currentContext = currentContext.copy(mode = AgentMode.PLAN)
-                                    systemPrompt = promptProvider.build(currentContext)
-                                    rawResult = ToolResult.Error("用户拒绝了模式切换请求，请继续在 PLAN 模式下完善方案，待用户认可后再次申请切换。", "MODE_SWITCH_REJECTED").toTransportString()
-                                    isError = true
                                 }
-                            } else {
-                                currentContext = newCtx
-                                systemPrompt = promptProvider.build(currentContext)
                             }
+                            batchResults.add(ToolBatchResult(toolCall.id, toolCall.name, rawResult, isError, runResult.images, runResult.attachments))
                         }
-                        emit(AgentEvent.ToolCallFinished(effect.toolCall.id, effect.toolCall.name, rawResult, isError, attachments = runResult.attachments))
-                        actionQueue.addLast(AgentAction.ToolFinished(effect.toolCall.id, effect.toolCall.name, rawResult, isError, runResult.images))
+
+                        // 逐个推送完成事件（保持与 batchToolCalls 一致顺序），并进入收尾。
+                        batchResults.forEach { br ->
+                            send(AgentEvent.ToolCallFinished(br.id, br.toolName, br.result, br.isError, attachments = br.attachments))
+                        }
+                        actionQueue.addLast(AgentAction.ToolBatchFinished(batchResults))
                     }
                 }
             }
         }
         
-        state.error?.let { emit(AgentEvent.Failed(it)) }
-        emit(AgentEvent.Completed)
+        state.error?.let { send(AgentEvent.Failed(it)) }
+        send(AgentEvent.Completed)
     }
 
     private suspend fun runToolSync(tool: AgentTool?, toolCall: ToolCall, context: AgentContext): ToolRunResult {

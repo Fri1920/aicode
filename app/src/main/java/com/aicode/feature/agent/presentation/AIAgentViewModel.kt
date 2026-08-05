@@ -218,16 +218,29 @@ class AIAgentViewModel @Inject constructor(
         _changesMap.value = if (changes.isEmpty()) _changesMap.value - sessionId else _changesMap.value + (sessionId to changes)
     }
 
-    private val _runningTools = MutableStateFlow<Map<String, RunningToolOutput?>>(emptyMap())
-    val runningTool: StateFlow<RunningToolOutput?> = _currentSessionId
+    private val _runningTools = MutableStateFlow<Map<String, Map<String, RunningToolOutput>>>(emptyMap())
+    val runningTool: StateFlow<List<RunningToolOutput>> = _currentSessionId
         .flatMapLatest { id ->
-            if (id == null) flowOf(null)
-            else _runningTools.map { it[id] }
+            if (id == null) flowOf(emptyList())
+            else _runningTools.map { it[id]?.values?.toList() ?: emptyList() }
         }
-        .stateIn(viewModelScope, SharingStarted.Eagerly, null)
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
-    private fun setRunningTool(sessionId: String, tool: RunningToolOutput?) {
-        _runningTools.value = if (tool == null) _runningTools.value - sessionId else _runningTools.value + (sessionId to tool)
+    /** 添加/更新一个运行中工具（按 msgId 定位，支持多个工具并行）。 */
+    private fun setRunningTool(sessionId: String, msgId: String, tool: RunningToolOutput) {
+        val sessionTools = _runningTools.value[sessionId] ?: emptyMap()
+        _runningTools.value = _runningTools.value + (sessionId to (sessionTools + (msgId to tool)))
+    }
+
+    /** 移除一个运行中工具；会话无剩余运行工具时清除该会话条目。 */
+    private fun removeRunningTool(sessionId: String, msgId: String) {
+        val sessionTools = _runningTools.value[sessionId] ?: return
+        val updated = sessionTools - msgId
+        _runningTools.value = if (updated.isEmpty()) {
+            _runningTools.value - sessionId
+        } else {
+            _runningTools.value + (sessionId to updated)
+        }
     }
 
     private val _compactingSessions = MutableStateFlow<Map<String, Boolean>>(emptyMap())
@@ -659,14 +672,15 @@ class AIAgentViewModel @Inject constructor(
                             toolArgs = event.argsPreview,
                             isError = false
                         )
-                        setRunningTool(sessionId, RunningToolOutput(msgId, "", event.toolName, event.argsPreview))
+                        setRunningTool(sessionId, msgId, RunningToolOutput(msgId, "", event.toolName, event.argsPreview))
                     }
                     is AgentEvent.ToolCallProgress -> {
-                        setRunningTool(sessionId, RunningToolOutput(
-                            "tool_${event.id}",
+                        val msgId = "tool_${event.id}"
+                        setRunningTool(sessionId, msgId, RunningToolOutput(
+                            msgId,
                             event.accumulated,
                             event.toolName,
-                            toolArgsByMsgId["tool_${event.id}"] ?: ""
+                            toolArgsByMsgId[msgId] ?: ""
                         ))
                     }
                     is AgentEvent.ToolCallFinished -> {
@@ -683,9 +697,7 @@ class AIAgentViewModel @Inject constructor(
                             attachments = event.attachments
                         )
                         toolArgsByMsgId.remove(msgId)
-                        if (_runningTools.value[sessionId]?.messageId == msgId) {
-                            setRunningTool(sessionId, null)
-                        }
+                        removeRunningTool(sessionId, msgId)
                     }
                     is AgentEvent.Failed -> {
                         failed = true
@@ -719,7 +731,7 @@ class AIAgentViewModel @Inject constructor(
             if (sessionJobs[sessionId] == coroutineContext[Job]) {
                 sessionJobs.remove(sessionId)
             }
-            setRunningTool(sessionId, null)
+            _runningTools.value = _runningTools.value - sessionId
             setStreamingText(sessionId, null)
             setStreamingReasoning(sessionId, null)
             setCompacting(sessionId, false)
@@ -776,33 +788,36 @@ class AIAgentViewModel @Inject constructor(
         val sessionId = _currentSessionId.value ?: return
         val job = sessionJobs[sessionId] ?: return
         if (!job.isActive) return
-        val running = _runningTools.value[sessionId]
+        val runningTools = _runningTools.value[sessionId]?.values?.toList() ?: emptyList()
         val streamingText = _streamingTexts.value[sessionId]
         val streamingReasoning = _streamingReasonings.value[sessionId]
         val stoppedText = context.getString(R.string.agent_stopped_by_user)
         job.cancel()
         pendingMergedNotifications.remove(sessionId)
         setAgentState(sessionId, AgentUIState.Idle)
-        setRunningTool(sessionId, null)
+        _runningTools.value = _runningTools.value - sessionId
         setStreamingText(sessionId, null)
         setStreamingReasoning(sessionId, null)
         setCompacting(sessionId, false)
         setRetryState(sessionId, null)
         viewModelScope.launch {
-            if (running != null) {
-                val partial = running.text.trimEnd()
-                val content = if (partial.isNotEmpty()) "$partial\n\n$stoppedText" else stoppedText
-                messagePersistenceUseCase.persist(
-                    sessionId = sessionId,
-                    role = MessageRole.TOOL,
-                    content = content,
-                    id = running.messageId,
-                    toolCallId = running.messageId.removePrefix("tool_"),
-                    toolName = running.toolName.ifBlank { null },
-                    toolArgs = running.toolArgs.ifBlank { toolArgsByMsgId[running.messageId] },
-                    isError = true
-                )
-                toolArgsByMsgId.remove(running.messageId)
+            if (runningTools.isNotEmpty()) {
+                // 并行执行被中止：所有未完成的工具都落库为「已停止」
+                runningTools.forEach { running ->
+                    val partial = running.text.trimEnd()
+                    val content = if (partial.isNotEmpty()) "$partial\n\n$stoppedText" else stoppedText
+                    messagePersistenceUseCase.persist(
+                        sessionId = sessionId,
+                        role = MessageRole.TOOL,
+                        content = content,
+                        id = running.messageId,
+                        toolCallId = running.messageId.removePrefix("tool_"),
+                        toolName = running.toolName.ifBlank { null },
+                        toolArgs = running.toolArgs.ifBlank { toolArgsByMsgId[running.messageId] },
+                        isError = true
+                    )
+                    toolArgsByMsgId.remove(running.messageId)
+                }
             } else if (!streamingText.isNullOrEmpty() || !streamingReasoning.isNullOrEmpty()) {
                 val partial = (streamingText ?: "").trimEnd()
                 val content = if (partial.isNotEmpty()) "$partial\n\n$stoppedText" else stoppedText
@@ -814,7 +829,6 @@ class AIAgentViewModel @Inject constructor(
                     reasoning = reasoning
                 )
             }
-            setRunningTool(sessionId, null)
             setStreamingText(sessionId, null)
             setStreamingReasoning(sessionId, null)
             setCompacting(sessionId, false)

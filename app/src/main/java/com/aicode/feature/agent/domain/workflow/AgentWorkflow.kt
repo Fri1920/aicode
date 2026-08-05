@@ -2,7 +2,6 @@ package com.aicode.feature.agent.domain.workflow
 
 import com.aicode.feature.agent.domain.model.AgentContext
 import com.aicode.feature.agent.domain.model.AgentMode
-import com.aicode.feature.agent.domain.model.WorkflowResult
 import com.aicode.feature.agent.domain.tool.AgentTool
 import com.aicode.feature.agent.domain.tool.ToolCall
 import kotlinx.coroutines.flow.Flow
@@ -66,12 +65,6 @@ sealed class AgentEvent {
 }
 
 interface AgentWorkflow {
-    suspend fun execute(
-        userRequest: String,
-        context: AgentContext,
-        tools: List<AgentTool>
-    ): WorkflowResult
-
     /**
      * 运行 Agent 循环并以事件流的形式分步推送进度：
      * 模型回复 → （可能的）工具调用 → 工具结果 → 再回复 …… 直至模型不再调用工具。
