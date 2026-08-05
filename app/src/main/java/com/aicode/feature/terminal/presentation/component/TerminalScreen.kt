@@ -57,7 +57,10 @@ import com.aicode.feature.terminal.domain.TerminalTab
 import com.aicode.feature.terminal.presentation.TerminalViewModel
 import com.termux.view.TerminalView
 import compose.icons.FeatherIcons
-import compose.icons.feathericons.*
+import compose.icons.feathericons.ArrowLeft
+import compose.icons.feathericons.Plus
+import compose.icons.feathericons.RefreshCw
+import compose.icons.feathericons.X
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import com.aicode.R

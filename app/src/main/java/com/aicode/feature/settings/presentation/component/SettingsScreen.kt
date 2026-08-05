@@ -58,7 +58,21 @@ import com.aicode.feature.settings.domain.model.AIProviderConfig
 import com.aicode.feature.settings.domain.model.ModelMetadata
 import com.aicode.feature.settings.presentation.SettingsViewModel
 import compose.icons.FeatherIcons
-import compose.icons.feathericons.*
+import compose.icons.feathericons.ArrowLeft
+import compose.icons.feathericons.Box
+import compose.icons.feathericons.ChevronRight
+import compose.icons.feathericons.Cloud
+import compose.icons.feathericons.Cpu
+import compose.icons.feathericons.FileText
+import compose.icons.feathericons.Globe
+import compose.icons.feathericons.HardDrive
+import compose.icons.feathericons.Info
+import compose.icons.feathericons.Lock
+import compose.icons.feathericons.Moon
+import compose.icons.feathericons.Plus
+import compose.icons.feathericons.RefreshCw
+import compose.icons.feathericons.Save
+import compose.icons.feathericons.Server
 
 /** 设置页内部二级菜单分区。Menu 为首页菜单，其余为各自的二级页。 */
 internal enum class SettingsSection(@param:StringRes val titleRes: Int) {

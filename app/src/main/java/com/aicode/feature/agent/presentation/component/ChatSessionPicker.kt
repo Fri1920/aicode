@@ -33,7 +33,6 @@ import com.aicode.core.theme.Radius
 import com.aicode.core.theme.Spacing
 import com.aicode.feature.agent.domain.model.ChatSession
 import compose.icons.FeatherIcons
-import compose.icons.feathericons.*
 
 /**
  * 单条会话行：短按选中，长按弹出功能菜单（重命名/删除）。供侧边栏历史记录列表复用。

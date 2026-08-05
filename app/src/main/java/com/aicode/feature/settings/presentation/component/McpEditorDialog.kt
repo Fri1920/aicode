@@ -54,7 +54,13 @@ import androidx.compose.ui.unit.sp
 import com.aicode.feature.agent.domain.mcp.McpServerConfig
 import com.aicode.feature.agent.domain.mcp.McpToolDescriptor
 import compose.icons.FeatherIcons
-import compose.icons.feathericons.*
+import compose.icons.feathericons.Check
+import compose.icons.feathericons.FileText
+import compose.icons.feathericons.RefreshCw
+import compose.icons.feathericons.Shield
+import compose.icons.feathericons.Tool
+import compose.icons.feathericons.Trash2
+import compose.icons.feathericons.X
 import kotlinx.serialization.json.JsonObject
 import androidx.compose.ui.res.stringResource
 import com.aicode.R

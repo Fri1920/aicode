@@ -14,7 +14,8 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.aicode.feature.workspace.domain.model.RemoteConnection
 import com.aicode.feature.workspace.domain.model.RemoteMount
 import compose.icons.FeatherIcons
-import compose.icons.feathericons.*
+import compose.icons.feathericons.ArrowLeft
+import compose.icons.feathericons.Plus
 import androidx.compose.ui.res.stringResource
 import com.aicode.R
 
@@ -183,8 +184,9 @@ fun RemoteServerScreen(
             initialConnection = connectionToEdit,
             onDismiss = { showAddConnectionDialog = false },
             onAdd = { name, host, port, username, password, protocol ->
-                if (connectionToEdit != null) {
-                    viewModel.updateConnection(connectionToEdit!!.id, name, host, port, username, password, protocol)
+                val editing = connectionToEdit
+                if (editing != null) {
+                    viewModel.updateConnection(editing.id, name, host, port, username, password, protocol)
                 } else {
                     viewModel.addConnection(name, host, port, username, password, protocol)
                 }
@@ -217,8 +219,9 @@ fun RemoteServerScreen(
                 workspaces = uiState.workspaces,
                 onDismiss = { showAddMountDialog = false },
                 onAdd = { connectionId, remotePath, localWorkspacePath, autoConnect ->
-                    if (mountToEdit != null) {
-                        viewModel.updateMount(mountToEdit!!.id, connectionId, remotePath, localWorkspacePath, autoConnect)
+                    val editing = mountToEdit
+                    if (editing != null) {
+                        viewModel.updateMount(editing.id, connectionId, remotePath, localWorkspacePath, autoConnect)
                     } else {
                         viewModel.addMount(connectionId, remotePath, localWorkspacePath, autoConnect)
                     }

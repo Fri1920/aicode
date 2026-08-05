@@ -33,6 +33,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalConfiguration
@@ -79,6 +81,8 @@ internal fun AgentMessageItem(
     if (message.role == MessageRole.ASSISTANT && !hasContent && !hasReasoning) return
 
     val isUser = message.role == MessageRole.USER
+    val screenWidthDp = LocalConfiguration.current.screenWidthDp
+    val maxUserBubbleWidth = remember(screenWidthDp) { (screenWidthDp * 0.85).dp }
     var copied by remember { mutableStateOf(false) }
     val clipboard = LocalClipboard.current
     val copyScope = rememberCoroutineScope()
@@ -88,7 +92,7 @@ internal fun AgentMessageItem(
         verticalArrangement = Arrangement.spacedBy(Spacing.xs)
     ) {
         if (hasReasoning) {
-            ReasoningBubble(text = message.reasoning!!, initiallyExpanded = false)
+            ReasoningBubble(text = message.reasoning.orEmpty(), initiallyExpanded = false)
         }
         if (hasContent || hasAttachments || message.role != MessageRole.ASSISTANT) {
             Column(
@@ -101,26 +105,26 @@ internal fun AgentMessageItem(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Surface(
-                        shape = if (isUser) {
-                            RoundedCornerShape(Radius.md, Radius.md, Radius.xs, Radius.md)
-                        } else {
-                            RoundedCornerShape(Radius.md, Radius.md, Radius.md, Radius.xs)
-                        },
-                        color = when (message.role) {
-                            MessageRole.USER -> MaterialTheme.colorScheme.primary
-                            MessageRole.ASSISTANT -> MaterialTheme.colorScheme.surface
-                            MessageRole.TOOL -> MaterialTheme.colorScheme.surfaceVariant
-                        },
-                        border = if (message.role == MessageRole.ASSISTANT) {
-                            BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
-                        } else null,
-                        // 用户气泡按内容自适应宽度；AI/工具气泡填满可用宽度，两侧外边距由 LazyColumn contentPadding 统一提供
-                        modifier = if (isUser) {
-                            Modifier.widthIn(max = (LocalConfiguration.current.screenWidthDp * 0.85).dp)
-                        } else {
-                            Modifier.fillMaxWidth()
-                        }
-                    ) {
+                            shape = if (isUser) {
+                                RoundedCornerShape(Radius.md, Radius.md, Radius.xs, Radius.md)
+                            } else {
+                                RoundedCornerShape(Radius.md, Radius.md, Radius.md, Radius.xs)
+                            },
+                            color = when (message.role) {
+                                MessageRole.USER -> MaterialTheme.colorScheme.primary
+                                MessageRole.ASSISTANT -> MaterialTheme.colorScheme.surface
+                                MessageRole.TOOL -> MaterialTheme.colorScheme.surfaceVariant
+                            },
+                            border = if (message.role == MessageRole.ASSISTANT) {
+                                BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                            } else null,
+                            // 用户气泡按内容自适应宽度；AI/工具气泡填满可用宽度，两侧外边距由 LazyColumn contentPadding 统一提供
+                            modifier = if (isUser) {
+                                Modifier.widthIn(max = maxUserBubbleWidth)
+                            } else {
+                                Modifier.fillMaxWidth()
+                            }
+                        ) {
                         if (message.role == MessageRole.TOOL) {
                             ToolMessageBody(message, liveOutput = liveOutput)
                         } else {
@@ -169,7 +173,10 @@ internal fun AgentMessageItem(
                 if (message.content.hasVisibleContent() && message.role != MessageRole.TOOL) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         val iconTint = MaterialTheme.colorScheme.onSurfaceVariant
-                        IconButton(
+                        MessageActionIconButton(
+                            icon = if (copied) FeatherIcons.Check else FeatherIcons.Copy,
+                            contentDescription = if (copied) stringResource(R.string.chat_copied) else stringResource(R.string.chat_copy),
+                            tint = iconTint,
                             onClick = {
                                 copyScope.launch {
                                     clipboard.setClipEntry(
@@ -177,41 +184,23 @@ internal fun AgentMessageItem(
                                     )
                                     copied = true
                                 }
-                            },
-                            modifier = Modifier.size(28.dp),
-                            colors = IconButtonDefaults.iconButtonColors(contentColor = iconTint),
-                        ) {
-                            Icon(
-                                if (copied) FeatherIcons.Check else FeatherIcons.Copy,
-                                contentDescription = if (copied) stringResource(R.string.chat_copied) else stringResource(R.string.chat_copy),
-                                modifier = Modifier.size(14.dp),
+                            }
+                        )
+                        if (isUser && onRewindClick != null) {
+                            MessageActionIconButton(
+                                icon = FeatherIcons.RotateCcw,
+                                contentDescription = stringResource(R.string.checkpoint_rewind_title),
+                                tint = iconTint,
+                                onClick = { onRewindClick(message.id) }
                             )
                         }
-                        if (isUser && onRewindClick != null) {
-                            IconButton(
-                                onClick = { onRewindClick(message.id) },
-                                modifier = Modifier.size(28.dp),
-                                colors = IconButtonDefaults.iconButtonColors(contentColor = iconTint),
-                            ) {
-                                Icon(
-                                    FeatherIcons.RotateCcw,
-                                    contentDescription = stringResource(R.string.checkpoint_rewind_title),
-                                    modifier = Modifier.size(14.dp),
-                                )
-                            }
-                        }
                         if (onMoreClick != null) {
-                            IconButton(
-                                onClick = { onMoreClick(message) },
-                                modifier = Modifier.size(28.dp),
-                                colors = IconButtonDefaults.iconButtonColors(contentColor = iconTint),
-                            ) {
-                                Icon(
-                                    FeatherIcons.MoreHorizontal,
-                                    contentDescription = stringResource(R.string.chat_more_options),
-                                    modifier = Modifier.size(14.dp),
-                                )
-                            }
+                            MessageActionIconButton(
+                                icon = FeatherIcons.MoreHorizontal,
+                                contentDescription = stringResource(R.string.chat_more_options),
+                                tint = iconTint,
+                                onClick = { onMoreClick(message) }
+                            )
                         }
                         if (message.role == MessageRole.ASSISTANT && (message.inputTokens > 0 || message.outputTokens > 0)) {
                             val inStr = formatTokenCount(message.inputTokens)
@@ -233,6 +222,22 @@ internal fun AgentMessageItem(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun MessageActionIconButton(
+    icon: ImageVector,
+    contentDescription: String,
+    tint: Color,
+    onClick: () -> Unit
+) {
+    IconButton(
+        onClick = onClick,
+        modifier = Modifier.size(28.dp),
+        colors = IconButtonDefaults.iconButtonColors(contentColor = tint),
+    ) {
+        Icon(icon, contentDescription = contentDescription, modifier = Modifier.size(14.dp))
     }
 }
 

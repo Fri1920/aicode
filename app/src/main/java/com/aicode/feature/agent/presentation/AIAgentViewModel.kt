@@ -550,7 +550,7 @@ class AIAgentViewModel @Inject constructor(
             runSlashCommand(command, request, sessionId)
             return@launch
         }
-        sessionJobs[sessionId] = coroutineContext[Job]!!
+        coroutineContext[Job]?.let { sessionJobs[sessionId] = it }
         setAgentState(sessionId, AgentUIState.Streaming)
 
         try {

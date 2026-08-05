@@ -237,7 +237,7 @@ private fun uniqueUploadFile(dir: File, fileName: String): File {
 
 private fun resolveImageMimeType(context: Context, uri: Uri, fileName: String): String {
     val mime = context.contentResolver.getType(uri)?.lowercase()
-    if (mime in SUPPORTED_IMAGE_MIME_TYPES) return mime!!
+    if (mime != null && mime in SUPPORTED_IMAGE_MIME_TYPES) return mime
 
     val byExtension = when (fileName.substringAfterLast('.', "").lowercase()) {
         "jpg", "jpeg" -> "image/jpeg"
