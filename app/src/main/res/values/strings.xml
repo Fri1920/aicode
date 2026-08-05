@@ -147,6 +147,15 @@
     <string name="chat_placeholder">有什么可以帮你的？</string>
     <string name="chat_input_hint">描述你的需求，我来帮你编写、修改或解释代码</string>
 
+    <!-- Agent Status -->
+    <string name="agent_stopped_by_user">已被用户停止</string>
+    <string name="agent_tool_executing">%1$s 执行中…</string>
+    <string name="agent_context_compacted">上下文已压缩</string>
+    <string name="agent_context_no_compaction">当前上下文无需压缩（消息过少）</string>
+    <string name="agent_compaction_failed">压缩失败: %1$s</string>
+    <string name="agent_model_not_selected">未选择</string>
+    <string name="agent_apply_changes_failed">应用更改失败: %1$s</string>
+
     <!-- About -->
     <string name="about_version">版本</string>
     <string name="about_github_repo">GitHub 仓库</string>

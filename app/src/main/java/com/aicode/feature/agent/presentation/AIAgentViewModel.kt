@@ -1,7 +1,9 @@
 package com.aicode.feature.agent.presentation
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.aicode.R
 import com.aicode.core.util.FileLogger
 import com.aicode.core.util.toUserMessage
 import com.aicode.feature.agent.data.local.dao.AgentMessageDao
@@ -47,6 +49,7 @@ import com.aicode.feature.agent.presentation.AgentAttachment
 import com.aicode.feature.agent.presentation.component.RewindOption
 import com.aicode.feature.agent.presentation.component.formatTokenCount
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -88,7 +91,8 @@ class AIAgentViewModel @Inject constructor(
     private val slashCommandRegistry: SlashCommandRegistry,
     private val checkpointManager: CheckpointManager,
     private val checkpointDao: CheckpointDao,
-    private val backupManager: BackupManager
+    private val backupManager: BackupManager,
+    @param:ApplicationContext private val context: Context
 ) : ViewModel(), SlashCommandContext {
 
     private val sessionJobs = mutableMapOf<String, Job>()
@@ -313,8 +317,6 @@ class AIAgentViewModel @Inject constructor(
 
     private companion object {
         const val TAG = "AIAgentViewModel"
-        /** 用户主动停止时的收尾文案（追加在已输出内容之后，而非整体替换）。 */
-        const val STOPPED_TOOL_TEXT = "已被用户停止"
     }
 
     init {
@@ -579,7 +581,7 @@ class AIAgentViewModel @Inject constructor(
             val sessionDomain = sessionEntity?.toDomain()
             val mode = sessionDomain?.mode ?: AgentMode.BUILD
 
-            val context = AgentContext(
+            val agentContext = AgentContext(
                 currentFile = currentFile,
                 selectedCode = selectedCode,
                 projectRoot = projectRoot,
@@ -593,7 +595,7 @@ class AIAgentViewModel @Inject constructor(
 
             agentWorkflow.executeEvents(
                 userRequest = modelRequest,
-                context = context,
+                context = agentContext,
                 tools = toolRegistry.getAvailableTools(mode)
             ).collect { event ->
                 when (event) {
@@ -650,7 +652,7 @@ class AIAgentViewModel @Inject constructor(
                         messagePersistenceUseCase.persist(
                             sessionId,
                             MessageRole.TOOL,
-                            "${SessionUseCase.PENDING_TOOL_MARKER} ${event.toolName} 执行中…",
+                            "${SessionUseCase.PENDING_TOOL_MARKER} ${context.getString(R.string.agent_tool_executing, event.toolName)}",
                             id = msgId,
                             toolCallId = event.id,
                             toolName = event.toolName,
@@ -777,6 +779,7 @@ class AIAgentViewModel @Inject constructor(
         val running = _runningTools.value[sessionId]
         val streamingText = _streamingTexts.value[sessionId]
         val streamingReasoning = _streamingReasonings.value[sessionId]
+        val stoppedText = context.getString(R.string.agent_stopped_by_user)
         job.cancel()
         pendingMergedNotifications.remove(sessionId)
         setAgentState(sessionId, AgentUIState.Idle)
@@ -788,7 +791,7 @@ class AIAgentViewModel @Inject constructor(
         viewModelScope.launch {
             if (running != null) {
                 val partial = running.text.trimEnd()
-                val content = if (partial.isNotEmpty()) "$partial\n\n$STOPPED_TOOL_TEXT" else STOPPED_TOOL_TEXT
+                val content = if (partial.isNotEmpty()) "$partial\n\n$stoppedText" else stoppedText
                 messagePersistenceUseCase.persist(
                     sessionId = sessionId,
                     role = MessageRole.TOOL,
@@ -802,7 +805,7 @@ class AIAgentViewModel @Inject constructor(
                 toolArgsByMsgId.remove(running.messageId)
             } else if (!streamingText.isNullOrEmpty() || !streamingReasoning.isNullOrEmpty()) {
                 val partial = (streamingText ?: "").trimEnd()
-                val content = if (partial.isNotEmpty()) "$partial\n\n$STOPPED_TOOL_TEXT" else STOPPED_TOOL_TEXT
+                val content = if (partial.isNotEmpty()) "$partial\n\n$stoppedText" else stoppedText
                 val reasoning = streamingReasoning?.takeIf { it.hasVisibleContent() }
                 messagePersistenceUseCase.persist(
                     sessionId = sessionId,
@@ -908,7 +911,7 @@ class AIAgentViewModel @Inject constructor(
                         else -> {}
                     }
                 }
-                val resultText = if (changed) "上下文已压缩" else "当前上下文无需压缩（消息过少）"
+                val resultText = if (changed) context.getString(R.string.agent_context_compacted) else context.getString(R.string.agent_context_no_compaction)
                 messagePersistenceUseCase.persist(
                     sessionId = sid,
                     role = MessageRole.ASSISTANT,
@@ -921,7 +924,7 @@ class AIAgentViewModel @Inject constructor(
                 messagePersistenceUseCase.persist(
                     sessionId = sid,
                     role = MessageRole.ASSISTANT,
-                    content = "压缩失败: ${e.message}"
+                    content = context.getString(R.string.agent_compaction_failed, e.message)
                 )
             } finally {
                 setCompacting(sid, false)
@@ -933,9 +936,9 @@ class AIAgentViewModel @Inject constructor(
     }
 
     private fun sessionProviderModelDisplay(sid: String): String {
-        val pair = currentSessionProviderModel.value ?: return "未选择"
+        val pair = currentSessionProviderModel.value ?: return context.getString(R.string.agent_model_not_selected)
         val (_, model) = pair
-        return model?.takeIf { it.isNotBlank() } ?: "未选择"
+        return model?.takeIf { it.isNotBlank() } ?: context.getString(R.string.agent_model_not_selected)
     }
 
     private fun escapeMd(text: String): String = text.replace("|", "\\|").replace("\n", " ")
@@ -1141,7 +1144,7 @@ class AIAgentViewModel @Inject constructor(
             FileLogger.e(TAG, "applyChanges 失败", e)
             val sessionId = _currentSessionId.value
             if (sessionId != null) {
-                setAgentState(sessionId, AgentUIState.Error("应用更改失败: ${e.message}"))
+                setAgentState(sessionId, AgentUIState.Error(context.getString(R.string.agent_apply_changes_failed, e.message)))
             }
         }
     }
