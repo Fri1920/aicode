@@ -1,7 +1,10 @@
 package com.aicode.feature.git.presentation
 
+import android.content.Context
+import androidx.annotation.StringRes
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.aicode.R
 import com.aicode.core.util.FileLogger
 import com.aicode.core.util.LineDiff
 import com.aicode.feature.git.domain.GitCommandFailureException
@@ -19,6 +22,7 @@ import com.aicode.feature.git.presentation.component.DiffRow
 import com.aicode.feature.git.presentation.component.highlightCode
 import com.aicode.feature.git.presentation.component.inferSyntaxLanguage
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
@@ -37,7 +41,8 @@ import javax.inject.Inject
  */
 @HiltViewModel
 class GitViewModel @Inject constructor(
-    private val repository: GitRepository
+    private val repository: GitRepository,
+    @param:ApplicationContext private val context: Context
 ) : ViewModel() {
 
     private companion object {
@@ -134,7 +139,7 @@ class GitViewModel @Inject constructor(
             } catch (e: Exception) {
                 if (e is CancellationException) throw e
                 FileLogger.e(TAG, "加载分支列表失败", e)
-                _state.update { it.copy(branchesLoading = false, toast = "加载分支失败: ${e.message}") }
+                _state.update { it.copy(branchesLoading = false, toast = context.getString(R.string.git_toast_load_branches_failed, e.message)) }
             }
         }
     }
@@ -177,27 +182,28 @@ class GitViewModel @Inject constructor(
             } catch (e: Exception) {
                 if (e is CancellationException) throw e
                 FileLogger.e(TAG, "刷新失败", e)
-                _state.update { it.copy(loading = false, toast = "刷新失败: ${e.message}") }
+                _state.update { it.copy(loading = false, toast = context.getString(R.string.git_toast_refresh_failed, e.message)) }
             }
         }
     }
 
     /** 执行一个写操作：置 busy → 跑命令 → 刷新 → 反馈。操作间互斥。 */
     private fun runAction(
-        name: String,
+        @StringRes nameRes: Int,
         action: suspend () -> String
     ) {
         if (_state.value.busy) return
         _state.update { it.copy(busy = true, toast = null) }
         viewModelScope.launch {
+            val name = context.getString(nameRes)
             val msg = try {
                 action()
-                "${name}成功"
+                context.getString(R.string.git_toast_action_success, name)
             } catch (e: Exception) {
                 if (e is CancellationException) throw e
                 FileLogger.e(TAG, "${name}失败", e)
                 val reason = (e as? GitCommandFailureException)?.output ?: e.message
-                "${name}失败: ${GitErrorMessage.friendly(reason ?: "")}"
+                context.getString(R.string.git_toast_action_failed, name, GitErrorMessage.friendly(reason ?: ""))
             }
             // 刷新以反映新状态；失败也刷新，让 UI 与仓库一致。
             try {
@@ -211,31 +217,31 @@ class GitViewModel @Inject constructor(
                 }
             } catch (e: Exception) {
                 if (e is CancellationException) throw e
-                _state.update { it.copy(busy = false, toast = "$msg（刷新失败）") }
+                _state.update { it.copy(busy = false, toast = context.getString(R.string.git_toast_action_refresh_failed, msg)) }
             }
         }
     }
 
-    fun stage(path: String) = runAction("暂存", { repository.stage(path) })
-    fun unstage(path: String) = runAction("取消暂存", { repository.unstage(path) })
-    fun stageAll() = runAction("全部暂存", { repository.stageAll() })
-    fun unstageAll() = runAction("全部取消暂存", { repository.unstageAll() })
-    fun commit(message: String) = runAction("提交", { repository.commit(message) })
+    fun stage(path: String) = runAction(R.string.git_stage, { repository.stage(path) })
+    fun unstage(path: String) = runAction(R.string.git_unstage, { repository.unstage(path) })
+    fun stageAll() = runAction(R.string.git_action_stage_all, { repository.stageAll() })
+    fun unstageAll() = runAction(R.string.git_action_unstage_all, { repository.unstageAll() })
+    fun commit(message: String) = runAction(R.string.git_action_commit, { repository.commit(message) })
     /** 在当前工作区执行 `git init` 初始化仓库；成功后 runAction 末尾自动刷新（notARepo 翻 false）。 */
-    fun initRepo() = runAction("初始化", { repository.initRepo() })
+    fun initRepo() = runAction(R.string.git_action_init, { repository.initRepo() })
     fun pull() {
         if (!_state.value.hasRemote) {
-            _state.update { it.copy(toast = "未配置远程仓库，无法拉取") }
+            _state.update { it.copy(toast = context.getString(R.string.git_toast_no_remote_pull)) }
             return
         }
-        runAction("拉取", { repository.pull() })
+        runAction(R.string.git_pull, { repository.pull() })
     }
     fun push() {
         if (!_state.value.hasRemote) {
-            _state.update { it.copy(toast = "未配置远程仓库，无法推送") }
+            _state.update { it.copy(toast = context.getString(R.string.git_toast_no_remote_push)) }
             return
         }
-        runAction("推送", { repository.push() })
+        runAction(R.string.git_push, { repository.push() })
     }
 
     /**
@@ -284,7 +290,7 @@ class GitViewModel @Inject constructor(
             } catch (e: Exception) {
                 if (e is CancellationException) throw e
                 FileLogger.e(TAG, "加载更多提交失败", e)
-                _state.update { it.copy(graphLoadingMore = false, toast = "加载更多失败: ${e.message}") }
+                _state.update { it.copy(graphLoadingMore = false, toast = context.getString(R.string.git_toast_load_more_failed, e.message)) }
             }
         }
     }
@@ -298,12 +304,12 @@ class GitViewModel @Inject constructor(
         viewModelScope.launch {
             val msg = try {
                 repository.checkout(ref, isRemote)
-                "已切换到 $ref"
+                context.getString(R.string.git_toast_checkout_success, ref)
             } catch (e: Exception) {
                 if (e is CancellationException) throw e
                 FileLogger.e(TAG, "切换分支失败", e)
                 val reason = (e as? GitCommandFailureException)?.output ?: e.message
-                "切换失败: ${GitErrorMessage.friendly(reason ?: "")}"
+                context.getString(R.string.git_toast_checkout_failed, GitErrorMessage.friendly(reason ?: ""))
             }
             try {
                 if (repository.isRepo()) {
@@ -317,7 +323,7 @@ class GitViewModel @Inject constructor(
                 }
             } catch (e: Exception) {
                 if (e is CancellationException) throw e
-                _state.update { it.copy(checkoutLoading = null, toast = "$msg（刷新失败）") }
+                _state.update { it.copy(checkoutLoading = null, toast = context.getString(R.string.git_toast_action_refresh_failed, msg)) }
             }
         }
     }
@@ -328,7 +334,7 @@ class GitViewModel @Inject constructor(
      */
     fun createBranch(name: String, startPoint: String?, checkout: Boolean) {
         if (name.isBlank()) return
-        runAction("创建分支", { repository.createBranch(name, startPoint, checkout) })
+        runAction(R.string.git_action_create_branch, { repository.createBranch(name, startPoint, checkout) })
     }
 
     /**
@@ -336,7 +342,7 @@ class GitViewModel @Inject constructor(
      */
     fun deleteBranch(name: String) {
         if (name.isBlank()) return
-        runAction("删除分支", { repository.deleteBranch(name) })
+        runAction(R.string.git_action_delete_branch, { repository.deleteBranch(name) })
     }
 
     /**
@@ -344,7 +350,7 @@ class GitViewModel @Inject constructor(
      */
     fun deleteRemoteBranch(ref: String) {
         if (ref.isBlank()) return
-        runAction("删除远程分支", { repository.deleteRemoteBranch(ref) })
+        runAction(R.string.git_action_delete_remote_branch, { repository.deleteRemoteBranch(ref) })
     }
 
     /**
@@ -352,7 +358,7 @@ class GitViewModel @Inject constructor(
      */
     fun renameBranch(oldName: String, newName: String) {
         if (oldName.isBlank() || newName.isBlank()) return
-        runAction("重命名分支", { repository.renameBranch(oldName, newName) })
+        runAction(R.string.git_action_rename_branch, { repository.renameBranch(oldName, newName) })
     }
 
     /**
@@ -360,7 +366,7 @@ class GitViewModel @Inject constructor(
      */
     fun createTag(name: String) {
         if (name.isBlank()) return
-        runAction("创建标签", { repository.createTag(name) })
+        runAction(R.string.git_action_create_tag, { repository.createTag(name) })
     }
 
     /**
@@ -368,7 +374,7 @@ class GitViewModel @Inject constructor(
      */
     fun deleteTag(name: String) {
         if (name.isBlank()) return
-        runAction("删除标签", { repository.deleteTag(name) })
+        runAction(R.string.git_action_delete_tag, { repository.deleteTag(name) })
     }
 
     /**
@@ -389,7 +395,7 @@ class GitViewModel @Inject constructor(
                     FileLogger.e(TAG, "加载提交文件 diff 失败: $path", e)
                     null
                 }
-            _state.update { it.copy(diffLoading = false, diffData = data, toast = if (data == null) "加载差异失败" else null) }
+            _state.update { it.copy(diffLoading = false, diffData = data, toast = if (data == null) context.getString(R.string.git_toast_diff_failed) else null) }
         }
     }
 
@@ -410,7 +416,7 @@ class GitViewModel @Inject constructor(
                 FileLogger.e(TAG, "加载工作区 diff 失败: $path", e)
                 null
             }
-            _state.update { it.copy(diffLoading = false, diffData = data, toast = if (data == null) "加载差异失败" else null) }
+            _state.update { it.copy(diffLoading = false, diffData = data, toast = if (data == null) context.getString(R.string.git_toast_diff_failed) else null) }
         }
     }
 

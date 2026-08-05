@@ -399,6 +399,29 @@
     <string name="git_init_repo">Initialize Git Repository</string>
     <string name="git_commit_message">Commit message</string>
 
+    <!-- Git Toast Messages -->
+    <string name="git_toast_load_branches_failed">Failed to load branches: %1$s</string>
+    <string name="git_toast_refresh_failed">Refresh failed: %1$s</string>
+    <string name="git_toast_action_refresh_failed">%1$s (refresh failed)</string>
+    <string name="git_toast_no_remote_pull">No remote repository configured, cannot pull</string>
+    <string name="git_toast_no_remote_push">No remote repository configured, cannot push</string>
+    <string name="git_toast_load_more_failed">Failed to load more: %1$s</string>
+    <string name="git_toast_action_success">%1$s successful</string>
+    <string name="git_toast_action_failed">%1$s failed: %2$s</string>
+    <string name="git_toast_checkout_success">Switched to %1$s</string>
+    <string name="git_toast_checkout_failed">Switch failed: %1$s</string>
+    <string name="git_toast_diff_failed">Failed to load diff</string>
+    <string name="git_action_stage_all">Stage all</string>
+    <string name="git_action_unstage_all">Unstage all</string>
+    <string name="git_action_commit">Commit</string>
+    <string name="git_action_init">Initialize</string>
+    <string name="git_action_create_branch">Create branch</string>
+    <string name="git_action_delete_branch">Delete branch</string>
+    <string name="git_action_delete_remote_branch">Delete remote branch</string>
+    <string name="git_action_rename_branch">Rename branch</string>
+    <string name="git_action_create_tag">Create tag</string>
+    <string name="git_action_delete_tag">Delete tag</string>
+
     <!-- Git Identity -->
     <string name="git_tab_identity">Identity</string>
     <string name="git_tab_credentials">Credentials</string>
