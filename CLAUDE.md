@@ -38,16 +38,18 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **改动分档**：
   - **新功能 / 复杂多文件改动 / 架构重构**：新建分支 `feat/xxx` 或 `refactor/xxx`，改完验证通过后合回 `main` 并清理分支。
   - **日常 Bug 修复 / 补单元测试 / CI与构建配置 / 纯文档 / 资源文案**：直接在 `main` 分支提交，无需新建分支，避免分支过滥。
+  - **预览版（RC）热修复**：已发 RC Tag 后发现问题，必须从**该 RC Tag** 拉 `hotfix/xxx` 分支修复（**勿从最新 `main` 或功能分支拉**，否则会把已合入的未发版功能带进修复包），修复验证后升 rc 序号打 Tag 发修复版，再合回 `main` 并清理分支（详见「发版流程」）。
 - **改动前先定分支**：涉及新功能开发时，先确认分支命名（如 `feat/session-model`），避免不同主题混在同一分支。
 - **提交前必跑冒烟**：改完编译型代码（`.kt` / `.gradle.kts` / `AndroidManifest.xml`）→ 提交前默认 `./gradlew :app:assembleUniversalDebug` 验证可编译（**勿跑 `assembleDebug`/`assembleRelease` 三 flavor**，详见 Build and Run）。
-- **合并入 main**：本地合并并确认无冲突后，及时清理已被合并的本地分支（`git branch -d <branch_name>`）。
+- **推送到远端前必跑单元测试**：任何 `git push` 到远端之前，必须先跑一次单元测试 `./gradlew :app:testUniversalDebugUnitTest`（单 flavor，勿跑聚合 `test`），确认测试全部通过后再推送。改动不涉及逻辑（纯文档 / 资源文案 / 纯 `.md`）时可跳过。
+- **合并入 main**：本地合并并确认无冲突后，及时清理已被合并的本地分支（`git branch -d <branch_name>`，删前用 `git branch --merged main` 确认安全）；已推送过的分支同步删除远端（`git push origin --delete <branch_name>`），避免本地删了远端残留。分支删除不影响已打的 Tag，Tag 独立引用提交，可随时 `git show <tag>` 追溯。
 
 ## 版本号规范
 
 - **唯一事实源**：由 Git Tag / Commit 动态推导解析，**彻底无需手写 `app/build.gradle.kts` 中的 `versionName`**。
   - **`versionName`**：由 `gitVersionName()` 在构建时动态解析（如 tag 为 `v1.7.0` 则为 `1.7.0`；tag 为 `v1.7.0-rc1` 则为 `1.7.0-rc1`；非 Tag 的平时提交为 `1.7.0-dev.N+<hash>`）。
   - **`versionCode`**：由 `gitCommitCount()` 从 git 提交数自动生成，随提交单调递增，无需手动维护。
-- **与 Tag 绑定**：发版时只需直接在 `main` 节点上打 git tag，例如 `v1.7.0-rc1` 或 `v1.7.0`，CI 捕获后会自动将生成的 APK 与该版本进行匹配并发布 Release。**严禁在功能分支上打 Tag 发版**，必须先合入 `main` 再打 Tag，确保发版的代码在 `main` 主线上可追溯。
+- **与 Tag 绑定**：发版时只需直接在 `main` 节点上打 git tag，例如 `v1.7.0-rc1` 或 `v1.7.0`，CI 捕获后会自动将生成的 APK 与该版本进行匹配并发布 Release。**严禁在功能分支（`feat/*` / `refactor/*`）上打 Tag 发版**，必须先合入 `main` 再打 Tag，确保发版的代码在 `main` 主线上可追溯。**唯一例外：预览版热修复**——RC 已发出后发现问题时，允许在基于该 RC Tag 的 `hotfix/*` 分支上打 rc 序号 +1 的 Tag 发修复版，修复必须随后合回 `main`（见「发版流程」）。
 
 ## 发版流程（RC 判定）
 
@@ -62,7 +64,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 1. **零代码修改发版（必须在 `main` 分支）**：无需在代码或配置中修改版本号。所有功能/修补必须先合并到 `main` 分支，在 `main` 最新的提交节点上直接打 Tag（例如 `git tag v1.7.0-rc1`）并推送：`git push origin v1.7.0-rc1`。
 2. CI 接收到 `v*` Tag 后，自动捕获 Tag 版本推导生成 APK，构建 Release 发出。
 3. **真机装 rc 包**，至少跑通 AI 对话 + 终端 + 容器启动三条主线。
-4. 有问题 -> 修 -> 升 rc 序号打 tag（`v1.7.0-rc2`）重发；无问题 -> 直接打正式 Tag（`v1.7.0`）推远端转正。
+4. 有问题 -> 从该 RC Tag 拉 `hotfix/xxx` 分支修复（**勿从最新 `main` 拉**，否则会把已合入的未发版功能带进修复包）-> 升 rc 序号打 Tag（`v1.7.0-rc2`）推送重发 -> 将修复合回 `main` 并推送 -> 删除 hotfix 分支；无问题 -> 直接打正式 Tag（`v1.7.0`）推远端转正。
 
 ## Build and Run
 
