@@ -124,7 +124,7 @@ class GitRepository @Inject constructor(
             val y = line[1]
             val rawPath = line.substring(3)
             // 重命名形如 "old -> new"，展示新路径。
-            val path = rawPath.substringAfter(" -> ").trim()
+            val path = unquotePorcelainPath(rawPath.substringAfter(" -> ").trim())
 
             if (x == '?' && y == '?') {
                 untracked.add(path)
@@ -628,6 +628,44 @@ class GitRepository @Inject constructor(
                 java.io.File(workspaceRepository.currentPath(), path).takeIf { it.isFile }?.readText() ?: ""
             }.getOrDefault("")
         }
+
+    /**
+     * porcelain v1 对含引号/反斜杠/控制字符的路径会整体加引号并做 C 风格转义
+     * （如 `"a\"b.txt"`、`"a\tb.txt"`、八进制 `\NNN`），这里做反向解析还原真实路径。
+     * 未加引号的普通路径（含空格）原样返回。
+     */
+    private fun unquotePorcelainPath(raw: String): String {
+        if (!raw.startsWith("\"")) return raw
+        val inner = raw.removeSurrounding("\"")
+        val sb = StringBuilder(inner.length)
+        var i = 0
+        while (i < inner.length) {
+            val c = inner[i]
+            if (c == '\\' && i + 1 < inner.length) {
+                when (val n = inner[i + 1]) {
+                    'n' -> { sb.append('\n'); i += 2 }
+                    't' -> { sb.append('\t'); i += 2 }
+                    '\\' -> { sb.append('\\'); i += 2 }
+                    '"' -> { sb.append('"'); i += 2 }
+                    in '0'..'7' -> {
+                        // 八进制 \NNN（最多 3 位）
+                        val end = minOf(i + 4, inner.length)
+                        val octal = inner.substring(i + 1, end).takeWhile { it in '0'..'7' }
+                        if (octal.length == 3) {
+                            sb.append(octal.toInt(8).toChar())
+                            i += 1 + octal.length
+                        } else {
+                            sb.append(c); i += 1
+                        }
+                    }
+                    else -> { sb.append(c); i += 1 }
+                }
+            } else {
+                sb.append(c); i += 1
+            }
+        }
+        return sb.toString()
+    }
 
     /**
      * 对单个 shell 参数做单引号转义。含「安全字符」之外的字符（空格、`|`、`$`、反引号、`*` 等）时

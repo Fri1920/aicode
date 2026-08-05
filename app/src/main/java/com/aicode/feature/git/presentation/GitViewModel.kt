@@ -19,6 +19,7 @@ import com.aicode.feature.git.presentation.component.DiffRow
 import com.aicode.feature.git.presentation.component.highlightCode
 import com.aicode.feature.git.presentation.component.inferSyntaxLanguage
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -131,6 +132,7 @@ class GitViewModel @Inject constructor(
                     it.copy(branches = allRefs.branches, tags = allRefs.tags, graph = graph, commits = commits, branchesLoading = false, branchesLoaded = true)
                 }
             } catch (e: Exception) {
+                if (e is CancellationException) throw e
                 FileLogger.e(TAG, "加载分支列表失败", e)
                 _state.update { it.copy(branchesLoading = false, toast = "加载分支失败: ${e.message}") }
             }
@@ -147,6 +149,7 @@ class GitViewModel @Inject constructor(
                 val allRefs = repository.loadAllRefs()
                 _state.update { it.copy(branches = allRefs.branches, tags = allRefs.tags) }
             } catch (e: Exception) {
+                if (e is CancellationException) throw e
                 FileLogger.e(TAG, "刷新分支列表失败", e)
             }
         }
@@ -172,6 +175,7 @@ class GitViewModel @Inject constructor(
                     it.copy(loading = false, notARepo = false, status = snap.status, commits = commits, graph = snap.graph, hasRemote = snap.hasRemote, hasIdentity = snap.hasIdentity, branchesLoaded = false, branchesLoading = false, branches = emptyList(), tags = emptyList())
                 }
             } catch (e: Exception) {
+                if (e is CancellationException) throw e
                 FileLogger.e(TAG, "刷新失败", e)
                 _state.update { it.copy(loading = false, toast = "刷新失败: ${e.message}") }
             }
@@ -190,6 +194,7 @@ class GitViewModel @Inject constructor(
                 action()
                 "${name}成功"
             } catch (e: Exception) {
+                if (e is CancellationException) throw e
                 FileLogger.e(TAG, "${name}失败", e)
                 val reason = (e as? GitCommandFailureException)?.output ?: e.message
                 "${name}失败: ${GitErrorMessage.friendly(reason ?: "")}"
@@ -205,6 +210,7 @@ class GitViewModel @Inject constructor(
                     _state.update { it.copy(busy = false, notARepo = true, toast = msg) }
                 }
             } catch (e: Exception) {
+                if (e is CancellationException) throw e
                 _state.update { it.copy(busy = false, toast = "$msg（刷新失败）") }
             }
         }
@@ -249,6 +255,7 @@ class GitViewModel @Inject constructor(
             val files = try {
                 repository.commitFiles(hash)
             } catch (e: Exception) {
+                if (e is CancellationException) throw e
                 FileLogger.e(TAG, "加载提交文件失败: $hash", e)
                 emptyList()
             }
@@ -275,6 +282,7 @@ class GitViewModel @Inject constructor(
                 val commits = graph.commits.map { GitCommit(it.hash, it.shortHash, it.author, it.date, it.message) }
                 _state.update { it.copy(graph = graph, commits = commits, graphLoadingMore = false) }
             } catch (e: Exception) {
+                if (e is CancellationException) throw e
                 FileLogger.e(TAG, "加载更多提交失败", e)
                 _state.update { it.copy(graphLoadingMore = false, toast = "加载更多失败: ${e.message}") }
             }
@@ -292,6 +300,7 @@ class GitViewModel @Inject constructor(
                 repository.checkout(ref, isRemote)
                 "已切换到 $ref"
             } catch (e: Exception) {
+                if (e is CancellationException) throw e
                 FileLogger.e(TAG, "切换分支失败", e)
                 val reason = (e as? GitCommandFailureException)?.output ?: e.message
                 "切换失败: ${GitErrorMessage.friendly(reason ?: "")}"
@@ -307,6 +316,7 @@ class GitViewModel @Inject constructor(
                     _state.update { it.copy(checkoutLoading = null, notARepo = true, toast = msg) }
                 }
             } catch (e: Exception) {
+                if (e is CancellationException) throw e
                 _state.update { it.copy(checkoutLoading = null, toast = "$msg（刷新失败）") }
             }
         }
