@@ -1,47 +1,28 @@
 package com.aicode.feature.agent.presentation.component
 
-import android.content.Context
 import android.content.ClipData
-import androidx.compose.ui.platform.ClipEntry
-import androidx.compose.ui.platform.LocalClipboard
-import com.aicode.feature.agent.presentation.AgentUIMessage
 import android.net.Uri
-import android.provider.OpenableColumns
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.DragInteraction
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.DrawerState
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -53,45 +34,27 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameNanos
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.ClipEntry
+import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.aicode.R
 import com.aicode.core.theme.Brand
-import com.aicode.core.theme.Radius
 import com.aicode.core.theme.Spacing
-import com.aicode.feature.agent.domain.model.AgentImage
-import com.aicode.feature.agent.domain.model.AgentMode
 import com.aicode.feature.agent.domain.tool.question.UserQuestionAnswer
-import com.aicode.feature.agent.presentation.AgentAttachment
+import com.aicode.feature.agent.presentation.AgentUIMessage
 import com.aicode.feature.agent.presentation.AgentUIState
 import com.aicode.feature.agent.presentation.AIAgentViewModel
 import com.aicode.feature.agent.presentation.hasVisibleContent
-import com.aicode.feature.agent.presentation.MessageRole
 import com.aicode.feature.settings.presentation.SettingsViewModel
-import com.aicode.feature.settings.presentation.component.ModelLogoIcon
 import com.aicode.feature.workspace.presentation.WorkspaceViewModel
-import compose.icons.FeatherIcons
-import compose.icons.feathericons.GitBranch
-import compose.icons.feathericons.Menu
-import compose.icons.feathericons.Plus
-import compose.icons.feathericons.Star
-import compose.icons.feathericons.Terminal
-import kotlinx.coroutines.Dispatchers
+import java.io.File
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import java.io.File
-import java.util.Base64
-import androidx.compose.ui.res.stringResource
-import com.aicode.R
 
 internal val brandGradient = Brush.linearGradient(listOf(Brand.Blue, Brand.Sky))
 private const val REASONING_SCROLL_BUCKET_CHARS = 120
@@ -117,146 +80,6 @@ private data class AutoScrollSignal(
 private fun reasoningScrollBucket(text: String?): Int =
     text?.length?.let { (it / REASONING_SCROLL_BUCKET_CHARS) + 1 } ?: 0
 
-private data class UploadedWorkspaceFile(
-    val fileName: String,
-    val containerPath: String,
-    val localPath: String,
-    val mimeType: String,
-    val sizeBytes: Long,
-    val image: AgentImage? = null
-)
-
-internal data class PendingUploadAttachment(
-    val fileName: String,
-    val containerPath: String,
-    val localPath: String,
-    val mimeType: String,
-    val sizeBytes: Long,
-    val image: AgentImage? = null,
-)
-
-internal val PendingUploadAttachment.isImage: Boolean
-    get() = image != null
-
-private fun List<PendingUploadAttachment>.toAttachmentText(context: Context): String {
-    if (isEmpty()) return ""
-    return buildString {
-        append(context.getString(R.string.chat_attachment_prefix))
-        this@toAttachmentText.forEach { attachment ->
-            append('\n')
-            append("- ")
-            append(attachment.fileName)
-            append("：")
-            append(attachment.containerPath)
-        }
-    }
-}
-
-private fun appendAttachmentsToRequest(
-    context: Context,
-    request: String,
-    attachments: List<PendingUploadAttachment>
-): String {
-    val attachmentText = attachments.toAttachmentText(context)
-    if (attachmentText.isBlank()) return request
-    if (request.isBlank()) return attachmentText
-    return request.trimEnd() + "\n\n" + attachmentText
-}
-
-private fun UploadedWorkspaceFile.toPendingAttachment(): PendingUploadAttachment =
-    PendingUploadAttachment(
-        fileName = fileName,
-        containerPath = containerPath,
-        localPath = localPath,
-        mimeType = mimeType,
-        sizeBytes = sizeBytes,
-        image = image
-    )
-
-private fun PendingUploadAttachment.toAgentAttachment(): AgentAttachment =
-    AgentAttachment(
-        fileName = fileName,
-        containerPath = containerPath,
-        localPath = localPath,
-        mimeType = mimeType,
-        sizeBytes = sizeBytes,
-        isImage = isImage
-    )
-
-private fun List<PendingUploadAttachment>.toAgentAttachments(): List<AgentAttachment> =
-    map { it.toAgentAttachment() }
-
-private fun PendingUploadAttachment.toAgentImage(): AgentImage? = image
-
-private fun List<PendingUploadAttachment>.toAgentImages(): List<AgentImage> =
-    mapNotNull { it.toAgentImage() }
-
-private fun maxAttachmentMessage(context: Context, max: Int): String =
-    context.getString(R.string.chat_attachment_max, max)
-
-private fun uploadSuccessMessage(context: Context, count: Int): String =
-    context.getString(R.string.chat_attachment_uploaded, count)
-
-private fun partialUploadMessage(context: Context, count: Int): String =
-    context.getString(R.string.chat_attachment_uploaded_partial, count)
-
-private fun selectedAttachments(
-    uris: List<Uri>,
-    currentCount: Int
-): List<Uri> = uris.take((MAX_PENDING_ATTACHMENTS - currentCount).coerceAtLeast(0))
-
-private fun hasAttachmentSlots(currentCount: Int): Boolean =
-    currentCount < MAX_PENDING_ATTACHMENTS
-
-private fun remainingAttachmentSlots(currentCount: Int): Int =
-    (MAX_PENDING_ATTACHMENTS - currentCount).coerceAtLeast(0)
-
-private fun imageLimitError(context: Context): String =
-    context.getString(R.string.chat_image_too_large, formatBytes(MAX_IMAGE_UPLOAD_BYTES))
-
-private fun attachmentsRoot(workspace: File): File =
-    File(File(workspace, ".aicode"), "attachments").apply { mkdirs() }
-
-private fun workspaceContainerPath(relativePath: String): String =
-    "~/workspace/$relativePath"
-
-private fun attachmentRelativePath(workspace: File, target: File): String =
-    target.relativeTo(workspace).invariantSeparatorsPath
-
-private fun pickedFileToastPath(context: Context, path: String): String =
-    context.getString(R.string.chat_uploaded_to, path)
-
-private fun emptyWorkspaceMessage(context: Context): String =
-    context.getString(R.string.chat_select_workspace_first)
-
-private fun unreadableFileMessage(context: Context): String =
-    context.getString(R.string.chat_read_file_failed)
-
-private fun unavailableWorkspaceMessage(context: Context): String =
-    context.getString(R.string.chat_workspace_unavailable)
-
-private fun uploadFallbackError(context: Context): String =
-    context.getString(R.string.chat_upload_failed)
-
-private fun unsupportedImageTypeError(context: Context): String =
-    context.getString(R.string.chat_unsupported_image_type)
-
-private fun uploadFileName(context: Context, uri: Uri): String =
-    context.displayName(uri).ifBlank { "upload" }
-
-private fun safeUploadFileName(context: Context, uri: Uri): String =
-    sanitizeUploadFileName(uploadFileName(context, uri))
-
-private fun imageMimeType(context: Context, uri: Uri, fileName: String): String =
-    resolveImageMimeType(context, uri, fileName)
-
-private fun fileMimeType(context: Context, uri: Uri, fileName: String): String =
-    context.contentResolver.getType(uri)?.lowercase()
-        ?: when (fileName.substringAfterLast('.', "").lowercase()) {
-            "txt", "md", "kt", "java", "js", "ts", "json", "xml", "html", "css", "py", "sh", "gradle", "kts" -> "text/plain"
-            "pdf" -> "application/pdf"
-            else -> "application/octet-stream"
-        }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -796,337 +619,3 @@ fun AIChatPanel(
     }
 }
 
-private suspend fun copyUriToWorkspace(
-    context: Context,
-    uri: Uri,
-    workspacePath: String,
-    includeImageData: Boolean = false
-): UploadedWorkspaceFile = withContext(Dispatchers.IO) {
-    val workspace = File(workspacePath)
-    require(workspace.isDirectory) { unavailableWorkspaceMessage(context) }
-
-    val uploadsDir = attachmentsRoot(workspace)
-    val target = uniqueUploadFile(uploadsDir, safeUploadFileName(context, uri))
-
-    val input = context.contentResolver.openInputStream(uri) ?: error(unreadableFileMessage(context))
-    input.use { source ->
-        target.outputStream().use { output ->
-            source.copyTo(output)
-        }
-    }
-
-    val relativePath = attachmentRelativePath(workspace, target)
-    val mimeType = if (includeImageData) {
-        runCatching { imageMimeType(context, uri, target.name) }
-            .getOrElse { error ->
-                runCatching { target.delete() }
-                throw error
-            }
-    } else {
-        fileMimeType(context, uri, target.name)
-    }
-    val image = if (includeImageData) {
-        if (target.length() > MAX_IMAGE_UPLOAD_BYTES) {
-            runCatching { target.delete() }
-            error(imageLimitError(context))
-        }
-        AgentImage(
-            mimeType = mimeType,
-            base64Data = Base64.getEncoder().encodeToString(target.readBytes()),
-            path = workspaceContainerPath(relativePath)
-        )
-    } else {
-        null
-    }
-    UploadedWorkspaceFile(
-        fileName = target.name,
-        containerPath = workspaceContainerPath(relativePath),
-        localPath = target.absolutePath,
-        mimeType = mimeType,
-        sizeBytes = target.length(),
-        image = image
-    )
-}
-
-private fun Context.displayName(uri: Uri): String {
-    return contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
-        val index = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
-        if (index >= 0 && cursor.moveToFirst()) cursor.getString(index).orEmpty() else ""
-    }.orEmpty()
-}
-
-private fun sanitizeUploadFileName(name: String): String {
-    val cleaned = name
-        .map { ch -> if (ch.code < 32 || ch in "\\/:*?\"<>|") '_' else ch }
-        .joinToString("")
-        .trim()
-        .trim('.')
-    return cleaned.ifBlank { "upload" }.take(160)
-}
-
-private fun uniqueUploadFile(dir: File, fileName: String): File {
-    var candidate = File(dir, fileName)
-    if (!candidate.exists()) return candidate
-
-    val dotIndex = fileName.lastIndexOf('.')
-    val stem = if (dotIndex > 0) fileName.substring(0, dotIndex) else fileName
-    val extension = if (dotIndex > 0) fileName.substring(dotIndex) else ""
-    var index = 1
-    while (candidate.exists()) {
-        candidate = File(dir, "$stem-$index$extension")
-        index += 1
-    }
-    return candidate
-}
-
-private fun resolveImageMimeType(context: Context, uri: Uri, fileName: String): String {
-    val mime = context.contentResolver.getType(uri)?.lowercase()
-    if (mime in SUPPORTED_IMAGE_MIME_TYPES) return mime!!
-
-    val byExtension = when (fileName.substringAfterLast('.', "").lowercase()) {
-        "jpg", "jpeg" -> "image/jpeg"
-        "png" -> "image/png"
-        "gif" -> "image/gif"
-        "webp" -> "image/webp"
-        else -> null
-    }
-    if (byExtension != null) return byExtension
-    error(unsupportedImageTypeError(context))
-}
-
-private val SUPPORTED_IMAGE_MIME_TYPES = setOf(
-    "image/jpeg",
-    "image/png",
-    "image/gif",
-    "image/webp"
-)
-
-private const val MAX_IMAGE_UPLOAD_BYTES = 5L * 1024 * 1024
-private const val MAX_PENDING_ATTACHMENTS = 8
-
-internal fun formatBytes(bytes: Long): String {
-    val kb = 1024.0
-    val mb = kb * 1024.0
-    return when {
-        bytes >= mb -> String.format(java.util.Locale.US, "%.1f MB", bytes / mb)
-        bytes >= kb -> String.format(java.util.Locale.US, "%.0f KB", bytes / kb)
-        else -> "$bytes B"
-    }
-}
-
-@Composable
-internal fun ChatHeader(
-    sessionTitle: String,
-    modelName: String?,
-    inputTokens: Int,
-    outputTokens: Int,
-    onOpenDrawer: () -> Unit,
-    onNewChat: () -> Unit,
-    onNavigateToTerminal: () -> Unit,
-    onNavigateToGit: () -> Unit,
-    currentMode: AgentMode,
-    onToggleMode: (AgentMode) -> Unit,
-    connectionState: com.aicode.feature.agent.domain.container.ConnectionState? = null
-) {
-    Surface(
-        color = MaterialTheme.colorScheme.background
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .statusBarsPadding()
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = Spacing.sm, vertical = Spacing.sm),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(onClick = onOpenDrawer) {
-                    Icon(
-                        FeatherIcons.Menu,
-                        contentDescription = stringResource(R.string.chat_open_sidebar),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = sessionTitle,
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onBackground,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(Spacing.xs)
-                    ) {
-                        if (!modelName.isNullOrBlank()) {
-                            ModelLogoIcon(modelName = modelName, size = 14.dp)
-                        }
-                        Text(
-                            text = modelName?.takeIf { it.isNotBlank() } ?: stringResource(R.string.chat_no_model_selected),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                }
-                IconButton(onClick = onNewChat) {
-                    Icon(
-                        FeatherIcons.Plus,
-                        contentDescription = stringResource(R.string.chat_new_session),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                IconButton(onClick = onNavigateToGit) {
-                    Icon(
-                        FeatherIcons.GitBranch,
-                        contentDescription = stringResource(R.string.chat_open_git),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                IconButton(onClick = onNavigateToTerminal) {
-                    Icon(
-                        FeatherIcons.Terminal,
-                        contentDescription = stringResource(R.string.chat_open_terminal),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-            }
-            // 远程模式：左边 SSH 连接状态，右边 token 累计统计
-            if (connectionState != null) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = Spacing.md, vertical = Spacing.xs),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    ConnectionIndicator(state = connectionState)
-                    TokenStats(
-                        inputTokens = inputTokens,
-                        outputTokens = outputTokens
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun ConnectionIndicator(
-    state: com.aicode.feature.agent.domain.container.ConnectionState
-) {
-    val (dotColor, text) = when (state) {
-        com.aicode.feature.agent.domain.container.ConnectionState.CONNECTED ->
-            MaterialTheme.colorScheme.primary to stringResource(R.string.chat_ssh_connected)
-        com.aicode.feature.agent.domain.container.ConnectionState.CONNECTING ->
-            MaterialTheme.colorScheme.tertiary to stringResource(R.string.chat_ssh_connecting)
-        com.aicode.feature.agent.domain.container.ConnectionState.FAILED ->
-            MaterialTheme.colorScheme.error to stringResource(R.string.chat_ssh_failed)
-        com.aicode.feature.agent.domain.container.ConnectionState.DISCONNECTED ->
-            MaterialTheme.colorScheme.outline to stringResource(R.string.chat_ssh_disconnected)
-    }
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(Spacing.xs)
-    ) {
-        Box(
-            modifier = Modifier
-                .size(6.dp)
-                .clip(CircleShape)
-                .background(dotColor)
-        )
-        Text(
-            text = text,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
-    }
-}
-
-@Composable
-private fun TokenStats(inputTokens: Int, outputTokens: Int) {
-    val inStr = formatTokenCount(inputTokens)
-    val outStr = formatTokenCount(outputTokens)
-    Text(
-        text = "↑$inStr ↓$outStr",
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant
-    )
-}
-
-@Composable
-private fun RemoteConnectingPlaceholder(
-    state: com.aicode.feature.agent.domain.container.ConnectionState
-) {
-    val text = when (state) {
-        com.aicode.feature.agent.domain.container.ConnectionState.CONNECTING -> stringResource(R.string.chat_connecting_remote)
-        com.aicode.feature.agent.domain.container.ConnectionState.FAILED -> stringResource(R.string.chat_remote_connect_failed)
-        com.aicode.feature.agent.domain.container.ConnectionState.DISCONNECTED -> stringResource(R.string.chat_no_remote_connection)
-        com.aicode.feature.agent.domain.container.ConnectionState.CONNECTED -> ""
-    }
-    Box(
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(Spacing.sm)
-        ) {
-            if (state == com.aicode.feature.agent.domain.container.ConnectionState.CONNECTING) {
-                androidx.compose.material3.CircularProgressIndicator(
-                    modifier = Modifier.size(28.dp),
-                    strokeWidth = 2.dp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            Text(
-                text = text,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-    }
-}
-
-@Composable
-internal fun BrandMark(size: androidx.compose.ui.unit.Dp, iconSize: androidx.compose.ui.unit.Dp) {
-    Box(
-        modifier = Modifier
-            .size(size)
-            .clip(RoundedCornerShape(Radius.lg))
-            .background(brandGradient),
-        contentAlignment = Alignment.Center
-    ) {
-        Icon(
-            FeatherIcons.Star,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onPrimary,
-            modifier = Modifier.size(iconSize)
-        )
-    }
-}
-
-@Composable
-internal fun WelcomeState(modifier: Modifier = Modifier) {
-    Column(
-        modifier = modifier.padding(Spacing.xl),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        BrandMark(size = 64.dp, iconSize = 34.dp)
-        Spacer(Modifier.height(Spacing.xl))
-        Text(
-            text = stringResource(R.string.chat_placeholder),
-            style = MaterialTheme.typography.headlineSmall,
-            color = MaterialTheme.colorScheme.onBackground
-        )
-        Spacer(Modifier.height(Spacing.sm))
-        Text(
-            text = stringResource(R.string.chat_input_hint),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-    }
-}
