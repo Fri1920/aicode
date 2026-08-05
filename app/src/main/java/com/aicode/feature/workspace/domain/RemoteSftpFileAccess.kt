@@ -143,9 +143,12 @@ class RemoteSftpFileAccess @Inject constructor(
         // 确保父目录存在
         val parent = remote.substringBeforeLast('/', "")
         if (parent.isNotEmpty()) execExitCode("mkdir -p ${shellQuote(parent)}")
-        // 用 printf 写入：内容经 shellQuote 转义后作为单行命令参数，不依赖 here-doc
+        // 用 base64 中转写入：内容编码为单行 base64（无换行、无引号、无特殊字符），远程解码落盘。
+        // 相比 printf %s 直接把原始内容作命令行参数传递，base64 不受换行/引号/二进制内容的破坏，
+        // 与 readBytes/copyToLocal 的 base64 中转方式对称。
+        val b64 = java.util.Base64.getEncoder().encodeToString(content.toByteArray(Charsets.UTF_8))
         val redirect = if (overwrite) ">" else ">>"
-        val exit = execExitCode("printf %s ${shellQuote(content)} $redirect ${shellQuote(remote)}")
+        val exit = execExitCode("printf %s ${shellQuote(b64)} | base64 -d $redirect ${shellQuote(remote)}")
         if (exit != 0) FileLogger.w(TAG, "writeFile 退出码=$exit: $remote")
     }
 

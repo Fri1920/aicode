@@ -31,11 +31,46 @@ class SyncEngine(
         
         // 2. 检查 .gitignore 规则
         if (useGitIgnore && gitIgnorePatterns.isNotEmpty()) {
-            if (parts.any { p -> gitIgnorePatterns.any { g -> p == g || (g.startsWith("*.") && p.endsWith(g.drop(1))) } }) {
+            if (gitIgnorePatterns.any { pattern -> matchesGitIgnore(pattern, parts) }) {
                 return true
             }
         }
         return false
+    }
+
+    /**
+     * gitignore 模式匹配（适度实现，不做完整规范解析）：
+     * - `*.ext`：匹配任意层级同名扩展名的文件/目录；
+     * - `**` 通配前缀：任意层级开始；
+     * - 多段模式（如 build 下的 *.log）：在路径段序列的任意位置匹配；
+     * - 前导 `/` 锚定因调用方同时传入本地/远程两种完整路径、无法可靠定位工作区根，
+     *   这里保守地按非锚定处理（宁可多忽略，不因解析失败漏忽略）。
+     * 匹配基于完整路径段序列，本地与远程路径均适用。
+     */
+    private fun matchesGitIgnore(pattern: String, parts: List<String>): Boolean {
+        var p = pattern.trim().trimEnd('/').trimStart('/')
+        if (p.isEmpty()) return false
+        // 双星通配前缀：任意层级开始
+        p = p.removePrefix("**/")
+        if (p.isEmpty()) return false
+        // *.ext 文件模式：匹配任意层级的文件名
+        if (p.startsWith("*.") && '/' !in p) {
+            val ext = p.removePrefix("*.")
+            return parts.any { it.endsWith(ext) }
+        }
+        val segs = p.split('/')
+        if (segs.size > parts.size) return false
+        return (0..parts.size - segs.size).any { start ->
+            segs.indices.all { i -> segMatch(segs[i], parts[start + i]) }
+        }
+    }
+
+    /** 单段匹配：`**` 与 `*` 通配段、精确段。 */
+    private fun segMatch(pattern: String, segment: String): Boolean {
+        if (pattern == "**") return true
+        if ('*' !in pattern) return pattern == segment
+        val regex = Regex("^" + Regex.escape(pattern).replace("\\*", ".*") + "$")
+        return regex.matches(segment)
     }
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -157,10 +192,16 @@ class SyncEngine(
      * 开始监听本地镜像目录的改变
      */
     fun startWatching() {
+        // 防止重复监听：重新进入时先清理旧的 observer（目录删除/重建或重复调用可能残留）
+        stopWatching()
         val mask = FileObserver.CREATE or FileObserver.MODIFY or FileObserver.DELETE or FileObserver.MOVED_TO or FileObserver.MOVED_FROM
-        
+        // 已监听目录去重：动态新建的子目录可能触发重复的 watchDirectory 递归
+        val watchedDirs = mutableSetOf<String>()
+
         fun watchDirectory(dir: File) {
-            if (!dir.exists() || !dir.isDirectory || isIgnored(dir.absolutePath)) return
+            val key = dir.absolutePath
+            if (!dir.exists() || !dir.isDirectory || isIgnored(dir.absolutePath) || key in watchedDirs) return
+            watchedDirs.add(key)
             val observer = object : FileObserver(dir, mask) {
                 override fun onEvent(event: Int, path: String?) {
                     if (path == null) return
