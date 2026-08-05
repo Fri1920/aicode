@@ -91,8 +91,10 @@ class McpManager @Inject constructor(
     private suspend fun connectOne(cfg: McpServerConfig): McpServerStatus {
         return try {
             val transport = if (cfg.isStdio) {
-                // 本地 stdio server 需要容器就绪（首次会解压 rootfs）。
-                containerEngine.ensureInstalled()
+                // 本地 stdio server 需要容器就绪；未就绪不自动初始化，直接失败并引导去终端页完成初始化。
+                containerEngine.notReadyHint()?.let {
+                    throw IllegalStateException(it)
+                }
                 StdioTransport(
                     serverName = cfg.name,
                     engine = containerEngine,

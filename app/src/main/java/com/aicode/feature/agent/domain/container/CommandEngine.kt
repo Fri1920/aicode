@@ -87,8 +87,17 @@ interface CommandEngine {
     fun defaultShell(): String
 
     /**
+     * 后端是否已就绪可执行命令。null 表示就绪；非 null 为未就绪的原因提示，
+     * 由调用方展示给用户并引导其完成初始化（本地为「请先进入终端页面初始化」）。
+     *
+     * 默认实现恒返回 null（远程 SSH 的连接失败由首次命令自动重试处理，不属此类）。
+     * [LinuxContainerEngine] 覆写为按 rootfs/provision 状态返回引导文案。
+     */
+    fun notReadyHint(): String? = null
+
+    /**
      * 幂等地确保后端可用：本地会解压 rootfs/proot 并配置基础包（首次耗时）；
-     * 远程则建立 SSH 连接。供所有命令执行入口在执行前统一调用。
+     * 远程则建立 SSH 连接。仅由终端页（唯一初始化入口）调用，命令执行入口不再自动触发。
      */
     suspend fun ensureInstalled()
 

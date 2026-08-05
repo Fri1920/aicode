@@ -58,5 +58,7 @@ class DelegatingCommandEngine @Inject constructor(
 
     override fun defaultShell(): String = delegate().defaultShell()
 
+    override fun notReadyHint(): String? = delegate().notReadyHint()
+
     override suspend fun ensureInstalled() = delegate().ensureInstalled()
 }

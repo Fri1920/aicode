@@ -298,6 +298,7 @@
     <string name="container_extra_bindings">Extra bindings (space-separated, e.g. /sdcard:/mnt)</string>
     <string name="container_extra_proot_args">Extra proot args (space-separated)</string>
     <string name="container_imported_click">Imported (tap to reselect)</string>
+    <string name="container_not_ready_hint">Container is not initialized yet. Please open the Terminal page to complete initialization first.</string>
     <string name="container_file_selected">File selected</string>
     <string name="container_select_image_file">Select tar.gz / tgz / tar.xz / txz image file</string>
     <string name="container_no_sftp_channel">No SFTP channel available. Please configure an SFTP connection in the "Remote Server" page first.</string>

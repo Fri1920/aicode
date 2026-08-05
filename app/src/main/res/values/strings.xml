@@ -298,6 +298,7 @@
     <string name="container_extra_bindings">额外绑定（空格分隔，如 /sdcard:/mnt）</string>
     <string name="container_extra_proot_args">额外 proot 参数（空格分隔）</string>
     <string name="container_imported_click">已导入（点此重新选择）</string>
+    <string name="container_not_ready_hint">容器尚未初始化，请先进入终端页面完成初始化后再执行命令</string>
     <string name="container_file_selected">已选择文件</string>
     <string name="container_select_image_file">选择 tar.gz / tgz / tar.xz / txz 镜像文件</string>
     <string name="container_no_sftp_channel">暂无可用的 SFTP 通道，请先在「远程服务器」页配置一个 SFTP 连接通道。</string>

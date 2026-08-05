@@ -2,10 +2,13 @@ package com.aicode.feature.agent.domain.container
 
 import com.aicode.core.util.FileLogger
 import com.aicode.feature.workspace.domain.WorkspacePathMapper
+import com.aicode.R
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.currentCoroutineContext
@@ -69,6 +72,7 @@ data class ProotInvocation(
 
 @Singleton
 class LinuxContainerEngine @Inject constructor(
+    @param:ApplicationContext private val context: android.content.Context,
     private val containerInstaller: ContainerInstaller,
     private val containerSettingsRepository: com.aicode.feature.settings.data.repository.ContainerSettingsRepository,
     private val workspacePathMapper: WorkspacePathMapper
@@ -77,8 +81,17 @@ class LinuxContainerEngine @Inject constructor(
     private val _initProgress = MutableStateFlow<ContainerInitState>(ContainerInitState.Idle)
     override val initProgress: StateFlow<ContainerInitState> = _initProgress.asStateFlow()
 
-    /** 串行化 ensureInstalled，避免多入口并发触发重复解压/配置；后到者等待后看到就绪直接置 Ready。 */
+    /** 串行化容器初始化（含后台 initScope 内的任务创建与执行），避免多入口并发重复解压/配置。 */
     private val initMutex = Mutex()
+
+    /**
+     * 容器初始化的独立协程作用域：不随任何页面/调用方取消而中断，
+     * 保证退出终端页后初始化仍在后台继续，下次进入可复用或等待其完成。
+     */
+    private val initScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    /** 当前在途的初始化 job（受 [initMutex] 保护），完成后置 null。 */
+    private var initJob: Job? = null
 
     /**
      * 当前选中的 profile（缓存自 [containerSettingsRepository.activeProfileIdFlow]，避免同步读 DataStore）。
@@ -170,11 +183,14 @@ class LinuxContainerEngine @Inject constructor(
         projectPath: String?,
         timeoutMs: Long
     ): Flow<CommandEvent> = flow {
-        // 懒安装：首次执行命令时解压 rootfs/proot 并配置基础包（python3/git/pip/node/npm/rg）
-        ensureInstalled()
+        // 未就绪（rootfs 未解压或基础包未配置）时不自动初始化，直接提示用户去终端页完成初始化。
+        notReadyHint()?.let {
+            emit(CommandEvent.Line(it))
+            emit(CommandEvent.Exit(null))
+            return@flow
+        }
         emitAll(streamExecNoInstall(command, projectPath, timeoutMs))
     }.flowOn(Dispatchers.IO)
-
     /**
      * 在容器内流式执行命令的「裸」实现：每读到一行就 emit [CommandEvent.Line]，命令结束 emit
      * [CommandEvent.Exit]。**不触发懒安装**（不调 [ensureInstalled]），假定 rootfs 已就绪。
@@ -263,8 +279,8 @@ class LinuxContainerEngine @Inject constructor(
         projectPath: String?,
         timeoutMs: Long
     ): String = withContext(Dispatchers.IO) {
-        // 懒安装：首次执行命令时解压 rootfs/proot 并配置基础包（python3/git/rg）
-        ensureInstalled()
+        // 未就绪时不自动初始化，直接返回引导文案，由用户去终端页完成初始化。
+        notReadyHint()?.let { return@withContext it }
         execCaptured(command, projectPath, timeoutMs).output
     }
 
@@ -277,7 +293,8 @@ class LinuxContainerEngine @Inject constructor(
         projectPath: String?,
         timeoutMs: Long
     ): CommandResult = withContext(Dispatchers.IO) {
-        ensureInstalled()
+        // 未就绪时不自动初始化，直接返回引导文案，由用户去终端页完成初始化。
+        notReadyHint()?.let { return@withContext CommandResult(it, null) }
         val r = execCaptured(command, projectPath, timeoutMs)
         CommandResult(r.output, r.exitCode)
     }
@@ -503,6 +520,15 @@ class LinuxContainerEngine @Inject constructor(
     }
 
     /**
+     * 容器未就绪（rootfs 未解压或基础包未配置完成）时返回引导文案，就绪返回 null。
+     * 命令执行入口据此不自动初始化、直接失败并引导用户去终端页完成初始化。
+     */
+    override fun notReadyHint(): String? {
+        if (containerInstaller.isInstalledFor(currentProfile) && isProvisioned()) return null
+        return context.getString(R.string.container_not_ready_hint)
+    }
+
+    /**
      * 容器默认命令 shell：内置 Alpine 按 provision 状态选 `/bin/bash` 或 `/bin/sh`；
      * 自定义镜像用 profile 指定的 [ContainerProfile.shellPath]，未指定回退 `/bin/sh`。
      *
@@ -517,27 +543,50 @@ class LinuxContainerEngine @Inject constructor(
     /**
      * 幂等地确保容器可用：先解压 rootfs/proot（首次耗时），内置再配置基础包（首次需联网）。
      * 自定义镜像只解压 rootfs，不 provision——镜像源与所需工具由用户自行处理。
-     * 供所有命令执行入口（[runCommandSync]/[runCommandStream]）在执行前统一调用。
+     * 仅由终端页（[TerminalSessionManager]）作为唯一初始化入口调用；命令执行入口不再自动触发。
      *
-     * 用 [initMutex] 串行化：多入口并发时只让第一个真正解压/配置，其余等待后看到就绪直接置 [ContainerInitState.Ready]。
-     * 全程通过 [initProgress] 上报阶段进度，供 UI 实时展示。
+     * 耗时初始化（解压/装包）在引擎级 [initScope] 中执行，不随调用方（终端页 viewModelScope）
+     * 取消而中断——退出终端页后初始化仍在后台继续，下次进入可复用同一 job 或等待其完成。
+     * 全程通过 [initProgress] 上报阶段进度。rootfs 已解压但基础包配置失败时置 [ContainerInitState.Failed]
+     * 并抛异常（不静默置 Ready），让终端页进入失败态、可重试，避免"依赖缺失却显示成功"。
      */
-    override suspend fun ensureInstalled() = initMutex.withLock {
+    override suspend fun ensureInstalled() {
         val profile = currentProfile
-        // 每次启动或执行命令前确保提取最新的内置文档
+        // 每次进入终端页前确保提取最新的内置文档
         containerInstaller.extractDocs()
         if (containerInstaller.isInstalledFor(profile) && isProvisioned()) {
             _initProgress.value = ContainerInitState.Ready
             refreshContainerHome()
-            return@withLock
+            return
         }
+        // 启动或复用后台初始化 job；initMutex 只保护 job 的创建/复用，真正的耗时工作在 initScope 里跑。
+        val job = initMutex.withLock {
+            val existing = initJob
+            if (existing == null || !existing.isActive) {
+                initJob = initScope.launch { doInit(profile) }
+            }
+            initJob!!
+        }
+        // 等待完成；若调用方（终端页）被取消，join 抛 CancellationException，但后台 job 继续执行。
+        job.join()
+        if (containerInstaller.isInstalledFor(profile) && isProvisioned()) {
+            _initProgress.value = ContainerInitState.Ready
+            refreshContainerHome()
+        } else {
+            val reason = if (containerInstaller.isInstalledFor(profile))
+                "容器基础包安装未完成（可能是网络问题），请重试"
+            else
+                "容器未安装（缺少 rootfs/proot）"
+            _initProgress.value = ContainerInitState.Failed(reason)
+            throw IllegalStateException(reason)
+        }
+    }
+
+    /** 在 [initScope] 中真正执行一次性初始化：解压 rootfs + 配置基础包。 */
+    private suspend fun doInit(profile: ContainerProfile) {
         // installRootfsIfNeed 在真正解压/部署时回调更新进度（已安装则快路径不回调）
         containerInstaller.installRootfsIfNeed(profile) { _initProgress.value = it }
         if (profile.isBuiltin) provisionIfNeeded()
-        _initProgress.value =
-            if (containerInstaller.isInstalledFor(profile)) ContainerInitState.Ready
-            else ContainerInitState.Failed("容器未安装（缺少 rootfs/proot）")
-        if (containerInstaller.isInstalledFor(profile)) refreshContainerHome()
     }
 
     /** 查容器内 $HOME 并缓存到 [WorkspacePathMapper]，供文件工具展开 ~。 */

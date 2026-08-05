@@ -154,6 +154,11 @@ class GitViewModel @Inject constructor(
 
     fun refresh() {
         if (_state.value.busy) return
+        // 容器未就绪时不执行 git 命令，直接提示用户去终端页完成初始化，避免误显示"非 Git 仓库"。
+        repository.notReadyHint()?.let { hint ->
+            _state.update { it.copy(loading = false, toast = hint) }
+            return
+        }
         _state.update { it.copy(loading = true, toast = null) }
         viewModelScope.launch {
             try {

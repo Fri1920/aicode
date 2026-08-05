@@ -80,6 +80,9 @@ class GitRepository @Inject constructor(
             .getOrElse { false }
     }
 
+    /** 容器是否就绪可执行 git 命令；未就绪时返回引导文案（供 Git 页在刷新前提示用户去终端页初始化）。 */
+    fun notReadyHint(): String? = engine.notReadyHint()
+
     /** 在当前工作区初始化 git 仓库（`git init`）。据退出码判成败，失败抛 [GitCommandFailureException]。 */
     suspend fun initRepo(): String = gitChecked("init")
 
