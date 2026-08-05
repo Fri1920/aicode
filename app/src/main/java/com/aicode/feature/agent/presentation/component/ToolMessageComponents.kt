@@ -7,6 +7,7 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -36,9 +37,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
@@ -245,29 +245,24 @@ internal fun ToolStatusDot(running: Boolean, isError: Boolean) {
         isError -> DiffRemoveText
         else -> DiffAddText
     }
-    if (running) {
+    val dotAlpha = if (running) {
         val transition = rememberInfiniteTransition(label = "tool-status-dot")
-        val a by transition.animateFloat(
+        transition.animateFloat(
             initialValue = 1f,
             targetValue = 0.25f,
             animationSpec = infiniteRepeatable(animation = tween(650), repeatMode = RepeatMode.Reverse),
             label = "tool-status-dot-alpha"
-        )
-        Box(
-            modifier = Modifier
-                .size(8.dp)
-                .graphicsLayer { alpha = a }
-                .clip(CircleShape)
-                .background(baseColor)
-        )
+        ).value
     } else {
-        Box(
-            modifier = Modifier
-                .size(8.dp)
-                .clip(CircleShape)
-                .background(baseColor)
-        )
+        1f
     }
+    Box(
+        modifier = Modifier
+            .size(8.dp)
+            .graphicsLayer { alpha = dotAlpha }
+            .clip(CircleShape)
+            .background(baseColor)
+    )
 }
 
 /** 展开区的一段带小标题的内容块（如「指令」「结果」） */

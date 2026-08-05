@@ -147,6 +147,15 @@
     <string name="chat_placeholder">有什么可以帮你的？</string>
     <string name="chat_input_hint">描述你的需求，我来帮你编写、修改或解释代码</string>
 
+    <!-- Agent Status -->
+    <string name="agent_stopped_by_user">已被用户停止</string>
+    <string name="agent_tool_executing">%1$s 执行中…</string>
+    <string name="agent_context_compacted">上下文已压缩</string>
+    <string name="agent_context_no_compaction">当前上下文无需压缩（消息过少）</string>
+    <string name="agent_compaction_failed">压缩失败: %1$s</string>
+    <string name="agent_model_not_selected">未选择</string>
+    <string name="agent_apply_changes_failed">应用更改失败: %1$s</string>
+
     <!-- About -->
     <string name="about_version">版本</string>
     <string name="about_github_repo">GitHub 仓库</string>
@@ -317,6 +326,12 @@
     <string name="credential_default_hint">同 host 多账号时，默认那条优先注入</string>
     <string name="credential_fields_required">host、用户名、Token 均不能为空</string>
 
+    <!-- Credential Toast -->
+    <string name="credential_toast_saved">凭据已保存</string>
+    <string name="credential_toast_save_failed">保存失败: %1$s</string>
+    <string name="credential_toast_deleted">凭据已删除</string>
+    <string name="credential_toast_identity_saved">署名与仓库地址已保存</string>
+
     <!-- Credential List -->
     <string name="credential_empty_hint">尚未添加凭据，点右上角 + 添加</string>
 
@@ -398,6 +413,29 @@
     <string name="git_init_desc">初始化后会在此创建 .git，之后可暂存、提交、关联远程。</string>
     <string name="git_init_repo">初始化 Git 仓库</string>
     <string name="git_commit_message">提交信息</string>
+
+    <!-- Git Toast Messages -->
+    <string name="git_toast_load_branches_failed">加载分支失败: %1$s</string>
+    <string name="git_toast_refresh_failed">刷新失败: %1$s</string>
+    <string name="git_toast_action_refresh_failed">%1$s（刷新失败）</string>
+    <string name="git_toast_no_remote_pull">未配置远程仓库，无法拉取</string>
+    <string name="git_toast_no_remote_push">未配置远程仓库，无法推送</string>
+    <string name="git_toast_load_more_failed">加载更多失败: %1$s</string>
+    <string name="git_toast_action_success">%1$s成功</string>
+    <string name="git_toast_action_failed">%1$s失败: %2$s</string>
+    <string name="git_toast_checkout_success">已切换到 %1$s</string>
+    <string name="git_toast_checkout_failed">切换失败: %1$s</string>
+    <string name="git_toast_diff_failed">加载差异失败</string>
+    <string name="git_action_stage_all">全部暂存</string>
+    <string name="git_action_unstage_all">全部取消暂存</string>
+    <string name="git_action_commit">提交</string>
+    <string name="git_action_init">初始化</string>
+    <string name="git_action_create_branch">创建分支</string>
+    <string name="git_action_delete_branch">删除分支</string>
+    <string name="git_action_delete_remote_branch">删除远程分支</string>
+    <string name="git_action_rename_branch">重命名分支</string>
+    <string name="git_action_create_tag">创建标签</string>
+    <string name="git_action_delete_tag">删除标签</string>
 
     <!-- Git Identity -->
     <string name="git_tab_identity">署名</string>

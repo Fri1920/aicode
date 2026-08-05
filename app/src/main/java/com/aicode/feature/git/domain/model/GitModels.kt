@@ -13,7 +13,6 @@ data class GitFileChange(
     val staged: Boolean
 )
 
-/** 一条提交记录。 */
 data class GitCommit(
     val hash: String,
     val shortHash: String,
@@ -22,14 +21,12 @@ data class GitCommit(
     val message: String
 )
 
-/** 一个分支引用。 */
 data class GitBranch(
     val name: String,
     val current: Boolean,
     val remote: Boolean
 )
 
-/** 一个标签。 */
 data class GitTag(
     val name: String,
     val shortHash: String
@@ -48,5 +45,4 @@ data class GitStatus(
         get() = staged.isNotEmpty() || unstaged.isNotEmpty() || untracked.isNotEmpty()
 }
 
-/** Git 页的三个标签页。 */
 enum class GitTab { STATUS, BRANCHES, LOG }

@@ -45,7 +45,11 @@ import com.aicode.core.theme.Spacing
 import com.aicode.feature.workspace.domain.model.Workspace
 import com.aicode.feature.workspace.presentation.WorkspaceViewModel
 import compose.icons.FeatherIcons
-import compose.icons.feathericons.*
+import compose.icons.feathericons.Folder
+import compose.icons.feathericons.FolderPlus
+import compose.icons.feathericons.MoreHorizontal
+import compose.icons.feathericons.Plus
+import compose.icons.feathericons.Trash2
 import androidx.compose.ui.res.stringResource
 import com.aicode.R
 

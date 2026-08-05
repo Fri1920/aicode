@@ -99,7 +99,12 @@ import com.aicode.feature.settings.domain.model.ProviderType
 import com.aicode.feature.settings.presentation.FetchState
 import com.aicode.feature.settings.presentation.SettingsViewModel
 import compose.icons.FeatherIcons
-import compose.icons.feathericons.*
+import compose.icons.feathericons.ArrowLeft
+import compose.icons.feathericons.Cpu
+import compose.icons.feathericons.DownloadCloud
+import compose.icons.feathericons.Plus
+import compose.icons.feathericons.Sliders
+import compose.icons.feathericons.Trash2
 import androidx.compose.ui.res.stringResource
 import com.aicode.R
 

@@ -23,7 +23,8 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import com.aicode.core.theme.Spacing
 import compose.icons.FeatherIcons
-import compose.icons.feathericons.*
+import compose.icons.feathericons.Eye
+import compose.icons.feathericons.EyeOff
 import androidx.compose.ui.res.stringResource
 import com.aicode.R
 

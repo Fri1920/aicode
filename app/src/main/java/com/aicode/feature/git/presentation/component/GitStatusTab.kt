@@ -83,25 +83,26 @@ internal fun StatusTab(
         if (clean) {
             EmptyState(stringResource(R.string.git_clean_with_changes))
         } else {
+            val ss = s ?: return
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(bottom = Spacing.xl)
             ) {
-                if (s!!.staged.isNotEmpty()) {
-                    item { SectionHeader(stringResource(R.string.git_staged_count, s.staged.size)) }
-                    items(s.staged, key = { "s-${it.path}" }) { f ->
+                if (ss.staged.isNotEmpty()) {
+                    item { SectionHeader(stringResource(R.string.git_staged_count, ss.staged.size)) }
+                    items(ss.staged, key = { "s-${it.path}" }) { f ->
                         FileRow(f, actionIcon = FeatherIcons.Minus, actionDesc = stringResource(R.string.git_unstage), onAction = { onUnstage(f.path) }, enabled = !busy)
                     }
                 }
-                if (s.unstaged.isNotEmpty()) {
-                    item { SectionHeader(stringResource(R.string.git_modified_count, s.unstaged.size)) }
-                    items(s.unstaged, key = { "u-${it.path}" }) { f ->
+                if (ss.unstaged.isNotEmpty()) {
+                    item { SectionHeader(stringResource(R.string.git_modified_count, ss.unstaged.size)) }
+                    items(ss.unstaged, key = { "u-${it.path}" }) { f ->
                         FileRow(f, actionIcon = FeatherIcons.Plus, actionDesc = stringResource(R.string.git_stage), onAction = { onStage(f.path) }, enabled = !busy, onClick = { onFileDiff(f.path) })
                     }
                 }
-                if (s.untracked.isNotEmpty()) {
-                    item { SectionHeader(stringResource(R.string.git_untracked_count, s.untracked.size)) }
-                    items(s.untracked, key = { it }) { path ->
+                if (ss.untracked.isNotEmpty()) {
+                    item { SectionHeader(stringResource(R.string.git_untracked_count, ss.untracked.size)) }
+                    items(ss.untracked, key = { it }) { path ->
                         FileRow(
                             file = GitFileChange(path, "?", staged = false),
                             actionIcon = FeatherIcons.Plus,

@@ -13,7 +13,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import compose.icons.FeatherIcons
-import compose.icons.feathericons.*
+import compose.icons.feathericons.Info
+import compose.icons.feathericons.Settings
+import compose.icons.feathericons.Share2
 import androidx.compose.ui.res.stringResource
 import com.aicode.R
 
@@ -120,9 +122,10 @@ fun WiFiFtpServerSection(viewModel: RemoteServerViewModel) {
                 }
 
                 if (errorMessage != null) {
+                    val error = errorMessage
                     Spacer(modifier = Modifier.height(12.dp))
                     Text(
-                        text = context.getString(R.string.ftp_error, errorMessage!!),
+                        text = context.getString(R.string.ftp_error, error),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.error
                     )

@@ -55,9 +55,13 @@ import com.aicode.core.theme.Spacing
 import com.aicode.core.ui.rememberImeBottomInset
 import com.aicode.feature.agent.domain.command.SlashCommandHandler
 import com.aicode.feature.agent.domain.model.AgentMode
+import com.aicode.feature.agent.domain.model.ChangeType
+import com.aicode.feature.agent.domain.model.CodeChange
 import com.aicode.feature.agent.domain.model.ReasoningEffort
 import com.aicode.feature.agent.domain.permission.PermissionChoice
 import com.aicode.feature.agent.domain.tool.PendingToolPermission
+import com.aicode.feature.agent.domain.tool.mode.PlanApprovalRequest
+import com.aicode.feature.agent.presentation.AgentUIState
 import com.aicode.feature.agent.presentation.QueuedRequest
 import com.aicode.feature.settings.domain.model.AIProviderConfig
 import com.aicode.feature.workspace.presentation.WorkspaceViewModel
@@ -497,21 +501,21 @@ internal fun ToolPermissionPanel(
 }
 
 @Composable
-internal fun StatusBanner(state: com.aicode.feature.agent.presentation.AgentUIState) {
+internal fun StatusBanner(state: AgentUIState) {
     androidx.compose.animation.AnimatedVisibility(
-        visible = state is com.aicode.feature.agent.presentation.AgentUIState.Error || state is com.aicode.feature.agent.presentation.AgentUIState.Applied,
+        visible = state is AgentUIState.Error || state is AgentUIState.Applied,
         enter = androidx.compose.animation.fadeIn(),
         exit = androidx.compose.animation.fadeOut()
     ) {
         when (state) {
-            is com.aicode.feature.agent.presentation.AgentUIState.Error -> InfoBanner(
+            is AgentUIState.Error -> InfoBanner(
                 text = state.message,
                 container = MaterialTheme.colorScheme.errorContainer,
                 content = MaterialTheme.colorScheme.onErrorContainer,
                 icon = FeatherIcons.AlertCircle
             )
 
-            is com.aicode.feature.agent.presentation.AgentUIState.Applied -> InfoBanner(
+            is AgentUIState.Applied -> InfoBanner(
                 text = stringResource(R.string.chat_code_changes_applied),
                 container = MaterialTheme.colorScheme.primaryContainer,
                 content = MaterialTheme.colorScheme.onPrimaryContainer,
@@ -550,7 +554,7 @@ internal fun InfoBanner(
 
 @Composable
 fun ChangePreviewPanel(
-    changes: List<com.aicode.feature.agent.domain.model.CodeChange>,
+    changes: List<CodeChange>,
     onApply: () -> Unit,
     onReject: () -> Unit
 ) {
@@ -598,10 +602,10 @@ fun ChangePreviewPanel(
 }
 
 @Composable
-fun ChangeItem(change: com.aicode.feature.agent.domain.model.CodeChange) {
+fun ChangeItem(change: CodeChange) {
     val accent = when (change.type) {
-        com.aicode.feature.agent.domain.model.ChangeType.CREATE -> MaterialTheme.colorScheme.tertiary
-        com.aicode.feature.agent.domain.model.ChangeType.DELETE -> MaterialTheme.colorScheme.error
+        ChangeType.CREATE -> MaterialTheme.colorScheme.tertiary
+        ChangeType.DELETE -> MaterialTheme.colorScheme.error
         else -> MaterialTheme.colorScheme.secondary
     }
     Row(
@@ -610,9 +614,9 @@ fun ChangeItem(change: com.aicode.feature.agent.domain.model.CodeChange) {
     ) {
         Text(
             text = when (change.type) {
-                com.aicode.feature.agent.domain.model.ChangeType.CREATE -> "+"
-                com.aicode.feature.agent.domain.model.ChangeType.DELETE -> "−"
-                com.aicode.feature.agent.domain.model.ChangeType.REPLACE -> "~"
+                ChangeType.CREATE -> "+"
+                ChangeType.DELETE -> "−"
+                ChangeType.REPLACE -> "~"
                 else -> "→"
             },
             modifier = Modifier.width(20.dp),
@@ -637,7 +641,7 @@ fun ChangeItem(change: com.aicode.feature.agent.domain.model.CodeChange) {
  */
 @Composable
 internal fun PlanApprovalPanel(
-    state: com.aicode.feature.agent.domain.tool.mode.PlanApprovalRequest,
+    state: PlanApprovalRequest,
     onApprove: () -> Unit,
     onRefine: () -> Unit
 ) {

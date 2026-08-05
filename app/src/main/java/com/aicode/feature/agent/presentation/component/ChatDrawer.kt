@@ -45,6 +45,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -53,7 +54,11 @@ import com.aicode.core.theme.Spacing
 import com.aicode.feature.agent.domain.model.ChatSession
 import com.aicode.feature.agent.presentation.AgentUIState
 import compose.icons.FeatherIcons
-import compose.icons.feathericons.*
+import compose.icons.feathericons.Download
+import compose.icons.feathericons.Edit2
+import compose.icons.feathericons.Plus
+import compose.icons.feathericons.Settings
+import compose.icons.feathericons.Trash2
 import androidx.compose.ui.res.stringResource
 import com.aicode.R
 
@@ -282,78 +287,63 @@ private fun SessionActionSheet(
                     .padding(horizontal = Spacing.lg)
                     .padding(bottom = Spacing.md)
             )
-            Surface(onClick = {
-                onDismiss()
-                onRename()
-            }, color = Color.Transparent) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = Spacing.lg, vertical = Spacing.md),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = FeatherIcons.Edit2,
-                        contentDescription = null,
-                        modifier = Modifier.size(20.dp),
-                        tint = MaterialTheme.colorScheme.onSurface
-                    )
-                    Spacer(Modifier.width(Spacing.lg))
-                    Text(
-                        text = stringResource(R.string.common_rename),
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
+            SheetActionRow(
+                icon = FeatherIcons.Edit2,
+                label = stringResource(R.string.common_rename),
+                tint = MaterialTheme.colorScheme.onSurface,
+                onClick = {
+                    onDismiss()
+                    onRename()
                 }
-            }
-            Surface(onClick = {
-                onDismiss()
-                onExport()
-            }, color = Color.Transparent) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = Spacing.lg, vertical = Spacing.md),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = FeatherIcons.Download,
-                        contentDescription = null,
-                        modifier = Modifier.size(20.dp),
-                        tint = MaterialTheme.colorScheme.onSurface
-                    )
-                    Spacer(Modifier.width(Spacing.lg))
-                    Text(
-                        text = stringResource(R.string.chat_export_session),
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
+            )
+            SheetActionRow(
+                icon = FeatherIcons.Download,
+                label = stringResource(R.string.chat_export_session),
+                tint = MaterialTheme.colorScheme.onSurface,
+                onClick = {
+                    onDismiss()
+                    onExport()
                 }
-            }
-            Surface(onClick = {
-                onDismiss()
-                onDelete()
-            }, color = Color.Transparent) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = Spacing.lg, vertical = Spacing.md),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = FeatherIcons.Trash2,
-                        contentDescription = null,
-                        modifier = Modifier.size(20.dp),
-                        tint = MaterialTheme.colorScheme.error
-                    )
-                    Spacer(Modifier.width(Spacing.lg))
-                    Text(
-                        text = stringResource(R.string.common_delete),
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.error
-                    )
+            )
+            SheetActionRow(
+                icon = FeatherIcons.Trash2,
+                label = stringResource(R.string.common_delete),
+                tint = MaterialTheme.colorScheme.error,
+                onClick = {
+                    onDismiss()
+                    onDelete()
                 }
-            }
+            )
+        }
+    }
+}
+
+@Composable
+private fun SheetActionRow(
+    icon: ImageVector,
+    label: String,
+    tint: Color,
+    onClick: () -> Unit
+) {
+    Surface(onClick = onClick, color = Color.Transparent) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = Spacing.lg, vertical = Spacing.md),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                modifier = Modifier.size(20.dp),
+                tint = tint
+            )
+            Spacer(Modifier.width(Spacing.lg))
+            Text(
+                text = label,
+                style = MaterialTheme.typography.bodyLarge,
+                color = tint
+            )
         }
     }
 }

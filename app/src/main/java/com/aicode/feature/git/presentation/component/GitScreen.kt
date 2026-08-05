@@ -239,8 +239,8 @@ fun GitScreen(
         )
     }
 
-    if (editingCredential != null) {
-        val editing = editingCredential!!
+    val editing = editingCredential
+    if (editing != null) {
         CredentialEditorSheet(
             initial = editing,
             onDismiss = { editingCredential = null },

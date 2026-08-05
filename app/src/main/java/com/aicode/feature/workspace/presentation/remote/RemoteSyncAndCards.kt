@@ -18,7 +18,14 @@ import com.aicode.feature.workspace.domain.model.RemoteConnection
 import com.aicode.feature.workspace.domain.model.RemoteMount
 import com.aicode.feature.workspace.domain.model.RemoteProtocol
 import compose.icons.FeatherIcons
-import compose.icons.feathericons.*
+import compose.icons.feathericons.CheckSquare
+import compose.icons.feathericons.Cloud
+import compose.icons.feathericons.Edit2
+import compose.icons.feathericons.FileText
+import compose.icons.feathericons.Folder
+import compose.icons.feathericons.HardDrive
+import compose.icons.feathericons.Layers
+import compose.icons.feathericons.Trash2
 import androidx.compose.ui.res.stringResource
 import com.aicode.R
 

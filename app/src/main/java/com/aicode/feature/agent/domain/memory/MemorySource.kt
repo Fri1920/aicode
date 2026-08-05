@@ -15,7 +15,6 @@ interface MemorySource {
     /** 保存一条记忆（创建或覆盖） */
     fun saveMemory(name: String, description: String, content: String): Boolean
 
-    /** 删除一条记忆 */
     fun deleteMemory(name: String): Boolean
 
     companion object {

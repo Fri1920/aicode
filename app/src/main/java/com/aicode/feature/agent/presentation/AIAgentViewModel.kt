@@ -1,7 +1,9 @@
 package com.aicode.feature.agent.presentation
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.aicode.R
 import com.aicode.core.util.FileLogger
 import com.aicode.core.util.toUserMessage
 import com.aicode.feature.agent.data.local.dao.AgentMessageDao
@@ -17,17 +19,24 @@ import com.aicode.feature.settings.data.repository.DefaultModelSettingsRepositor
 import com.aicode.feature.agent.domain.model.AgentContext
 import com.aicode.feature.agent.domain.model.AgentImage
 import com.aicode.feature.agent.domain.model.AgentMessage
+import com.aicode.feature.agent.domain.model.AgentMode
+import com.aicode.feature.agent.domain.model.ChangeType
 import com.aicode.feature.agent.domain.model.ChatSession
 import com.aicode.feature.agent.domain.model.CodeChange
+import com.aicode.feature.agent.domain.model.ReasoningEffort
 import com.aicode.feature.agent.domain.model.WorkflowStatus
 import com.aicode.feature.agent.domain.permission.PermissionChoice
 import com.aicode.feature.agent.domain.workflow.AgentWorkflow
 import com.aicode.feature.terminal.domain.TabFinishedEvent
 import com.aicode.feature.terminal.domain.TAIL_LINES
+import com.aicode.feature.terminal.domain.TerminalSessionManager
 import com.aicode.feature.terminal.domain.takeTailLines
 import com.aicode.feature.agent.domain.workflow.AgentEvent
 import com.aicode.feature.agent.domain.tool.ToolPermissionManager
 import com.aicode.feature.agent.domain.tool.ToolRegistry
+import com.aicode.feature.agent.domain.tool.mode.PlanApprovalChoice
+import com.aicode.feature.agent.domain.tool.mode.PlanApprovalManager
+import com.aicode.feature.agent.domain.tool.mode.PlanApprovalRequest
 import com.aicode.feature.agent.domain.tool.question.AskUserQuestionManager
 import com.aicode.feature.agent.domain.tool.question.UserQuestionAnswer
 import com.aicode.feature.agent.domain.session.SessionUseCase
@@ -40,6 +49,7 @@ import com.aicode.feature.agent.presentation.AgentAttachment
 import com.aicode.feature.agent.presentation.component.RewindOption
 import com.aicode.feature.agent.presentation.component.formatTokenCount
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -50,6 +60,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
@@ -75,12 +86,13 @@ class AIAgentViewModel @Inject constructor(
     private val containerEngine: LinuxContainerEngine,
     private val sessionUseCase: SessionUseCase,
     private val messagePersistenceUseCase: MessagePersistenceUseCase,
-    private val planApprovalManager: com.aicode.feature.agent.domain.tool.mode.PlanApprovalManager,
-    private val terminalSessionManager: com.aicode.feature.terminal.domain.TerminalSessionManager,
+    private val planApprovalManager: PlanApprovalManager,
+    private val terminalSessionManager: TerminalSessionManager,
     private val slashCommandRegistry: SlashCommandRegistry,
     private val checkpointManager: CheckpointManager,
     private val checkpointDao: CheckpointDao,
-    private val backupManager: BackupManager
+    private val backupManager: BackupManager,
+    @param:ApplicationContext private val context: Context
 ) : ViewModel(), SlashCommandContext {
 
     private val sessionJobs = mutableMapOf<String, Job>()
@@ -140,22 +152,22 @@ class AIAgentViewModel @Inject constructor(
         }
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
-    val currentSessionMode: StateFlow<com.aicode.feature.agent.domain.model.AgentMode> = kotlinx.coroutines.flow.combine(
+    val currentSessionMode: StateFlow<AgentMode> = combine(
         _currentSessionId, sessions
     ) { id, list ->
-        list.find { it.id == id }?.mode ?: com.aicode.feature.agent.domain.model.AgentMode.BUILD
-    }.stateIn(viewModelScope, SharingStarted.Eagerly, com.aicode.feature.agent.domain.model.AgentMode.BUILD)
+        list.find { it.id == id }?.mode ?: AgentMode.BUILD
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, AgentMode.BUILD)
 
     /** 当前会话的思考强度（默认 MEDIUM）。 */
-    val currentSessionReasoningEffort: StateFlow<com.aicode.feature.agent.domain.model.ReasoningEffort> =
-        kotlinx.coroutines.flow.combine(
+    val currentSessionReasoningEffort: StateFlow<ReasoningEffort> =
+        combine(
             _currentSessionId, sessions
         ) { id, list ->
-            list.find { it.id == id }?.reasoningEffort ?: com.aicode.feature.agent.domain.model.ReasoningEffort.MEDIUM
-        }.stateIn(viewModelScope, SharingStarted.Eagerly, com.aicode.feature.agent.domain.model.ReasoningEffort.MEDIUM)
+            list.find { it.id == id }?.reasoningEffort ?: ReasoningEffort.MEDIUM
+        }.stateIn(viewModelScope, SharingStarted.Eagerly, ReasoningEffort.MEDIUM)
 
     /** 当前会话绑定的 providerId/model（null 表示未绑定，回退全局 active provider）。 */
-    val currentSessionProviderModel: StateFlow<Pair<String?, String?>> = kotlinx.coroutines.flow.combine(
+    val currentSessionProviderModel: StateFlow<Pair<String?, String?>> = combine(
         _currentSessionId, sessions
     ) { id, list ->
         val s = list.find { it.id == id }
@@ -167,7 +179,7 @@ class AIAgentViewModel @Inject constructor(
      * 使 UI 能区分「切换/冷启动加载中」与「空会话」——避免先闪 Welcome 或上一个会话的消息再突然刷新。
      * 过滤掉「纯工具调用」的空助手行（content 为空、仅用于回放配对，不应显示为气泡）。
      */
-    val messagesState: StateFlow<ChatMessagesState> = kotlinx.coroutines.flow.combine(
+    val messagesState: StateFlow<ChatMessagesState> = combine(
         _currentSessionId,
         _messageLimit
     ) { id, limitMap -> id to (limitMap[id] ?: defaultLimit) }
@@ -287,7 +299,7 @@ class AIAgentViewModel @Inject constructor(
         }
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
-    val pendingPlanApproval: StateFlow<com.aicode.feature.agent.domain.tool.mode.PlanApprovalRequest?> = planApprovalManager.pendingApproval
+    val pendingPlanApproval: StateFlow<PlanApprovalRequest?> = planApprovalManager.pendingApproval
 
     // 工具调用传入参数（argsPreview）按落库消息 id 暂存：ToolCallStarted 落库后，
     // ToolCallFinished / 用户停止会用同 id REPLACE 整行，需在此把参数带到后续落库。
@@ -305,8 +317,6 @@ class AIAgentViewModel @Inject constructor(
 
     private companion object {
         const val TAG = "AIAgentViewModel"
-        /** 用户主动停止时的收尾文案（追加在已输出内容之后，而非整体替换）。 */
-        const val STOPPED_TOOL_TEXT = "已被用户停止"
     }
 
     init {
@@ -550,7 +560,7 @@ class AIAgentViewModel @Inject constructor(
             runSlashCommand(command, request, sessionId)
             return@launch
         }
-        sessionJobs[sessionId] = coroutineContext[Job]!!
+        coroutineContext[Job]?.let { sessionJobs[sessionId] = it }
         setAgentState(sessionId, AgentUIState.Streaming)
 
         try {
@@ -569,9 +579,9 @@ class AIAgentViewModel @Inject constructor(
 
             val sessionEntity = sessionUseCase.getSessionById(sessionId)
             val sessionDomain = sessionEntity?.toDomain()
-            val mode = sessionDomain?.mode ?: com.aicode.feature.agent.domain.model.AgentMode.BUILD
+            val mode = sessionDomain?.mode ?: AgentMode.BUILD
 
-            val context = AgentContext(
+            val agentContext = AgentContext(
                 currentFile = currentFile,
                 selectedCode = selectedCode,
                 projectRoot = projectRoot,
@@ -585,7 +595,7 @@ class AIAgentViewModel @Inject constructor(
 
             agentWorkflow.executeEvents(
                 userRequest = modelRequest,
-                context = context,
+                context = agentContext,
                 tools = toolRegistry.getAvailableTools(mode)
             ).collect { event ->
                 when (event) {
@@ -642,7 +652,7 @@ class AIAgentViewModel @Inject constructor(
                         messagePersistenceUseCase.persist(
                             sessionId,
                             MessageRole.TOOL,
-                            "${SessionUseCase.PENDING_TOOL_MARKER} ${event.toolName} 执行中…",
+                            "${SessionUseCase.PENDING_TOOL_MARKER} ${context.getString(R.string.agent_tool_executing, event.toolName)}",
                             id = msgId,
                             toolCallId = event.id,
                             toolName = event.toolName,
@@ -769,6 +779,7 @@ class AIAgentViewModel @Inject constructor(
         val running = _runningTools.value[sessionId]
         val streamingText = _streamingTexts.value[sessionId]
         val streamingReasoning = _streamingReasonings.value[sessionId]
+        val stoppedText = context.getString(R.string.agent_stopped_by_user)
         job.cancel()
         pendingMergedNotifications.remove(sessionId)
         setAgentState(sessionId, AgentUIState.Idle)
@@ -780,7 +791,7 @@ class AIAgentViewModel @Inject constructor(
         viewModelScope.launch {
             if (running != null) {
                 val partial = running.text.trimEnd()
-                val content = if (partial.isNotEmpty()) "$partial\n\n$STOPPED_TOOL_TEXT" else STOPPED_TOOL_TEXT
+                val content = if (partial.isNotEmpty()) "$partial\n\n$stoppedText" else stoppedText
                 messagePersistenceUseCase.persist(
                     sessionId = sessionId,
                     role = MessageRole.TOOL,
@@ -794,7 +805,7 @@ class AIAgentViewModel @Inject constructor(
                 toolArgsByMsgId.remove(running.messageId)
             } else if (!streamingText.isNullOrEmpty() || !streamingReasoning.isNullOrEmpty()) {
                 val partial = (streamingText ?: "").trimEnd()
-                val content = if (partial.isNotEmpty()) "$partial\n\n$STOPPED_TOOL_TEXT" else STOPPED_TOOL_TEXT
+                val content = if (partial.isNotEmpty()) "$partial\n\n$stoppedText" else stoppedText
                 val reasoning = streamingReasoning?.takeIf { it.hasVisibleContent() }
                 messagePersistenceUseCase.persist(
                     sessionId = sessionId,
@@ -834,14 +845,14 @@ class AIAgentViewModel @Inject constructor(
         _currentSessionId.value = id
     }
 
-    fun setSessionMode(mode: com.aicode.feature.agent.domain.model.AgentMode) {
+    fun setSessionMode(mode: AgentMode) {
         val sid = _currentSessionId.value ?: return
         viewModelScope.launch {
             sessionUseCase.updateMode(sid, mode.name)
         }
     }
 
-    fun setSessionReasoningEffort(effort: com.aicode.feature.agent.domain.model.ReasoningEffort) {
+    fun setSessionReasoningEffort(effort: ReasoningEffort) {
         val sid = _currentSessionId.value ?: return
         viewModelScope.launch {
             sessionUseCase.updateReasoningEffort(sid, effort.name)
@@ -900,7 +911,7 @@ class AIAgentViewModel @Inject constructor(
                         else -> {}
                     }
                 }
-                val resultText = if (changed) "上下文已压缩" else "当前上下文无需压缩（消息过少）"
+                val resultText = if (changed) context.getString(R.string.agent_context_compacted) else context.getString(R.string.agent_context_no_compaction)
                 messagePersistenceUseCase.persist(
                     sessionId = sid,
                     role = MessageRole.ASSISTANT,
@@ -913,7 +924,7 @@ class AIAgentViewModel @Inject constructor(
                 messagePersistenceUseCase.persist(
                     sessionId = sid,
                     role = MessageRole.ASSISTANT,
-                    content = "压缩失败: ${e.message}"
+                    content = context.getString(R.string.agent_compaction_failed, e.message)
                 )
             } finally {
                 setCompacting(sid, false)
@@ -925,9 +936,9 @@ class AIAgentViewModel @Inject constructor(
     }
 
     private fun sessionProviderModelDisplay(sid: String): String {
-        val pair = currentSessionProviderModel.value ?: return "未选择"
+        val pair = currentSessionProviderModel.value ?: return context.getString(R.string.agent_model_not_selected)
         val (_, model) = pair
-        return model?.takeIf { it.isNotBlank() } ?: "未选择"
+        return model?.takeIf { it.isNotBlank() } ?: context.getString(R.string.agent_model_not_selected)
     }
 
     private fun escapeMd(text: String): String = text.replace("|", "\\|").replace("\n", " ")
@@ -935,12 +946,12 @@ class AIAgentViewModel @Inject constructor(
 
     /** 用户批准计划，唤醒 workflow 继续在 BUILD 模式执行。 */
     fun approvePlanAndBuild() {
-        planApprovalManager.resolve(com.aicode.feature.agent.domain.tool.mode.PlanApprovalChoice.APPROVE)
+        planApprovalManager.resolve(PlanApprovalChoice.APPROVE)
     }
 
     /** 用户选择继续反馈，唤醒 workflow 回滚到 PLAN 模式。 */
     fun refinePlan() {
-        planApprovalManager.resolve(com.aicode.feature.agent.domain.tool.mode.PlanApprovalChoice.REFINE)
+        planApprovalManager.resolve(PlanApprovalChoice.REFINE)
     }
 
     fun selectSession(id: String) {
@@ -1075,13 +1086,13 @@ class AIAgentViewModel @Inject constructor(
             withContext(Dispatchers.IO) {
                 for (change in changes) {
                     when (change.type) {
-                        com.aicode.feature.agent.domain.model.ChangeType.CREATE -> {
+                        ChangeType.CREATE -> {
                             val file = File(change.filePath)
                             file.parentFile?.mkdirs()
                             file.writeText(change.newCode)
                         }
 
-                        com.aicode.feature.agent.domain.model.ChangeType.REPLACE -> {
+                        ChangeType.REPLACE -> {
                             val file = File(change.filePath)
                             val lines = file.readLines().toMutableList()
                             val start = (change.startLine - 1).coerceIn(0, lines.size)
@@ -1098,7 +1109,7 @@ class AIAgentViewModel @Inject constructor(
                             }
                         }
 
-                        com.aicode.feature.agent.domain.model.ChangeType.INSERT -> {
+                        ChangeType.INSERT -> {
                             val file = File(change.filePath)
                             val lines = file.readLines().toMutableList()
                             val insertLine = (change.startLine - 1).coerceIn(0, lines.size)
@@ -1108,7 +1119,7 @@ class AIAgentViewModel @Inject constructor(
                             file.writeText(lines.joinToString("\n"))
                         }
 
-                        com.aicode.feature.agent.domain.model.ChangeType.DELETE -> {
+                        ChangeType.DELETE -> {
                             val file = File(change.filePath)
                             val lines = file.readLines().toMutableList()
                             val start = (change.startLine - 1).coerceIn(0, lines.size)
@@ -1133,7 +1144,7 @@ class AIAgentViewModel @Inject constructor(
             FileLogger.e(TAG, "applyChanges 失败", e)
             val sessionId = _currentSessionId.value
             if (sessionId != null) {
-                setAgentState(sessionId, AgentUIState.Error("应用更改失败: ${e.message}"))
+                setAgentState(sessionId, AgentUIState.Error(context.getString(R.string.agent_apply_changes_failed, e.message)))
             }
         }
     }

@@ -147,6 +147,15 @@
     <string name="chat_placeholder">How can I help you?</string>
     <string name="chat_input_hint">Describe what you need, and I\'ll help you write, modify, or explain code</string>
 
+    <!-- Agent Status -->
+    <string name="agent_stopped_by_user">Stopped by user</string>
+    <string name="agent_tool_executing">%1$s running…</string>
+    <string name="agent_context_compacted">Context compacted</string>
+    <string name="agent_context_no_compaction">No compaction needed (too few messages)</string>
+    <string name="agent_compaction_failed">Compaction failed: %1$s</string>
+    <string name="agent_model_not_selected">Not selected</string>
+    <string name="agent_apply_changes_failed">Failed to apply changes: %1$s</string>
+
     <!-- About -->
     <string name="about_version">Version</string>
     <string name="about_github_repo">GitHub Repository</string>
@@ -317,6 +326,12 @@
     <string name="credential_default_hint">For multiple accounts on the same host, the default one is injected first</string>
     <string name="credential_fields_required">Host, username, and token are all required</string>
 
+    <!-- Credential Toast -->
+    <string name="credential_toast_saved">Credential saved</string>
+    <string name="credential_toast_save_failed">Save failed: %1$s</string>
+    <string name="credential_toast_deleted">Credential deleted</string>
+    <string name="credential_toast_identity_saved">Identity and repository URL saved</string>
+
     <!-- Credential List -->
     <string name="credential_empty_hint">No credentials yet, tap + to add</string>
 
@@ -398,6 +413,29 @@
     <string name="git_init_desc">Initialization will create .git here, after which you can stage, commit, and link remotes.</string>
     <string name="git_init_repo">Initialize Git Repository</string>
     <string name="git_commit_message">Commit message</string>
+
+    <!-- Git Toast Messages -->
+    <string name="git_toast_load_branches_failed">Failed to load branches: %1$s</string>
+    <string name="git_toast_refresh_failed">Refresh failed: %1$s</string>
+    <string name="git_toast_action_refresh_failed">%1$s (refresh failed)</string>
+    <string name="git_toast_no_remote_pull">No remote repository configured, cannot pull</string>
+    <string name="git_toast_no_remote_push">No remote repository configured, cannot push</string>
+    <string name="git_toast_load_more_failed">Failed to load more: %1$s</string>
+    <string name="git_toast_action_success">%1$s successful</string>
+    <string name="git_toast_action_failed">%1$s failed: %2$s</string>
+    <string name="git_toast_checkout_success">Switched to %1$s</string>
+    <string name="git_toast_checkout_failed">Switch failed: %1$s</string>
+    <string name="git_toast_diff_failed">Failed to load diff</string>
+    <string name="git_action_stage_all">Stage all</string>
+    <string name="git_action_unstage_all">Unstage all</string>
+    <string name="git_action_commit">Commit</string>
+    <string name="git_action_init">Initialize</string>
+    <string name="git_action_create_branch">Create branch</string>
+    <string name="git_action_delete_branch">Delete branch</string>
+    <string name="git_action_delete_remote_branch">Delete remote branch</string>
+    <string name="git_action_rename_branch">Rename branch</string>
+    <string name="git_action_create_tag">Create tag</string>
+    <string name="git_action_delete_tag">Delete tag</string>
 
     <!-- Git Identity -->
     <string name="git_tab_identity">Identity</string>

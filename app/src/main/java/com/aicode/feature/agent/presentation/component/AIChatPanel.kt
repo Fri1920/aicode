@@ -386,9 +386,8 @@ fun AIChatPanel(
         }
     }
 
-    val sv = settingsViewModel
-    val executionMode = sv?.executionMode?.collectAsStateWithLifecycle()?.value
-    val connectionState = sv?.connectionState?.collectAsStateWithLifecycle()?.value
+    val executionMode = settingsViewModel?.executionMode?.collectAsStateWithLifecycle()?.value
+    val connectionState = settingsViewModel?.connectionState?.collectAsStateWithLifecycle()?.value
     val isRemote = executionMode == com.aicode.feature.settings.data.repository.ExecutionMode.REMOTE_SSH
 
     Scaffold(
@@ -451,7 +450,7 @@ fun AIChatPanel(
                         if (showReasoning) {
                             item(key = "__reasoning__", contentType = "tail") {
                                 // 流式实时：短文本默认展开边想边看，过长（超 REASONING_COLLAPSE_LINE_LIMIT）时由气泡内部自动折叠，不刷屏
-                                ReasoningBubble(text = reasoning!!, initiallyExpanded = true)
+                                ReasoningBubble(text = reasoning.orEmpty(), initiallyExpanded = true)
                             }
                         }
                         val streaming = streamingText
@@ -475,7 +474,10 @@ fun AIChatPanel(
                                 TailKind.THINKING -> ThinkingBubble()
                                 TailKind.STREAMING -> StreamingBubble(text = streaming ?: "")
                                 TailKind.COMPACTING -> CompactionProgressBubble()
-                                TailKind.RETRYING -> RetryingBubble(retryState!!.attempt, retryState!!.maxRetries)
+                                TailKind.RETRYING -> {
+                                    val rs = retryState
+                                    if (rs != null) RetryingBubble(rs.attempt, rs.maxRetries) else Box(Modifier)
+                                }
                                 TailKind.NONE -> Box(Modifier)
                             }
                         }

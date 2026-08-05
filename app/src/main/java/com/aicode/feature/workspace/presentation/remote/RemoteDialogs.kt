@@ -22,7 +22,9 @@ import com.aicode.feature.workspace.domain.model.RemoteConnection
 import com.aicode.feature.workspace.domain.model.RemoteMount
 import com.aicode.feature.workspace.domain.model.RemoteProtocol
 import compose.icons.FeatherIcons
-import compose.icons.feathericons.*
+import compose.icons.feathericons.Eye
+import compose.icons.feathericons.EyeOff
+import compose.icons.feathericons.Folder
 import androidx.compose.ui.res.stringResource
 import com.aicode.R
 
@@ -417,10 +419,11 @@ fun RemoteDirectoryBrowserDialog(
             Column(modifier = Modifier.fillMaxWidth().heightIn(min = 200.dp, max = 400.dp)) {
                 Text(stringResource(R.string.remote_current_path, currentPath), fontWeight = FontWeight.Bold)
                 Spacer(modifier = Modifier.height(8.dp))
+                val loadError = error
                 if (isLoading) {
                     CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
-                } else if (error != null) {
-                    Text(stringResource(R.string.remote_load_failed, error!!), color = MaterialTheme.colorScheme.error)
+                } else if (loadError != null) {
+                    Text(stringResource(R.string.remote_load_failed, loadError), color = MaterialTheme.colorScheme.error)
                 } else {
                     LazyColumn {
                         if (currentPath != "/") {
