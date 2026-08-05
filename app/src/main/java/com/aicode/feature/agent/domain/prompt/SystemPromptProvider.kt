@@ -2,7 +2,11 @@ package com.aicode.feature.agent.domain.prompt
 
 import android.content.Context
 import com.aicode.core.util.FileLogger
+import com.aicode.feature.agent.domain.container.ContainerInstaller
+import com.aicode.feature.agent.domain.memory.MemoryRepository
+import com.aicode.feature.agent.domain.memory.MemoryScope
 import com.aicode.feature.agent.domain.model.AgentContext
+import com.aicode.feature.agent.domain.model.AgentMode
 import com.aicode.feature.agent.domain.skill.SkillRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
@@ -19,8 +23,8 @@ import javax.inject.Singleton
 class SystemPromptProvider @Inject constructor(
     @param:ApplicationContext private val context: Context,
     private val skillRepository: SkillRepository,
-    private val memoryRepository: com.aicode.feature.agent.domain.memory.MemoryRepository,
-    private val containerInstaller: com.aicode.feature.agent.domain.container.ContainerInstaller
+    private val memoryRepository: MemoryRepository,
+    private val containerInstaller: ContainerInstaller
 ) {
     // 抽象独立的 Source
     interface PromptSource {
@@ -54,7 +58,7 @@ class SystemPromptProvider @Inject constructor(
         @Volatile private var cached: String? = null
 
         override fun build(ctx: AgentContext): String? {
-            if (ctx.mode != com.aicode.feature.agent.domain.model.AgentMode.PLAN) return null
+            if (ctx.mode != AgentMode.PLAN) return null
             return cached ?: resolvePrompt("80-plan-mode.md")
                 .replace(LEADING_COMMENT, "")
                 .trim()
@@ -66,7 +70,7 @@ class SystemPromptProvider @Inject constructor(
         @Volatile private var cached: String? = null
 
         override fun build(ctx: AgentContext): String? {
-            if (ctx.mode != com.aicode.feature.agent.domain.model.AgentMode.AUTO) return null
+            if (ctx.mode != AgentMode.AUTO) return null
             return cached ?: resolvePrompt("81-auto-mode.md")
                 .replace(LEADING_COMMENT, "")
                 .trim()
@@ -162,8 +166,8 @@ class SystemPromptProvider @Inject constructor(
             val memories = try { memoryRepository.listMemories(ctx.projectRoot) } catch (e: Exception) { return null }
             if (memories.isEmpty()) return null
             
-            val globalMemories = memories.filter { it.scope == com.aicode.feature.agent.domain.memory.MemoryScope.GLOBAL }
-            val projectMemories = memories.filter { it.scope == com.aicode.feature.agent.domain.memory.MemoryScope.PROJECT }
+            val globalMemories = memories.filter { it.scope == MemoryScope.GLOBAL }
+            val projectMemories = memories.filter { it.scope == MemoryScope.PROJECT }
             
             val newContent = buildString {
                 if (globalMemories.isNotEmpty()) {
@@ -257,7 +261,7 @@ class SystemPromptProvider @Inject constructor(
 
     /**
      * 按优先级解析单个提示词片段：prompts.custom/（用户覆盖） > prompts/（本地默认副本） > assets（内置兑底）。
-     * 本地副本由 [com.aicode.feature.agent.domain.container.ContainerInstaller.extractPrompts] 在启动时全量释放，
+     * 本地副本由 [ContainerInstaller.extractPrompts] 在启动时全量释放，
      * App 升级后随之更新；用户只需在 prompts.custom/ 放同名文件即可覆盖，无需改内置。
      */
     private fun resolvePrompt(name: String): String {
