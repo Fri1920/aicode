@@ -481,37 +481,41 @@ class OpenAIAdapter @Inject constructor(
             }
         }
 
-        // 防御性清理：保证 assistant(tool_calls) 与其 tool 响应消息一一配对，避免上游 400。
-        // 1) 孤立 tool 消息（前驱 assistant 无 tool_calls，如上下文压缩导致配对断裂）→ 跳过；
+        // 防御性清理：保证 assistant(tool_calls) 与其 tool 响应消息按 tool_call_id 一一配对并紧跟，
+        // 避免上游 400。可能破坏配对的场景：
+        // 1) 并发/异步工具结果乱序落位（如 askUserQuestion 阻塞等待期间其他工具结果插队），
+        //    assistant(tool_calls) 与其响应被其他消息隔开 → 将匹配的 tool 响应吸附回紧跟其后；
+        // 2) 孤立 tool 消息（前驱 assistant 无 tool_calls，如上下文压缩导致配对断裂）→ 跳过，
         //    否则 OpenAI 报 "Messages with role 'tool' must be a response to a preceding
-        //    message with 'tool_calls'"。
-        // 2) assistant 声明的 tool_calls 多于紧随其后的 tool 响应数（如用户拒绝导致部分调用
-        //    未执行、tool 结果缺失）→ 裁剪多余 tool_calls，否则 OpenAI 报
-        //    "insufficient tool messages following tool_calls message"。
+        //    message with 'tool_calls'"；
+        // 3) assistant 声明的 tool_calls 无对应响应（如用户拒绝导致部分调用未执行）→ 裁剪，
+        //    否则 OpenAI 报 "insufficient tool messages following tool_calls message"。
         val cleaned = mutableListOf<OpenAIChatMessage>()
-        var i = 0
-        while (i < raw.size) {
+        val consumed = BooleanArray(raw.size)
+        for (i in raw.indices) {
+            if (consumed[i]) continue
             val msg = raw[i]
             if (msg.role == "assistant" && msg.tool_calls?.isNotEmpty() == true) {
-                var toolCount = 0
-                var j = i + 1
-                while (j < raw.size && raw[j].role == "tool") {
-                    toolCount++
-                    j++
+                val remaining = msg.tool_calls!!.map { it.id }.toMutableSet()
+                val matchedTools = mutableListOf<OpenAIChatMessage>()
+                for (j in i + 1 until raw.size) {
+                    if (consumed[j]) continue
+                    val m = raw[j]
+                    if (m.role == "tool" && m.tool_call_id != null && m.tool_call_id in remaining) {
+                        matchedTools.add(m)
+                        consumed[j] = true
+                        remaining.remove(m.tool_call_id)
+                        if (remaining.isEmpty()) break
+                    }
                 }
-                val calls = msg.tool_calls!!
-                if (toolCount < calls.size) {
-                    cleaned.add(msg.copy(tool_calls = calls.take(toolCount).ifEmpty { null }))
-                } else {
-                    cleaned.add(msg)
-                }
-                repeat(toolCount) { cleaned.add(raw[i + 1 + it]) }
-                i = j
+                val keptCalls = if (remaining.isEmpty()) msg.tool_calls
+                else msg.tool_calls!!.filter { it.id !in remaining }
+                cleaned.add(if (keptCalls === msg.tool_calls) msg else msg.copy(tool_calls = keptCalls.ifEmpty { null }))
+                cleaned.addAll(matchedTools)
             } else if (msg.role == "tool") {
-                i++ // 孤立 tool 消息，跳过
+                consumed[i] = true // 孤立 tool 消息，跳过
             } else {
                 cleaned.add(msg)
-                i++
             }
         }
         return cleaned
