@@ -60,6 +60,13 @@ class TerminalTab(
 
     var runState: RunState = runState
         internal set
+
+    /**
+     * 是否已向 AI 发出过完成事件。兜底监控与 onFinished 都可能触发完成，
+     * 用此标记保证同一命令只回调一次，避免进程迟退时重复通知。
+     */
+    @Volatile
+    var finishedNotified: Boolean = false
 }
 
 /**

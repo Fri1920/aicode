@@ -311,7 +311,8 @@ class TerminalSessionManager @Inject constructor(
                         if (current.isBackground && _tabs.value.none { it.isBackground && it.runState is RunState.Running }) {
                             stopKeepaliveService()
                         }
-                        if (current.notifyOnExit) {
+                        if (current.notifyOnExit && !current.finishedNotified) {
+                            current.finishedNotified = true
                             _tabFinishedEvents.tryEmit(
                                 TabFinishedEvent(
                                     current.id, current.title, current.command, exitCode, current.sourceSessionId,
@@ -362,7 +363,8 @@ class TerminalSessionManager @Inject constructor(
                     if (target.isBackground && _tabs.value.none { it.isBackground && it.runState is RunState.Running }) {
                         stopKeepaliveService()
                     }
-                    if (target.notifyOnExit) {
+                    if (target.notifyOnExit && !target.finishedNotified) {
+                        target.finishedNotified = true
                         _tabFinishedEvents.tryEmit(
                             TabFinishedEvent(
                                 target.id, target.title, target.command, finished.exitStatus, target.sourceSessionId,
