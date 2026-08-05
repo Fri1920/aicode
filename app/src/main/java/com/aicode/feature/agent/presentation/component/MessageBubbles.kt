@@ -214,7 +214,7 @@ internal fun AgentMessageItem(
                     }
                     // 复制成功 1.5s 后恢复图标
                     if (copied) {
-                        LaunchedEffect(Unit) {
+                        LaunchedEffect(copied) {
                             delay(1500)
                             copied = false
                         }
