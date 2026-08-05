@@ -154,6 +154,8 @@ class StatefulAgentWorkflow @Inject constructor(
         data class RequestPermission(val toolCall: ToolCall) : AgentSideEffect
         /** 批量并行执行已批准的工具；传入空列表表示本批无工具可执行，直接进入收尾。 */
         data class ExecuteToolBatch(val toolCalls: List<ToolCall>) : AgentSideEffect
+        /** 整批取消（用户拒绝批次中某个调用）：补发已启动工具的完成事件，清理 UI「执行中」状态。 */
+        data class CancelToolBatch(val toolCalls: List<ToolCall>) : AgentSideEffect
     }
 
     private suspend fun getActiveProvider(sessionId: String?): AIProvider {
@@ -282,13 +284,14 @@ class StatefulAgentWorkflow @Inject constructor(
                 } else {
                     val rawResult = ToolResult.Error(action.denyReason, action.errorCode).toTransportString()
                     if (action.errorCode == USER_REJECTED_CODE) {
-                        // 模型一次可能返回多个 tool_calls。用户拒绝当前调用后，剩余未执行的
-                        // tool_call（含已批准未执行、未请求权限的）也必须补上 tool 响应，否则
-                        // assistant(toolCalls=N) 后只有部分 tool 消息，OpenAI 会报 400。
-                        val unexecuted = (newState.pendingPermissionCalls + newState.approvedToolCalls).map { pending ->
+                        // 模型一次可能返回多个 tool_calls。用户拒绝批次中任意一个 → 整批取消：
+                        // 按 batchToolCalls 原始顺序为所有调用补上 tool 响应（不重复不遗漏），
+                        // 否则 assistant(toolCalls=N) 后只有部分 tool 消息，OpenAI 会报 400
+                        // "insufficient tool messages following tool_calls"。
+                        val cancelled = newState.batchToolCalls.map { call ->
                             AgentMessage.ToolResultMessage(
-                                id = pending.id,
-                                toolName = pending.name,
+                                id = call.id,
+                                toolName = call.name,
                                 result = ToolResult.Error(
                                     "用户拒绝了本轮工具调用，该调用未执行。",
                                     USER_REJECTED_CODE
@@ -296,16 +299,18 @@ class StatefulAgentWorkflow @Inject constructor(
                             )
                         }
                         newState = state.copy(
-                            messages = state.messages + AgentMessage.ToolResultMessage(
-                                id = action.toolCall.id,
-                                toolName = action.toolCall.name,
-                                result = rawResult
-                            ) + unexecuted,
+                            messages = state.messages + cancelled,
+                            batchToolCalls = emptyList(),
                             pendingPermissionCalls = emptyList(),
                             approvedToolCalls = emptyList(),
                             isFinished = true
                         )
-                        return newState to emptyList()
+                        // 已批准未执行（已收到 ToolCallStarted）的工具需补发完成事件，
+                        // 否则 UI 与落库消息会一直停留在「执行中」。
+                        if (state.approvedToolCalls.isNotEmpty()) {
+                            effects.add(AgentSideEffect.CancelToolBatch(state.approvedToolCalls))
+                        }
+                        return newState to effects
                     }
                     // 策略/系统拒绝（如 PLAN 模式禁止执行）：记录拒绝结果，继续收集后续权限。
                     val remaining = newState.pendingPermissionCalls.filterNot { it.id == action.toolCall.id }
@@ -474,6 +479,23 @@ class StatefulAgentWorkflow @Inject constructor(
                             send(AgentEvent.ToolCallStarted(effect.toolCall.id, effect.toolCall.name, argsPreview))
                         }
                         actionQueue.addLast(AgentAction.PermissionEvaluated(effect.toolCall, checkResult.approved, argsPreview, checkResult.denyReason, checkResult.errorCode))
+                    }
+                    is AgentSideEffect.CancelToolBatch -> {
+                        // 整批取消：已批准未执行的工具补发完成事件（内容为未执行），
+                        // 让 ViewModel 清理 runningTool 并 REPLACE 掉「执行中」占位消息。
+                        effect.toolCalls.forEach { toolCall ->
+                            send(
+                                AgentEvent.ToolCallFinished(
+                                    id = toolCall.id,
+                                    toolName = toolCall.name,
+                                    result = ToolResult.Error(
+                                        "用户拒绝了本轮工具调用，该调用未执行。",
+                                        USER_REJECTED_CODE
+                                    ).toTransportString(),
+                                    isError = true
+                                )
+                            )
+                        }
                     }
                     is AgentSideEffect.ExecuteToolBatch -> {
                         // 并行执行本批已批准的工具。先统一记录 checkpoint（editFile/writeFile 修改前快照），
