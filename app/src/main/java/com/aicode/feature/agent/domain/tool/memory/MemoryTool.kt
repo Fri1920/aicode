@@ -1,6 +1,8 @@
 package com.aicode.feature.agent.domain.tool.memory
 
 import com.aicode.core.util.FileLogger
+import com.aicode.feature.agent.domain.memory.MemoryEdit
+import com.aicode.feature.agent.domain.memory.MemoryEditResult
 import com.aicode.feature.agent.domain.memory.MemoryRepository
 import com.aicode.feature.agent.domain.memory.MemoryScope
 import com.aicode.feature.agent.domain.model.AgentContext
@@ -10,8 +12,11 @@ import com.aicode.feature.agent.domain.tool.ToolCapability
 import com.aicode.feature.agent.domain.tool.ToolParameter
 import com.aicode.feature.agent.domain.tool.ToolPermissionPolicy
 import com.aicode.feature.agent.domain.tool.ToolResult
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
 import javax.inject.Inject
@@ -36,12 +41,32 @@ class MemoryTool @Inject constructor(
     override val description =
         "管理 AI 的长期记忆。当用户告知新的偏好、项目约定、架构设计，或者你发现了有价值的规律时，使用此工具将其永久记录。"
 
+    /** edits 数组单个元素的结构，供 function-calling 的 items schema，语义与 editFile 一致。 */
+    private val editItemSchema: Map<String, Any> = mapOf(
+        "type" to "object",
+        "properties" to mapOf(
+            "old_string" to mapOf(
+                "type" to "string",
+                "description" to "要被替换的原文，需与记忆当前正文精确匹配（含缩进和换行）。带足够上下文以保证唯一。"
+            ),
+            "new_string" to mapOf(
+                "type" to "string",
+                "description" to "替换后的新内容。传空字符串表示删除匹配到的内容。"
+            ),
+            "replace_all" to mapOf(
+                "type" to "boolean",
+                "description" to "是否替换该 old_string 的全部匹配项。默认 false（要求唯一匹配）。"
+            )
+        ),
+        "required" to listOf("old_string", "new_string")
+    )
+
     override val parameters: Map<String, ToolParameter> = mapOf(
         "action" to ToolParameter(
             name = "action",
             type = ParameterType.STRING,
-            description = "操作类型：read=读取记忆正文；save=保存记忆；delete=删除记忆；list=列出所有记忆摘要",
-            enum = listOf("read", "save", "delete", "list"),
+            description = "操作类型：read=读取记忆正文；save=保存记忆（创建或全量覆盖）；edit=对已有记忆正文做局部编辑；delete=删除记忆；list=列出所有记忆摘要",
+            enum = listOf("read", "save", "edit", "delete", "list"),
             required = true
         ),
         "name" to ToolParameter(
@@ -61,6 +86,14 @@ class MemoryTool @Inject constructor(
             type = ParameterType.STRING,
             description = "记忆的详细正文（Markdown 格式，save 必填）。",
             required = false
+        ),
+        "edits" to ToolParameter(
+            name = "edits",
+            type = ParameterType.ARRAY,
+            description = "edit 操作要应用的编辑列表，按顺序依次生效，每个编辑在前一个的结果上匹配。" +
+                "单处修改也用只含一个元素的数组。每个元素：{old_string, new_string, replace_all?}。",
+            required = false,
+            itemsSchema = editItemSchema
         ),
         "scope" to ToolParameter(
             name = "scope",
@@ -87,6 +120,7 @@ class MemoryTool @Inject constructor(
                 "list" -> handleList(context.projectRoot)
                 "read" -> handleRead(memoryName, context.projectRoot)
                 "save" -> handleSave(args, memoryName, scope, context.projectRoot)
+                "edit" -> handleEdit(args, memoryName, scope, context.projectRoot)
                 "delete" -> handleDelete(memoryName, scope, context.projectRoot)
                 else -> ToolResult.Error("不支持的操作: $action", "UNSUPPORTED_ACTION")
             }
@@ -128,6 +162,38 @@ class MemoryTool @Inject constructor(
         } else {
             ToolResult.Error("保存记忆失败，请查看日志。", "SAVE_FAILED")
         }
+    }
+
+    private fun handleEdit(args: Map<String, JsonElement>, name: String?, scope: MemoryScope, projectRoot: String?): ToolResult {
+        if (name.isNullOrEmpty()) return ToolResult.Error("edit 操作需要 name 参数", "MISSING_NAME")
+
+        val edits = parseEdits(args)
+            ?: return ToolResult.Error("edit 操作需要 edits 参数：请在 edits 数组里给出至少一个 {old_string,new_string} 编辑", "MISSING_EDITS")
+
+        if (scope == MemoryScope.PROJECT && projectRoot.isNullOrBlank()) {
+            return ToolResult.Error("当前未选择工作区，无法编辑项目级记忆。请改用 scope=global", "NO_WORKSPACE")
+        }
+
+        return when (val result = memoryRepository.editMemory(name, edits, scope, projectRoot)) {
+            is MemoryEditResult.Success ->
+                ToolResult.Success(JsonPrimitive("已成功编辑记忆「$name」的正文（${scope.name.lowercase()} 作用域）。"))
+            is MemoryEditResult.NotFound ->
+                ToolResult.Error("未找到记忆「${result.name}」，请先通过 save 创建，或确认 name 与作用域是否正确。", "MEMORY_NOT_FOUND")
+            is MemoryEditResult.Error ->
+                ToolResult.Error(result.message, result.code)
+        }
+    }
+
+    private fun parseEdits(args: Map<String, JsonElement>): List<MemoryEdit>? {
+        val arr = args["edits"] as? JsonArray ?: return null
+        if (arr.isEmpty()) return null
+        return arr.mapNotNull { el ->
+            val obj = el as? JsonObject ?: return@mapNotNull null
+            val old = obj["old_string"]?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
+            val new = obj["new_string"]?.jsonPrimitive?.contentOrNull ?: ""
+            val all = obj["replace_all"]?.jsonPrimitive?.booleanOrNull ?: false
+            MemoryEdit(old, new, all)
+        }.takeIf { it.isNotEmpty() }
     }
 
     private fun handleDelete(name: String?, scope: MemoryScope, projectRoot: String?): ToolResult {

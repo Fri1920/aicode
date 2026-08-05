@@ -48,6 +48,16 @@ class MemoryRepository @Inject constructor(
         }
     }
 
+    fun editMemory(name: String, edits: List<MemoryEdit>, scope: MemoryScope, projectRoot: String?): MemoryEditResult {
+        return when (scope) {
+            MemoryScope.GLOBAL -> globalMemorySource.editMemory(name, edits)
+            MemoryScope.PROJECT -> {
+                if (projectRoot.isNullOrBlank()) MemoryEditResult.Error("NO_WORKSPACE", "当前未选择工作区，无法编辑项目级记忆")
+                else ProjectMemorySource(projectRoot).editMemory(name, edits)
+            }
+        }
+    }
+
     fun deleteMemory(name: String, scope: MemoryScope, projectRoot: String?): Boolean {
         return when (scope) {
             MemoryScope.GLOBAL -> globalMemorySource.deleteMemory(name)
