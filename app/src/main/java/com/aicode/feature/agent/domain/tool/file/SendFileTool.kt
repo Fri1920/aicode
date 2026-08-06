@@ -84,16 +84,17 @@ class SendFileTool @Inject constructor(
             }
 
             val files = paths.mapIndexed { index, path ->
-                val fileName = names.getOrNull(index)?.takeIf { it.isNotBlank() }
-                    ?: path.substringAfterLast('/').ifBlank { path }
+                val rawName = path.substringAfterLast('/').ifBlank { path }
+                // 显示名允许自定义；MIME 类型必须按原始文件名推断，自定义名缺后缀/加前缀都不影响类型识别。
+                val displayName = names.getOrNull(index)?.takeIf { it.isNotBlank() } ?: rawName
                 JsonObject(
                     mapOf(
                         "path" to JsonPrimitive(fileAccess.toDisplayPath(path)),
                         "local_path" to JsonPrimitive(fileAccess.copyToLocal(path).absolutePath),
-                        "name" to JsonPrimitive(fileName),
-                        "mime_type" to JsonPrimitive(guessMimeType(fileName)),
+                        "name" to JsonPrimitive(displayName),
+                        "mime_type" to JsonPrimitive(guessMimeType(rawName)),
                         "size_bytes" to JsonPrimitive(fileAccess.fileSize(path)),
-                        "is_image" to JsonPrimitive(guessMimeType(fileName).startsWith("image/"))
+                        "is_image" to JsonPrimitive(guessMimeType(rawName).startsWith("image/"))
                     )
                 )
             }
