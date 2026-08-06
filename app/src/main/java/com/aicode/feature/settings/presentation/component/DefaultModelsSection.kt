@@ -1,16 +1,13 @@
 package com.aicode.feature.settings.presentation.component
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -20,38 +17,30 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
-import androidx.compose.material.icons.outlined.KeyboardArrowDown
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aicode.R
-import com.aicode.core.theme.Radius
 import com.aicode.core.theme.Spacing
 import com.aicode.feature.settings.domain.model.AIProviderConfig
 import com.aicode.feature.settings.domain.model.ModelMetadata
@@ -82,47 +71,55 @@ internal fun DefaultModelsSection(
 
     LaunchedEffect(Unit) { onLoadMetadata() }
 
-    val visionProviderName = providers.firstOrNull { it.id == visionProviderId }?.name
-    val visionSubtitle = if (visionProviderId.isBlank() || visionModel.isBlank()) {
+    val visionValue = if (visionProviderId.isBlank() || visionModel.isBlank()) {
         stringResource(R.string.settings_vision_follow_chat)
     } else {
-        if (!visionProviderName.isNullOrBlank()) {
-            stringResource(R.string.settings_vision_dedicated, visionProviderName, visionModel)
-        } else {
-            visionModel
-        }
+        visionModel
     }
 
-    val compactionProviderName = providers.firstOrNull { it.id == compactionProviderId }?.name
-    val compactionSubtitle = if (compactionProviderId.isBlank() || compactionModel.isBlank()) {
+    val compactionValue = if (compactionProviderId.isBlank() || compactionModel.isBlank()) {
         stringResource(R.string.settings_compaction_follow_chat)
     } else {
-        if (!compactionProviderName.isNullOrBlank()) {
-            stringResource(R.string.settings_compaction_dedicated, compactionProviderName, compactionModel)
-        } else {
-            compactionModel
-        }
+        compactionModel
     }
 
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(Spacing.lg),
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = Spacing.lg)
+            .padding(bottom = Spacing.xl),
         verticalArrangement = Arrangement.spacedBy(Spacing.sm)
     ) {
-        item {
-            MenuRow(
+        SettingsGroup {
+            SettingsRow(
                 icon = FeatherIcons.Image,
                 title = stringResource(R.string.settings_vision_model),
-                subtitle = visionSubtitle,
-                onClick = { showVisionSheet = true }
+                onClick = { showVisionSheet = true },
+                trailing = {
+                    Text(
+                        text = visionValue,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
             )
-        }
-        item {
-            MenuRow(
+            SettingsDivider()
+            SettingsRow(
                 icon = FeatherIcons.Minimize2,
                 title = stringResource(R.string.settings_compaction_model),
-                subtitle = compactionSubtitle,
-                onClick = { showCompactionSheet = true }
+                onClick = { showCompactionSheet = true },
+                trailing = {
+                    Text(
+                        text = compactionValue,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
             )
         }
     }
@@ -130,8 +127,6 @@ internal fun DefaultModelsSection(
     if (showVisionSheet) {
         ModelSelectionSheet(
             title = stringResource(R.string.settings_vision_model),
-            followChatModelText = stringResource(R.string.vision_follow_chat_model),
-            followDescText = stringResource(R.string.vision_follow_desc),
             noModelsText = stringResource(R.string.vision_no_models),
             providers = providers,
             currentProviderId = visionProviderId,
@@ -152,8 +147,6 @@ internal fun DefaultModelsSection(
     if (showCompactionSheet) {
         ModelSelectionSheet(
             title = stringResource(R.string.settings_compaction_model),
-            followChatModelText = stringResource(R.string.compaction_follow_chat_model),
-            followDescText = stringResource(R.string.compaction_follow_desc),
             noModelsText = stringResource(R.string.compaction_no_models),
             providers = providers,
             currentProviderId = compactionProviderId,
@@ -173,15 +166,13 @@ internal fun DefaultModelsSection(
 }
 
 /**
- * 模型选择弹窗：风格与 [FetchModelsDialog] 保持一致（包含搜索框、Logo 图标、能力 Tag、提供商折叠分组）。
- * 识图模型与压缩模型共用此组件，仅文案不同。
+ * 模型选择弹窗：风格与拉取模型弹窗保持一致（iOS 胶囊搜索框、提供商分组卡片、能力 Tag）。
+ * 识图模型与压缩模型共用此组件，仅文案不同；右上角「重置」清除专用模型配置（回退跟随聊天模型）。
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ModelSelectionSheet(
     title: String,
-    followChatModelText: String,
-    followDescText: String,
     noModelsText: String,
     providers: List<AIProviderConfig>,
     currentProviderId: String,
@@ -193,158 +184,90 @@ private fun ModelSelectionSheet(
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var searchQuery by remember { mutableStateOf("") }
-    val collapsedProviders = remember { mutableStateMapOf<String, Boolean>() }
-
-    val configuration = LocalConfiguration.current
-    val screenHeight = configuration.screenHeightDp.dp
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
         sheetGesturesEnabled = true,
-        containerColor = Color.Transparent,
-        tonalElevation = 0.dp,
-        dragHandle = null
+        containerColor = settingsPageBackground()
     ) {
-        Box(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .fillMaxHeight(),
-            contentAlignment = Alignment.BottomCenter
+                .padding(horizontal = Spacing.lg)
+                .padding(bottom = Spacing.lg),
+            verticalArrangement = Arrangement.spacedBy(Spacing.sm)
         ) {
-            Surface(
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(screenHeight * 0.85f),
-                color = MaterialTheme.colorScheme.surface,
-                shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
+                    .padding(horizontal = Spacing.lg, vertical = Spacing.md),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(Spacing.lg)
-                        .padding(bottom = Spacing.md),
-                    verticalArrangement = Arrangement.spacedBy(Spacing.md)
-                ) {
-                    Text(
-                        text = title,
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.weight(1f)
+                )
+                Text(
+                    text = stringResource(R.string.common_reset),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.clickable { onClear() }
+                )
+            }
 
-                    OutlinedTextField(
-                        value = searchQuery,
-                        onValueChange = { searchQuery = it },
-                        placeholder = { Text(stringResource(R.string.provider_filter_models_hint)) },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(50)
-                    )
+            ModelSearchField(
+                query = searchQuery,
+                onQueryChange = { searchQuery = it },
+                placeholder = stringResource(R.string.provider_filter_models_hint)
+            )
 
-                    LazyColumn(
+            val activeProviders = providers.filter { it.isEnabled && it.models.isNotEmpty() }
+            if (activeProviders.isEmpty()) {
+                SettingsGroup {
+                    Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(Spacing.xs)
+                            .heightIn(min = 360.dp),
+                        contentAlignment = Alignment.Center
                     ) {
-                        if (searchQuery.isBlank() || followChatModelText.contains(searchQuery, ignoreCase = true)) {
-                            item(key = "header_follow_chat") {
-                                Card(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    shape = RoundedCornerShape(Radius.md),
-                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                                    border = BorderStroke(
-                                        1.dp,
-                                        if (currentProviderId.isBlank()) MaterialTheme.colorScheme.primary
-                                        else MaterialTheme.colorScheme.outlineVariant
-                                    )
-                                ) {
-                                    Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .clickable { onClear() }
-                                            .padding(Spacing.lg),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Column(modifier = Modifier.weight(1f)) {
-                                            Text(
-                                                text = followChatModelText,
-                                                style = MaterialTheme.typography.titleMedium,
-                                                fontWeight = FontWeight.Normal,
-                                                color = MaterialTheme.colorScheme.onSurface
-                                            )
-                                            Text(
-                                                text = followDescText,
-                                                style = MaterialTheme.typography.bodySmall,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                modifier = Modifier.padding(top = Spacing.xs)
-                                            )
-                                        }
-                                        if (currentProviderId.isBlank()) {
-                                            Spacer(Modifier.width(Spacing.sm))
-                                            Icon(
-                                                imageVector = FeatherIcons.Check,
-                                                contentDescription = null,
-                                                tint = MaterialTheme.colorScheme.primary,
-                                                modifier = Modifier.size(22.dp)
-                                            )
-                                        }
-                                    }
-                                }
-                            }
+                        Text(
+                            text = noModelsText,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(Spacing.lg)
+                        )
+                    }
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 360.dp, max = 420.dp),
+                    verticalArrangement = Arrangement.spacedBy(Spacing.sm)
+                ) {
+                    activeProviders.forEach { provider ->
+                        val filteredModels = provider.models.filter {
+                            searchQuery.isBlank() || it.contains(searchQuery, ignoreCase = true)
                         }
-
-                        val activeProviders = providers.filter { it.isEnabled && it.models.isNotEmpty() }
-                        if (activeProviders.isEmpty()) {
-                            item {
-                                Text(
-                                    text = noModelsText,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.padding(Spacing.md)
-                                )
+                        if (filteredModels.isNotEmpty()) {
+                            item(key = "header_${provider.id}") {
+                                SettingsGroupHeader("${provider.name} (${filteredModels.size})")
                             }
-                        } else {
-                            activeProviders.forEach { provider ->
-                                val filteredModels = provider.models.filter {
-                                    searchQuery.isBlank() || it.contains(searchQuery, ignoreCase = true)
-                                }
-                                if (filteredModels.isNotEmpty()) {
-                                    item(key = "header_${provider.id}") {
-                                        val expanded = collapsedProviders[provider.id] != true
-                                        Row(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .heightIn(min = 44.dp)
-                                                .clickable { collapsedProviders[provider.id] = expanded }
-                                                .padding(horizontal = Spacing.xs, vertical = Spacing.sm),
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            Text(
-                                                text = "${provider.name} (${filteredModels.size})",
-                                                style = MaterialTheme.typography.titleSmall,
-                                                color = MaterialTheme.colorScheme.primary,
-                                                maxLines = 1,
-                                                overflow = TextOverflow.Ellipsis,
-                                                modifier = Modifier.weight(1f)
-                                            )
-                                            Icon(
-                                                imageVector = if (expanded) Icons.Outlined.KeyboardArrowDown else Icons.AutoMirrored.Outlined.KeyboardArrowRight,
-                                                contentDescription = if (expanded) stringResource(R.string.provider_collapse_brand, provider.name) else stringResource(R.string.provider_expand_brand, provider.name),
-                                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                modifier = Modifier.size(20.dp)
-                                            )
+                            item(key = "card_${provider.id}") {
+                                SettingsGroup {
+                                    filteredModels.forEachIndexed { index, model ->
+                                        if (index > 0) {
+                                            SettingsDivider()
                                         }
-                                    }
-                                    if (collapsedProviders[provider.id] != true) {
-                                        items(filteredModels, key = { "${provider.id}_$it" }) { model ->
-                                            ModelSelectionRow(
-                                                model = model,
-                                                selected = provider.id == currentProviderId && model == currentModel,
-                                                metadata = modelMetadata[model],
-                                                onClick = { onSelect(provider.id, model) }
-                                            )
-                                        }
+                                        ModelSelectionRow(
+                                            model = model,
+                                            selected = provider.id == currentProviderId && model == currentModel,
+                                            metadata = modelMetadata[model],
+                                            onClick = { onSelect(provider.id, model) }
+                                        )
                                     }
                                 }
                             }

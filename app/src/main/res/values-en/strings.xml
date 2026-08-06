@@ -33,9 +33,7 @@
     <string name="settings_providers_count">%1$d</string>
     <string name="settings_providers_active"> · Active: %1$s</string>
     <string name="settings_vision_follow_chat">Follow current chat model</string>
-    <string name="settings_vision_dedicated">Dedicated: %1$s · %2$s</string>
     <string name="settings_compaction_follow_chat">Follow current chat model</string>
-    <string name="settings_compaction_dedicated">Dedicated: %1$s · %2$s</string>
     <string name="settings_mcp_empty">No MCP servers configured</string>
     <string name="settings_mcp_count_connected">%1$d · Connected %2$d</string>
     <string name="settings_container_current">Current: %1$s</string>
@@ -551,8 +549,6 @@
     <string name="provider_filter_models_hint">Filter models by name</string>
     <string name="provider_fetch_failed">Fetch failed: %1$s</string>
     <string name="provider_no_matching_models">No matching models</string>
-    <string name="provider_collapse_brand">Collapse %1$s</string>
-    <string name="provider_expand_brand">Expand %1$s</string>
     <string name="provider_please_wait">Please wait…</string>
     <string name="provider_test">Test</string>
 
@@ -696,13 +692,9 @@
     <string name="tool_expand_remaining">Expand remaining %1$s lines</string>
 
     <!-- Vision Model -->
-    <string name="vision_follow_chat_model">Follow current chat model</string>
-    <string name="vision_follow_desc">Vision always uses the currently selected chat model; if it doesn\'t support Vision, image recognition is unavailable.</string>
     <string name="vision_no_models">No models available. Please add and configure a model in "AI Providers" before selecting a dedicated vision model.</string>
 
     <!-- Compaction Model -->
-    <string name="compaction_follow_chat_model">Follow current chat model</string>
-    <string name="compaction_follow_desc">Context compaction always uses the currently selected chat model.</string>
     <string name="compaction_no_models">No models available. Please add and configure a model in "AI Providers" before selecting a dedicated compaction model.</string>
 
     <!-- Web Search Result -->

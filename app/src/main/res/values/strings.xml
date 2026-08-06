@@ -33,9 +33,7 @@
     <string name="settings_providers_count">%1$d 个</string>
     <string name="settings_providers_active"> · 启用：%1$s</string>
     <string name="settings_vision_follow_chat">跟随当前聊天模型</string>
-    <string name="settings_vision_dedicated">专用：%1$s · %2$s</string>
     <string name="settings_compaction_follow_chat">跟随当前聊天模型</string>
-    <string name="settings_compaction_dedicated">专用：%1$s · %2$s</string>
     <string name="settings_mcp_empty">未配置 MCP 服务器</string>
     <string name="settings_mcp_count_connected">%1$d 个 · 已连接 %2$d</string>
     <string name="settings_container_current">当前：%1$s</string>
@@ -81,6 +79,7 @@
     <string name="common_current">当前</string>
     <string name="common_collapse">折叠</string>
     <string name="common_collapse_action">收起</string>
+    <string name="common_reset">重置</string>
     <string name="chat_new_session">新建会话</string>
     <string name="common_new_tab">新建标签</string>
     <string name="common_show">显示</string>
@@ -551,8 +550,6 @@
     <string name="provider_filter_models_hint">输入模型名称筛选</string>
     <string name="provider_fetch_failed">拉取失败：%1$s</string>
     <string name="provider_no_matching_models">没有匹配的模型</string>
-    <string name="provider_collapse_brand">折叠%1$s</string>
-    <string name="provider_expand_brand">展开%1$s</string>
     <string name="provider_please_wait">请稍候…</string>
     <string name="provider_test">测试</string>
 
@@ -696,13 +693,9 @@
     <string name="tool_expand_remaining">展开剩余 %1$s 行</string>
 
     <!-- Vision Model -->
-    <string name="vision_follow_chat_model">跟随当前聊天模型</string>
-    <string name="vision_follow_desc">识图始终用当前选中的聊天模型；当其不支持 Vision 时识图不可用。</string>
     <string name="vision_no_models">暂无可用模型。请在「AI 提供商」中添加并配置模型后再选识图专用模型。</string>
 
     <!-- Compaction Model -->
-    <string name="compaction_follow_chat_model">跟随当前聊天模型</string>
-    <string name="compaction_follow_desc">上下文压缩始终用当前选中的聊天模型。</string>
     <string name="compaction_no_models">暂无可用模型。请在「AI 提供商」中添加并配置模型后再选压缩专用模型。</string>
 
     <!-- Web Search Result -->

@@ -1,6 +1,7 @@
 package com.aicode.feature.settings.presentation.component
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
@@ -11,6 +12,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -20,6 +22,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
@@ -28,6 +31,7 @@ import androidx.compose.ui.unit.sp
 import com.aicode.core.theme.Spacing
 import compose.icons.FeatherIcons
 import compose.icons.feathericons.ChevronRight
+import compose.icons.feathericons.Search
 
 /**
  * 设置页分组组件：浅灰背景 + 白色分组圆角卡片 + 组内缩进分隔线 + 黑色线条图标。
@@ -137,4 +141,53 @@ internal fun SettingsDivider() {
         thickness = 0.5.dp,
         color = if (settingsLightMode()) Color(0xFFE5E5EA) else MaterialTheme.colorScheme.outlineVariant
     )
+}
+
+/** iOS 风格搜索框：浅灰胶囊背景、无边框，与设置页分组风格一致。 */
+@Composable
+internal fun ModelSearchField(
+    query: String,
+    onQueryChange: (String) -> Unit,
+    placeholder: String,
+    modifier: Modifier = Modifier
+) {
+    val light = settingsLightMode()
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(50),
+        color = if (light) Color(0xFFE9E9EB) else MaterialTheme.colorScheme.surfaceVariant
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = Spacing.md, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                FeatherIcons.Search,
+                contentDescription = null,
+                tint = if (light) Color(0xFF8E8E93) else MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(18.dp)
+            )
+            Spacer(Modifier.width(Spacing.sm))
+            Box(modifier = Modifier.weight(1f)) {
+                if (query.isEmpty()) {
+                    Text(
+                        text = placeholder,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = if (light) Color(0xFF8E8E93) else MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1
+                    )
+                }
+                BasicTextField(
+                    value = query,
+                    onValueChange = onQueryChange,
+                    textStyle = MaterialTheme.typography.bodyMedium.copy(
+                        color = if (light) Color(0xFF0F0F0F) else MaterialTheme.colorScheme.onSurface
+                    ),
+                    singleLine = true,
+                    cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        }
+    }
 }

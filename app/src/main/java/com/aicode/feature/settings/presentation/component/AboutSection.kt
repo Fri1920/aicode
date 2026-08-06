@@ -62,8 +62,8 @@ import compose.icons.feathericons.Tag
 /**
  * 关于页：顶部应用信息、版本号（点击检查更新）、GitHub 仓库、开源许可证。
  *
- * 纯展示型页面，无持久化。布局与样式与 SettingsScreen 的 MenuRow 保持一致
- * (Card + RoundedCornerShape(Radius.md) + outlineVariant 边框 + onSurfaceVariant 图标)。
+ * 纯展示型页面，无持久化。使用带边框独立卡片（Card + RoundedCornerShape(Radius.md)
+ * + outlineVariant 边框 + onSurfaceVariant 图标）。
  */
 @Composable
 internal fun AboutSection() {
@@ -191,7 +191,7 @@ private fun AboutHeaderCard(appName: String, appIcon: androidx.compose.ui.graphi
 }
 
 /**
- * 单行卡片：左侧可选图标 + 标题，右侧可选文案 + 右箭头。仿 SettingsScreen 的 MenuRow。
+ * 单行卡片：左侧可选图标 + 标题，右侧可选文案 + 右箭头。
  *
  * @param leading 左侧图标，null 则留出占位空格使标题与下方卡片左对齐于标题起点。
  * @param value 右侧文案，null 则不显示，仅显示右箭头。

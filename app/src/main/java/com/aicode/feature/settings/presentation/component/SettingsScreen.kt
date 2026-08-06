@@ -2,7 +2,6 @@ package com.aicode.feature.settings.presentation.component
 
 import androidx.activity.compose.BackHandler
 import androidx.annotation.StringRes
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -16,9 +15,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -43,12 +39,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.aicode.core.theme.Radius
 import com.aicode.core.theme.Spacing
 import com.aicode.core.util.LogLevel
 import com.aicode.R
@@ -62,7 +55,6 @@ import com.aicode.feature.settings.presentation.SettingsViewModel
 import compose.icons.FeatherIcons
 import compose.icons.feathericons.ArrowLeft
 import compose.icons.feathericons.Box
-import compose.icons.feathericons.ChevronRight
 import compose.icons.feathericons.Cloud
 import compose.icons.feathericons.Cpu
 import compose.icons.feathericons.FileText
@@ -504,55 +496,6 @@ internal fun SettingsMenu(
                 title = stringResource(SettingsSection.About.titleRes),
                 onClick = { onOpen(SettingsSection.About) }
             )
-        }
-    }
-}
-/** 二级菜单入口行：图标 + 标题 + 摘要 + 右箭头。 */
-@Composable
-internal fun MenuRow(
-    icon: ImageVector,
-    title: String,
-    subtitle: String,
-    onClick: () -> Unit
-) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onClick() },
-        shape = RoundedCornerShape(Radius.md),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(Spacing.lg),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(24.dp)
-            )
-            Spacer(Modifier.width(Spacing.md))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Normal,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    text = subtitle,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            Icon(
-                imageVector = FeatherIcons.ChevronRight,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
