@@ -14,9 +14,7 @@ data class AIProviderConfig(
     val selectedModel: String = defaultModel,
     val isEnabled: Boolean = true,
     val useFullUrl: Boolean = false,
-    val useResponseApi: Boolean = false,
-    /** 手动配置的模型能力（识图/工具/上下文窗口），key 为模型名。 */
-    val modelCapabilities: Map<String, ModelMetadata> = emptyMap()
+    val useResponseApi: Boolean = false
 ) {
     /** 实际生效的模型：优先 selectedModel，其次 defaultModel。 */
     val effectiveModel: String

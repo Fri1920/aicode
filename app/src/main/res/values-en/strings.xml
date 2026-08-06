@@ -524,8 +524,6 @@
     <string name="provider_section_models">Models</string>
     <string name="provider_show_api_key">Show API Key</string>
     <string name="provider_hide_api_key">Hide API Key</string>
-    <string name="provider_model_supports_vision">Vision</string>
-    <string name="provider_model_supports_tools">Tools</string>
     <string name="provider_model_context_input">Input Window (tokens)</string>
     <string name="provider_model_context_output">Output Window (tokens)</string>
     <string name="provider_new">New Provider</string>
@@ -542,8 +540,15 @@
     <string name="provider_model_name">Model Name</string>
     <string name="provider_model_name_hint">e.g. gpt-4o</string>
     <string name="provider_model_already_added">This model has already been added</string>
+    <string name="provider_edit_model">Edit Model</string>
+    <string name="provider_model_input_mode">Input Mode</string>
+    <string name="provider_model_output_mode">Output Mode</string>
+    <string name="provider_model_mode_text">Text</string>
+    <string name="provider_model_mode_image">Image</string>
+    <string name="provider_model_capabilities">Capabilities</string>
+    <string name="provider_model_capability_tools">Tools</string>
+    <string name="provider_model_capability_reasoning">Reasoning</string>
     <string name="provider_filter_models_hint">Filter models by name</string>
-    <string name="provider_fetching">Fetching…</string>
     <string name="provider_fetch_failed">Fetch failed: %1$s</string>
     <string name="provider_no_matching_models">No matching models</string>
     <string name="provider_collapse_brand">Collapse %1$s</string>

@@ -524,8 +524,6 @@
     <string name="provider_section_models">模型</string>
     <string name="provider_show_api_key">显示密钥</string>
     <string name="provider_hide_api_key">隐藏密钥</string>
-    <string name="provider_model_supports_vision">支持识图</string>
-    <string name="provider_model_supports_tools">支持工具调用</string>
     <string name="provider_model_context_input">输入窗口 (Token)</string>
     <string name="provider_model_context_output">输出窗口 (Token)</string>
     <string name="provider_new">新提供商</string>
@@ -542,8 +540,15 @@
     <string name="provider_model_name">模型名称</string>
     <string name="provider_model_name_hint">例如 gpt-4o</string>
     <string name="provider_model_already_added">该模型已添加</string>
+    <string name="provider_edit_model">编辑模型</string>
+    <string name="provider_model_input_mode">输入模式</string>
+    <string name="provider_model_output_mode">输出模式</string>
+    <string name="provider_model_mode_text">文本</string>
+    <string name="provider_model_mode_image">图片</string>
+    <string name="provider_model_capabilities">能力</string>
+    <string name="provider_model_capability_tools">工具</string>
+    <string name="provider_model_capability_reasoning">推理</string>
     <string name="provider_filter_models_hint">输入模型名称筛选</string>
-    <string name="provider_fetching">正在拉取…</string>
     <string name="provider_fetch_failed">拉取失败：%1$s</string>
     <string name="provider_no_matching_models">没有匹配的模型</string>
     <string name="provider_collapse_brand">折叠%1$s</string>

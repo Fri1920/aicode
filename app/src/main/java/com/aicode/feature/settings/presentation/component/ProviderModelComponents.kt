@@ -122,7 +122,8 @@ internal fun ProviderModelRow(
     testing: Boolean,
     result: ModelTestResult?,
     onTest: () -> Unit,
-    onRemove: () -> Unit
+    onRemove: () -> Unit,
+    onEdit: () -> Unit = {}
 ) {
     var showErrorDetail by remember { mutableStateOf(false) }
 
@@ -131,7 +132,12 @@ internal fun ProviderModelRow(
             .fillMaxWidth()
             .padding(horizontal = Spacing.lg, vertical = Spacing.sm)
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onEdit),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
             ModelLogoIcon(modelName = model, size = 24.dp)
             Spacer(Modifier.width(Spacing.md))
 
