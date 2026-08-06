@@ -39,6 +39,7 @@ class AnthropicAdapter @Inject constructor(
     override var useFullUrl = false
     override var useResponseApi = false
     override var model = "claude-3-5-sonnet-20241022"
+    override var providerId = ""
     override var logSessionId: String? = null
 
     override suspend fun complete(

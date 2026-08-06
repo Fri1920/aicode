@@ -99,6 +99,7 @@ import com.aicode.feature.settings.data.remote.ModelTestResult
 import com.aicode.feature.settings.domain.model.AIProviderConfig
 import com.aicode.feature.settings.domain.model.ModelMetadata
 import com.aicode.feature.settings.domain.model.ProviderType
+import com.aicode.feature.settings.domain.model.mergeModelMetadata
 import com.aicode.feature.settings.presentation.FetchState
 import com.aicode.feature.settings.presentation.SettingsViewModel
 import compose.icons.FeatherIcons
@@ -109,7 +110,6 @@ import compose.icons.feathericons.DownloadCloud
 import compose.icons.feathericons.Eye
 import compose.icons.feathericons.EyeOff
 import compose.icons.feathericons.Plus
-import compose.icons.feathericons.Search
 import compose.icons.feathericons.Sliders
 import compose.icons.feathericons.Trash2
 import androidx.compose.ui.res.stringResource
@@ -162,7 +162,7 @@ fun ProviderEditorScreen(
     }
 
     LaunchedEffect(type, modelSnapshot) {
-        viewModel.resolveModelMetadata(type, modelSnapshot)
+        viewModel.resolveModelMetadata(providerId, type, modelSnapshot)
     }
 
     LaunchedEffect(providerId, modelSnapshot) {
@@ -427,7 +427,7 @@ fun ProviderEditorScreen(
                                 }
                                 ProviderModelRow(
                                     model = model,
-                                    metadata = effectiveModelMetadata(model, customMetadata["$providerId:$model"], modelMetadata[model]),
+                                    metadata = mergeModelMetadata(model, modelMetadata[model], customMetadata["$providerId:$model"]),
                                     testing = model in testing,
                                     result = testResults[model],
                                     onTest = { viewModel.testModel(currentConfig(), model) },
@@ -474,7 +474,7 @@ fun ProviderEditorScreen(
                 } else {
                     stringResource(R.string.common_add)
                 },
-                initial = editingModel?.let { effectiveModelMetadata(it, customMetadata["$providerId:$it"], modelMetadata[it]) },
+                initial = editingModel?.let { mergeModelMetadata(it, modelMetadata[it], customMetadata["$providerId:$it"]) },
                 onSave = { model, meta ->
                     val editing = editingModel
                     if (editing != null && model != editing) {
@@ -922,55 +922,6 @@ private fun SkeletonBlock(
     )
 }
 
-/** iOS 风格搜索框：浅灰胶囊背景、无边框，与设置页分组风格一致。 */
-@Composable
-private fun ModelSearchField(
-    query: String,
-    onQueryChange: (String) -> Unit,
-    placeholder: String,
-    modifier: Modifier = Modifier
-) {
-    val light = MaterialTheme.colorScheme.background.luminance() > 0.5f
-    Surface(
-        modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(50),
-        color = if (light) Color(0xFFE9E9EB) else MaterialTheme.colorScheme.surfaceVariant
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = Spacing.md, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(
-                FeatherIcons.Search,
-                contentDescription = null,
-                tint = if (light) Color(0xFF8E8E93) else MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(18.dp)
-            )
-            Spacer(Modifier.width(Spacing.sm))
-            Box(modifier = Modifier.weight(1f)) {
-                if (query.isEmpty()) {
-                    Text(
-                        text = placeholder,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = if (light) Color(0xFF8E8E93) else MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1
-                    )
-                }
-                BasicTextField(
-                    value = query,
-                    onValueChange = onQueryChange,
-                    textStyle = MaterialTheme.typography.bodyMedium.copy(
-                        color = if (light) Color(0xFF0F0F0F) else MaterialTheme.colorScheme.onSurface
-                    ),
-                    singleLine = true,
-                    cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
-        }
-    }
-}
-
 internal fun defaultProviderBaseUrl(type: ProviderType): String = when (type) {
     ProviderType.ANTHROPIC -> "https://api.anthropic.com/"
     ProviderType.GEMINI -> "https://generativelanguage.googleapis.com/"
@@ -1132,30 +1083,4 @@ private fun providerTypeLabel(type: ProviderType): String = when (type) {
     ProviderType.OPENAI -> "OpenAI"
     ProviderType.ANTHROPIC -> "Anthropic"
     ProviderType.GEMINI -> "Gemini"
-}
-
-/** 合并自定义元数据与自动解析（拉取/内置）元数据，自定义优先；窗口未填时保留自动值。 */
-private fun effectiveModelMetadata(
-    model: String,
-    custom: ModelMetadata?,
-    auto: ModelMetadata?
-): ModelMetadata {
-    val a = auto ?: ModelMetadata(
-        id = model,
-        displayName = model,
-        contextTokens = 0,
-        inputTokens = null,
-        outputTokens = null
-    )
-    val c = custom ?: return a
-    return a.copy(
-        modelType = c.modelType,
-        supportsVision = c.supportsVision,
-        supportsImageOutput = c.supportsImageOutput,
-        supportsTools = c.supportsTools,
-        supportsReasoning = c.supportsReasoning,
-        contextTokens = c.contextTokens.takeIf { it > 0 } ?: a.contextTokens,
-        inputTokens = c.inputTokens ?: a.inputTokens,
-        outputTokens = c.outputTokens ?: a.outputTokens
-    )
 }

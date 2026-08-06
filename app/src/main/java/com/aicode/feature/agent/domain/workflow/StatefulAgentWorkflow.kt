@@ -213,6 +213,7 @@ class StatefulAgentWorkflow @Inject constructor(
         provider.model = config.effectiveModel
         provider.useFullUrl = config.useFullUrl
         provider.useResponseApi = config.useResponseApi
+        provider.providerId = config.id
         provider.logSessionId = sessionId
         return provider
     }
@@ -664,7 +665,7 @@ class StatefulAgentWorkflow @Inject constructor(
 
     private suspend fun activeModelSupportsVision(sessionId: String?): Boolean {
         val config = resolveProviderConfig(sessionId) ?: return false
-        val metadata = modelMetadataService.resolve(config.type, config.effectiveModel)
+        val metadata = modelMetadataService.resolve(config.id, config.type, config.effectiveModel)
         return metadata.supportsVision
     }
 
@@ -704,7 +705,7 @@ class StatefulAgentWorkflow @Inject constructor(
         val config = aiProviderRepository.getProviderById(providerId) ?: return false
         if (!config.isEnabled) return false
         if (config.apiKey.isBlank()) return false
-        val metadata = modelMetadataService.resolve(config.type, model)
+        val metadata = modelMetadataService.resolve(config.id, config.type, model)
         return metadata.supportsVision
     }
 

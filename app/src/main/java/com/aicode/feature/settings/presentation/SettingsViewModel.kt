@@ -571,17 +571,17 @@ class SettingsViewModel @Inject constructor(
             modelApiService.fetchModels(provider.baseUrl, provider.apiKey, provider.type)
                 .onSuccess {
                     _fetchState.value = FetchState.Success(it)
-                    resolveModelMetadata(provider.type, it)
+                    resolveModelMetadata(provider.id, provider.type, it)
                 }
                 .onFailure { _fetchState.value = FetchState.Error(it.message ?: "拉取失败") }
         }
     }
 
-    fun resolveModelMetadata(type: ProviderType, modelIds: List<String>) {
+    fun resolveModelMetadata(providerId: String, type: ProviderType, modelIds: List<String>) {
         val normalizedIds = modelIds.map { it.trim() }.filter { it.isNotEmpty() }.distinct()
         if (normalizedIds.isEmpty()) return
         viewModelScope.launch {
-            val metadata = modelMetadataService.resolveAll(type, normalizedIds)
+            val metadata = modelMetadataService.resolveAll(providerId, type, normalizedIds)
             _modelMetadata.update { current -> current + metadata }
         }
     }
@@ -605,7 +605,7 @@ class SettingsViewModel @Inject constructor(
             for (provider in enabled) {
                 val ids = provider.models.map { it.trim() }.filter { it.isNotEmpty() }.distinct()
                 if (ids.isEmpty()) continue
-                resolved += modelMetadataService.resolveAll(provider.type, ids)
+                resolved += modelMetadataService.resolveAll(provider.id, provider.type, ids)
             }
             if (resolved.isNotEmpty()) {
                 _modelMetadata.update { it + resolved }

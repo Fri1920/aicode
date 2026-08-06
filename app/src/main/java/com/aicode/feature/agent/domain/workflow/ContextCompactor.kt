@@ -48,7 +48,7 @@ class ContextCompactor @Inject constructor(
         onEvent: suspend (AgentEvent) -> Unit = {}
     ): List<AgentMessage> {
         val totalTokens = estimateTokens(messages)
-        val metadata = modelMetadataService.resolve(inferProviderType(aiProvider), aiProvider.model)
+        val metadata = modelMetadataService.resolve(aiProvider.providerId, inferProviderType(aiProvider), aiProvider.model)
         val contextLimit = metadata.contextTokens.takeIf { it > 0 } ?: ModelContextPolicy.DEFAULT_CONTEXT_TOKENS
         val triggerThreshold = (contextLimit * 0.9f).toInt()
         if (messages.size <= 2 || (!force && totalTokens < triggerThreshold)) {

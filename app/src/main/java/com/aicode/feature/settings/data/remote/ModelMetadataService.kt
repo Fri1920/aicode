@@ -2,8 +2,10 @@ package com.aicode.feature.settings.data.remote
 
 import android.content.Context
 import com.aicode.core.util.FileLogger
+import com.aicode.feature.settings.data.local.CustomModelMetadataStore
 import com.aicode.feature.settings.domain.model.ModelMetadata
 import com.aicode.feature.settings.domain.model.ProviderType
+import com.aicode.feature.settings.domain.model.mergeModelMetadata
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -23,7 +25,8 @@ import javax.inject.Singleton
 
 @Singleton
 class ModelMetadataService @Inject constructor(
-    @param:ApplicationContext private val context: Context
+    @param:ApplicationContext private val context: Context,
+    private val customModelMetadataStore: CustomModelMetadataStore
 ) {
     private val json = Json { ignoreUnknownKeys = true }
 
@@ -40,18 +43,28 @@ class ModelMetadataService @Inject constructor(
         .writeTimeout(10, TimeUnit.SECONDS)
         .build()
 
-    suspend fun resolve(type: ProviderType, modelId: String): ModelMetadata = withContext(Dispatchers.IO) {
-        val catalog = loadCatalog()
-        findMetadata(catalog, type, modelId) ?: default(type, modelId)
-    }
+    suspend fun resolve(providerId: String, type: ProviderType, modelId: String): ModelMetadata =
+        withContext(Dispatchers.IO) {
+            val catalog = loadCatalog()
+            val auto = findMetadata(catalog, type, modelId) ?: default(type, modelId)
+            mergeCustom(providerId, modelId, auto)
+        }
 
-    suspend fun resolveAll(type: ProviderType, modelIds: List<String>): Map<String, ModelMetadata> =
+    suspend fun resolveAll(providerId: String, type: ProviderType, modelIds: List<String>): Map<String, ModelMetadata> =
         withContext(Dispatchers.IO) {
             val catalog = loadCatalog()
             modelIds.associateWith { modelId ->
-                findMetadata(catalog, type, modelId) ?: default(type, modelId)
+                val auto = findMetadata(catalog, type, modelId) ?: default(type, modelId)
+                mergeCustom(providerId, modelId, auto)
             }
         }
+
+    /** 自定义元数据优先于自动解析（拉取/内置）结果；providerId 为空（未关联配置）时跳过合并。 */
+    private suspend fun mergeCustom(providerId: String, modelId: String, auto: ModelMetadata): ModelMetadata {
+        if (providerId.isBlank()) return auto
+        val custom = customModelMetadataStore.get(providerId, modelId)
+        return mergeModelMetadata(modelId, auto, custom)
+    }
 
     /**
      * App 启动时统一调用的异步刷新：磁盘缓存未过期（<24h）则跳过；拉取成功写入内存与磁盘缓存，

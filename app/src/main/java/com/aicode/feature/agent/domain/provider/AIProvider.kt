@@ -50,6 +50,12 @@ interface AIProvider {
     var model: String
 
     /**
+     * 当前 provider 配置 id（数据库主键），用于关联自定义模型元数据。
+     * 调用前由工作流设置；为空时元数据解析回退纯自动（拉取/内置/默认）。
+     */
+    var providerId: String
+
+    /**
      * 当前会话 id，仅用于日志归档：调用前由工作流设置，[com.aicode.core.util.AILogger]
      * 据此把每次请求/响应写到对应会话的文件。为 null 时落到 `session-unknown.log`。
      */

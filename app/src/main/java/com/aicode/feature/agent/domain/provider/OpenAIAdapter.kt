@@ -38,6 +38,7 @@ class OpenAIAdapter @Inject constructor(
     override var useFullUrl = false
     override var useResponseApi = false
     override var model = "gpt-4-turbo"
+    override var providerId = ""
     override var logSessionId: String? = null
 
     override suspend fun complete(

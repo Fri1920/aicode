@@ -25,3 +25,32 @@ data class ModelMetadata(
     }
 }
 
+/**
+ * 合并自定义元数据与自动解析（拉取/内置）元数据，自定义优先；窗口未填时保留自动值。
+ * [base] 为空时构造兜底元数据（窗口 0，能力全 false）。
+ */
+fun mergeModelMetadata(
+    model: String,
+    base: ModelMetadata?,
+    custom: ModelMetadata?
+): ModelMetadata {
+    val a = base ?: ModelMetadata(
+        id = model,
+        displayName = model,
+        contextTokens = 0,
+        inputTokens = null,
+        outputTokens = null
+    )
+    val c = custom ?: return a
+    return a.copy(
+        modelType = c.modelType,
+        supportsVision = c.supportsVision,
+        supportsImageOutput = c.supportsImageOutput,
+        supportsTools = c.supportsTools,
+        supportsReasoning = c.supportsReasoning,
+        contextTokens = c.contextTokens.takeIf { it > 0 } ?: a.contextTokens,
+        inputTokens = c.inputTokens ?: a.inputTokens,
+        outputTokens = c.outputTokens ?: a.outputTokens
+    )
+}
+

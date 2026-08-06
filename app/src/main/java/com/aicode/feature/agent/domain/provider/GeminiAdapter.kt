@@ -30,6 +30,7 @@ class GeminiAdapter @Inject constructor(
     override var useFullUrl = false
     override var useResponseApi = false
     override var model = "gemini-1.5-flash"
+    override var providerId = ""
     override var logSessionId: String? = null
 
     override suspend fun complete(

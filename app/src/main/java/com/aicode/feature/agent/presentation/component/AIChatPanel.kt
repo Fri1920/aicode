@@ -157,7 +157,7 @@ fun AIChatPanel(
     LaunchedEffect(activeProvider?.type, activeModel) {
         val provider = activeProvider ?: return@LaunchedEffect
         if (activeModel.isNotBlank()) {
-            settingsViewModel?.resolveModelMetadata(provider.type, listOf(activeModel))
+            settingsViewModel?.resolveModelMetadata(provider.id, provider.type, listOf(activeModel))
         }
     }
 
