@@ -58,7 +58,7 @@ fun RemoteServerScreen(
                     Tab(
                         selected = selectedTab == 1,
                         onClick = { selectedTab = 1 },
-                        text = { Text(stringResource(R.string.common_workspace)) }
+                        text = { Text(stringResource(R.string.remote_tab_mounts)) }
                     )
                     Tab(
                         selected = selectedTab == 2,

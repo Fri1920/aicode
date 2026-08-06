@@ -15,7 +15,7 @@
     <string name="settings_log">日志等级</string>
     <string name="settings_log_viewer">日志查看</string>
     <string name="settings_permissions">工具授权</string>
-    <string name="settings_remote_servers">远程工作区</string>
+    <string name="settings_remote_servers">连接与同步</string>
     <string name="settings_backup">备份与还原</string>
     <string name="settings_about">关于</string>
     <string name="settings_language">语言</string>
@@ -60,7 +60,7 @@
     <string name="settings_category_environment">运行环境</string>
     <string name="settings_category_tools">工具与权限</string>
     <string name="settings_category_appearance">外观与语言</string>
-    <string name="settings_category_other">其他</string>
+    <string name="settings_category_system">系统</string>
 
     <!-- i18n: UI 文案 -->
     <!-- Common -->
@@ -464,7 +464,6 @@
     <string name="mcp_no_tools_hint">未检测到工具，点击右上角刷新按钮重试</string>
     <string name="mcp_no_description">无描述</string>
     <string name="mcp_needs_approval">需要审批</string>
-    <string name="mcp_delete_server">删除此 MCP 服务器</string>
 
     <!-- MCP HTTP Fields -->
     <string name="mcp_server_url">服务器地址</string>
@@ -610,8 +609,9 @@
     <string name="ftp_save_config">保存配置</string>
 
     <!-- Remote Server -->
-    <string name="remote_workspace_title">远程工作区</string>
+    <string name="remote_workspace_title">连接与同步</string>
     <string name="remote_tab_connections">连接配置</string>
+    <string name="remote_tab_mounts">挂载目录</string>
     <string name="remote_tab_ftp">内置FTP</string>
     <string name="remote_tab_sync">同步设置</string>
     <string name="remote_no_connections">暂无连接配置，请点击添加。</string>

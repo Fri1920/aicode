@@ -277,9 +277,9 @@ fun ProviderItem(
             Surface(
                 shape = RoundedCornerShape(Radius.sm),
                 color = if (provider.isEnabled) {
-                    MaterialTheme.colorScheme.primaryContainer
+                    MaterialTheme.colorScheme.tertiary.copy(alpha = 0.12f)
                 } else {
-                    MaterialTheme.colorScheme.surfaceVariant
+                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.10f)
                 }
             ) {
                 Text(
@@ -287,7 +287,7 @@ fun ProviderItem(
                     style = MaterialTheme.typography.labelSmall,
                     fontWeight = FontWeight.Medium,
                     color = if (provider.isEnabled) {
-                        MaterialTheme.colorScheme.onPrimaryContainer
+                        MaterialTheme.colorScheme.tertiary
                     } else {
                         MaterialTheme.colorScheme.onSurfaceVariant
                     },

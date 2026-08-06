@@ -349,12 +349,6 @@ fun SettingsScreen(
             onSave = { config ->
                 viewModel.upsertMcpServer(editingMcp?.name, config)
                 showMcpDialog = false
-            },
-            onDelete = editingMcp?.let { existing ->
-                {
-                    viewModel.deleteMcpServer(existing.name)
-                    showMcpDialog = false
-                }
             }
         )
     }
@@ -491,8 +485,8 @@ internal fun SettingsMenu(
             onClick = onOpenLanguageSheet
         )
 
-        // ── 其他 ──
-        SectionHeader(text = stringResource(R.string.settings_category_other))
+        // ── 系统 ──
+        SectionHeader(text = stringResource(R.string.settings_category_system))
         SwitchRow(
             icon = FeatherIcons.RefreshCw,
             title = stringResource(R.string.settings_keepalive_title),

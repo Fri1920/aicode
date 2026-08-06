@@ -19,7 +19,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -31,7 +30,6 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -59,7 +57,6 @@ import compose.icons.feathericons.FileText
 import compose.icons.feathericons.RefreshCw
 import compose.icons.feathericons.Shield
 import compose.icons.feathericons.Tool
-import compose.icons.feathericons.Trash2
 import compose.icons.feathericons.X
 import kotlinx.serialization.json.JsonObject
 import androidx.compose.ui.res.stringResource
@@ -73,8 +70,7 @@ fun McpServerEditDialog(
     onRefreshTools: () -> Unit = {},
     onOpenLogs: (() -> Unit)? = null,
     onDismiss: () -> Unit,
-    onSave: (McpServerConfig) -> Unit,
-    onDelete: (() -> Unit)?
+    onSave: (McpServerConfig) -> Unit
 ) {
     var selectedTab by remember { mutableIntStateOf(0) } // 0: 基础设置, 1: 工具
 
@@ -521,19 +517,7 @@ fun McpServerEditDialog(
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(stringResource(R.string.common_save), style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold))
                     }
-
-                    if (onDelete != null) {
-                        TextButton(
-                            onClick = onDelete,
-                            colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Icon(FeatherIcons.Trash2, contentDescription = null, modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(stringResource(R.string.mcp_delete_server))
-                    }
                 }
-            }
         }
     }
 }

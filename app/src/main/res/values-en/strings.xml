@@ -15,7 +15,7 @@
     <string name="settings_log">Log Level</string>
     <string name="settings_log_viewer">Log Viewer</string>
     <string name="settings_permissions">Tool Permissions</string>
-    <string name="settings_remote_servers">Remote Workspace</string>
+    <string name="settings_remote_servers">Connections &amp; Sync</string>
     <string name="settings_backup">Backup &amp; Restore</string>
     <string name="settings_about">About</string>
     <string name="settings_language">Language</string>
@@ -60,7 +60,7 @@
     <string name="settings_category_environment">Environment</string>
     <string name="settings_category_tools">Tools  &amp; Permissions</string>
     <string name="settings_category_appearance">Appearance  &amp; Language</string>
-    <string name="settings_category_other">Other</string>
+    <string name="settings_category_system">System</string>
 
     <!-- i18n: UI strings -->
     <!-- Common -->
@@ -464,7 +464,6 @@
     <string name="mcp_no_tools_hint">No tools detected, tap the refresh button in the top right to retry</string>
     <string name="mcp_no_description">No description</string>
     <string name="mcp_needs_approval">Needs approval</string>
-    <string name="mcp_delete_server">Delete this MCP server</string>
 
     <!-- MCP HTTP Fields -->
     <string name="mcp_server_url">Server URL</string>
@@ -610,8 +609,9 @@
     <string name="ftp_save_config">Save Configuration</string>
 
     <!-- Remote Server -->
-    <string name="remote_workspace_title">Remote Workspace</string>
+    <string name="remote_workspace_title">Connections &amp; Sync</string>
     <string name="remote_tab_connections">Connections</string>
+    <string name="remote_tab_mounts">Mounted Directories</string>
     <string name="remote_tab_ftp">Built-in FTP</string>
     <string name="remote_tab_sync">Sync Settings</string>
     <string name="remote_no_connections">No connections yet, tap to add.</string>
