@@ -4,6 +4,7 @@ import com.aicode.core.util.FileLogger
 import com.aicode.feature.settings.data.local.dao.AIProviderDao
 import com.aicode.feature.settings.data.local.entity.AIProviderEntity
 import com.aicode.feature.settings.domain.model.AIProviderConfig
+import com.aicode.feature.settings.domain.model.ModelMetadata
 import com.aicode.feature.settings.domain.model.ProviderType
 import com.aicode.feature.settings.domain.repository.AIProviderRepository
 import kotlinx.coroutines.flow.Flow
@@ -84,7 +85,13 @@ class AIProviderRepositoryImpl @Inject constructor(
     }
 
     private fun AIProviderEntity.toDomainModel(): AIProviderConfig {
-        val modelList = models.split("\n").map { it.trim() }.filter { it.isNotEmpty() }
+        val capabilities = mutableMapOf<String, ModelMetadata>()
+        val modelList = models.split("\n").mapNotNull { line ->
+            val (name, meta) = decodeModelLine(line)
+            if (name.isEmpty()) return@mapNotNull null
+            if (meta != null) capabilities[name] = meta
+            name
+        }
         return AIProviderConfig(
             id = id,
             name = name,
@@ -97,7 +104,8 @@ class AIProviderRepositoryImpl @Inject constructor(
             selectedModel = selectedModel.ifBlank { defaultModel },
             isEnabled = isEnabled,
             useFullUrl = useFullUrl,
-            useResponseApi = useResponseApi
+            useResponseApi = useResponseApi,
+            modelCapabilities = capabilities
         )
     }
 
@@ -111,10 +119,35 @@ class AIProviderRepositoryImpl @Inject constructor(
             useFullUrl = useFullUrl,
             defaultModel = defaultModel,
             isActive = isActive,
-            models = models.joinToString("\n"),
+            models = models.joinToString("\n") { encodeModelLine(it, modelCapabilities[it]) },
             selectedModel = selectedModel,
             isEnabled = isEnabled,
             useResponseApi = useResponseApi
         )
+    }
+
+    /** 解析单行模型：`name|vision|tools|input|output`；旧数据（纯名字）返回 null 能力。 */
+    private fun decodeModelLine(line: String): Pair<String, ModelMetadata?> {
+        val parts = line.split("|")
+        val name = parts[0].trim()
+        if (parts.size < 5) return name to null
+        val vision = parts[1] == "1"
+        val tools = parts[2] == "1"
+        val input = parts[3].toIntOrNull()
+        val output = parts[4].toIntOrNull()
+        return name to ModelMetadata(
+            id = name,
+            contextTokens = input ?: 0,
+            inputTokens = input,
+            outputTokens = output,
+            supportsVision = vision,
+            supportsTools = tools
+        )
+    }
+
+    /** 编码单行模型：无能力时保持纯名字以兼容旧数据。 */
+    private fun encodeModelLine(name: String, meta: ModelMetadata?): String {
+        if (meta == null) return name
+        return "$name|${if (meta.supportsVision) 1 else 0}|${if (meta.supportsTools) 1 else 0}|${meta.inputTokens ?: ""}|${meta.outputTokens ?: ""}"
     }
 }

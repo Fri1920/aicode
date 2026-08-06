@@ -518,6 +518,16 @@
     <string name="perm_promote_to_global">Promote to global</string>
 
     <!-- Provider Editor -->
+    <string name="provider_section_basic">General</string>
+    <string name="provider_section_type">Provider Type</string>
+    <string name="provider_section_options">Options</string>
+    <string name="provider_section_models">Models</string>
+    <string name="provider_show_api_key">Show API Key</string>
+    <string name="provider_hide_api_key">Hide API Key</string>
+    <string name="provider_model_supports_vision">Vision</string>
+    <string name="provider_model_supports_tools">Tools</string>
+    <string name="provider_model_context_input">Input Window (tokens)</string>
+    <string name="provider_model_context_output">Output Window (tokens)</string>
     <string name="provider_new">New Provider</string>
     <string name="provider_add">Add Provider</string>
     <string name="provider_edit">Edit Provider</string>
@@ -525,8 +535,7 @@
     <string name="provider_add_model">Add Model</string>
     <string name="provider_config">Config</string>
     <string name="provider_full_url">Full URL</string>
-    <string name="provider_full_url_on_desc">When enabled, the Base URL is the full request endpoint, no default path appended</string>
-    <string name="provider_full_url_off_desc">When disabled, the default path is automatically appended</string>
+    <string name="provider_full_url_desc">Base URL is the full request address, no default path appended</string>
     <string name="provider_response_api">Response API (new)</string>
     <string name="provider_models_count">Models (%1$s)</string>
     <string name="provider_fetch_models">Fetch Models</string>
@@ -554,7 +563,8 @@
     <string name="log_level">Log Level</string>
     <string name="log_level_desc">Logs below this level will be ignored. Use VERBOSE during development (log all); NONE to disable logging.</string>
     <string name="log_file_location">Log files are located at Android/data/&lt;package&gt;/files/logs/.</string>
-    <string name="provider_no_models_hint">No models configured, tap edit to add</string>
+    <string name="provider_no_models">No Models</string>
+    <string name="provider_no_models_hint">Tap the button in the top-right to add a model</string>
     <string name="provider_model_summary">Model: %1$s · %2$s total</string>
 
     <!-- Remote Dialogs -->

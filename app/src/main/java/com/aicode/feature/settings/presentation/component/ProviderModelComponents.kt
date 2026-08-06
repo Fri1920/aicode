@@ -129,7 +129,7 @@ internal fun ProviderModelRow(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = Spacing.xs, vertical = Spacing.sm)
+            .padding(horizontal = Spacing.lg, vertical = Spacing.sm)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             ModelLogoIcon(modelName = model, size = 24.dp)
@@ -178,7 +178,7 @@ internal fun ProviderModelRow(
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
-                    .padding(top = Spacing.sm, start = 32.dp)
+                    .padding(top = Spacing.sm, start = 52.dp)
                     .then(
                         if (!r.success) Modifier.clickable { showErrorDetail = true } else Modifier
                     )
