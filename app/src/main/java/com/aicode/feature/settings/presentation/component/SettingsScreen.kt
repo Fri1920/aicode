@@ -41,6 +41,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -126,6 +128,7 @@ fun SettingsScreen(
             ?: stringResource(R.string.language_follow_system)
     }
 
+
     var section by remember { mutableStateOf(SettingsSection.Menu) }
     var logReturnSection by remember { mutableStateOf(SettingsSection.Menu) }
     var editingProvider by remember { mutableStateOf<AIProviderConfig?>(null) }
@@ -169,12 +172,12 @@ fun SettingsScreen(
     }
 
     Scaffold(
-        containerColor = MaterialTheme.colorScheme.background,
+        containerColor = settingsPageBackground(),
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(section.titleRes)) },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background,
+                    containerColor = settingsPageBackground(),
                     titleContentColor = MaterialTheme.colorScheme.onBackground
                 ),
                 navigationIcon = {
@@ -234,22 +237,11 @@ fun SettingsScreen(
         ) {
             when (section) {
                 SettingsSection.Menu -> SettingsMenu(
-                    providerCount = providers.size,
-                    activeProviderName = activeProvider?.name,
-                    activeContainerProfileName = containerProfiles.firstOrNull { it.id == activeProfileId }?.name,
-                    visionProviderName = providers.firstOrNull { it.id == visionProviderId }?.name,
-                    visionModel = visionModel,
-                    compactionProviderName = providers.firstOrNull { it.id == compactionProviderId }?.name,
-                    compactionModel = compactionModel,
-                    mcpCount = mcpServers.size,
-                    mcpConnected = mcpStatuses.count { it.state == McpServerStatus.State.CONNECTED },
-                    logLevel = logLevel,
-                    permissionRuleCount = projectRules.size + globalRules.size,
                     themeMode = themeMode,
+                    currentLanguageDisplayName = currentLanguageDisplayName,
                     onOpenThemeSheet = { showThemeSheet = true },
                     keepaliveEnabled = keepaliveEnabled,
                     onToggleKeepalive = { viewModel.setKeepaliveEnabled(it) },
-                    currentLanguageDisplayName = currentLanguageDisplayName,
                     onOpenLanguageSheet = { showLanguageSheet = true },
                     onOpen = {
                         if (it == SettingsSection.LogViewer) {
@@ -373,22 +365,11 @@ fun SettingsScreen(
 /** 设置首页：每个分区一个可点击的二级菜单入口。 */
 @Composable
 internal fun SettingsMenu(
-    providerCount: Int,
-    activeProviderName: String?,
-    activeContainerProfileName: String?,
-    visionProviderName: String?,
-    visionModel: String,
-    compactionProviderName: String?,
-    compactionModel: String,
-    mcpCount: Int,
-    mcpConnected: Int,
-    logLevel: LogLevel,
-    permissionRuleCount: Int,
     themeMode: AppThemeMode,
+    currentLanguageDisplayName: String,
     onOpenThemeSheet: () -> Unit,
     keepaliveEnabled: Boolean,
     onToggleKeepalive: (Boolean) -> Unit,
-    currentLanguageDisplayName: String,
     onOpenLanguageSheet: () -> Unit,
     onOpen: (SettingsSection) -> Unit
 ) {
@@ -396,179 +377,136 @@ internal fun SettingsMenu(
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(Spacing.lg),
+            .padding(horizontal = Spacing.lg)
+            .padding(bottom = Spacing.xl),
         verticalArrangement = Arrangement.spacedBy(Spacing.sm)
     ) {
         // ── AI 配置 ──
-        SectionHeader(text = stringResource(R.string.settings_category_ai))
-        MenuRow(
-            icon = FeatherIcons.Cloud,
-            title = stringResource(SettingsSection.Providers.titleRes),
-            subtitle = if (providerCount == 0) {
-                stringResource(R.string.settings_providers_empty)
-            } else {
-                stringResource(R.string.settings_providers_count, providerCount) +
-                    (activeProviderName?.let { stringResource(R.string.settings_providers_active, it) } ?: "")
-            },
-            onClick = { onOpen(SettingsSection.Providers) }
-        )
-        MenuRow(
-            icon = FeatherIcons.Cpu,
-            title = stringResource(SettingsSection.DefaultModels.titleRes),
-            subtitle = run {
-                val parts = mutableListOf<String>()
-                if (!visionProviderName.isNullOrBlank() && visionModel.isNotBlank()) {
-                    parts.add(stringResource(R.string.settings_vision_model) + ": " + (visionProviderName?.let { "$it · $visionModel" } ?: visionModel))
-                }
-                if (!compactionProviderName.isNullOrBlank() && compactionModel.isNotBlank()) {
-                    parts.add(stringResource(R.string.settings_compaction_model) + ": " + (compactionProviderName?.let { "$it · $compactionModel" } ?: compactionModel))
-                }
-                if (parts.isEmpty()) stringResource(R.string.settings_default_models_subtitle) else parts.joinToString("\n")
-            },
-            onClick = { onOpen(SettingsSection.DefaultModels) }
-        )
-        MenuRow(
-            icon = FeatherIcons.Box,
-            title = stringResource(SettingsSection.Mcp.titleRes),
-            subtitle = if (mcpCount == 0) stringResource(R.string.settings_mcp_empty) else stringResource(R.string.settings_mcp_count_connected, mcpCount, mcpConnected),
-            onClick = { onOpen(SettingsSection.Mcp) }
-        )
+        SettingsGroupHeader(text = stringResource(R.string.settings_category_ai))
+        SettingsGroup {
+            SettingsRow(
+                icon = FeatherIcons.Cloud,
+                title = stringResource(SettingsSection.Providers.titleRes),
+                onClick = { onOpen(SettingsSection.Providers) }
+            )
+            SettingsDivider()
+            SettingsRow(
+                icon = FeatherIcons.Cpu,
+                title = stringResource(SettingsSection.DefaultModels.titleRes),
+                onClick = { onOpen(SettingsSection.DefaultModels) }
+            )
+            SettingsDivider()
+            SettingsRow(
+                icon = FeatherIcons.Box,
+                title = stringResource(SettingsSection.Mcp.titleRes),
+                onClick = { onOpen(SettingsSection.Mcp) }
+            )
+        }
 
         // ── 运行环境 ──
-        SectionHeader(text = stringResource(R.string.settings_category_environment))
-        MenuRow(
-            icon = FeatherIcons.HardDrive,
-            title = stringResource(SettingsSection.Container.titleRes),
-            subtitle = stringResource(R.string.settings_container_current, activeContainerProfileName ?: stringResource(R.string.settings_container_builtin_alpine)),
-            onClick = { onOpen(SettingsSection.Container) }
-        )
-        MenuRow(
-            icon = FeatherIcons.Server,
-            title = stringResource(SettingsSection.RemoteServers.titleRes),
-            subtitle = stringResource(R.string.settings_remote_subtitle),
-            onClick = { onOpen(SettingsSection.RemoteServers) }
-        )
+        SettingsGroupHeader(text = stringResource(R.string.settings_category_environment))
+        SettingsGroup {
+            SettingsRow(
+                icon = FeatherIcons.HardDrive,
+                title = stringResource(SettingsSection.Container.titleRes),
+                onClick = { onOpen(SettingsSection.Container) }
+            )
+            SettingsDivider()
+            SettingsRow(
+                icon = FeatherIcons.Server,
+                title = stringResource(SettingsSection.RemoteServers.titleRes),
+                onClick = { onOpen(SettingsSection.RemoteServers) }
+            )
+        }
 
         // ── 工具与权限 ──
-        SectionHeader(text = stringResource(R.string.settings_category_tools))
-        MenuRow(
-            icon = FeatherIcons.Lock,
-            title = stringResource(SettingsSection.Permissions.titleRes),
-            subtitle = if (permissionRuleCount == 0) stringResource(R.string.settings_permissions_empty) else stringResource(R.string.settings_permissions_count, permissionRuleCount),
-            onClick = { onOpen(SettingsSection.Permissions) }
-        )
-        MenuRow(
-            icon = FeatherIcons.FileText,
-            title = stringResource(SettingsSection.Log.titleRes),
-            subtitle = stringResource(R.string.settings_log_current, logLevel.name),
-            onClick = { onOpen(SettingsSection.Log) }
-        )
-        MenuRow(
-            icon = FeatherIcons.FileText,
-            title = stringResource(SettingsSection.LogViewer.titleRes),
-            subtitle = stringResource(R.string.settings_log_viewer_subtitle),
-            onClick = { onOpen(SettingsSection.LogViewer) }
-        )
+        SettingsGroupHeader(text = stringResource(R.string.settings_category_tools))
+        SettingsGroup {
+            SettingsRow(
+                icon = FeatherIcons.Lock,
+                title = stringResource(SettingsSection.Permissions.titleRes),
+                onClick = { onOpen(SettingsSection.Permissions) }
+            )
+            SettingsDivider()
+            SettingsRow(
+                icon = FeatherIcons.FileText,
+                title = stringResource(SettingsSection.Log.titleRes),
+                onClick = { onOpen(SettingsSection.Log) }
+            )
+            SettingsDivider()
+            SettingsRow(
+                icon = FeatherIcons.FileText,
+                title = stringResource(SettingsSection.LogViewer.titleRes),
+                onClick = { onOpen(SettingsSection.LogViewer) }
+            )
+        }
 
         // ── 外观与语言 ──
-        SectionHeader(text = stringResource(R.string.settings_category_appearance))
-        MenuRow(
-            icon = FeatherIcons.Moon,
-            title = stringResource(R.string.settings_theme_title),
-            subtitle = stringResource(themeMode.labelRes),
-            onClick = onOpenThemeSheet
-        )
-        MenuRow(
-            icon = FeatherIcons.Globe,
-            title = stringResource(R.string.settings_language),
-            subtitle = currentLanguageDisplayName,
-            onClick = onOpenLanguageSheet
-        )
+        SettingsGroupHeader(text = stringResource(R.string.settings_category_appearance))
+        SettingsGroup {
+            SettingsRow(
+                icon = FeatherIcons.Moon,
+                title = stringResource(R.string.settings_theme_title),
+                onClick = onOpenThemeSheet,
+                trailing = {
+                    Text(
+                        text = stringResource(themeMode.labelRes),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = if (MaterialTheme.colorScheme.background.luminance() > 0.5f) {
+                            Color(0xFF8E9094)
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        }
+                    )
+                }
+            )
+            SettingsDivider()
+            SettingsRow(
+                icon = FeatherIcons.Globe,
+                title = stringResource(R.string.settings_language),
+                onClick = onOpenLanguageSheet,
+                trailing = {
+                    Text(
+                        text = currentLanguageDisplayName,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = if (MaterialTheme.colorScheme.background.luminance() > 0.5f) {
+                            Color(0xFF8E9094)
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        }
+                    )
+                }
+            )
+        }
 
         // ── 系统 ──
-        SectionHeader(text = stringResource(R.string.settings_category_system))
-        SwitchRow(
-            icon = FeatherIcons.RefreshCw,
-            title = stringResource(R.string.settings_keepalive_title),
-            subtitle = stringResource(R.string.settings_keepalive_subtitle),
-            checked = keepaliveEnabled,
-            onCheckedChange = onToggleKeepalive
-        )
-        MenuRow(
-            icon = FeatherIcons.Save,
-            title = stringResource(SettingsSection.Backup.titleRes),
-            subtitle = stringResource(R.string.settings_backup_subtitle),
-            onClick = { onOpen(SettingsSection.Backup) }
-        )
-        MenuRow(
-            icon = FeatherIcons.Info,
-            title = stringResource(SettingsSection.About.titleRes),
-            subtitle = stringResource(R.string.settings_about_subtitle),
-            onClick = { onOpen(SettingsSection.About) }
-        )
-    }
-}
-
-@Composable
-internal fun SwitchRow(
-    icon: ImageVector,
-    title: String,
-    subtitle: String,
-    checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit
-) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(Radius.md),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(Spacing.lg),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(24.dp)
+        SettingsGroupHeader(text = stringResource(R.string.settings_category_system))
+        SettingsGroup {
+            SettingsRow(
+                icon = FeatherIcons.RefreshCw,
+                title = stringResource(R.string.settings_keepalive_title),
+                trailing = {
+                    Switch(
+                        checked = keepaliveEnabled,
+                        onCheckedChange = onToggleKeepalive
+                    )
+                }
             )
-            Spacer(Modifier.width(Spacing.md))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Normal,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    text = subtitle,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            Switch(
-                checked = checked,
-                onCheckedChange = onCheckedChange
+            SettingsDivider()
+            SettingsRow(
+                icon = FeatherIcons.Save,
+                title = stringResource(SettingsSection.Backup.titleRes),
+                onClick = { onOpen(SettingsSection.Backup) }
+            )
+            SettingsDivider()
+            SettingsRow(
+                icon = FeatherIcons.Info,
+                title = stringResource(SettingsSection.About.titleRes),
+                onClick = { onOpen(SettingsSection.About) }
             )
         }
     }
 }
-
-/** 分组小标题。 */
-@Composable
-internal fun SectionHeader(text: String) {
-    Text(
-        text = text,
-        style = MaterialTheme.typography.labelLarge,
-        fontWeight = FontWeight.Bold,
-        color = MaterialTheme.colorScheme.primary,
-        modifier = Modifier.padding(top = Spacing.sm, bottom = Spacing.xs)
-    )
-}
-
 /** 二级菜单入口行：图标 + 标题 + 摘要 + 右箭头。 */
 @Composable
 internal fun MenuRow(
