@@ -36,8 +36,9 @@ import javax.inject.Inject
 /**
  * Git 页的 UI 状态与操作。
  *
- * 进入页面即 [refresh] 并发拉取 status/branches/log；每个写操作（暂存/提交/拉取/推送）执行后
- * 自动刷新并通过 [GitUiState.toast] 反馈。[GitUiState.busy] 守卫防止并发写操作相互踩踏。
+ * 进入页面即 [refresh] 并发拉取 status/graph/remote，随后异步拉取全量分支/标签；每个写操作
+ * （暂存/提交/拉取/推送）执行后自动刷新并通过 [GitUiState.toast] 反馈。[GitUiState.busy]
+ * 守卫防止并发写操作相互踩踏。
  */
 @HiltViewModel
 class GitViewModel @Inject constructor(
@@ -74,7 +75,7 @@ class GitViewModel @Inject constructor(
         val loadingCommit: String? = null,
         /** 正在分页加载更旧的提交（滚动到底触发）。不置 busy，避免阻塞写操作。 */
         val graphLoadingMore: Boolean = false,
-        /** 全量分支/标签是否已加载（延迟到切 BRANCHES tab 时拉取，避免首屏 20s 卡顿）。 */
+        /** 全量分支/标签是否已加载（进入页面即后台拉取，不阻塞首屏；切 BRANCHES tab 时未完成则继续等）。 */
         val branchesLoaded: Boolean = false,
         /** 正在加载全量分支/标签。 */
         val branchesLoading: Boolean = false,
@@ -92,8 +93,8 @@ class GitViewModel @Inject constructor(
     init { refresh() }
 
     /** 仓库快照：并发拉取 status/graph/remote（+可选 identity）的结果。不含全量分支/标签——
-     * 那些延迟到切 BRANCHES tab 时才拉（[loadBranches]），避免大仓库首屏 20s 卡顿。
-     * graph 的 refs 标注只用本地分支（[repository.localRefsOnly]，亚秒级），远程/标签标注延迟补全。 */
+     * 那些在 [refresh] 成功后异步拉取（[loadBranches]），避免阻塞首屏。
+     * graph 的 refs 标注只用本地分支（[repository.localRefsOnly]，亚秒级），远程/标签标注由 [loadBranches] 补全。 */
     private data class RepoSnapshot(
         val status: GitStatus,
         val graph: GitGraph,
@@ -113,15 +114,16 @@ class GitViewModel @Inject constructor(
 
     fun setTab(tab: GitTab) {
         _state.update { it.copy(tab = tab) }
+        // 兜底：进入页面即已异步加载；若尚未开始/完成（如加载失败后重进），切 tab 时再补一次。
         if (tab == GitTab.BRANCHES && !_state.value.branchesLoaded && !_state.value.branchesLoading) {
             loadBranches()
         }
     }
 
     /**
-     * 按需加载全量分支/标签（切到 BRANCHES tab 时触发）。一次 [repository.loadAllRefs] 拉取，
-     * 填充 branches/tags 并用全量 refs 更新 graph 的标注。不置 busy，只读不阻塞写操作。
-     * 已加载过则跳过；写操作后需手动调 [refreshBranches] 同步。
+     * 加载全量分支/标签（进入页面 [refresh] 成功后即触发，无需等切 BRANCHES tab）。
+     * 一次 [repository.loadAllRefs] 拉取，填充 branches/tags 并用全量 refs 更新 graph 的标注。
+     * 不置 busy，只读不阻塞写操作。已加载过则跳过；写操作后需手动调 [refreshBranchesIfLoaded] 同步。
      */
     fun loadBranches() {
         if (_state.value.branchesLoading || _state.value.branchesLoaded) return
@@ -178,6 +180,8 @@ class GitViewModel @Inject constructor(
                 _state.update {
                     it.copy(loading = false, notARepo = false, status = snap.status, commits = commits, graph = snap.graph, hasRemote = snap.hasRemote, hasIdentity = snap.hasIdentity, branchesLoaded = false, branchesLoading = false, branches = emptyList(), tags = emptyList())
                 }
+                // 页面已打开：后台拉取全量分支/标签，用户切到 BRANCHES tab 时无需再等。
+                loadBranches()
             } catch (e: Exception) {
                 if (e is CancellationException) throw e
                 FileLogger.e(TAG, "刷新失败", e)
