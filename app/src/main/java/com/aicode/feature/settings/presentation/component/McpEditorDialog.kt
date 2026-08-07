@@ -126,7 +126,7 @@ fun McpServerEditDialog(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 14.dp),
+                        .padding(horizontal = 16.dp, vertical = 10.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     IconButton(
@@ -143,7 +143,7 @@ fun McpServerEditDialog(
                         text = if (initial == null) stringResource(R.string.mcp_add) else stringResource(R.string.mcp_edit),
                         style = MaterialTheme.typography.titleMedium.copy(
                             fontWeight = FontWeight.Bold,
-                            fontSize = 18.sp
+                            fontSize = 16.sp
                         ),
                         modifier = Modifier.weight(1f),
                         textAlign = TextAlign.Center,
@@ -152,7 +152,7 @@ fun McpServerEditDialog(
                     if (onOpenLogs != null) {
                         IconButton(
                             onClick = onOpenLogs,
-                            modifier = Modifier.size(36.dp)
+                            modifier = Modifier.size(32.dp)
                         ) {
                             Icon(
                                 FeatherIcons.FileText,
@@ -180,10 +180,10 @@ fun McpServerEditDialog(
                         .padding(horizontal = 20.dp)
                         .background(
                             MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
-                            RoundedCornerShape(14.dp)
+                            RoundedCornerShape(12.dp)
                         )
-                        .padding(4.dp),
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        .padding(3.dp),
+                    horizontalArrangement = Arrangement.spacedBy(3.dp)
                 ) {
                     val tabs = listOf(stringResource(R.string.mcp_basic_settings), stringResource(R.string.common_tool))
                     tabs.forEachIndexed { index, title ->
@@ -191,10 +191,10 @@ fun McpServerEditDialog(
                         Box(
                             modifier = Modifier
                                 .weight(1f)
-                                .clip(RoundedCornerShape(10.dp))
+                                .clip(RoundedCornerShape(8.dp))
                                 .background(if (isSelected) MaterialTheme.colorScheme.surface else Color.Transparent)
                                 .clickable { selectedTab = index }
-                                .padding(vertical = 10.dp),
+                                .padding(vertical = 8.dp),
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
@@ -208,7 +208,7 @@ fun McpServerEditDialog(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(10.dp))
 
                 // ── Tab Content Area ──
                 Box(
@@ -223,18 +223,18 @@ fun McpServerEditDialog(
                                 .fillMaxWidth()
                                 .verticalScroll(rememberScrollState())
                                 .padding(horizontal = 20.dp, vertical = 8.dp),
-                            verticalArrangement = Arrangement.spacedBy(16.dp)
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
                             // 是否启用 Card
                             Card(
-                                shape = RoundedCornerShape(16.dp),
+                                shape = RoundedCornerShape(12.dp),
                                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)),
                                 modifier = Modifier.fillMaxWidth()
                             ) {
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                                        .padding(horizontal = 16.dp, vertical = 6.dp),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Text(
@@ -251,21 +251,15 @@ fun McpServerEditDialog(
                             }
 
                             // 名称字段
-                            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                Text(
-                                    text = stringResource(R.string.common_name),
-                                    style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                                OutlinedTextField(
-                                    value = name,
-                                    onValueChange = { name = it },
-                                    placeholder = { Text(stringResource(R.string.mcp_name_hint)) },
-                                    singleLine = true,
-                                    shape = RoundedCornerShape(12.dp),
-                                    modifier = Modifier.fillMaxWidth()
-                                )
-                            }
+                            OutlinedTextField(
+                                value = name,
+                                onValueChange = { name = it },
+                                label = { Text(stringResource(R.string.common_name)) },
+                                placeholder = { Text(stringResource(R.string.mcp_name_hint)) },
+                                singleLine = true,
+                                shape = RoundedCornerShape(12.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            )
 
                             // 传输类型选择
                             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -278,11 +272,11 @@ fun McpServerEditDialog(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .background(
-                                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
                                             RoundedCornerShape(12.dp)
                                         )
-                                        .padding(4.dp),
-                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                        .padding(3.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(3.dp)
                                 ) {
                                     val types = listOf(false to stringResource(R.string.mcp_remote_http), true to stringResource(R.string.mcp_local_stdio))
                                     types.forEach { (stdioFlag, label) ->
@@ -293,15 +287,15 @@ fun McpServerEditDialog(
                                                 .clip(RoundedCornerShape(8.dp))
                                                 .background(if (selected) MaterialTheme.colorScheme.surface else Color.Transparent)
                                                 .clickable { isStdio = stdioFlag }
-                                                .padding(vertical = 10.dp),
+                                                .padding(vertical = 8.dp),
                                             contentAlignment = Alignment.Center
                                         ) {
                                             Text(
                                                 text = label,
                                                 style = MaterialTheme.typography.bodyMedium.copy(
-                                                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal
+                                                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal
                                                 ),
-                                                color = if (selected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant
+                                                color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                                             )
                                         }
                                     }
@@ -349,7 +343,7 @@ fun McpServerEditDialog(
                                         Icon(
                                             FeatherIcons.Tool,
                                             contentDescription = null,
-                                            modifier = Modifier.size(36.dp),
+                                            modifier = Modifier.size(32.dp),
                                             tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
                                         )
                                         Text(
@@ -365,7 +359,7 @@ fun McpServerEditDialog(
                                     val isApprovalRequired = tool.name in requireApprovalToolsSet
 
                                     Card(
-                                        shape = RoundedCornerShape(16.dp),
+                                        shape = RoundedCornerShape(12.dp),
                                         colors = CardDefaults.cardColors(
                                             containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
                                         ),
@@ -374,7 +368,7 @@ fun McpServerEditDialog(
                                         Column(
                                             modifier = Modifier
                                                 .fillMaxWidth()
-                                                .padding(16.dp)
+                                                .padding(12.dp)
                                         ) {
                                             Row(
                                                 modifier = Modifier.fillMaxWidth(),
@@ -474,7 +468,7 @@ fun McpServerEditDialog(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 20.dp, vertical = 16.dp),
+                        .padding(horizontal = 20.dp, vertical = 12.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Button(
@@ -510,7 +504,7 @@ fun McpServerEditDialog(
                         },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(48.dp),
+                            .height(44.dp),
                         shape = RoundedCornerShape(12.dp)
                     ) {
                         Icon(FeatherIcons.Check, contentDescription = null, modifier = Modifier.size(18.dp))

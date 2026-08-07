@@ -3,7 +3,6 @@ package com.aicode.feature.settings.presentation.component
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -11,7 +10,6 @@ import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -23,12 +21,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -39,15 +34,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.aicode.core.theme.Brand
+import androidx.compose.ui.res.stringResource
 import com.aicode.core.theme.Radius
 import com.aicode.core.theme.Spacing
 import com.aicode.feature.agent.domain.mcp.McpServerConfig
@@ -59,11 +55,11 @@ import compose.icons.feathericons.Terminal
 import compose.icons.feathericons.Trash2
 import kotlin.math.roundToInt
 import kotlinx.coroutines.launch
-import androidx.compose.ui.res.stringResource
 import com.aicode.R
 
 /**
- * MCP 二级页（可视化）：全新现代化设计的 Server 列表页面。
+ * MCP 二级页：与提供商/默认模型一致的 iOS 分组列表。
+ * 白色分组卡片内每台 server 一行，两行布局（名称+状态 / 类型+摘要），支持左滑删除。
  */
 @Composable
 internal fun McpSection(
@@ -75,51 +71,58 @@ internal fun McpSection(
     onEdit: (McpServerConfig) -> Unit,
     onDelete: (String) -> Unit
 ) {
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(Spacing.lg),
-        verticalArrangement = Arrangement.spacedBy(Spacing.md)
-    ) {
-        if (servers.isEmpty()) {
-            item {
+    if (servers.isEmpty()) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(vertical = 48.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(Spacing.md)
+            ) {
                 Box(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 48.dp),
+                        .size(64.dp)
+                        .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(Radius.lg)),
                     contentAlignment = Alignment.Center
                 ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(Spacing.md)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(64.dp)
-                                .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(Radius.lg)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                FeatherIcons.Terminal,
-                                contentDescription = null,
-                                modifier = Modifier.size(28.dp),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                        Text(
-                            text = stringResource(R.string.mcp_empty),
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Text(
-                            text = stringResource(R.string.mcp_empty_hint),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
+                    Icon(
+                        FeatherIcons.Terminal,
+                        contentDescription = null,
+                        modifier = Modifier.size(28.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
+                Text(
+                    text = stringResource(R.string.mcp_empty),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = stringResource(R.string.mcp_empty_hint),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
-        } else {
-            items(servers, key = { it.name }) { server ->
+        }
+        return
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = Spacing.lg)
+            .padding(bottom = Spacing.xl),
+        verticalArrangement = Arrangement.spacedBy(Spacing.sm)
+    ) {
+        SettingsGroup {
+            servers.forEachIndexed { index, server ->
+                if (index > 0) {
+                    SettingsDivider()
+                }
                 McpServerRow(
                     server = server,
                     status = statuses.firstOrNull { it.name == server.name },
@@ -131,8 +134,9 @@ internal fun McpSection(
     }
 }
 
-/** 单个 MCP server 行：现代化卡片样式（图标状态标签 + 药丸标签 + 右侧箭头，支持左滑删除）。 */
-@OptIn(ExperimentalMaterial3Api::class)
+/**
+ * 单个 MCP server 行：分组内白底行，图标 + 名称/状态 + 类型/摘要 + 右箭头，左滑删除。
+ */
 @Composable
 internal fun McpServerRow(
     server: McpServerConfig,
@@ -141,6 +145,8 @@ internal fun McpServerRow(
     onDelete: () -> Unit
 ) {
     val isConnected = server.enabled && status?.state == McpServerStatus.State.CONNECTED
+    val light = MaterialTheme.colorScheme.background.luminance() > 0.5f
+    val rowBackground = if (light) Color.White else MaterialTheme.colorScheme.surface
 
     val statusText = when {
         !server.enabled -> stringResource(R.string.mcp_disabled)
@@ -166,6 +172,13 @@ internal fun McpServerRow(
 
     val statusBgColor = statusColor.copy(alpha = 0.12f)
 
+    val typeText = if (server.isStdio) stringResource(R.string.mcp_builtin) else "HTTP"
+    val infoText = when {
+        isConnected -> stringResource(R.string.mcp_tools_count, status?.toolCount ?: 0, status?.toolCount ?: 0)
+        server.isStdio -> server.command.orEmpty().ifEmpty { "stdio" }
+        else -> server.url.orEmpty().ifEmpty { "HTTP" }
+    }
+
     val density = LocalDensity.current
     val revealPx = remember(density) { with(density) { -112.dp.toPx() } }
     val offsetX = remember { Animatable(0f) }
@@ -179,7 +192,7 @@ internal fun McpServerRow(
     Box(
         modifier = Modifier.fillMaxWidth()
     ) {
-        // 1. 底层删除按钮（固定在右端，向右滑动滑动时会受到挤压、缩放与透明度渐变，直到消失）
+        // 1. 底层删除按钮（固定在右端，随滑动露出，带缩放与透明度渐变）
         Row(
             modifier = Modifier
                 .matchParentSize()
@@ -197,9 +210,9 @@ internal fun McpServerRow(
                             scaleX = (0.4f + 0.6f * progress).coerceIn(0f, 1f)
                             scaleY = (0.7f + 0.3f * progress).coerceIn(0f, 1f)
                         }
-                        .clip(RoundedCornerShape(16.dp))
+                        .clip(RoundedCornerShape(10.dp))
                         .background(Color(0xFFEF4444))
-                        .border(1.dp, Color(0xFFF87171), RoundedCornerShape(16.dp))
+                        .border(1.dp, Color(0xFFF87171), RoundedCornerShape(10.dp))
                         .clickable {
                             coroutineScope.launch {
                                 offsetX.animateTo(0f)
@@ -233,11 +246,12 @@ internal fun McpServerRow(
             }
         }
 
-        // 2. 表层卡片（支持手势回弹与滑动展开）
-        Card(
+        // 2. 表层分组行（支持手势回弹与滑动展开）
+        Row(
             modifier = Modifier
                 .offset { IntOffset(offsetX.value.roundToInt(), 0) }
                 .fillMaxWidth()
+                .background(rowBackground)
                 .pointerInput(Unit) {
                     detectHorizontalDragGestures(
                         onDragStart = {
@@ -286,130 +300,108 @@ internal fun McpServerRow(
                     } else {
                         onClick()
                     }
-                },
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                }
+                .padding(horizontal = Spacing.lg, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(
+            // 左侧容器图标 + 状态圆点
+            Box(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-                verticalAlignment = Alignment.CenterVertically
+                    .size(32.dp)
+                    .background(
+                        color = MaterialTheme.colorScheme.surfaceVariant,
+                        shape = RoundedCornerShape(8.dp)
+                    )
             ) {
-                // 左侧容器图标 + 状态圆点
+                Icon(
+                    imageVector = if (server.isStdio) FeatherIcons.Terminal else FeatherIcons.Server,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier
+                        .size(18.dp)
+                        .align(Alignment.Center)
+                )
                 Box(
                     modifier = Modifier
-                        .size(48.dp)
-                        .background(
-                            color = MaterialTheme.colorScheme.surfaceVariant,
-                            shape = RoundedCornerShape(12.dp)
-                        )
-                ) {
-                    Icon(
-                        imageVector = if (server.isStdio) FeatherIcons.Terminal else FeatherIcons.Server,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier
-                            .size(22.dp)
-                            .align(Alignment.Center)
-                    )
-                    // 右下角带描边的状态圆点
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.BottomEnd)
-                            .padding(2.dp)
-                            .size(10.dp)
-                            .background(color = statusColor, shape = RoundedCornerShape(Radius.pill))
-                            .border(1.5.dp, MaterialTheme.colorScheme.surface, RoundedCornerShape(Radius.pill))
-                    )
-                }
-
-                Spacer(modifier = Modifier.width(16.dp))
-
-                // 中间标题和 Pill 标签
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = server.name,
-                        style = MaterialTheme.typography.titleMedium.copy(
-                            fontWeight = FontWeight.SemiBold,
-                            fontSize = 16.sp
-                        ),
-                        color = MaterialTheme.colorScheme.onSurface,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-
-                    Spacer(Modifier.height(8.dp))
-
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        // 1. 状态 Pill
-                        Box(
-                            modifier = Modifier
-                                .background(statusBgColor, RoundedCornerShape(Radius.pill))
-                                .padding(horizontal = 8.dp, vertical = 2.dp)
-                        ) {
-                            Text(
-                                text = statusText,
-                                style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
-                                color = statusColor
-                            )
-                        }
-
-                        // 2. 类型 Pill
-                        Box(
-                            modifier = Modifier
-                                .background(
-                                    MaterialTheme.colorScheme.surfaceVariant,
-                                    RoundedCornerShape(Radius.pill)
-                                )
-                                .padding(horizontal = 8.dp, vertical = 2.dp)
-                        ) {
-                            Text(
-                                text = if (server.isStdio) stringResource(R.string.mcp_builtin) else "HTTP",
-                                style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-
-                        // 3. 工具数量/信息 Pill
-                        val infoText = when {
-                            isConnected -> stringResource(R.string.mcp_tools_count, status?.toolCount ?: 0, status?.toolCount ?: 0)
-                            server.isStdio -> server.command.orEmpty().ifEmpty { "stdio" }
-                            else -> server.url.orEmpty().ifEmpty { "HTTP" }
-                        }
-                        Box(
-                            modifier = Modifier
-                                .background(
-                                    MaterialTheme.colorScheme.surfaceVariant,
-                                    RoundedCornerShape(Radius.pill)
-                                )
-                                .padding(horizontal = 8.dp, vertical = 2.dp)
-                        ) {
-                            Text(
-                                text = infoText,
-                                style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.width(8.dp))
-
-                // 右侧箭头
-                Icon(
-                    imageVector = FeatherIcons.ChevronRight,
-                    contentDescription = stringResource(R.string.mcp_details),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(20.dp)
+                        .align(Alignment.BottomEnd)
+                        .padding(1.dp)
+                        .size(8.dp)
+                        .background(color = statusColor, shape = RoundedCornerShape(Radius.pill))
+                        .border(1.5.dp, rowBackground, RoundedCornerShape(Radius.pill))
                 )
             }
+
+            Spacer(modifier = Modifier.width(Spacing.md))
+
+            // 中间：名称 / 类型 + 摘要
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = server.name,
+                    style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold),
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Spacer(modifier = Modifier.height(6.dp))
+
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    McpPill(
+                        text = typeText,
+                        textColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        backgroundColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
+                    )
+                    McpPill(
+                        text = infoText,
+                        textColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        backgroundColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                        modifier = Modifier.weight(1f, fill = false)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.width(Spacing.sm))
+
+            // 状态 pill 与右箭头垂直居中，与整行中心对齐
+            McpPill(
+                text = statusText,
+                textColor = statusColor,
+                backgroundColor = statusBgColor
+            )
+            Spacer(modifier = Modifier.width(Spacing.xs))
+            Icon(
+                imageVector = FeatherIcons.ChevronRight,
+                contentDescription = stringResource(R.string.mcp_details),
+                tint = if (light) Color(0xFFC7C7CC) else MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(18.dp)
+            )
         }
+    }
+}
+
+/** 紧凑 pill 标签：胶囊背景 + 小字，用于状态/类型/摘要。 */
+@Composable
+private fun McpPill(
+    text: String,
+    textColor: Color,
+    backgroundColor: Color,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .background(backgroundColor, RoundedCornerShape(Radius.pill))
+            .padding(horizontal = 8.dp, vertical = 2.dp)
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
+            color = textColor,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
     }
 }

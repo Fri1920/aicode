@@ -41,21 +41,15 @@ internal fun McpHttpFields(
     onUrlChange: (String) -> Unit,
     headers: SnapshotStateList<Pair<String, String>>
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Text(
-            text = stringResource(R.string.mcp_server_url),
-            style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        OutlinedTextField(
-            value = url,
-            onValueChange = onUrlChange,
-            placeholder = { Text(stringResource(R.string.mcp_server_url_hint)) },
-            singleLine = true,
-            shape = RoundedCornerShape(12.dp),
-            modifier = Modifier.fillMaxWidth()
-        )
-    }
+    OutlinedTextField(
+        value = url,
+        onValueChange = onUrlChange,
+        label = { Text(stringResource(R.string.mcp_server_url)) },
+        placeholder = { Text(stringResource(R.string.mcp_server_url_hint)) },
+        singleLine = true,
+        shape = RoundedCornerShape(12.dp),
+        modifier = Modifier.fillMaxWidth()
+    )
 
     Spacer(modifier = Modifier.height(4.dp))
 
@@ -74,52 +68,44 @@ internal fun McpHttpFields(
     } else {
         headers.forEachIndexed { index, (k, v) ->
             Card(
-                shape = RoundedCornerShape(18.dp),
+                shape = RoundedCornerShape(14.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                        .padding(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Text(
-                        text = stringResource(R.string.mcp_header_name),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
                     OutlinedTextField(
                         value = k,
                         onValueChange = { headers[index] = it to v },
+                        label = { Text(stringResource(R.string.mcp_header_name)) },
                         placeholder = { Text(stringResource(R.string.mcp_header_name_hint)) },
                         singleLine = true,
                         shape = RoundedCornerShape(12.dp),
                         colors = OutlinedTextFieldDefaults.colors(
-                            unfocusedBorderColor = Color.Transparent,
+                            unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
                             focusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
-                            unfocusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.45f),
-                            focusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.75f)
+                            unfocusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f),
+                            focusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f)
                         ),
                         modifier = Modifier.fillMaxWidth()
                     )
 
-                    Text(
-                        text = stringResource(R.string.mcp_header_value),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
                     OutlinedTextField(
                         value = v,
                         onValueChange = { headers[index] = k to it },
+                        label = { Text(stringResource(R.string.mcp_header_value)) },
                         placeholder = { Text(stringResource(R.string.mcp_header_value_hint)) },
                         singleLine = true,
                         shape = RoundedCornerShape(12.dp),
                         colors = OutlinedTextFieldDefaults.colors(
-                            unfocusedBorderColor = Color.Transparent,
+                            unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
                             focusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
-                            unfocusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.45f),
-                            focusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.75f)
+                            unfocusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f),
+                            focusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f)
                         ),
                         modifier = Modifier.fillMaxWidth()
                     )
@@ -130,13 +116,13 @@ internal fun McpHttpFields(
                     ) {
                         IconButton(
                             onClick = { headers.removeAt(index) },
-                            modifier = Modifier.size(36.dp)
+                            modifier = Modifier.size(32.dp)
                         ) {
                             Icon(
                                 FeatherIcons.Trash2,
                                 contentDescription = stringResource(R.string.common_delete),
                                 tint = MaterialTheme.colorScheme.error,
-                                modifier = Modifier.size(20.dp)
+                                modifier = Modifier.size(16.dp)
                             )
                         }
                     }
@@ -152,14 +138,14 @@ internal fun McpHttpFields(
             color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f)
         ) {
             Row(
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Icon(
                     FeatherIcons.Plus,
                     contentDescription = null,
-                    modifier = Modifier.size(16.dp),
+                    modifier = Modifier.size(14.dp),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Text(
