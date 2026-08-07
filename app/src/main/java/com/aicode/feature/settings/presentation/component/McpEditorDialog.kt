@@ -49,6 +49,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.aicode.feature.agent.domain.mcp.McpScope
 import com.aicode.feature.agent.domain.mcp.McpServerConfig
 import com.aicode.feature.agent.domain.mcp.McpToolDescriptor
 import compose.icons.FeatherIcons
@@ -57,7 +58,6 @@ import compose.icons.feathericons.FileText
 import compose.icons.feathericons.RefreshCw
 import compose.icons.feathericons.Shield
 import compose.icons.feathericons.Tool
-import compose.icons.feathericons.X
 import kotlinx.serialization.json.JsonObject
 import androidx.compose.ui.res.stringResource
 import com.aicode.R
@@ -66,17 +66,20 @@ import com.aicode.R
 @Composable
 fun McpServerEditDialog(
     initial: McpServerConfig?,
+    initialScope: McpScope? = null,
     tools: List<McpToolDescriptor> = emptyList(),
     onRefreshTools: () -> Unit = {},
     onOpenLogs: (() -> Unit)? = null,
     onDismiss: () -> Unit,
-    onSave: (McpServerConfig) -> Unit
+    onSave: (McpServerConfig, McpScope) -> Unit
 ) {
     var selectedTab by remember { mutableIntStateOf(0) } // 0: 基础设置, 1: 工具
 
     var name by remember { mutableStateOf(initial?.name ?: "") }
     var enabled by remember { mutableStateOf(initial?.enabled ?: true) }
     var isStdio by remember { mutableStateOf(initial?.isStdio ?: false) }
+    // 作用域：新增默认当前项目，编辑保持原作用域。
+    var scope by remember { mutableStateOf(initialScope ?: McpScope.PROJECT) }
 
     // HTTP 形态字段
     var url by remember { mutableStateOf(initial?.url ?: "") }
@@ -97,12 +100,9 @@ fun McpServerEditDialog(
         }
     }
 
-    // 工具权限字段 (disabledTools / requireApprovalTools)
+    // 工具权限字段 (disabledTools)
     val disabledToolsSet = remember {
         mutableStateListOf<String>().apply { addAll(initial?.disabledTools ?: emptyList()) }
-    }
-    val requireApprovalToolsSet = remember {
-        mutableStateListOf<String>().apply { addAll(initial?.requireApprovalTools ?: emptyList()) }
     }
 
     val canSave = name.isNotBlank() && if (isStdio) command.isNotBlank() else url.isNotBlank()
@@ -114,8 +114,7 @@ fun McpServerEditDialog(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = MaterialTheme.colorScheme.surface,
-        dragHandle = null
+        containerColor = MaterialTheme.colorScheme.surface
     ) {
         Column(
             modifier = Modifier
@@ -129,16 +128,7 @@ fun McpServerEditDialog(
                         .padding(horizontal = 16.dp, vertical = 10.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    IconButton(
-                        onClick = onDismiss,
-                        modifier = Modifier.size(36.dp)
-                    ) {
-                        Icon(
-                            FeatherIcons.X,
-                            contentDescription = stringResource(R.string.common_close),
-                            tint = MaterialTheme.colorScheme.onSurface
-                        )
-                    }
+                    Spacer(modifier = Modifier.size(36.dp))
                     Text(
                         text = if (initial == null) stringResource(R.string.mcp_add) else stringResource(R.string.mcp_edit),
                         style = MaterialTheme.typography.titleMedium.copy(
@@ -152,7 +142,7 @@ fun McpServerEditDialog(
                     if (onOpenLogs != null) {
                         IconButton(
                             onClick = onOpenLogs,
-                            modifier = Modifier.size(32.dp)
+                            modifier = Modifier.size(36.dp)
                         ) {
                             Icon(
                                 FeatherIcons.FileText,
@@ -225,6 +215,50 @@ fun McpServerEditDialog(
                                 .padding(horizontal = 20.dp, vertical = 8.dp),
                             verticalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
+                            // 作用域选择（全局 / 当前项目）
+                            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Text(
+                                    text = stringResource(R.string.mcp_scope_label),
+                                    style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .background(
+                                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                                            RoundedCornerShape(12.dp)
+                                        )
+                                        .padding(3.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(3.dp)
+                                ) {
+                                    val scopes = listOf(
+                                        McpScope.GLOBAL to stringResource(R.string.mcp_scope_global),
+                                        McpScope.PROJECT to stringResource(R.string.mcp_scope_project)
+                                    )
+                                    scopes.forEach { (s, label) ->
+                                        val selected = scope == s
+                                        Box(
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .clip(RoundedCornerShape(8.dp))
+                                                .background(if (selected) MaterialTheme.colorScheme.surface else Color.Transparent)
+                                                .clickable { scope = s }
+                                                .padding(vertical = 8.dp),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Text(
+                                                text = label,
+                                                style = MaterialTheme.typography.bodyMedium.copy(
+                                                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal
+                                                ),
+                                                color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+
                             // 是否启用 Card
                             Card(
                                 shape = RoundedCornerShape(12.dp),
@@ -356,7 +390,7 @@ fun McpServerEditDialog(
                             } else {
                                 tools.forEach { tool ->
                                     val isToolEnabled = tool.name !in disabledToolsSet
-                                    val isApprovalRequired = tool.name in requireApprovalToolsSet
+                                    var descriptionExpanded by remember(tool.name) { mutableStateOf(false) }
 
                                     Card(
                                         shape = RoundedCornerShape(12.dp),
@@ -368,7 +402,7 @@ fun McpServerEditDialog(
                                         Column(
                                             modifier = Modifier
                                                 .fillMaxWidth()
-                                                .padding(12.dp)
+                                                .padding(10.dp)
                                         ) {
                                             Row(
                                                 modifier = Modifier.fillMaxWidth(),
@@ -392,15 +426,23 @@ fun McpServerEditDialog(
                                                 text = tool.description ?: stringResource(R.string.mcp_no_description),
                                                 style = MaterialTheme.typography.bodySmall,
                                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                maxLines = 3,
+                                                maxLines = if (descriptionExpanded) Int.MAX_VALUE else 2,
                                                 overflow = TextOverflow.Ellipsis
+                                            )
+                                            Text(
+                                                text = stringResource(if (descriptionExpanded) R.string.common_collapse else R.string.common_expand),
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = MaterialTheme.colorScheme.primary,
+                                                modifier = Modifier
+                                                    .clickable { descriptionExpanded = !descriptionExpanded }
+                                                    .padding(top = 2.dp)
                                             )
 
                                             val paramKeys = remember(tool.inputSchema) {
                                                 (tool.inputSchema?.get("properties") as? JsonObject)?.keys ?: emptySet()
                                             }
                                             if (paramKeys.isNotEmpty()) {
-                                                Spacer(modifier = Modifier.height(10.dp))
+                                                Spacer(modifier = Modifier.height(8.dp))
                                                 FlowRow(
                                                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                                                     verticalArrangement = Arrangement.spacedBy(6.dp)
@@ -424,37 +466,7 @@ fun McpServerEditDialog(
                                                 }
                                             }
 
-                                            Spacer(modifier = Modifier.height(12.dp))
-                                            HorizontalDivider(
-                                                modifier = Modifier.fillMaxWidth(),
-                                                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
-                                            )
-                                            Spacer(modifier = Modifier.height(8.dp))
-
-                                            Row(
-                                                modifier = Modifier.fillMaxWidth(),
-                                                verticalAlignment = Alignment.CenterVertically
-                                            ) {
-                                                Icon(
-                                                    FeatherIcons.Shield,
-                                                    contentDescription = null,
-                                                    modifier = Modifier.size(16.dp),
-                                                    tint = MaterialTheme.colorScheme.primary
-                                                )
-                                                Spacer(modifier = Modifier.width(6.dp))
-                                                Text(
-                                                    text = stringResource(R.string.mcp_needs_approval),
-                                                    style = MaterialTheme.typography.bodyMedium,
-                                                    color = MaterialTheme.colorScheme.onSurface,
-                                                    modifier = Modifier.weight(1f)
-                                                )
-                                                Switch(
-                                                    checked = isApprovalRequired,
-                                                    onCheckedChange = { checked ->
-                                                        if (checked) requireApprovalToolsSet.add(tool.name) else requireApprovalToolsSet.remove(tool.name)
-                                                    }
-                                                )
-                                            }
+                                            Spacer(modifier = Modifier.height(10.dp))
                                         }
                                     }
                                 }
@@ -484,8 +496,7 @@ fun McpServerEditDialog(
                                         .filter { it.first.isNotEmpty() }
                                         .toMap(),
                                     enabled = enabled,
-                                    disabledTools = disabledToolsSet.toSet(),
-                                    requireApprovalTools = requireApprovalToolsSet.toSet()
+                                    disabledTools = disabledToolsSet.toSet()
                                 )
                             } else {
                                 McpServerConfig(
@@ -496,11 +507,10 @@ fun McpServerEditDialog(
                                         .filter { it.first.isNotEmpty() }
                                         .toMap(),
                                     enabled = enabled,
-                                    disabledTools = disabledToolsSet.toSet(),
-                                    requireApprovalTools = requireApprovalToolsSet.toSet()
+                                    disabledTools = disabledToolsSet.toSet()
                                 )
                             }
-                            onSave(config)
+                            onSave(config, scope)
                         },
                         modifier = Modifier
                             .fillMaxWidth()

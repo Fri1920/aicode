@@ -258,7 +258,7 @@ class BackupManagerImpl @Inject constructor(
         gitCredentials = if (options.gitCredentials) gitCredentialDao.getAllOnce().map { it.toDto() } else emptyList(),
         remoteConnections = if (options.remoteConnections) remoteConnectionDao.getAllConnectionsOnce().map { it.toDto() } else emptyList(),
         remoteMounts = if (options.remoteConnections) remoteConnectionDao.getAllMountsOnce().map { it.toDto() } else emptyList(),
-        mcpServers = if (options.mcpServers) mcpConfigRepository.getServers() else emptyList(),
+        mcpServers = if (options.mcpServers) mcpConfigRepository.getGlobalServers() else emptyList(),
         globalPermissionRules = if (options.permissionRules) permissionRulesRepository.getGlobalRulesOnce() else emptyList(),
         themeMode = if (options.appSettings) themeSettingsRepository.snapshot() else null,
         keepaliveEnabled = if (options.appSettings) keepaliveSettingsRepository.snapshot() else false,
@@ -427,7 +427,7 @@ class BackupManagerImpl @Inject constructor(
             remoteConnectionDao.insertAllMounts(meta.remoteMounts.map { it.toEntity() })
         }
         if (meta.mcpServers.isNotEmpty()) {
-            mcpConfigRepository.setServers(meta.mcpServers)
+            mcpConfigRepository.setGlobalServers(meta.mcpServers)
             mcpManager.reload()
         }
         if (meta.globalPermissionRules.isNotEmpty()) {

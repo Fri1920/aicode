@@ -452,6 +452,9 @@
     <string name="mcp_edit">Edit MCP</string>
     <string name="mcp_view_logs">View this MCP\'s logs</string>
     <string name="mcp_refresh_tools">Refresh Tools</string>
+    <string name="mcp_scope_label">Scope</string>
+    <string name="mcp_scope_global">Global</string>
+    <string name="mcp_scope_project">Project</string>
     <string name="mcp_basic_settings">Basic Settings</string>
     <string name="mcp_enabled">Enabled</string>
     <string name="mcp_name_hint">e.g. fetch, github, gitlab</string>
@@ -461,7 +464,6 @@
     <string name="mcp_save_first_hint">Please save and connect to the server first to view the tool list</string>
     <string name="mcp_no_tools_hint">No tools detected, tap the refresh button in the top right to retry</string>
     <string name="mcp_no_description">No description</string>
-    <string name="mcp_needs_approval">Needs approval</string>
 
     <!-- MCP HTTP Fields -->
     <string name="mcp_server_url">Server URL</string>

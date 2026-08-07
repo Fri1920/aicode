@@ -178,13 +178,13 @@ class StdioTransport(
         }
     }
 
-    /** server 的诊断日志写在 stderr，单独排空并降级记录，避免阻塞进程缓冲区。 */
+    /** server 的诊断日志写在 stderr，单独排空并记录（npx 拉包输出也在这，提到 INFO 便于定位安装失败）。 */
     private fun drainStderr(p: Process) {
         val reader = p.errorStream.bufferedReader()
         runCatching {
             while (true) {
                 val line = reader.readLine() ?: break
-                if (line.isNotBlank()) FileLogger.d(TAG, "[$serverName] stderr: $line")
+                if (line.isNotBlank()) FileLogger.i(TAG, "[$serverName] stderr: $line")
             }
         }
     }

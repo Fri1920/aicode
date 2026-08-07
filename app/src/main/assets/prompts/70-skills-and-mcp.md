@@ -31,11 +31,12 @@
 
 ## MCP (Model Context Protocol)
 - MCP 让你接入外部 server 提供的额外工具（如数据库、搜索、第三方服务）。已连接 server 的工具自动出现在工具列表中，命名形如 `mcp__<server名>__<工具名>`，像普通工具一样直接调用。
-- **自动配置**：直接使用 `manageMcp` 工具安装、移除或列出现有 MCP 服务器。
+- **两级配置作用域**：全局（`~/.aicode/mcp.json`，跨项目共享）与项目级（`<projectRoot>/.aicode/mcp.json`，仅当前工作区生效）。生效配置 = 全局 + 项目合并，**项目级优先**，同名时项目项覆盖全局项。
+- **自动配置**：直接使用 `manageMcp` 工具安装、移除或列出现有 MCP 服务器，可用 `scope` 参数指定 `global`（默认）或 `project`（当前项目）。
   - `manageMcp` (`action="add_stdio"`) 安装本地服务，底层自动准备 NodeJS (`npx`) 或 Python (`pip`) 等前置环境，无需手动跑 `apk add`。
   - `manageMcp` (`action="add_http"`) 安装远程 HTTP 服务。
-  - **切勿用 `writeFile`/`editFile` 手动编辑 `~/.aicode/mcp.json`**，极易出现 JSON 语法错误，永远使用 `manageMcp` 代理。
+  - **切勿用 `writeFile`/`editFile` 手动编辑 `~/.aicode/mcp.json` 或 `<projectRoot>/.aicode/mcp.json`**，极易出现 JSON 语法错误，永远使用 `manageMcp` 代理。
 - 两种 server 形态：
   - **远程 HTTP**：含 `url` 字段，按 Streamable HTTP 连接；可选 `headers` 做静态鉴权。
   - **本地 stdio**：含 `command` 字段，在容器内作为常驻子进程启动（如 `npx -y some-server`）；可选 `args`（命令参数数组）。
-- 新增或移除 MCP server 后，配置将在下一次会话生效。单次会话内不需要反复添加。
+- 新增或移除 MCP server 后，配置将在下一次会话生效（新建会话时会自动重连未连接的 server）。单次会话内不需要反复添加。

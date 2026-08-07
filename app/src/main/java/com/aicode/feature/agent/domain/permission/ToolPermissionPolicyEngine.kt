@@ -36,8 +36,7 @@ class ToolPermissionPolicyEngine @Inject constructor(
         const val TERMINAL_SHELL_ACTION = "start"
         val NON_REMEMBERABLE_CAPABILITIES = setOf(
             ToolCapability.MODIFY_AGENT_CONFIG,
-            ToolCapability.MODIFY_CONTAINER_ENV,
-            ToolCapability.EXTERNAL_TOOL
+            ToolCapability.MODIFY_CONTAINER_ENV
         )
     }
 

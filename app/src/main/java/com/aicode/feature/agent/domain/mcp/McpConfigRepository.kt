@@ -2,11 +2,15 @@ package com.aicode.feature.agent.domain.mcp
 
 import com.aicode.core.util.FileLogger
 import com.aicode.feature.agent.domain.container.ContainerInstaller
+import com.aicode.feature.workspace.data.repository.WorkspaceRepository
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.sync.Mutex
@@ -25,74 +29,152 @@ import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
 import kotlinx.serialization.json.putJsonObject
 import java.io.File
+import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import javax.inject.Singleton
 
+/** MCP server 的配置作用域：全局（跨项目共享）或项目级（仅当前工作区生效）。 */
+enum class McpScope { GLOBAL, PROJECT }
+
+/** 一个生效的 MCP 条目：配置 + 其来源作用域，供 UI 标注「全局/项目」。 */
+data class McpServerEntry(
+    val server: McpServerConfig,
+    val scope: McpScope
+)
+
+/**
+ * MCP 配置持久化，支持全局 + 项目级两级：
+ * - 全局：`filesDir/aicode/mcp.json`（跨项目、跨升级保留）；
+ * - 项目级：`workspacePath/.aicode/mcp.json`（随工作区走，可 git 追踪）。
+ *
+ * 生效配置 = 全局 + 项目合并，**项目级优先**，同名时项目项覆盖全局项。
+ * 并发模式：Mutex 保护文件 IO + MutableStateFlow 缓存，项目级按工作区路径各自缓存。
+ */
+@OptIn(ExperimentalCoroutinesApi::class)
 @Singleton
 class McpConfigRepository @Inject constructor(
-    private val containerInstaller: ContainerInstaller
+    private val containerInstaller: ContainerInstaller,
+    private val workspaceRepository: WorkspaceRepository
 ) {
     private companion object {
         const val TAG = "McpConfigRepository"
         const val CONFIG_FILE = "mcp.json"
+        const val AICODE_DIR = ".aicode"
         const val DEFAULT_JSON = """{"mcpServers":{}}"""
         val JSON = Json { ignoreUnknownKeys = true; isLenient = true }
         val PRETTY_JSON = Json { prettyPrint = true }
     }
 
-    private val configFile: File
+    /** 全局配置文件：`filesDir/aicode/mcp.json`。 */
+    private val globalFile: File
         get() = File(containerInstaller.aicodeDir, CONFIG_FILE)
 
-    private val rawState = MutableStateFlow<String?>(null)
+    /** 当前工作区的项目级配置文件：`workspacePath/.aicode/mcp.json`。 */
+    private fun projectFileForPath(workspacePath: String): File =
+        File(File(workspacePath, AICODE_DIR), CONFIG_FILE)
+
+    private val globalState = MutableStateFlow<String?>(null)
+    private val projectStates = ConcurrentHashMap<String, MutableStateFlow<String?>>()
     private val mutex = Mutex()
 
-    private suspend fun ensureLoaded() {
-        if (rawState.value != null) return
+    private fun getProjectState(workspacePath: String): MutableStateFlow<String?> =
+        projectStates.getOrPut(workspacePath) { MutableStateFlow(null) }
+
+    private suspend fun ensureGlobalLoaded() {
+        if (globalState.value != null) return
         mutex.withLock {
-            if (rawState.value != null) return
-            rawState.value = load()
+            if (globalState.value != null) return
+            globalState.value = load(globalFile)
         }
     }
 
-    private suspend fun load(): String = withContext(Dispatchers.IO) {
-        val file = configFile
+    private suspend fun ensureProjectLoaded(workspacePath: String) {
+        val state = getProjectState(workspacePath)
+        if (state.value != null) return
+        mutex.withLock {
+            if (state.value != null) return
+            state.value = load(projectFileForPath(workspacePath))
+        }
+    }
+
+    private suspend fun load(file: File): String = withContext(Dispatchers.IO) {
+        // 只读加载：文件不存在时返回默认配置，不主动创建目录/文件，
+        // 避免在 projectsRoot 下误建 .aicode 目录被工作区扫描器当成工作区。
         if (file.isFile) {
             return@withContext runCatching { file.readText() }.getOrElse {
-                FileLogger.w(TAG, "读取 $CONFIG_FILE 失败，回退默认配置: ${it.message}")
+                FileLogger.w(TAG, "读取 ${file.name} 失败，回退默认配置: ${it.message}")
                 DEFAULT_JSON
             }
         }
-        writeFile(DEFAULT_JSON)
         DEFAULT_JSON
     }
 
-    private fun writeFile(json: String) {
-        val file = configFile
+    private fun writeFile(file: File, json: String) {
         file.parentFile?.mkdirs()
         file.writeText(json)
     }
 
-    val rawJsonFlow: Flow<String> = flow {
-        ensureLoaded()
-        emitAll(rawState.filterNotNull())
+    /** 全局 MCP 配置流。 */
+    val globalServersFlow: Flow<List<McpServerConfig>> = flow {
+        ensureGlobalLoaded()
+        emitAll(globalState.filterNotNull().map { parse(it) })
     }
 
-    val serversFlow: Flow<List<McpServerConfig>> = rawJsonFlow.map { parse(it) }
+    /**
+     * 当前项目生效的 MCP 条目流（全局 + 项目合并，项目优先覆盖同名），
+     * 跟随当前工作区切换自动重载对应项目配置。
+     */
+    val effectiveEntriesFlow: Flow<List<McpServerEntry>> =
+        workspaceRepository.current.flatMapLatest {
+            val path = workspaceRepository.currentPath()
+            ensureGlobalLoaded()
+            ensureProjectLoaded(path)
+            combine(globalState, getProjectState(path)) { g, p ->
+                merge(parse(g ?: DEFAULT_JSON), parse(p ?: DEFAULT_JSON))
+            }
+        }
 
-    suspend fun getServers(): List<McpServerConfig> {
-        ensureLoaded()
-        return parse(rawState.value ?: DEFAULT_JSON)
+    suspend fun getGlobalServers(): List<McpServerConfig> {
+        ensureGlobalLoaded()
+        return parse(globalState.value ?: DEFAULT_JSON)
     }
 
-    suspend fun setRawJson(json: String) {
+    suspend fun getProjectServers(): List<McpServerConfig> {
+        val path = workspaceRepository.currentPath()
+        ensureProjectLoaded(path)
+        return parse(getProjectState(path).value ?: DEFAULT_JSON)
+    }
+
+    suspend fun setGlobalServers(servers: List<McpServerConfig>) {
+        val json = serialize(servers)
         mutex.withLock {
-            withContext(Dispatchers.IO) { writeFile(json) }
-            rawState.value = json
+            withContext(Dispatchers.IO) { writeFile(globalFile, json) }
+            globalState.value = json
         }
     }
 
-    suspend fun setServers(servers: List<McpServerConfig>) {
-        setRawJson(serialize(servers))
+    suspend fun setProjectServers(servers: List<McpServerConfig>) {
+        val path = workspaceRepository.currentPath()
+        val json = serialize(servers)
+        mutex.withLock {
+            withContext(Dispatchers.IO) { writeFile(projectFileForPath(path), json) }
+            getProjectState(path).value = json
+        }
+    }
+
+    /** 当前项目生效的合并配置（项目优先覆盖同名），供 [McpManager] 连接使用。 */
+    suspend fun getEffectiveServers(): List<McpServerConfig> =
+        getEffectiveEntries().map { it.server }
+
+    /** 当前项目生效的合并条目（含来源作用域），供设置页列表标注使用。 */
+    suspend fun getEffectiveEntries(): List<McpServerEntry> {
+        val path = workspaceRepository.currentPath()
+        ensureGlobalLoaded()
+        ensureProjectLoaded(path)
+        return merge(
+            parse(globalState.value ?: DEFAULT_JSON),
+            parse(getProjectState(path).value ?: DEFAULT_JSON)
+        )
     }
 
     fun serialize(servers: List<McpServerConfig>): String {
@@ -121,9 +203,6 @@ class McpConfigRepository @Inject constructor(
                     if (server.disabledTools.isNotEmpty()) {
                         putJsonArray("disabledTools") { server.disabledTools.forEach { add(it) } }
                     }
-                    if (server.requireApprovalTools.isNotEmpty()) {
-                        putJsonArray("requireApprovalTools") { server.requireApprovalTools.forEach { add(it) } }
-                    }
                 }
             }
         }
@@ -148,9 +227,6 @@ class McpConfigRepository @Inject constructor(
             val disabledTools = (obj["disabledTools"] as? JsonArray)?.mapNotNull {
                 (it as? JsonPrimitive)?.contentOrNull
             }?.toSet() ?: emptySet()
-            val requireApprovalTools = (obj["requireApprovalTools"] as? JsonArray)?.mapNotNull {
-                (it as? JsonPrimitive)?.contentOrNull
-            }?.toSet() ?: emptySet()
 
             when {
                 !command.isNullOrBlank() -> {
@@ -166,8 +242,7 @@ class McpConfigRepository @Inject constructor(
                         args = args,
                         env = env,
                         enabled = enabled,
-                        disabledTools = disabledTools,
-                        requireApprovalTools = requireApprovalTools
+                        disabledTools = disabledTools
                     )
                 }
                 !url.isNullOrBlank() -> {
@@ -179,8 +254,7 @@ class McpConfigRepository @Inject constructor(
                         url = url,
                         headers = headers,
                         enabled = enabled,
-                        disabledTools = disabledTools,
-                        requireApprovalTools = requireApprovalTools
+                        disabledTools = disabledTools
                     )
                 }
                 else -> {
@@ -190,5 +264,16 @@ class McpConfigRepository @Inject constructor(
                 }
             }
         }
+    }
+
+    /** 合并全局与项目配置：全局按序在前，项目项覆盖同名，顺序 = 全局序 + 项目新增项。 */
+    private fun merge(
+        global: List<McpServerConfig>,
+        project: List<McpServerConfig>
+    ): List<McpServerEntry> {
+        val byName = LinkedHashMap<String, McpServerEntry>()
+        global.forEach { byName[it.name] = McpServerEntry(it, McpScope.GLOBAL) }
+        project.forEach { byName[it.name] = McpServerEntry(it, McpScope.PROJECT) }
+        return byName.values.toList()
     }
 }

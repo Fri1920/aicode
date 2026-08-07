@@ -26,6 +26,7 @@ import com.aicode.feature.agent.domain.model.CodeChange
 import com.aicode.feature.agent.domain.model.ReasoningEffort
 import com.aicode.feature.agent.domain.model.WorkflowStatus
 import com.aicode.feature.agent.domain.permission.PermissionChoice
+import com.aicode.feature.agent.domain.mcp.McpManager
 import com.aicode.feature.agent.domain.workflow.AgentWorkflow
 import com.aicode.feature.terminal.domain.TabFinishedEvent
 import com.aicode.feature.terminal.domain.TAIL_LINES
@@ -92,6 +93,7 @@ class AIAgentViewModel @Inject constructor(
     private val checkpointManager: CheckpointManager,
     private val checkpointDao: CheckpointDao,
     private val backupManager: BackupManager,
+    private val mcpManager: McpManager,
     @param:ApplicationContext private val context: Context
 ) : ViewModel(), SlashCommandContext {
 
@@ -849,6 +851,8 @@ class AIAgentViewModel @Inject constructor(
             setChanges(curId, emptyList())
             return@launch
         }
+        // 新会话时重连未连接的 MCP server，让 manageMcp 新增的配置真正生效。
+        mcpManager.reconnectUnconnected()
         val s = createSession(_currentWorkspace.value)
         sessionUseCase.upsertSession(s)
         _currentSessionId.value = s.id

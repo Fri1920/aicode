@@ -45,6 +45,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.aicode.core.theme.Spacing
 import com.aicode.core.util.LogLevel
 import com.aicode.R
+import com.aicode.feature.agent.domain.mcp.McpServerEntry
 import com.aicode.feature.agent.domain.mcp.McpServerConfig
 import com.aicode.feature.agent.domain.mcp.McpServerStatus
 import com.aicode.feature.backup.presentation.BackupSection
@@ -95,7 +96,7 @@ fun SettingsScreen(
     val activeProvider by viewModel.activeProvider.collectAsStateWithLifecycle()
     val logLevel by viewModel.logLevel.collectAsStateWithLifecycle()
     val logViewerState by viewModel.logViewerState.collectAsStateWithLifecycle()
-    val mcpServers by viewModel.mcpServers.collectAsStateWithLifecycle()
+    val mcpEntries by viewModel.mcpEntries.collectAsStateWithLifecycle()
     val mcpStatuses by viewModel.mcpStatuses.collectAsStateWithLifecycle()
     val mcpReloading by viewModel.mcpReloading.collectAsStateWithLifecycle()
     val globalRules by viewModel.globalRules.collectAsStateWithLifecycle()
@@ -125,7 +126,7 @@ fun SettingsScreen(
     var logReturnSection by remember { mutableStateOf(SettingsSection.Menu) }
     var editingProvider by remember { mutableStateOf<AIProviderConfig?>(null) }
     var showMcpDialog by remember { mutableStateOf(false) }
-    var editingMcp by remember { mutableStateOf<McpServerConfig?>(null) }
+    var editingMcp by remember { mutableStateOf<McpServerEntry?>(null) }
     var showContainerAddSheet by remember { mutableStateOf(false) }
     var showThemeSheet by remember { mutableStateOf(false) }
     var showLanguageSheet by remember { mutableStateOf(false) }
@@ -198,14 +199,24 @@ fun SettingsScreen(
                                 if (mcpReloading) {
                                     CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
                                 } else {
-                                    Icon(FeatherIcons.RefreshCw, contentDescription = stringResource(R.string.settings_reconnect))
+                                    Icon(
+                                        FeatherIcons.RefreshCw,
+                                        contentDescription = stringResource(R.string.settings_reconnect),
+                                        tint = MaterialTheme.colorScheme.onBackground,
+                                        modifier = Modifier.size(22.dp)
+                                    )
                                 }
                             }
                             IconButton(onClick = {
                                 editingMcp = null
                                 showMcpDialog = true
                             }) {
-                                Icon(FeatherIcons.Plus, contentDescription = stringResource(R.string.settings_add_mcp_server))
+                                Icon(
+                                    FeatherIcons.Plus,
+                                    contentDescription = stringResource(R.string.settings_add_mcp_server),
+                                    tint = MaterialTheme.colorScheme.onBackground,
+                                    modifier = Modifier.size(22.dp)
+                                )
                             }
                         }
                         SettingsSection.Container -> IconButton(onClick = { showContainerAddSheet = true }) {
@@ -264,16 +275,16 @@ fun SettingsScreen(
                     onClearCompactionModel = { viewModel.clearCompactionModel() }
                 )
                 SettingsSection.Mcp -> McpSection(
-                    servers = mcpServers,
+                    entries = mcpEntries,
                     statuses = mcpStatuses,
                     reloading = mcpReloading,
                     onReload = { viewModel.reloadMcp() },
-                    onToggle = { name, enabled -> viewModel.setMcpServerEnabled(name, enabled) },
+                    onToggle = { name, enabled, scope -> viewModel.setMcpServerEnabled(name, enabled, scope) },
                     onEdit = {
                         editingMcp = it
                         showMcpDialog = true
                     },
-                    onDelete = { viewModel.deleteMcpServer(it) }
+                    onDelete = { name, scope -> viewModel.deleteMcpServer(name, scope) }
                 )
                 SettingsSection.Container -> ContainerSection(
                     profiles = containerProfiles,
@@ -318,20 +329,21 @@ fun SettingsScreen(
 
     if (showMcpDialog) {
         McpServerEditDialog(
-            initial = editingMcp,
-            tools = viewModel.getMcpServerTools(editingMcp?.name),
-            onRefreshTools = { viewModel.reloadMcp() },
+            initial = editingMcp?.server,
+            initialScope = editingMcp?.scope,
+            tools = viewModel.getMcpServerTools(editingMcp?.server?.name),
+            onRefreshTools = { editingMcp?.let { viewModel.reloadMcpServer(it.server.name) } },
             onOpenLogs = editingMcp?.let { existing ->
                 {
                     showMcpDialog = false
                     logReturnSection = SettingsSection.Mcp
-                    viewModel.refreshLogs(filterServerName = existing.name)
+                    viewModel.refreshLogs(filterServerName = existing.server.name)
                     section = SettingsSection.LogViewer
                 }
             },
             onDismiss = { showMcpDialog = false },
-            onSave = { config ->
-                viewModel.upsertMcpServer(editingMcp?.name, config)
+            onSave = { config, scope ->
+                viewModel.upsertMcpServer(editingMcp?.server?.name, editingMcp?.scope, config, scope)
                 showMcpDialog = false
             }
         )

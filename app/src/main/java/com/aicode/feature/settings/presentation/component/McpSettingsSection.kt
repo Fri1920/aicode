@@ -46,11 +46,13 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.res.stringResource
 import com.aicode.core.theme.Radius
 import com.aicode.core.theme.Spacing
+import com.aicode.feature.agent.domain.mcp.McpScope
 import com.aicode.feature.agent.domain.mcp.McpServerConfig
+import com.aicode.feature.agent.domain.mcp.McpServerEntry
 import com.aicode.feature.agent.domain.mcp.McpServerStatus
 import compose.icons.FeatherIcons
+import compose.icons.feathericons.Box
 import compose.icons.feathericons.ChevronRight
-import compose.icons.feathericons.Server
 import compose.icons.feathericons.Terminal
 import compose.icons.feathericons.Trash2
 import kotlin.math.roundToInt
@@ -63,15 +65,15 @@ import com.aicode.R
  */
 @Composable
 internal fun McpSection(
-    servers: List<McpServerConfig>,
+    entries: List<McpServerEntry>,
     statuses: List<McpServerStatus>,
     reloading: Boolean,
     onReload: () -> Unit,
-    onToggle: (String, Boolean) -> Unit,
-    onEdit: (McpServerConfig) -> Unit,
-    onDelete: (String) -> Unit
+    onToggle: (String, Boolean, McpScope) -> Unit,
+    onEdit: (McpServerEntry) -> Unit,
+    onDelete: (String, McpScope) -> Unit
 ) {
-    if (servers.isEmpty()) {
+    if (entries.isEmpty()) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -119,15 +121,16 @@ internal fun McpSection(
         verticalArrangement = Arrangement.spacedBy(Spacing.sm)
     ) {
         SettingsGroup {
-            servers.forEachIndexed { index, server ->
+            entries.forEachIndexed { index, entry ->
                 if (index > 0) {
                     SettingsDivider()
                 }
                 McpServerRow(
-                    server = server,
-                    status = statuses.firstOrNull { it.name == server.name },
-                    onClick = { onEdit(server) },
-                    onDelete = { onDelete(server.name) }
+                    server = entry.server,
+                    scope = entry.scope,
+                    status = statuses.firstOrNull { it.name == entry.server.name },
+                    onClick = { onEdit(entry) },
+                    onDelete = { onDelete(entry.server.name, entry.scope) }
                 )
             }
         }
@@ -140,6 +143,7 @@ internal fun McpSection(
 @Composable
 internal fun McpServerRow(
     server: McpServerConfig,
+    scope: McpScope,
     status: McpServerStatus?,
     onClick: () -> Unit,
     onDelete: () -> Unit
@@ -307,18 +311,18 @@ internal fun McpServerRow(
             // 左侧容器图标 + 状态圆点
             Box(
                 modifier = Modifier
-                    .size(32.dp)
+                    .size(40.dp)
                     .background(
                         color = MaterialTheme.colorScheme.surfaceVariant,
                         shape = RoundedCornerShape(8.dp)
                     )
             ) {
                 Icon(
-                    imageVector = if (server.isStdio) FeatherIcons.Terminal else FeatherIcons.Server,
+                    imageVector = FeatherIcons.Box,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier
-                        .size(18.dp)
+                        .size(22.dp)
                         .align(Alignment.Center)
                 )
                 Box(
@@ -350,6 +354,11 @@ internal fun McpServerRow(
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
+                    McpPill(
+                        text = if (scope == McpScope.PROJECT) stringResource(R.string.mcp_scope_project) else stringResource(R.string.mcp_scope_global),
+                        textColor = if (scope == McpScope.PROJECT) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        backgroundColor = if (scope == McpScope.PROJECT) MaterialTheme.colorScheme.primary.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
+                    )
                     McpPill(
                         text = typeText,
                         textColor = MaterialTheme.colorScheme.onSurfaceVariant,

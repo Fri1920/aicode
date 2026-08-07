@@ -11,7 +11,9 @@ import com.aicode.feature.agent.domain.container.RemoteSshConnection
 import com.aicode.feature.agent.domain.container.RootfsSource
 import com.aicode.feature.agent.domain.mcp.McpConfigRepository
 import com.aicode.feature.agent.domain.mcp.McpManager
+import com.aicode.feature.agent.domain.mcp.McpScope
 import com.aicode.feature.agent.domain.mcp.McpServerConfig
+import com.aicode.feature.agent.domain.mcp.McpServerEntry
 import com.aicode.feature.agent.domain.mcp.McpServerStatus
 import com.aicode.feature.agent.domain.mcp.McpToolDescriptor
 import com.aicode.feature.agent.domain.permission.PermissionRule
@@ -129,8 +131,8 @@ class SettingsViewModel @Inject constructor(
     private val _languageTag = MutableStateFlow<String?>(null)
     val languageTag: StateFlow<String?> = _languageTag.asStateFlow()
 
-    private val _mcpServers = MutableStateFlow<List<McpServerConfig>>(emptyList())
-    val mcpServers: StateFlow<List<McpServerConfig>> = _mcpServers.asStateFlow()
+    private val _mcpEntries = MutableStateFlow<List<McpServerEntry>>(emptyList())
+    val mcpEntries: StateFlow<List<McpServerEntry>> = _mcpEntries.asStateFlow()
 
     val mcpStatuses: StateFlow<List<McpServerStatus>> = mcpManager.statuses
 
@@ -261,8 +263,8 @@ class SettingsViewModel @Inject constructor(
             }
 
             launch {
-                mcpConfigRepository.serversFlow.collectLatest {
-                    _mcpServers.value = it
+                mcpConfigRepository.effectiveEntriesFlow.collectLatest {
+                    _mcpEntries.value = it
                 }
             }
 
@@ -280,27 +282,62 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
-    fun upsertMcpServer(originalName: String?, config: McpServerConfig) {
+    fun upsertMcpServer(originalName: String?, initialScope: McpScope?, config: McpServerConfig, scope: McpScope) {
         viewModelScope.launch {
+            // 作用域迁移：仅当保存作用域与原来不同时，从原作用域移除旧条目，
+            // 避免残留条目在合并时（项目优先）继续覆盖新作用域的配置。
+            if (originalName != null && initialScope != null && initialScope != scope) {
+                val oldBase = if (initialScope == McpScope.GLOBAL) mcpConfigRepository.getGlobalServers() else mcpConfigRepository.getProjectServers()
+                val oldUpdated = oldBase.filterNot { it.name == originalName }
+                if (initialScope == McpScope.GLOBAL) mcpConfigRepository.setGlobalServers(oldUpdated) else mcpConfigRepository.setProjectServers(oldUpdated)
+            }
+            val base = if (scope == McpScope.GLOBAL) mcpConfigRepository.getGlobalServers() else mcpConfigRepository.getProjectServers()
             val ordered = LinkedHashMap<String, McpServerConfig>()
-            _mcpServers.value.forEach { ordered[it.name] = it }
+            base.forEach { ordered[it.name] = it }
             if (originalName != null && originalName != config.name) {
                 ordered.remove(originalName)
             }
             ordered[config.name] = config
-            persistMcpServers(ordered.values.toList())
+            val updated = ordered.values.toList()
+            if (scope == McpScope.GLOBAL) mcpConfigRepository.setGlobalServers(updated) else mcpConfigRepository.setProjectServers(updated)
+            _mcpReloading.value = true
+            try {
+                // 仅重连被改动的 server，其他 server 不受影响；重命名时先断开旧名。
+                if (originalName != null && originalName != config.name) {
+                    mcpManager.removeServer(originalName)
+                }
+                mcpManager.reloadServer(config.name)
+            } finally {
+                _mcpReloading.value = false
+            }
         }
     }
 
-    fun deleteMcpServer(name: String) {
+    fun deleteMcpServer(name: String, scope: McpScope) {
         viewModelScope.launch {
-            persistMcpServers(_mcpServers.value.filterNot { it.name == name })
+            val base = if (scope == McpScope.GLOBAL) mcpConfigRepository.getGlobalServers() else mcpConfigRepository.getProjectServers()
+            val updated = base.filterNot { it.name == name }
+            if (scope == McpScope.GLOBAL) mcpConfigRepository.setGlobalServers(updated) else mcpConfigRepository.setProjectServers(updated)
+            _mcpReloading.value = true
+            try {
+                mcpManager.removeServer(name)
+            } finally {
+                _mcpReloading.value = false
+            }
         }
     }
 
-    fun setMcpServerEnabled(name: String, enabled: Boolean) {
+    fun setMcpServerEnabled(name: String, enabled: Boolean, scope: McpScope) {
         viewModelScope.launch {
-            persistMcpServers(_mcpServers.value.map { if (it.name == name) it.copy(enabled = enabled) else it })
+            val base = if (scope == McpScope.GLOBAL) mcpConfigRepository.getGlobalServers() else mcpConfigRepository.getProjectServers()
+            val updated = base.map { if (it.name == name) it.copy(enabled = enabled) else it }
+            if (scope == McpScope.GLOBAL) mcpConfigRepository.setGlobalServers(updated) else mcpConfigRepository.setProjectServers(updated)
+            _mcpReloading.value = true
+            try {
+                mcpManager.reloadServer(name)
+            } finally {
+                _mcpReloading.value = false
+            }
         }
     }
 
@@ -315,19 +352,21 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
+    /** 仅重连指定 server（编辑弹窗右上角刷新工具用）。 */
+    fun reloadMcpServer(name: String) {
+        viewModelScope.launch {
+            _mcpReloading.value = true
+            try {
+                mcpManager.reloadServer(name)
+            } finally {
+                _mcpReloading.value = false
+            }
+        }
+    }
+
     fun getMcpServerTools(serverName: String?): List<McpToolDescriptor> {
         if (serverName.isNullOrBlank()) return emptyList()
         return mcpManager.getServerTools(serverName)
-    }
-
-    private suspend fun persistMcpServers(servers: List<McpServerConfig>) {
-        mcpConfigRepository.setServers(servers)
-        _mcpReloading.value = true
-        try {
-            mcpManager.reload()
-        } finally {
-            _mcpReloading.value = false
-        }
     }
 
     fun setLogLevel(level: LogLevel) {

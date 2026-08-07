@@ -2,6 +2,7 @@ package com.aicode.feature.agent.domain.tool.mcp
 
 import com.aicode.core.util.FileLogger
 import com.aicode.feature.agent.domain.mcp.McpConfigRepository
+import com.aicode.feature.agent.domain.mcp.McpScope
 import com.aicode.feature.agent.domain.mcp.McpServerConfig
 import com.aicode.feature.agent.domain.tool.AgentTool
 import com.aicode.feature.agent.domain.tool.ParameterType
@@ -69,6 +70,13 @@ class ManageMcpTool @Inject constructor(
             type = ParameterType.STRING,
             description = "HTTP 远程服务地址 (仅 add_http 必填)",
             required = false
+        ),
+        "scope" to ToolParameter(
+            name = "scope",
+            type = ParameterType.STRING,
+            description = "配置作用域：global（全局，默认）或 project（当前项目，仅当前工作区生效，项目级优先于全局）",
+            enum = listOf("global", "project"),
+            required = false
         )
     )
 
@@ -79,11 +87,13 @@ class ManageMcpTool @Inject constructor(
     ): PendingToolPermission {
         val action = args["action"]?.jsonPrimitive?.contentOrNull ?: "unknown"
         val server = args["server_name"]?.jsonPrimitive?.contentOrNull ?: "未指定"
+        val scope = resolveScope(args)
+        val scopeLabel = if (scope == McpScope.PROJECT) "当前项目" else "全局"
         val summary = when (action) {
-            "add_stdio" -> "添加本地 MCP server: $server"
-            "add_http" -> "添加 HTTP MCP server: $server"
-            "remove" -> "移除 MCP server: $server"
-            "list" -> "列出 MCP server"
+            "add_stdio" -> "添加本地 MCP server: $server ($scopeLabel)"
+            "add_http" -> "添加 HTTP MCP server: $server ($scopeLabel)"
+            "remove" -> "移除 MCP server: $server ($scopeLabel)"
+            "list" -> "列出 MCP server ($scopeLabel)"
             else -> "管理 MCP server"
         }
         return PendingToolPermission(
@@ -91,29 +101,38 @@ class ManageMcpTool @Inject constructor(
             toolName = name,
             title = "确认修改 MCP 配置",
             summary = summary,
-            details = "操作：$action\n服务：$server\n该操作会修改 Agent 的 MCP 配置，新增配置将在下一次会话生效。",
+            details = "操作：$action\n服务：$server\n作用域：$scopeLabel\n该操作会修改 Agent 的 MCP 配置，新增配置将在下一次会话生效。",
             argsPreview = argsPreview
         )
     }
 
     override suspend fun execute(args: Map<String, JsonElement>): ToolResult {
         val action = args["action"]?.jsonPrimitive?.contentOrNull ?: return ToolResult.Error("缺少 action 参数")
-        
+        val scope = resolveScope(args)
+        val scopeLabel = if (scope == McpScope.PROJECT) "当前项目" else "全局"
+
+        suspend fun readServers(): List<McpServerConfig> =
+            if (scope == McpScope.PROJECT) mcpConfigRepository.getProjectServers() else mcpConfigRepository.getGlobalServers()
+
+        suspend fun writeServers(servers: List<McpServerConfig>) {
+            if (scope == McpScope.PROJECT) mcpConfigRepository.setProjectServers(servers) else mcpConfigRepository.setGlobalServers(servers)
+        }
+
         return try {
             when (action) {
                 "list" -> {
-                    val servers = mcpConfigRepository.getServers()
+                    val servers = readServers()
                     ToolResult.Success(JsonPrimitive(mcpConfigRepository.serialize(servers)))
                 }
                 "remove" -> {
                     val name = args["server_name"]?.jsonPrimitive?.contentOrNull ?: return ToolResult.Error("remove 缺少 server_name")
-                    val servers = mcpConfigRepository.getServers().toMutableList()
+                    val servers = readServers().toMutableList()
                     val removed = servers.removeIf { it.name == name }
                     if (removed) {
-                        mcpConfigRepository.setServers(servers)
-                        ToolResult.Success(JsonPrimitive("已成功移除 MCP server: $name"))
+                        writeServers(servers)
+                        ToolResult.Success(JsonPrimitive("已成功移除 $scopeLabel MCP server: $name"))
                     } else {
-                        ToolResult.Error("未找到 MCP server: $name")
+                        ToolResult.Error("未找到 $scopeLabel MCP server: $name")
                     }
                 }
                 "add_stdio" -> {
@@ -129,12 +148,12 @@ class ManageMcpTool @Inject constructor(
                         enabled = true
                     )
                     
-                    val servers = mcpConfigRepository.getServers().toMutableList()
+                    val servers = readServers().toMutableList()
                     servers.removeIf { it.name == name }
                     servers.add(newServer)
-                    mcpConfigRepository.setServers(servers)
+                    writeServers(servers)
                     
-                    ToolResult.Success(JsonPrimitive("成功添加本地 MCP server: $name。配置将在下一次会话生效。若命令依赖 Node/Python 等运行时，请通过命令工具在用户确认后安装。"))
+                    ToolResult.Success(JsonPrimitive("成功添加 $scopeLabel 本地 MCP server: $name。配置将在下一次会话生效。若命令依赖 Node/Python 等运行时，请通过命令工具在用户确认后安装。"))
                 }
                 "add_http" -> {
                     val name = args["server_name"]?.jsonPrimitive?.contentOrNull ?: return ToolResult.Error("add_http 缺少 server_name")
@@ -147,12 +166,12 @@ class ManageMcpTool @Inject constructor(
                         enabled = true
                     )
                     
-                    val servers = mcpConfigRepository.getServers().toMutableList()
+                    val servers = readServers().toMutableList()
                     servers.removeIf { it.name == name }
                     servers.add(newServer)
-                    mcpConfigRepository.setServers(servers)
+                    writeServers(servers)
                     
-                    ToolResult.Success(JsonPrimitive("成功添加 HTTP MCP server: $name. 配置将在下一次会话生效。"))
+                    ToolResult.Success(JsonPrimitive("成功添加 $scopeLabel HTTP MCP server: $name. 配置将在下一次会话生效。"))
                 }
                 else -> ToolResult.Error("未知的 action: $action")
             }
@@ -161,5 +180,11 @@ class ManageMcpTool @Inject constructor(
             ToolResult.Error("管理 MCP 失败: ${e.message}")
         }
     }
+
+    private fun resolveScope(args: Map<String, JsonElement>): McpScope =
+        when (args["scope"]?.jsonPrimitive?.contentOrNull) {
+            "project", "PROJECT" -> McpScope.PROJECT
+            else -> McpScope.GLOBAL
+        }
     
 }

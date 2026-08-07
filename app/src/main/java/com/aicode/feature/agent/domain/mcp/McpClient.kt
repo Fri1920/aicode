@@ -33,6 +33,7 @@ class McpClient(
 
     /** 完整握手：initialize → initialized 通知 → tools/list。返回拿到的工具数。 */
     suspend fun connect(): Int {
+        FileLogger.i(TAG, "[$serverName] 开始连接")
         initialize()
         transport.notify("notifications/initialized")
         val count = refreshTools()
@@ -49,12 +50,17 @@ class McpClient(
                 put("version", "1.0.0")
             }
         }
+        FileLogger.i(TAG, "[$serverName] 发送 initialize（协议 v$PROTOCOL_VERSION）")
+        val t0 = System.currentTimeMillis()
         transport.request("initialize", params)
+        FileLogger.i(TAG, "[$serverName] initialize 完成（${System.currentTimeMillis() - t0}ms）")
         // 返回的 serverInfo / capabilities 暂不使用，只要不报错即视为握手成功。
     }
 
     /** 重新拉取工具列表（配置变更或手动刷新时调用）。 */
     suspend fun refreshTools(): Int {
+        FileLogger.i(TAG, "[$serverName] 拉取工具列表 tools/list")
+        val t0 = System.currentTimeMillis()
         val response = transport.request("tools/list")
         val result = response.result ?: throw McpException(message = "[$serverName] tools/list 无 result")
         tools = runCatching {
@@ -62,6 +68,7 @@ class McpClient(
         }.getOrElse {
             throw McpException(message = "[$serverName] 解析工具列表失败: ${it.message}", cause = it)
         }
+        FileLogger.i(TAG, "[$serverName] tools/list 完成，${tools.size} 个工具（${System.currentTimeMillis() - t0}ms）")
         return tools.size
     }
 

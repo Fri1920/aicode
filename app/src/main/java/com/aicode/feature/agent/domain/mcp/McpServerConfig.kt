@@ -12,8 +12,7 @@ data class McpServerConfig(
     val args: List<String> = emptyList(),
     val env: Map<String, String> = emptyMap(),
     val enabled: Boolean = true,
-    val disabledTools: Set<String> = emptySet(),
-    val requireApprovalTools: Set<String> = emptySet()
+    val disabledTools: Set<String> = emptySet()
 ) {
     val isStdio: Boolean get() = !command.isNullOrBlank()
 }

@@ -2,8 +2,10 @@ package com.aicode.feature.agent.domain.mcp
 
 import com.aicode.core.util.FileLogger
 import com.aicode.feature.agent.domain.tool.AgentTool
+import com.aicode.feature.agent.domain.tool.PendingToolPermission
 import com.aicode.feature.agent.domain.tool.ToolCapability
 import com.aicode.feature.agent.domain.tool.ToolParameter
+import com.aicode.feature.agent.domain.tool.ToolPermissionPolicy
 import com.aicode.feature.agent.domain.tool.ToolResult
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -43,6 +45,9 @@ class McpTool(
         descriptor.description ?: "MCP 工具 ${descriptor.name}（来自 ${client.serverName}）"
     override val capabilities = setOf(ToolCapability.EXTERNAL_TOOL)
 
+    // 所有 MCP 工具统一走工具权限：默认需审核，可「始终允许」记忆（见 ToolPermissionPolicyEngine）。
+    override val permissionPolicy = ToolPermissionPolicy.ASK
+
     // MCP 工具直接用原始 schema，不走 parameters 这条路；保留空 map 满足基类契约。
     override val parameters: Map<String, ToolParameter> = emptyMap()
 
@@ -74,6 +79,24 @@ class McpTool(
             ToolResult.Error("MCP 工具执行异常: ${e.message}")
         }
     }
+
+    /** 工具被调用时展示的权限请求，提供清晰的 MCP 工具上下文。 */
+    override fun buildPermissionRequest(
+        callId: String,
+        args: Map<String, JsonElement>,
+        argsPreview: String
+    ): PendingToolPermission {
+        return PendingToolPermission(
+            id = callId,
+            toolName = name,
+            title = "确认调用 MCP 工具",
+            summary = "AI 请求调用 MCP 工具「$remoteName」（服务 $serverName）",
+            details = "MCP 工具：$remoteName\n服务：$serverName\n参数：$argsPreview",
+            argsPreview = argsPreview
+        )
+    }
+
+    private val serverName: String get() = client.serverName
 
     /** 拼接命名空间名并清洗成 function-calling 合法字符（^[a-zA-Z0-9_-]{1,64}$）。 */
     private fun buildNamespacedName(server: String, tool: String): String {
