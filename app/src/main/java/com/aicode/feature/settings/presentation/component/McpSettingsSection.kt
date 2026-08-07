@@ -176,7 +176,7 @@ internal fun McpServerRow(
 
     val statusBgColor = statusColor.copy(alpha = 0.12f)
 
-    val typeText = if (server.isStdio) stringResource(R.string.mcp_builtin) else "HTTP"
+    val typeText = if (server.isStdio) stringResource(R.string.mcp_type_stdio) else "HTTP"
     val infoText = when {
         isConnected -> stringResource(R.string.mcp_tools_count, status?.toolCount ?: 0, status?.toolCount ?: 0)
         server.isStdio -> server.command.orEmpty().ifEmpty { "stdio" }

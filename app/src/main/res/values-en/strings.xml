@@ -484,7 +484,7 @@
     <string name="mcp_connected">Connected</string>
     <string name="mcp_connecting">Connecting…</string>
     <string name="mcp_connection_failed">Connection failed</string>
-    <string name="mcp_builtin">Built-in</string>
+    <string name="mcp_type_stdio">stdio</string>
     <string name="mcp_tools_count">Tools: %1$s/%2$s</string>
     <string name="mcp_details">Details</string>
 

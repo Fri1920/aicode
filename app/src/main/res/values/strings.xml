@@ -485,7 +485,7 @@
     <string name="mcp_connected">已连接</string>
     <string name="mcp_connecting">连接中…</string>
     <string name="mcp_connection_failed">连接失败</string>
-    <string name="mcp_builtin">内置</string>
+    <string name="mcp_type_stdio">stdio</string>
     <string name="mcp_tools_count">工具: %1$s/%2$s</string>
     <string name="mcp_details">详情</string>
 
