@@ -37,6 +37,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -45,6 +46,8 @@ import com.aicode.core.theme.Spacing
 import com.aicode.feature.settings.domain.model.AIProviderConfig
 import com.aicode.feature.settings.domain.model.ModelMetadata
 import compose.icons.FeatherIcons
+import compose.icons.feathericons.ArrowDown
+import compose.icons.feathericons.ArrowUp
 import compose.icons.feathericons.Check
 import compose.icons.feathericons.Image
 import compose.icons.feathericons.Minimize2
@@ -102,7 +105,9 @@ internal fun DefaultModelsSection(
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+                        overflow = TextOverflow.Ellipsis,
+                        textAlign = TextAlign.End,
+                        modifier = Modifier.weight(2f)
                     )
                 }
             )
@@ -117,7 +122,9 @@ internal fun DefaultModelsSection(
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+                        overflow = TextOverflow.Ellipsis,
+                        textAlign = TextAlign.End,
+                        modifier = Modifier.weight(2f)
                     )
                 }
             )
@@ -325,7 +332,6 @@ private fun ModelMetadataTags(metadata: ModelMetadata?) {
         horizontalArrangement = Arrangement.spacedBy(4.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
-        ModelTag(text = "Chat")
         if (metadata != null) {
             if (metadata.supportsVision) {
                 ModelTag(text = "Image", isHighlight = true)
@@ -335,10 +341,10 @@ private fun ModelMetadataTags(metadata: ModelMetadata?) {
             }
             val input = metadata.inputTokens?.takeIf { it > 0 } ?: metadata.contextTokens.takeIf { it > 0 }
             if (input != null) {
-                ModelTag(text = "Input ${formatTokenLimit(input)}")
+                ModelTag(text = formatTokenLimit(input), icon = FeatherIcons.ArrowUp)
             }
             metadata.outputTokens?.takeIf { it > 0 }?.let { output ->
-                ModelTag(text = "Output ${formatTokenLimit(output)}")
+                ModelTag(text = formatTokenLimit(output), icon = FeatherIcons.ArrowDown)
             }
         }
     }
@@ -347,7 +353,8 @@ private fun ModelMetadataTags(metadata: ModelMetadata?) {
 @Composable
 private fun ModelTag(
     text: String,
-    isHighlight: Boolean = false
+    isHighlight: Boolean = false,
+    icon: androidx.compose.ui.graphics.vector.ImageVector? = null
 ) {
     val backgroundColor = if (isHighlight) {
         MaterialTheme.colorScheme.primaryContainer
@@ -365,12 +372,25 @@ private fun ModelTag(
         shape = RoundedCornerShape(50),
         modifier = Modifier.padding(end = 4.dp)
     ) {
-        Text(
-            text = text,
-            style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
-            color = textColor,
-            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-        )
+        Row(
+            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            if (icon != null) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    modifier = Modifier.size(12.dp),
+                    tint = textColor
+                )
+                Spacer(Modifier.width(4.dp))
+            }
+            Text(
+                text = text,
+                style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+                color = textColor
+            )
+        }
     }
 }
 
