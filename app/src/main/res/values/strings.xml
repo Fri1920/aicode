@@ -49,7 +49,27 @@
     <string name="theme_dark">深色</string>
     <string name="theme_light">浅色</string>
     <string name="settings_keepalive_title">后台运行保活</string>
-    <string name="settings_keepalive_subtitle">显示前台通知，避免退到后台时系统杀进程</string>
+    <string name="settings_keepalive_subtitle">显示前台通知，防止后台被杀</string>
+    <string name="settings_agent_sound_title">Agent 完成通知</string>
+    <string name="settings_agent_sound_subtitle">退到后台时 Agent 完成弹出通知</string>
+    <string name="agent_complete_notification_title">任务完成</string>
+    <string name="agent_complete_notification_body">点击返回查看</string>
+    <string name="notification_channel_agent_complete">Agent 完成通知</string>
+    <string name="notification_channel_agent_complete_desc">Agent 在后台完成任务时弹出的通知</string>
+    <string name="settings_app_permissions">软件权限</string>
+    <string name="settings_permission_apk_install">安装未知应用</string>
+    <string name="settings_permission_apk_install_desc">允许安装 APK 安装包</string>
+    <string name="settings_permission_storage">访问存储空间</string>
+    <string name="settings_permission_storage_desc">读写工作区文件与容器镜像</string>
+    <string name="settings_permission_battery">忽略电池优化</string>
+    <string name="settings_permission_battery_desc">允许后台持续运行，减少被杀</string>
+    <string name="settings_autostart_title">自启动管理</string>
+    <string name="settings_autostart_subtitle">允许系统在后台自动拉起应用</string>
+    <string name="settings_permission_granted">已允许</string>
+    <string name="settings_permission_denied">未允许</string>
+    <string name="settings_permission_notification_title">需要通知权限</string>
+    <string name="settings_permission_notification_denied_desc">后台保活与 Agent 完成通知需要通知权限才能生效，当前无法弹出系统授权框，请在系统设置中手动开启</string>
+    <string name="settings_permission_storage_denied_desc">存储权限已被拒绝且无法再次申请，请在系统设置中手动开启</string>
     <string name="settings_backup_subtitle">加密导出/导入配置、聊天历史与凭据</string>
     <string name="settings_about_subtitle">版本检查 · GitHub · 许可证</string>
 
@@ -59,6 +79,8 @@
     <string name="settings_category_tools">工具与权限</string>
     <string name="settings_category_appearance">外观与语言</string>
     <string name="settings_category_system">系统</string>
+    <string name="settings_category_background">后台运行</string>
+    <string name="settings_category_system_permissions">系统权限</string>
 
     <!-- i18n: UI 文案 -->
     <!-- Common -->
@@ -71,6 +93,7 @@
     <string name="common_create">创建</string>
     <string name="common_delete">删除</string>
     <string name="common_cancel">取消</string>
+    <string name="common_go_to_settings">去设置</string>
     <string name="common_name">名称</string>
     <string name="common_image_preview">图片预览</string>
     <string name="common_expand">展开</string>
@@ -446,7 +469,6 @@
     <string name="git_actual_identity">git 实际署名：%1$s</string>
 
     <!-- Main Activity -->
-    <string name="main_no_storage_permission">未授予存储权限，本地镜像目录可能无法写入。</string>
 
     <!-- MCP Editor -->
     <string name="mcp_add">添加 MCP</string>

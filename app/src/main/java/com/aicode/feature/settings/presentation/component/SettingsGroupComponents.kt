@@ -97,7 +97,8 @@ internal fun SettingsRow(
     icon: ImageVector?,
     title: String,
     onClick: (() -> Unit)? = null,
-    trailing: (@Composable RowScope.() -> Unit)? = null
+    trailing: (@Composable RowScope.() -> Unit)? = null,
+    subtitle: String? = null
 ) {
     val modifier = Modifier
         .fillMaxWidth()
@@ -113,13 +114,21 @@ internal fun SettingsRow(
             )
             Spacer(Modifier.width(Spacing.md))
         }
-        Text(
-            text = title,
-            style = MaterialTheme.typography.bodyLarge,
-            fontWeight = FontWeight.Normal,
-            color = if (settingsLightMode()) Color(0xFF0F0F0F) else MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.weight(1f)
-        )
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.Normal,
+                color = if (settingsLightMode()) Color(0xFF0F0F0F) else MaterialTheme.colorScheme.onSurface
+            )
+            if (subtitle != null) {
+                Text(
+                    text = subtitle,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = if (settingsLightMode()) Color(0xFF8E8E93) else MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
         trailing?.invoke(this)
         if (onClick != null) {
             Spacer(Modifier.width(Spacing.xs))

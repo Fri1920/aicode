@@ -31,6 +31,7 @@ import com.aicode.feature.credentials.data.local.entity.GitCredentialEntity
 import com.aicode.feature.settings.data.local.dao.AIProviderDao
 import com.aicode.feature.settings.data.local.entity.AIProviderEntity
 import com.aicode.feature.settings.data.repository.CompactionModelSettingsRepository
+import com.aicode.feature.settings.data.repository.AgentSoundSettingsRepository
 import com.aicode.feature.settings.data.repository.KeepaliveSettingsRepository
 import com.aicode.feature.settings.data.repository.LogSettingsRepository
 import com.aicode.feature.settings.data.repository.SyncSettingsRepository
@@ -75,6 +76,7 @@ class BackupManagerImpl @Inject constructor(
     private val permissionRulesRepository: PermissionRulesRepository,
     private val themeSettingsRepository: ThemeSettingsRepository,
     private val keepaliveSettingsRepository: KeepaliveSettingsRepository,
+    private val agentSoundSettingsRepository: AgentSoundSettingsRepository,
     private val logSettingsRepository: LogSettingsRepository,
     private val visionModelSettingsRepository: VisionModelSettingsRepository,
     private val compactionModelSettingsRepository: CompactionModelSettingsRepository,
@@ -262,6 +264,7 @@ class BackupManagerImpl @Inject constructor(
         globalPermissionRules = if (options.permissionRules) permissionRulesRepository.getGlobalRulesOnce() else emptyList(),
         themeMode = if (options.appSettings) themeSettingsRepository.snapshot() else null,
         keepaliveEnabled = if (options.appSettings) keepaliveSettingsRepository.snapshot() else false,
+        agentSoundEnabled = if (options.appSettings) agentSoundSettingsRepository.snapshot() else false,
         logLevel = if (options.appSettings) logSettingsRepository.snapshot() else null,
         visionProviderId = if (options.appSettings) visionModelSettingsRepository.getVisionProviderId() else "",
         visionModel = if (options.appSettings) visionModelSettingsRepository.getVisionModel() else "",
@@ -435,6 +438,7 @@ class BackupManagerImpl @Inject constructor(
         }
         meta.themeMode?.let { themeSettingsRepository.restore(it) }
         keepaliveSettingsRepository.restore(meta.keepaliveEnabled)
+        agentSoundSettingsRepository.restore(meta.agentSoundEnabled)
         logSettingsRepository.restore(meta.logLevel)
         if (meta.visionProviderId.isNotBlank() || meta.visionModel.isNotBlank()) {
             visionModelSettingsRepository.setVisionModel(meta.visionProviderId, meta.visionModel)

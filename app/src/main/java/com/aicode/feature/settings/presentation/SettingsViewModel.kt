@@ -27,6 +27,7 @@ import com.aicode.feature.settings.data.repository.ExecutionMode
 import com.aicode.feature.settings.data.repository.CompactionModelSettingsRepository
 import com.aicode.feature.settings.data.repository.ExecutionModeHolder
 import com.aicode.feature.settings.data.repository.ExecutionModeRepository
+import com.aicode.feature.settings.data.repository.AgentSoundSettingsRepository
 import com.aicode.feature.settings.data.repository.KeepaliveSettingsRepository
 import com.aicode.feature.settings.data.repository.LanguageSettingsRepository
 import com.aicode.feature.settings.data.repository.LogSettingsRepository
@@ -78,6 +79,7 @@ class SettingsViewModel @Inject constructor(
     private val logSettingsRepository: LogSettingsRepository,
     private val themeSettingsRepository: ThemeSettingsRepository,
     private val keepaliveSettingsRepository: KeepaliveSettingsRepository,
+    private val agentSoundSettingsRepository: AgentSoundSettingsRepository,
     private val languageSettingsRepository: LanguageSettingsRepository,
     private val mcpConfigRepository: McpConfigRepository,
     private val mcpManager: McpManager,
@@ -123,6 +125,9 @@ class SettingsViewModel @Inject constructor(
 
     private val _keepaliveEnabled = MutableStateFlow(false)
     val keepaliveEnabled: StateFlow<Boolean> = _keepaliveEnabled.asStateFlow()
+
+    private val _agentSoundEnabled = MutableStateFlow(false)
+    val agentSoundEnabled: StateFlow<Boolean> = _agentSoundEnabled.asStateFlow()
 
     private val _themeMode = MutableStateFlow(AppThemeMode.AUTO)
     val themeMode: StateFlow<AppThemeMode> = _themeMode.asStateFlow()
@@ -235,6 +240,12 @@ class SettingsViewModel @Inject constructor(
             launch {
                 keepaliveSettingsRepository.enabledFlow.collectLatest {
                     _keepaliveEnabled.value = it
+                }
+            }
+
+            launch {
+                agentSoundSettingsRepository.enabledFlow.collectLatest {
+                    _agentSoundEnabled.value = it
                 }
             }
 
@@ -443,6 +454,12 @@ class SettingsViewModel @Inject constructor(
     fun setKeepaliveEnabled(enabled: Boolean) {
         viewModelScope.launch {
             keepaliveSettingsRepository.setEnabled(enabled)
+        }
+    }
+
+    fun setAgentSoundEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            agentSoundSettingsRepository.setEnabled(enabled)
         }
     }
 

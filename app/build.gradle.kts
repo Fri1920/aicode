@@ -215,6 +215,7 @@ dependencies {
     // Lifecycle + ViewModel
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.9.0")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.9.0")
+    implementation("androidx.lifecycle:lifecycle-process:2.9.0")
     implementation("androidx.activity:activity-compose:1.10.1")
 
     // Navigation
@@ -285,6 +286,10 @@ dependencies {
     implementation("com.mikepenz:multiplatform-markdown-renderer-code:0.41.0")
     // 语法高亮引擎（markdown-renderer-code 传递引入，显式声明以供 diff 视图直接使用）
     implementation("dev.snipme:highlights-jvm:1.1.0")
+
+    // WorkManager — 保活兜底：周期检查 TerminalKeepaliveService 存活并拉起（KeepaliveWorker）
+    implementation("androidx.work:work-runtime-ktx:2.10.0")
+    implementation("androidx.hilt:hilt-work:1.2.0")
 
     // Core Android
     implementation("androidx.core:core:1.16.0")

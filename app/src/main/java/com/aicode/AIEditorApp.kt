@@ -4,6 +4,8 @@ import android.app.Application
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.os.Build
+import androidx.work.Configuration
+import androidx.hilt.work.HiltWorkerFactory
 import com.aicode.core.util.AILogger
 import com.aicode.core.util.FileLogger
 import net.schmizz.sshj.common.SecurityUtils
@@ -14,6 +16,7 @@ import com.aicode.feature.settings.data.repository.KeepaliveSettingsRepository
 import com.aicode.feature.settings.data.repository.LanguageSettingsRepository
 import com.aicode.feature.settings.data.repository.LogSettingsRepository
 import com.aicode.feature.settings.data.remote.ModelMetadataService
+import com.aicode.feature.terminal.domain.KeepaliveWorker
 import com.aicode.feature.terminal.domain.TerminalKeepaliveService
 import dagger.hilt.android.HiltAndroidApp
 import kotlinx.coroutines.CoroutineScope
@@ -26,7 +29,7 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltAndroidApp
-class AIEditorApp : Application() {
+class AIEditorApp : Application(), Configuration.Provider {
 
     private companion object {
         const val TAG = "AIEditorApp"
@@ -60,6 +63,10 @@ class AIEditorApp : Application() {
     /** 后台保活开关持久化。 */
     @Inject
     lateinit var keepaliveSettings: KeepaliveSettingsRepository
+
+    /** WorkManager Worker 工厂：使 @HiltWorker（KeepaliveWorker）能注入依赖。 */
+    @Inject
+    lateinit var workerFactory: HiltWorkerFactory
 
     /** MCP 生命周期总管：启动即连接已配置的远程 server。 */
     @Inject
@@ -171,8 +178,11 @@ class AIEditorApp : Application() {
             keepaliveSettings.enabledFlow.distinctUntilChanged().collect { enabled ->
                 if (enabled) {
                     TerminalKeepaliveService.enablePersistent(this@AIEditorApp)
+                    // WorkManager 兜底：周期检查服务存活，被杀后自动拉起。
+                    KeepaliveWorker.schedule(this@AIEditorApp)
                 } else if (last == true) {
                     TerminalKeepaliveService.disablePersistent(this@AIEditorApp)
+                    KeepaliveWorker.cancel(this@AIEditorApp)
                 }
                 last = enabled
             }
@@ -184,6 +194,12 @@ class AIEditorApp : Application() {
         // AppCompatDelegate.setApplicationLocales 的自动 recreate 不生效，
         // 且两者同时设置 locale 会竞争导致偶发语言错乱。
     }
+
+    /** HiltWorkerFactory：@HiltWorker 的 Worker 经此工厂创建，才能注入 Repository。 */
+    override val workManagerConfiguration: Configuration
+        get() = Configuration.Builder()
+            .setWorkerFactory(workerFactory)
+            .build()
 
     /**
      * 读取 assets/docs 下所有内置文档，通过 SSH exec 同步到远程 ~/.aicode/docs/。
@@ -239,6 +255,17 @@ class AIEditorApp : Application() {
                 setShowBadge(false)
             }
             notificationManager.createNotificationChannel(channel)
+
+            // Agent 完成通知：需要弹窗+声音，区别于 terminal_service 的静默常驻通知。
+            val agentChannel = NotificationChannel(
+                "agent_complete",
+                getString(R.string.notification_channel_agent_complete),
+                NotificationManager.IMPORTANCE_HIGH
+            ).apply {
+                description = getString(R.string.notification_channel_agent_complete_desc)
+                setShowBadge(false)
+            }
+            notificationManager.createNotificationChannel(agentChannel)
         }
     }
 }

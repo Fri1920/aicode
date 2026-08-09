@@ -26,7 +26,6 @@ import androidx.compose.material3.ExposedDropdownMenuAnchorType
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
@@ -68,6 +67,7 @@ import compose.icons.feathericons.Plus
 import compose.icons.feathericons.RefreshCw
 import compose.icons.feathericons.Save
 import compose.icons.feathericons.Server
+import compose.icons.feathericons.Shield
 
 /** 设置页内部二级菜单分区。Menu 为首页菜单，其余为各自的二级页。 */
 internal enum class SettingsSection(@param:StringRes val titleRes: Int) {
@@ -80,6 +80,7 @@ internal enum class SettingsSection(@param:StringRes val titleRes: Int) {
     Log(R.string.settings_log),
     LogViewer(R.string.settings_log_viewer),
     Permissions(R.string.settings_permissions),
+    AppPermissions(R.string.settings_app_permissions),
     RemoteServers(R.string.settings_remote_servers),
     Backup(R.string.settings_backup),
     About(R.string.settings_about)
@@ -103,6 +104,7 @@ fun SettingsScreen(
     val projectRules by viewModel.projectRules.collectAsStateWithLifecycle()
     val currentProjectName by viewModel.currentProjectName.collectAsStateWithLifecycle()
     val keepaliveEnabled by viewModel.keepaliveEnabled.collectAsStateWithLifecycle()
+    val agentSoundEnabled by viewModel.agentSoundEnabled.collectAsStateWithLifecycle()
     val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
     val languageTag by viewModel.languageTag.collectAsStateWithLifecycle()
     val visionProviderId by viewModel.visionProviderId.collectAsStateWithLifecycle()
@@ -243,8 +245,6 @@ fun SettingsScreen(
                     themeMode = themeMode,
                     currentLanguageDisplayName = currentLanguageDisplayName,
                     onOpenThemeSheet = { showThemeSheet = true },
-                    keepaliveEnabled = keepaliveEnabled,
-                    onToggleKeepalive = { viewModel.setKeepaliveEnabled(it) },
                     onOpenLanguageSheet = { showLanguageSheet = true },
                     onOpen = {
                         if (it == SettingsSection.LogViewer) {
@@ -315,6 +315,12 @@ fun SettingsScreen(
                     onPromote = { viewModel.promoteRuleToGlobal(it) },
                     onDeleteGlobal = { viewModel.deleteGlobalRule(it) }
                 )
+                SettingsSection.AppPermissions -> AppPermissionsSection(
+                    keepaliveEnabled = keepaliveEnabled,
+                    onToggleKeepalive = { viewModel.setKeepaliveEnabled(it) },
+                    agentSoundEnabled = agentSoundEnabled,
+                    onToggleAgentSound = { viewModel.setAgentSoundEnabled(it) }
+                )
                 SettingsSection.Backup -> {
                     val backupViewModel: com.aicode.feature.backup.presentation.BackupViewModel =
                         androidx.hilt.navigation.compose.hiltViewModel()
@@ -372,8 +378,6 @@ internal fun SettingsMenu(
     themeMode: AppThemeMode,
     currentLanguageDisplayName: String,
     onOpenThemeSheet: () -> Unit,
-    keepaliveEnabled: Boolean,
-    onToggleKeepalive: (Boolean) -> Unit,
     onOpenLanguageSheet: () -> Unit,
     onOpen: (SettingsSection) -> Unit
 ) {
@@ -433,6 +437,12 @@ internal fun SettingsMenu(
             )
             SettingsDivider()
             SettingsRow(
+                icon = FeatherIcons.Shield,
+                title = stringResource(SettingsSection.AppPermissions.titleRes),
+                onClick = { onOpen(SettingsSection.AppPermissions) }
+            )
+            SettingsDivider()
+            SettingsRow(
                 icon = FeatherIcons.FileText,
                 title = stringResource(SettingsSection.Log.titleRes),
                 onClick = { onOpen(SettingsSection.Log) }
@@ -486,17 +496,6 @@ internal fun SettingsMenu(
         // ── 系统 ──
         SettingsGroupHeader(text = stringResource(R.string.settings_category_system))
         SettingsGroup {
-            SettingsRow(
-                icon = FeatherIcons.RefreshCw,
-                title = stringResource(R.string.settings_keepalive_title),
-                trailing = {
-                    Switch(
-                        checked = keepaliveEnabled,
-                        onCheckedChange = onToggleKeepalive
-                    )
-                }
-            )
-            SettingsDivider()
             SettingsRow(
                 icon = FeatherIcons.Save,
                 title = stringResource(SettingsSection.Backup.titleRes),

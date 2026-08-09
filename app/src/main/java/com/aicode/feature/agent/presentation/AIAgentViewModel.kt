@@ -1,8 +1,15 @@
 package com.aicode.feature.agent.presentation
 
+import android.app.PendingIntent
 import android.content.Context
+import android.content.Intent
+import androidx.core.app.NotificationCompat
+import androidx.core.app.NotificationManagerCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.ProcessLifecycleOwner
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.aicode.MainActivity
 import com.aicode.R
 import com.aicode.core.util.FileLogger
 import com.aicode.core.util.toUserMessage
@@ -15,6 +22,7 @@ import com.aicode.feature.agent.data.CodeChangeTracker
 import com.aicode.feature.agent.domain.container.ContainerInitState
 import com.aicode.feature.agent.domain.container.LinuxContainerEngine
 import com.aicode.feature.settings.domain.repository.AIProviderRepository
+import com.aicode.feature.settings.data.repository.AgentSoundSettingsRepository
 import com.aicode.feature.settings.data.repository.DefaultModelSettingsRepository
 import com.aicode.feature.agent.domain.model.AgentContext
 import com.aicode.feature.agent.domain.model.AgentImage
@@ -94,6 +102,7 @@ class AIAgentViewModel @Inject constructor(
     private val checkpointDao: CheckpointDao,
     private val backupManager: BackupManager,
     private val mcpManager: McpManager,
+    private val agentSoundSettings: AgentSoundSettingsRepository,
     @param:ApplicationContext private val context: Context
 ) : ViewModel(), SlashCommandContext {
 
@@ -330,8 +339,35 @@ class AIAgentViewModel @Inject constructor(
         return sessions.value.any { sessionJobs[it.id]?.isActive == true }
     }
 
+    /** App 退到后台时 Agent 完成，弹一条可点击的系统通知（标题=任务完成，正文=用户消息）。 */
+    private fun showAgentCompletedNotification(userRequest: String) {
+        val openAppIntent = PendingIntent.getActivity(
+            context,
+            0,
+            Intent(context, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+            },
+            PendingIntent.FLAG_IMMUTABLE
+        )
+        val notification = NotificationCompat.Builder(context, AGENT_COMPLETE_CHANNEL)
+            .setSmallIcon(android.R.drawable.ic_menu_info_details)
+            .setContentTitle(context.getString(R.string.agent_complete_notification_title))
+            .setContentText(
+                userRequest.ifBlank { context.getString(R.string.agent_complete_notification_body) }
+            )
+            .setContentIntent(openAppIntent)
+            .setAutoCancel(true)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .build()
+        runCatching {
+            NotificationManagerCompat.from(context).notify(AGENT_COMPLETE_NOTIFICATION_ID, notification)
+        }.onFailure { FileLogger.e(TAG, "发送 agent 完成通知失败", it) }
+    }
+
     private companion object {
         const val TAG = "AIAgentViewModel"
+        const val AGENT_COMPLETE_CHANNEL = "agent_complete"
+        const val AGENT_COMPLETE_NOTIFICATION_ID = 100
     }
 
     init {
@@ -709,6 +745,12 @@ class AIAgentViewModel @Inject constructor(
                     AgentEvent.Completed -> {
                         setRetryState(sessionId, null)
                         setCompacting(sessionId, false)
+                        // 仅当 App 不在前台时发 agent 完成通知（避免打扰正在看对话的用户）。
+                        val inForeground = ProcessLifecycleOwner.get().lifecycle.currentState
+                            .isAtLeast(Lifecycle.State.STARTED)
+                        if (!inForeground && agentSoundSettings.isEnabled()) {
+                            showAgentCompletedNotification(modelRequest)
+                        }
                     }
                     is AgentEvent.ModeChanged -> {
                         // 模式切换事件：PlanApprovalManager 已在 workflow 层面挂起等待用户批准

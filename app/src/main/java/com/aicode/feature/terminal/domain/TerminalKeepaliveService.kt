@@ -1,14 +1,24 @@
 package com.aicode.feature.terminal.domain
 
+import android.app.ActivityManager
+import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.os.Binder
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
+import com.aicode.MainActivity
 import com.aicode.core.util.FileLogger
 import com.aicode.R
+import com.aicode.feature.settings.data.repository.KeepaliveSettingsRepository
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
+import javax.inject.Inject
 
 @AndroidEntryPoint
 class TerminalKeepaliveService : Service() {
@@ -18,6 +28,11 @@ class TerminalKeepaliveService : Service() {
     /** 用户在设置页开启的常驻保活：为 true 时即便没有后台会话也保持前台通知。 */
     private var persistent = false
 
+    @Inject
+    lateinit var keepaliveSettings: KeepaliveSettingsRepository
+
+    private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+
     inner class LocalBinder : Binder() {
         fun getService(): TerminalKeepaliveService = this@TerminalKeepaliveService
     }
@@ -25,6 +40,20 @@ class TerminalKeepaliveService : Service() {
     override fun onCreate() {
         super.onCreate()
         FileLogger.i(TAG, "Service created")
+        // 进程被系统回收后 START_STICKY 重建：persistent 是内存态会丢失。
+        // 从持久化开关恢复常驻前台，否则服务空转后 stopSelf，保活形同虚设。
+        serviceScope.launch {
+            if (keepaliveSettings.isEnabled()) {
+                persistent = true
+                ensureForeground()
+                FileLogger.i(TAG, "Restored persistent keepalive after restart")
+            }
+        }
+    }
+
+    override fun onDestroy() {
+        serviceScope.cancel()
+        super.onDestroy()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -78,10 +107,19 @@ class TerminalKeepaliveService : Service() {
             sessionCount > 0 -> "运行中的终端任务: $sessionCount"
             else -> "后台保活已开启"
         }
+        val openAppIntent = PendingIntent.getActivity(
+            this,
+            0,
+            Intent(this, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+            },
+            PendingIntent.FLAG_IMMUTABLE
+        )
         val notification = NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_menu_info_details)
             .setContentTitle(getString(R.string.app_name))
             .setContentText(text)
+            .setContentIntent(openAppIntent)
             .setOngoing(true)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_DEFERRED)
@@ -116,6 +154,14 @@ class TerminalKeepaliveService : Service() {
             }
             runCatching { context.startService(intent) }
                 .onFailure { FileLogger.e(TAG, "disablePersistent startService failed", it) }
+        }
+
+        /** 判断保活服务当前是否在运行。WorkManager 兜底拉起前先探测，避免反复 startService。 */
+        fun isRunning(context: Context): Boolean {
+            val am = context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
+            val serviceName = TerminalKeepaliveService::class.java.name
+            return am.getRunningServices(Int.MAX_VALUE)
+                .any { it.service.packageName == context.packageName && it.service.className == serviceName }
         }
     }
 }
