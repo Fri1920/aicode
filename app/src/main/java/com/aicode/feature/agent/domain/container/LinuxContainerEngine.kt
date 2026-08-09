@@ -147,18 +147,20 @@ class LinuxContainerEngine @Inject constructor(
         private const val TIMEOUT_KILL_GRACE_MS = 200L
 
         /**
-         * 基础包配置版本。对应 assets/aicode/provision.sh 的版本：改脚本（包清单/安装逻辑）时同步 +1，
+         * 基础包配置版本。对应 assets/aicode/provision.sh 的版本：改脚本（包清单/安装逻辑/镜像源）时同步 +1，
          * 触发在设备上重新执行该脚本（apk add 幂等，已装包跳过）。
          * 独立于 [ContainerInstaller] 的 rootfs INSTALL_VERSION：rootfs 版本升级会删 rootfs
          * （连带清掉本标记），故新 rootfs 必然重跑配置；同 rootfs 下改脚本则靠本版本号触发。
+         * 标记文件由脚本自身写入（内容为下方版本号，或自定义镜像用户选择手动安装时的跳过标记
+         * provision-script-skipped），App 端仅读它判断是否完成。
          */
-        private const val PROVISION_VERSION = "provision-script-v5"
+        private const val PROVISION_VERSION = "provision-script-v6"
 
         /** `apk add` 下载基础包的超时（毫秒）：首次配置需联网拉包，给足时间。 */
         private const val PROVISION_TIMEOUT_MS = 600_000L
     }
 
-    /** 标记基础包已按 [PROVISION_VERSION] 配置完成，内容为版本号。按当前 profile 的 rootfs 目录存放（内置/自定义各自独立）。 */
+    /** 标记基础包已按 [PROVISION_VERSION] 配置完成（内容为版本号，或用户手动安装的跳过标记），按当前 profile 的 rootfs 目录存放（内置/自定义各自独立）。 */
     private fun provisionMarker(profile: ContainerProfile): java.io.File =
         java.io.File(containerInstaller.rootfsDirFor(profile), ".provisioned")
 
@@ -383,9 +385,10 @@ class LinuxContainerEngine @Inject constructor(
 
     /**
      * 首次初始化时执行通用依赖安装脚本（python3 / git / pip / node / npm / rg 等）。幂等：已按 [PROVISION_VERSION] 配置则直接返回。
-     * 所有容器（内置与自定义镜像）都会执行：脚本按容器内的包管理器（apk/apt-get/dnf/yum/pacman）自动装包，
-     * 包清单维护在脚本内。失败（断网/超时/退出码非 0）不写标记，下次 [ensureInstalled] 自动重试，且**不抛异常**——
-     * 配置失败不应阻塞用户使用容器（只是暂时没有这些工具）。
+     * **仅内置 Alpine 调用**（[doInit] 对自定义镜像不触发）：以 `--auto` 非交互模式运行，直接阿里云 apk 源 + 装包，
+     * 失败（断网/超时/退出码非 0）不写标记，下次 [ensureInstalled] 自动重试，且**不抛异常**——
+     * 配置失败不应阻塞用户使用容器（只是暂时没有这些工具）。自定义镜像的安装方式由用户在终端交互菜单选择
+     * （见 assets/aicode/provision.sh），App 端不再自动执行。
      *
      * 流式执行：用 [streamExecNoInstall]（不触发懒安装，避免与 [ensureInstalled] 递归）逐行拿到脚本输出，
      * 实时更新 [initProgress]，让 UI 能看到「正在安装…」+ 下载进度行。脚本由 [ContainerInstaller.extractProvisionScript]
@@ -395,12 +398,12 @@ class LinuxContainerEngine @Inject constructor(
         val marker = provisionMarker(currentProfile)
         if (marker.exists() && marker.readText().trim() == PROVISION_VERSION) return
 
-        FileLogger.i(TAG, "开始执行容器初始化依赖脚本（首次需联网，可能耗时较久）")
+        FileLogger.i(TAG, "开始执行容器初始化依赖脚本（内置镜像自动安装，首次需联网，可能耗时较久）")
         _initProgress.value = ContainerInitState.InstallingPackages(line = "运行初始化脚本…")
 
         var exitCode: Int? = null
         // rootfs 此时已由 ensureInstalled→installRootfsIfNeed 解压就绪；streamExecNoInstall 不再触发安装，无递归。
-        streamExecNoInstall("sh /root/.aicode/provision.sh", projectPath = null, timeoutMs = PROVISION_TIMEOUT_MS).collect { event ->
+        streamExecNoInstall("sh /root/.aicode/provision.sh --auto", projectPath = null, timeoutMs = PROVISION_TIMEOUT_MS).collect { event ->
             when (event) {
                 is CommandEvent.Line ->
                     _initProgress.value = ContainerInitState.InstallingPackages(line = event.text)
@@ -496,11 +499,14 @@ class LinuxContainerEngine @Inject constructor(
     }
 
     /**
-     * 容器未就绪（rootfs 未解压或基础包未配置完成）时返回引导文案，就绪返回 null。
+     * 容器未就绪（rootfs 未解压，或内置镜像基础包未配置完成）时返回引导文案，就绪返回 null。
+     * 自定义镜像只要求 rootfs 就绪：初始化脚本失败不阻塞使用，由用户自行补齐工具。
      * 命令执行入口据此不自动初始化、直接失败并引导用户去终端页完成初始化。
      */
     override fun notReadyHint(): String? {
-        if (containerInstaller.isInstalledFor(currentProfile) && isProvisioned()) return null
+        if (containerInstaller.isInstalledFor(currentProfile) &&
+            (isProvisioned() || !currentProfile.isBuiltin)
+        ) return null
         return context.getString(R.string.container_not_ready_hint)
     }
 
@@ -523,8 +529,9 @@ class LinuxContainerEngine @Inject constructor(
      *
      * 耗时初始化（解压/装包）在引擎级 [initScope] 中执行，不随调用方（终端页 viewModelScope）
      * 取消而中断——退出终端页后初始化仍在后台继续，下次进入可复用同一 job 或等待其完成。
-     * 全程通过 [initProgress] 上报阶段进度。rootfs 已解压但基础包配置失败时置 [ContainerInitState.Failed]
-     * 并抛异常（不静默置 Ready），让终端页进入失败态、可重试，避免"依赖缺失却显示成功"。
+     * 全程通过 [initProgress] 上报阶段进度。rootfs 已解压但基础包配置失败时：内置镜像置 [ContainerInitState.Failed]
+     * 并抛异常（不静默置 Ready），让终端页进入失败态、可重试，避免"依赖缺失却显示成功"；
+     * 自定义镜像不强制——用户自选的镜像可能不需要脚本装的工具，rootfs 就绪即放行，脚本下次进入时重试。
      */
     override suspend fun ensureInstalled() {
         val profile = currentProfile
@@ -545,11 +552,12 @@ class LinuxContainerEngine @Inject constructor(
         }
         // 等待完成；若调用方（终端页）被取消，join 抛 CancellationException，但后台 job 继续执行。
         job.join()
-        if (containerInstaller.isInstalledFor(profile) && isProvisioned()) {
+        val rootfsReady = containerInstaller.isInstalledFor(profile)
+        if (rootfsReady && (isProvisioned() || !profile.isBuiltin)) {
             _initProgress.value = ContainerInitState.Ready
             refreshContainerHome()
         } else {
-            val reason = if (containerInstaller.isInstalledFor(profile))
+            val reason = if (rootfsReady)
                 "容器基础包安装未完成（可能是网络问题），请重试"
             else
                 "容器未安装（缺少 rootfs/proot）"
@@ -558,11 +566,11 @@ class LinuxContainerEngine @Inject constructor(
         }
     }
 
-    /** 在 [initScope] 中真正执行一次性初始化：解压 rootfs + 执行通用依赖安装脚本（所有容器都执行）。 */
+    /** 在 [initScope] 中真正执行一次性初始化：解压 rootfs；内置 Alpine 额外自动安装基础包（自定义镜像由用户在终端交互菜单选择）。 */
     private suspend fun doInit(profile: ContainerProfile) {
         // installRootfsIfNeed 在真正解压/部署时回调更新进度（已安装则快路径不回调）
         containerInstaller.installRootfsIfNeed(profile) { _initProgress.value = it }
-        provisionIfNeeded()
+        if (profile.isBuiltin) provisionIfNeeded()
     }
 
     /** 查容器内 $HOME 并缓存到 [WorkspacePathMapper]，供文件工具展开 ~。 */
@@ -703,6 +711,9 @@ class LinuxContainerEngine @Inject constructor(
             // (PROOT_NO_SECCOMP=1) 反而在本设备触发过 ptrace(PEEKDATA) I/O error。
             "PATH" to "/usr/bin:/bin:/usr/sbin:/sbin",
             "HOME" to "/root",
+            // 宿主进程环境的 TMPDIR 指向 App 缓存目录（/data/user/0/<pkg>/cache），容器内 /data 未挂载、
+            // 该路径不存在——mktemp/dpkg 等会因找不到临时目录失败，故显式覆盖为容器内 /tmp。
+            "TMPDIR" to "/tmp",
             // git 全局配置指向持久挂载里的 .gitconfig（/root/.aicode 绑定到宿主 filesDir/aicode，
             // 跨 rootfs 升级不丢）。git-credentials 同放该目录，credential.helper=store 经此读。
             // 让终端/AI/UI 三端 git 都读同一份配置与凭据，详见 GitCredentialsFileSync。

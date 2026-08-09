@@ -319,13 +319,13 @@
     <string name="container_reset_title">重置容器</string>
     <string name="container_reset_confirm">将删除「%1$s」的 rootfs 目录（含已安装的工具与配置），下次使用时重新解压并初始化。是否继续？</string>
     <string name="container_builtin_badge">内置</string>
+    <string name="container_custom_badge">自定义</string>
+    <string name="container_ssh_badge">SSH</string>
     <string name="container_empty">暂无容器镜像</string>
     <string name="container_empty_desc">添加一个自定义镜像，或恢复内置 Alpine。</string>
     <string name="container_restore_builtin">恢复内置 Alpine</string>
     <string name="container_active">当前使用中</string>
-    <string name="container_builtin_auto">内置镜像 · 自动 (bash/sh)</string>
-    <string name="container_remote_ssh_desc">远程 SSH · %1$s · %2$s</string>
-    <string name="container_imported_desc">导入的 tar.gz · shell: %1$s</string>
+    <string name="container_shell_desc">shell: %1$s</string>
     <string name="container_edit_image">编辑镜像</string>
     <string name="container_local_image">本地镜像</string>
     <string name="container_shell_path">Shell</string>

@@ -444,7 +444,22 @@ private fun ContainerRow(
                     )
                     if (profile.isBuiltin) {
                         Spacer(modifier = Modifier.width(Spacing.xs))
-                        BuiltinBadge()
+                        SourceBadge(
+                            text = stringResource(R.string.container_builtin_badge),
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    } else if (profile.mode == ExecutionMode.REMOTE_SSH) {
+                        Spacer(modifier = Modifier.width(Spacing.xs))
+                        SourceBadge(
+                            text = stringResource(R.string.container_ssh_badge),
+                            color = MaterialTheme.colorScheme.secondary
+                        )
+                    } else {
+                        Spacer(modifier = Modifier.width(Spacing.xs))
+                        SourceBadge(
+                            text = stringResource(R.string.container_custom_badge),
+                            color = MaterialTheme.colorScheme.tertiary
+                        )
                     }
                 }
                 Text(
@@ -479,36 +494,31 @@ private fun ContainerRow(
     }
 }
 
-/** 内置镜像徽章：主题色浅底胶囊小字。 */
+/** 来源徽章：主题色浅底胶囊小字，按来源类型传入不同颜色。 */
 @Composable
-private fun BuiltinBadge() {
+private fun SourceBadge(text: String, color: Color) {
     Box(
         modifier = Modifier
-            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f), RoundedCornerShape(Radius.pill))
+            .background(color.copy(alpha = 0.12f), RoundedCornerShape(Radius.pill))
             .padding(horizontal = 8.dp, vertical = 2.dp)
     ) {
         Text(
-            text = stringResource(R.string.container_builtin_badge),
+            text = text,
             style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.primary
+            color = color
         )
     }
 }
 
-/** 镜像列表项副标题：按 mode 与来源类型描述。 */
+/** 镜像列表项副标题：本地镜像（内置/自定义）统一显示生效 shell，不区分来源；远程 SSH 显示通道名。 */
 private fun profileSubtitle(context: Context, profile: ContainerProfile, connections: List<RemoteConnection>): String {
-    return when {
-        profile.isBuiltin -> context.getString(R.string.container_builtin_auto)
-        profile.mode == ExecutionMode.REMOTE_SSH -> {
-            val ssh = profile.rootfsSource as? RootfsSource.RemoteSsh
-            val connName = ssh?.connectionId?.let { cid -> connections.firstOrNull { it.id == cid }?.name }
-            context.getString(R.string.container_remote_ssh_desc, connName ?: context.getString(R.string.container_channel_deleted), ssh?.remoteWorkspacePath ?: "")
-        }
-        else -> {
-            val shellDesc = profile.shellPath?.ifBlank { null } ?: "/bin/sh"
-            context.getString(R.string.container_imported_desc, shellDesc)
-        }
+    if (profile.mode == ExecutionMode.REMOTE_SSH) {
+        val ssh = profile.rootfsSource as? RootfsSource.RemoteSsh
+        val connName = ssh?.connectionId?.let { cid -> connections.firstOrNull { it.id == cid }?.name }
+        return connName ?: context.getString(R.string.container_channel_deleted)
     }
+    val shellDesc = profile.shellPath?.ifBlank { null } ?: "/bin/sh"
+    return context.getString(R.string.container_shell_desc, shellDesc)
 }
 
 /**

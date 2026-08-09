@@ -318,13 +318,13 @@
     <string name="container_reset_title">Reset Container</string>
     <string name="container_reset_confirm">This will delete the rootfs directory of "%1$s" (including installed tools and configs). It will be re-extracted and initialized on next use. Continue?</string>
     <string name="container_builtin_badge">Built-in</string>
+    <string name="container_custom_badge">Custom</string>
+    <string name="container_ssh_badge">SSH</string>
     <string name="container_empty">No container images</string>
     <string name="container_empty_desc">Add a custom image, or restore the built-in Alpine.</string>
     <string name="container_restore_builtin">Restore Built-in Alpine</string>
     <string name="container_active">Currently in use</string>
-    <string name="container_builtin_auto">Built-in Image · Auto (bash/sh)</string>
-    <string name="container_remote_ssh_desc">Remote SSH · %1$s · %2$s</string>
-    <string name="container_imported_desc">Imported tar.gz · shell: %1$s</string>
+    <string name="container_shell_desc">Shell: %1$s</string>
     <string name="container_edit_image">Edit Image</string>
     <string name="container_local_image">Local Image</string>
     <string name="container_shell_path">Shell</string>

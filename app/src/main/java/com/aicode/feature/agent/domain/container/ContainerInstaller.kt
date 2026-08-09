@@ -264,7 +264,7 @@ class ContainerInstaller @Inject constructor(
 
     /**
      * 按 [profile] 解压安装 rootfs。内置调现有全流程（proot/resolv/apk 源）；自定义本地镜像只解压 tar.gz
-     * + 装 proot，**不写 resolv.conf / apk 源、不 provision**——镜像源与所需工具由用户自行在容器内处理。
+     * + 装 proot + 写 DNS（不写 apk 源、不 provision）——镜像源与所需工具由用户自行在容器内处理。
      * 远程 SSH profile 无本地 rootfs，直接返回（命令执行走 [RemoteSshEngine]，不需本地 rootfs）。
      */
     suspend fun installRootfsIfNeed(
@@ -302,6 +302,7 @@ class ContainerInstaller @Inject constructor(
             }
             is RootfsSource.RemoteSsh -> { /* 无本地 rootfs，上面已提前 return */ }
         }
+        configureResolvConf(dest)
         prootTmpDir.mkdirs()
         customInstalledMarker(profile).writeText("custom")
         FileLogger.i(TAG, "自定义容器 rootfs 安装完成：${profile.id}")
@@ -359,14 +360,30 @@ class ContainerInstaller @Inject constructor(
         copyAsset(ASSET_LIBSHMEM, File(prootLibDir, "libandroid-shmem.so"), executable = true)
     }
 
-    /** 把单个 asset 复制到目标文件，按需赋「对所有用户」的可执行位（proot 进程以 App uid 运行）。 */
+    /** 把单个 asset 复制到目标文件，按需赋「对所有用户」的可执行位（proot 进程以 App uid 运行）。
+     *  幂等：内容与 assets 一致则跳过——proot 常被运行中的容器进程占用，直接覆写会 ETXTBSY；
+     *  不一致（App 升级换了新二进制）先删后写：unlink 运行中的可执行文件是安全的，新文件写新 inode 不与旧进程冲突。 */
     private fun copyAsset(assetPath: String, dest: File, executable: Boolean) {
         dest.parentFile?.mkdirs()
+        if (assetContentEquals(assetPath, dest)) return
+        dest.delete()
         context.assets.open(assetPath).use { input ->
             dest.outputStream().use { output -> input.copyTo(output) }
         }
         if (executable && !dest.setExecutable(true, false)) {
             FileLogger.w(TAG, "setExecutable 返回 false: ${dest.absolutePath}")
+        }
+    }
+
+    /** asset 与目标文件字节是否一致（读失败按不一致处理）。 */
+    private fun assetContentEquals(assetPath: String, dest: File): Boolean {
+        if (!dest.isFile) return false
+        return try {
+            context.assets.open(assetPath).use { input ->
+                dest.inputStream().use { output -> input.readBytes().contentEquals(output.readBytes()) }
+            }
+        } catch (e: Exception) {
+            false
         }
     }
 
@@ -472,10 +489,19 @@ class ContainerInstaller @Inject constructor(
     /**
      * 写入容器内 DNS，否则 apk/npm 等联网操作会因无法解析域名而失败。
      * 用阿里云公共 DNS：国内解析更快/更稳，8.8.8.8 在部分网络环境会被拦截。
+     * 已是有效配置（普通文件且含 nameserver）则不动，尊重容器内已有设置；
+     * 空文件或坏链（Ubuntu/Debian base 常把 resolv.conf 链到 systemd-resolved 的 stub，PRoot 下不可用）先删再写。
      */
-    private fun configureResolvConf() {
-        val etc = File(rootfsDir, "etc").apply { mkdirs() }
-        File(etc, "resolv.conf").writeText("nameserver 223.5.5.5\nnameserver 223.6.6.6\n")
+    private fun configureResolvConf(rootfs: File = rootfsDir) {
+        val etc = File(rootfs, "etc").apply { mkdirs() }
+        val conf = File(etc, "resolv.conf")
+        if (conf.isFile) {
+            runCatching {
+                if (conf.readText().contains("nameserver")) return
+            }
+        }
+        conf.delete()
+        conf.writeText("nameserver 223.5.5.5\nnameserver 223.6.6.6\n")
     }
 
     /**
