@@ -171,9 +171,8 @@ class SettingsViewModel @Inject constructor(
     private val _customProfiles = MutableStateFlow<List<ContainerProfile>>(emptyList())
     val customProfiles: StateFlow<List<ContainerProfile>> = _customProfiles.asStateFlow()
 
-    /** 全部 profile（内置 + 自定义），供 UI 列出。 */
+    /** 全部 profile（内置 Alpine 也作为普通一项持久化在列表里，首次启动自动写入）。 */
     val profiles: StateFlow<List<ContainerProfile>> = customProfiles
-        .map { listOf(ContainerProfile.BUILTIN_ALPINE) + it }
         .stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.Eagerly, listOf(ContainerProfile.BUILTIN_ALPINE))
 
     /** 当前执行模式（本地 PRoot / 远程 SSH），供 UI 判断是否显示远程连接指示器。 */
@@ -265,6 +264,11 @@ class SettingsViewModel @Inject constructor(
                 containerSettingsRepository.activeProfileIdFlow.collectLatest {
                     _activeProfileId.value = it
                 }
+            }
+
+            launch {
+                // 首次启动写入内置 Alpine 默认项（置位标记后不再自动补回）
+                containerSettingsRepository.ensureBuiltinDefault()
             }
 
             launch {
@@ -485,51 +489,67 @@ class SettingsViewModel @Inject constructor(
      */
     fun setActiveContainerProfile(id: String) {
         viewModelScope.launch {
-            val profile = _customProfiles.value.firstOrNull { it.id == id }
-                ?: ContainerProfile.BUILTIN_ALPINE.takeIf { it.id == id }
-                ?: return@launch
-            containerSettingsRepository.setActiveProfile(id)
-            when (profile.mode) {
-                ExecutionMode.LOCAL_PROOT -> {
-                    executionModeRepository.setExecutionMode(ExecutionMode.LOCAL_PROOT)
-                    executionModeHolder.setMode(ExecutionMode.LOCAL_PROOT)
-                }
+            applyProfile(id)
+        }
+    }
 
-                ExecutionMode.REMOTE_SSH -> {
-                    val ssh = profile.rootfsSource as? RootfsSource.RemoteSsh ?: return@launch
-                    val conn = remoteConnections.value.firstOrNull { it.id == ssh.connectionId }
-                        ?: return@launch
-                    val settings = com.aicode.feature.settings.data.repository.RemoteConnectionSettings(
-                        host = conn.host,
-                        port = conn.port,
-                        username = conn.username,
-                        password = conn.password,
-                        remoteWorkspacePath = ssh.remoteWorkspacePath.ifBlank { "/home/${conn.username}/workspace" }
-                    )
-                    executionModeRepository.setRemoteConnection(settings)
-                    executionModeRepository.setExecutionMode(ExecutionMode.REMOTE_SSH)
-                    executionModeHolder.setMode(ExecutionMode.REMOTE_SSH)
-                    // 运行时切换需主动连接（启动时由 AIEditorApp 连）；复用 RemoteSshConnection.connect
-                    runCatching {
-                        remoteSshConnection.connect(
-                            com.aicode.feature.agent.domain.container.RemoteConnectionConfig(
-                                host = settings.host,
-                                port = settings.port,
-                                username = settings.username,
-                                auth = com.aicode.feature.workspace.domain.remote.RemoteAuth.Password(settings.password),
-                                remoteWorkspacePath = settings.remoteWorkspacePath
-                            )
+    /** 把 [id] 应用为当前激活 profile：持久化 + 按 mode 切执行模式。找不到时回退列表第一个，再兜底内置。 */
+    private suspend fun applyProfile(id: String) {
+        val profile = _customProfiles.value.firstOrNull { it.id == id }
+            ?: ContainerProfile.BUILTIN_ALPINE.takeIf { it.id == id }
+            ?: _customProfiles.value.firstOrNull()
+            ?: return
+        containerSettingsRepository.setActiveProfile(profile.id)
+        when (profile.mode) {
+            ExecutionMode.LOCAL_PROOT -> {
+                executionModeRepository.setExecutionMode(ExecutionMode.LOCAL_PROOT)
+                executionModeHolder.setMode(ExecutionMode.LOCAL_PROOT)
+            }
+
+            ExecutionMode.REMOTE_SSH -> {
+                val ssh = profile.rootfsSource as? RootfsSource.RemoteSsh ?: return
+                val conn = remoteConnections.value.firstOrNull { it.id == ssh.connectionId }
+                    ?: return
+                val settings = com.aicode.feature.settings.data.repository.RemoteConnectionSettings(
+                    host = conn.host,
+                    port = conn.port,
+                    username = conn.username,
+                    password = conn.password,
+                    remoteWorkspacePath = ssh.remoteWorkspacePath.ifBlank { "/home/${conn.username}/workspace" }
+                )
+                executionModeRepository.setRemoteConnection(settings)
+                executionModeRepository.setExecutionMode(ExecutionMode.REMOTE_SSH)
+                executionModeHolder.setMode(ExecutionMode.REMOTE_SSH)
+                // 运行时切换需主动连接（启动时由 AIEditorApp 连）；复用 RemoteSshConnection.connect
+                runCatching {
+                    remoteSshConnection.connect(
+                        com.aicode.feature.agent.domain.container.RemoteConnectionConfig(
+                            host = settings.host,
+                            port = settings.port,
+                            username = settings.username,
+                            auth = com.aicode.feature.workspace.domain.remote.RemoteAuth.Password(settings.password),
+                            remoteWorkspacePath = settings.remoteWorkspacePath
                         )
-                    }.onFailure { FileLogger.w("SettingsViewModel", "切换到远程镜像时 SSH 连接失败", it) }
-                }
+                    )
+                }.onFailure { FileLogger.w("SettingsViewModel", "切换到远程镜像时 SSH 连接失败", it) }
             }
         }
     }
 
-    /** 重置内置 Alpine 容器：删除其 rootfs，下次启动重新解压 + provision。 */
-    fun resetBuiltinContainer() {
+    /** 重置容器：内置恢复出厂（清覆盖配置 + 删 rootfs），自定义本地镜像删 rootfs 下次重新解压。远程 SSH 无本地数据，UI 不提供入口。 */
+    fun resetContainer(profile: ContainerProfile) {
         viewModelScope.launch {
-            containerInstaller.resetBuiltinRootfs()
+            if (profile.isBuiltin) {
+                containerSettingsRepository.upsertCustomProfile(ContainerProfile.BUILTIN_ALPINE)
+            }
+            containerInstaller.resetRootfs(profile)
+        }
+    }
+
+    /** 空态恢复：把内置 Alpine 默认配置重新加回列表。 */
+    fun restoreBuiltinAlpine() {
+        viewModelScope.launch {
+            containerSettingsRepository.upsertCustomProfile(ContainerProfile.BUILTIN_ALPINE)
         }
     }
 
@@ -553,18 +573,15 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
-    /** 删除自定义 profile，连带清理其 rootfs 目录。 */
-    fun deleteCustomContainerProfile(profile: ContainerProfile) {
+    /** 删除容器 profile（内置 Alpine 也可删，删光后由空态恢复），连带清理本地 rootfs。 */
+    fun deleteContainerProfile(profile: ContainerProfile) {
         viewModelScope.launch {
             containerSettingsRepository.deleteCustomProfile(profile.id)
             containerInstaller.deleteCustomRootfs(profile)
             if (_activeProfileId.value == profile.id) {
-                containerSettingsRepository.setActiveProfile(ContainerProfile.BUILTIN_ID)
-                // 删的是当前激活的远程镜像：回退到内置本地镜像，同步切回本地模式
-                if (profile.mode == ExecutionMode.REMOTE_SSH) {
-                    executionModeRepository.setExecutionMode(ExecutionMode.LOCAL_PROOT)
-                    executionModeHolder.setMode(ExecutionMode.LOCAL_PROOT)
-                }
+                // 删除的是当前激活项：切到剩余第一个；列表空则回退内置 id（引擎 Alpine 兜底）
+                val remaining = _customProfiles.value.filterNot { it.id == profile.id }
+                applyProfile(remaining.firstOrNull()?.id ?: ContainerProfile.BUILTIN_ID)
             }
         }
     }

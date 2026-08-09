@@ -24,6 +24,8 @@ data class ContainerProfile(
     val extraBindings: List<String> = emptyList(),
     /** 额外 proot 参数，原样追加到基础 argv（如 ["-k","..."]）。 */
     val extraArgs: List<String> = emptyList(),
+    /** 自定义环境变量，注入容器内进程（覆盖同名默认值）。 */
+    val env: Map<String, String> = emptyMap(),
     val isBuiltin: Boolean,
     /** 该 profile 的执行模式：本地 PRoot 容器 or 远程 SSH。选中时据此切全局 [ExecutionMode]。 */
     val mode: ExecutionMode = ExecutionMode.LOCAL_PROOT

@@ -64,10 +64,10 @@ class WorkspacePathMapper @Inject constructor(
     }
 
     private suspend fun resolveProfile(id: String): ContainerProfile {
-        if (id == ContainerProfile.BUILTIN_ID) return ContainerProfile.BUILTIN_ALPINE
-        return containerSettingsRepository.customProfilesFlow
-            .first()
-            .firstOrNull { it.id == id } ?: ContainerProfile.BUILTIN_ALPINE
+        val profiles = containerSettingsRepository.customProfilesFlow.first()
+        return profiles.firstOrNull { it.id == id }
+            ?: profiles.firstOrNull()
+            ?: ContainerProfile.BUILTIN_ALPINE
     }
 
     /** 当前工作区在宿主上的根目录。 */

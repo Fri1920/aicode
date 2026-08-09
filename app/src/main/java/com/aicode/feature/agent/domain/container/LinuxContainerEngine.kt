@@ -108,11 +108,15 @@ class LinuxContainerEngine @Inject constructor(
         }
     }
 
-    /** 按 id 解析 profile：内置返回 [ContainerProfile.BUILTIN_ALPINE]，否则从自定义列表找，找不到回退内置。 */
+    /**
+     * 按 id 解析 profile：从持久化列表找，找不到回退列表第一个，再兜底内置 Alpine（保证引擎始终可用）。
+     * 列表里持久化的 Alpine 覆盖项优先于 [ContainerProfile.BUILTIN_ALPINE] 常量（用户编辑过的配置生效）。
+     */
     private suspend fun resolveProfile(id: String): ContainerProfile {
-        if (id == ContainerProfile.BUILTIN_ID) return ContainerProfile.BUILTIN_ALPINE
-        return containerSettingsRepository.customProfilesFlow.first()
-            .firstOrNull { it.id == id } ?: ContainerProfile.BUILTIN_ALPINE
+        val profiles = containerSettingsRepository.customProfilesFlow.first()
+        return profiles.firstOrNull { it.id == id }
+            ?: profiles.firstOrNull()
+            ?: ContainerProfile.BUILTIN_ALPINE
     }
 
     /**
@@ -143,29 +147,20 @@ class LinuxContainerEngine @Inject constructor(
         private const val TIMEOUT_KILL_GRACE_MS = 200L
 
         /**
-         * 容器首次初始化时自动安装的基础包清单（Alpine 3.21 的 `python3` 即 3.12.x）。
-         * 包含：python3、git、pip（py3-pip）、nodejs、npm、bash、curl、ripgrep（rg）。用 `--no-cache` 避免 apk 缓存撑大 rootfs。
-         * bash：作为默认交互/命令 shell（见 [defaultShell]）；装好后比 busybox ash 更接近桌面习惯。
-         * curl：常用下载工具，skill 脚本与 AI 联网拉取常依赖。
-         * ripgrep：提供 `rg`，用于高速搜索代码与文本。
-         * 改清单时同步 +1 [PROVISION_VERSION] 触发重装。
-         */
-        private const val PROVISION_PACKAGES = "python3 git py3-pip nodejs npm bash curl ripgrep"
-
-        /**
-         * 基础包配置版本。改 [PROVISION_PACKAGES] 或配置逻辑时 +1，触发在设备上重新 `apk add`。
+         * 基础包配置版本。对应 assets/aicode/provision.sh 的版本：改脚本（包清单/安装逻辑）时同步 +1，
+         * 触发在设备上重新执行该脚本（apk add 幂等，已装包跳过）。
          * 独立于 [ContainerInstaller] 的 rootfs INSTALL_VERSION：rootfs 版本升级会删 rootfs
-         * （连带清掉本标记），故新 rootfs 必然重跑配置；同 rootfs 下改包清单则靠本版本号触发。
+         * （连带清掉本标记），故新 rootfs 必然重跑配置；同 rootfs 下改脚本则靠本版本号触发。
          */
-        private const val PROVISION_VERSION = "py3.12-pip-node-bash-curl-rg-gitcredhelper-v4"
+        private const val PROVISION_VERSION = "provision-script-v5"
 
         /** `apk add` 下载基础包的超时（毫秒）：首次配置需联网拉包，给足时间。 */
         private const val PROVISION_TIMEOUT_MS = 600_000L
     }
 
-    /** 标记基础包（python3/git/rg 等）已按 [PROVISION_VERSION] 配置完成，内容为版本号。 */
-    private val provisionMarker: java.io.File
-        get() = java.io.File(containerInstaller.rootfsDir, ".provisioned")
+    /** 标记基础包已按 [PROVISION_VERSION] 配置完成，内容为版本号。按当前 profile 的 rootfs 目录存放（内置/自定义各自独立）。 */
+    private fun provisionMarker(profile: ContainerProfile): java.io.File =
+        java.io.File(containerInstaller.rootfsDirFor(profile), ".provisioned")
 
     /**
      * 在容器内流式执行命令：每读到一行就 emit 一个 [CommandEvent.Line]，命令结束 emit
@@ -387,43 +382,25 @@ class LinuxContainerEngine @Inject constructor(
     }
 
     /**
-     * 首次初始化时配置基础包（python3 / git / pip / node / npm / rg）。幂等：已按 [PROVISION_VERSION] 配置则直接返回。
-     * 失败（断网/超时/退出码非 0）不写标记，下次 [ensureInstalled] 自动重试，且**不抛异常**——
+     * 首次初始化时执行通用依赖安装脚本（python3 / git / pip / node / npm / rg 等）。幂等：已按 [PROVISION_VERSION] 配置则直接返回。
+     * 所有容器（内置与自定义镜像）都会执行：脚本按容器内的包管理器（apk/apt-get/dnf/yum/pacman）自动装包，
+     * 包清单维护在脚本内。失败（断网/超时/退出码非 0）不写标记，下次 [ensureInstalled] 自动重试，且**不抛异常**——
      * 配置失败不应阻塞用户使用容器（只是暂时没有这些工具）。
      *
-     * 流式执行：用 [streamExecNoInstall]（不触发懒安装，避免与 [ensureInstalled] 递归）逐行拿到 apk 输出，
-     * 实时更新 [initProgress]，让 UI 能看到「正在安装…」+ 下载进度行。脚本内先幂等覆盖 apk 源为阿里云
-     * 国内镜像（兜底存量已解压旧 rootfs，其镜像源仍是官方 dl-cdn），再 update 索引、装包。
+     * 流式执行：用 [streamExecNoInstall]（不触发懒安装，避免与 [ensureInstalled] 递归）逐行拿到脚本输出，
+     * 实时更新 [initProgress]，让 UI 能看到「正在安装…」+ 下载进度行。脚本由 [ContainerInstaller.extractProvisionScript]
+     * 启动即提取到 ~/.aicode/provision.sh（容器内 /root/.aicode/provision.sh，经 -b 绑定对所有 profile 可见）。
      */
     private suspend fun provisionIfNeeded() {
-        val marker = provisionMarker
+        val marker = provisionMarker(currentProfile)
         if (marker.exists() && marker.readText().trim() == PROVISION_VERSION) return
 
-        FileLogger.i(TAG, "开始配置容器基础包：$PROVISION_PACKAGES（首次需联网，可能耗时较久）")
-        _initProgress.value = ContainerInitState.InstallingPackages(line = "配置国内镜像源…")
-
-        // 幂等覆盖镜像源 + 刷新索引 + 装包。apk 源用 http（minirootfs 无 ca-certificates，见 ALPINE_MIRROR 注释）。
-        val script = buildString {
-            append("set -e\n")
-            append("mkdir -p /etc/apk\n")
-            append("cat > /etc/apk/repositories <<EOF\n")
-            append("${ContainerInstaller.ALPINE_MIRROR}/${ContainerInstaller.ALPINE_BRANCH}/main\n")
-            append("${ContainerInstaller.ALPINE_MIRROR}/${ContainerInstaller.ALPINE_BRANCH}/community\n")
-            append("EOF\n")
-            append("apk update\n")
-            append("apk add --no-cache $PROVISION_PACKAGES\n")
-            // 装好 git 后配置两个 credential.helper：store（命中已有凭据秒过）+ aicode 自定义 helper
-            // （store 未命中时经文件 IPC 通知 app 弹窗回填），让终端/AI/UI 三端裸 git 共用同一注入链。
-            // credential.helper 是 multi-valued，存量设备重配时若直接 `--add` 会与旧 store 行重复，
-            // 故先 `--replace-all` 清掉已有 helper 值再 `--add` aicode，保证顺序幂等（store 唯一在前、aicode 唯一在后）。
-            // 脚本由 [ContainerInstaller.extractCredentialHelper] 启动即提取到 /root/.aicode/git-credential-aicode。
-            append("git config --global --replace-all credential.helper 'store --file=/root/.aicode/git-credentials'\n")
-            append("git config --global --add credential.helper '/root/.aicode/git-credential-aicode'\n")
-        }
+        FileLogger.i(TAG, "开始执行容器初始化依赖脚本（首次需联网，可能耗时较久）")
+        _initProgress.value = ContainerInitState.InstallingPackages(line = "运行初始化脚本…")
 
         var exitCode: Int? = null
         // rootfs 此时已由 ensureInstalled→installRootfsIfNeed 解压就绪；streamExecNoInstall 不再触发安装，无递归。
-        streamExecNoInstall(script, projectPath = null, timeoutMs = PROVISION_TIMEOUT_MS).collect { event ->
+        streamExecNoInstall("sh /root/.aicode/provision.sh", projectPath = null, timeoutMs = PROVISION_TIMEOUT_MS).collect { event ->
             when (event) {
                 is CommandEvent.Line ->
                     _initProgress.value = ContainerInitState.InstallingPackages(line = event.text)
@@ -433,11 +410,11 @@ class LinuxContainerEngine @Inject constructor(
 
         if (exitCode == 0) {
             marker.writeText(PROVISION_VERSION)
-            FileLogger.i(TAG, "容器基础包配置完成：$PROVISION_PACKAGES")
+            FileLogger.i(TAG, "容器初始化依赖脚本执行完成")
         } else {
             FileLogger.w(
                 TAG,
-                "容器基础包配置未完成（退出码=$exitCode），将在下次初始化重试"
+                "容器初始化依赖脚本执行未完成（退出码=$exitCode），将在下次初始化重试"
             )
         }
     }
@@ -510,12 +487,11 @@ class LinuxContainerEngine @Inject constructor(
     override fun isContainerInstalled(): Boolean = containerInstaller.isInstalledFor(currentProfile)
 
     /**
-     * 基础包是否已配置完成（按当前 profile）。自定义镜像不 provision，视为已就绪——
-     * 所需工具由用户自行在容器内安装，不依赖本流程。
+     * 基础包是否已配置完成（按当前 profile 的标记）。所有容器（内置/自定义）首次初始化都会执行
+     * 通用依赖安装脚本（见 [provisionIfNeeded]），完成后写标记；脚本失败不写标记、下次重试。
      */
     override fun isProvisioned(): Boolean {
-        if (!currentProfile.isBuiltin) return true
-        val marker = provisionMarker
+        val marker = provisionMarker(currentProfile)
         return marker.exists() && marker.readText().trim() == PROVISION_VERSION
     }
 
@@ -541,8 +517,8 @@ class LinuxContainerEngine @Inject constructor(
     }
 
     /**
-     * 幂等地确保容器可用：先解压 rootfs/proot（首次耗时），内置再配置基础包（首次需联网）。
-     * 自定义镜像只解压 rootfs，不 provision——镜像源与所需工具由用户自行处理。
+     * 幂等地确保容器可用：先解压 rootfs/proot（首次耗时），再执行通用依赖安装脚本（首次需联网，
+     * 内置 Alpine 会 provision 基础包；自定义镜像按包管理器自动装包，镜像源与包清单由脚本管理）。
      * 仅由终端页（[TerminalSessionManager]）作为唯一初始化入口调用；命令执行入口不再自动触发。
      *
      * 耗时初始化（解压/装包）在引擎级 [initScope] 中执行，不随调用方（终端页 viewModelScope）
@@ -582,11 +558,11 @@ class LinuxContainerEngine @Inject constructor(
         }
     }
 
-    /** 在 [initScope] 中真正执行一次性初始化：解压 rootfs + 配置基础包。 */
+    /** 在 [initScope] 中真正执行一次性初始化：解压 rootfs + 执行通用依赖安装脚本（所有容器都执行）。 */
     private suspend fun doInit(profile: ContainerProfile) {
         // installRootfsIfNeed 在真正解压/部署时回调更新进度（已安装则快路径不回调）
         containerInstaller.installRootfsIfNeed(profile) { _initProgress.value = it }
-        if (profile.isBuiltin) provisionIfNeeded()
+        provisionIfNeeded()
     }
 
     /** 查容器内 $HOME 并缓存到 [WorkspacePathMapper]，供文件工具展开 ~。 */
@@ -647,7 +623,7 @@ class LinuxContainerEngine @Inject constructor(
         argv.add("exec \"\$0\" \"\$@\"")
         argv.add(program)
         argv.addAll(programArgs)
-        return ProotInvocation(argv, buildContainerEnv() + extraEnv)
+        return ProotInvocation(argv, buildContainerEnv() + currentProfile.env + extraEnv)
     }
 
     /**
@@ -660,7 +636,7 @@ class LinuxContainerEngine @Inject constructor(
         argv.add(defaultShell())
         argv.add("-c")
         argv.add(command)
-        return ProotInvocation(argv, buildContainerEnv())
+        return ProotInvocation(argv, buildContainerEnv() + currentProfile.env)
     }
 
     /**

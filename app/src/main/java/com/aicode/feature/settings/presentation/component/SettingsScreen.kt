@@ -294,9 +294,10 @@ fun SettingsScreen(
                     onSelect = { viewModel.setActiveContainerProfile(it) },
                     onSaveCustom = { viewModel.saveCustomContainerProfile(it) },
                     onEditCustom = { viewModel.editCustomContainerProfile(it) },
-                    onDeleteCustom = { viewModel.deleteCustomContainerProfile(it) },
+                    onDeleteProfile = { viewModel.deleteContainerProfile(it) },
                     onSwitchConfirmed = onStopAllAndCloseTerminal,
-                    onResetBuiltin = { viewModel.resetBuiltinContainer() },
+                    onResetProfile = { viewModel.resetContainer(it) },
+                    onRestoreBuiltin = { viewModel.restoreBuiltinAlpine() },
                     remoteConnections = remoteConnections
                 )
                 SettingsSection.Log -> LogSection(

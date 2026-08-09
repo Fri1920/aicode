@@ -98,6 +98,30 @@ class ContainerInstaller @Inject constructor(
         }
 
         /**
+         * 从 assets 提取容器初始化依赖安装脚本到 ~/.aicode/provision.sh 并赋可执行位。
+         *
+         * 经 [LinuxContainerEngine] 的 -b 绑定即容器内 /root/.aicode/provision.sh，由
+         * [LinuxContainerEngine.provisionIfNeeded] 在首次初始化时以 `sh` 执行——脚本按包管理器
+         * （apk/apt-get/dnf/yum/pacman）安装基础包，包清单维护在脚本内而非代码里。
+         * 启动即提取、每次覆盖写（脚本随 App 版本更新）。提取失败仅告警不抛：
+         * provision 缺脚本时会执行失败、不写完成标记、下次初始化自动重试。
+         */
+        fun extractProvisionScript(context: Context) {
+            val dest = File(File(context.filesDir, "aicode"), "provision.sh")
+            runCatching {
+                dest.parentFile?.mkdirs()
+                context.assets.open("aicode/provision.sh").use { input ->
+                    dest.outputStream().use { output -> input.copyTo(output) }
+                }
+                if (!dest.setExecutable(true, false)) {
+                    FileLogger.w(TAG, "setExecutable 返回 false: ${dest.absolutePath}")
+                }
+            }.onFailure {
+                FileLogger.w(TAG, "提取 provision 脚本失败: ${it.message}", it)
+            }
+        }
+
+        /**
          * 与 assets 里 alpine-rootfs 版本对应的 apk 分支，用于拼镜像源地址。
          * 固定 v3.21：与 [INSTALL_VERSION]（alpine-3.21.3）一致；该版本 apk-tools 2.14 在 proot 下可靠。
          */
@@ -298,10 +322,20 @@ class ContainerInstaller @Inject constructor(
         if (rootfsDir.exists()) rootfsDir.deleteRecursively()
     }
 
+    /** 按 [profile] 统一重置 rootfs：内置走 [resetBuiltinRootfs]，自定义本地删其 rootfs 目录，远程 SSH 无本地数据不操作。 */
+    fun resetRootfs(profile: ContainerProfile) {
+        if (profile.isBuiltin) {
+            resetBuiltinRootfs()
+            return
+        }
+        deleteCustomRootfs(profile)
+    }
+
     init {
         CoroutineScope(Dispatchers.IO).launch {
             extractDocs(context)
             extractCredentialHelper(context)
+            extractProvisionScript(context)
         }
     }
 
@@ -310,6 +344,9 @@ class ContainerInstaller @Inject constructor(
 
     /** 从 assets 提取 git credential helper 到 ~/.aicode/git-credential-aicode 并赋可执行位。 */
     fun extractCredentialHelper() = extractCredentialHelper(context)
+
+    /** 从 assets 提取容器初始化依赖安装脚本到 ~/.aicode/provision.sh 并赋可执行位。 */
+    fun extractProvisionScript() = extractProvisionScript(context)
 
     /** 从 assets 复制 proot 全套（二进制 + loader + 动态依赖库）到私有目录并赋权限 */
     private fun installProot() {

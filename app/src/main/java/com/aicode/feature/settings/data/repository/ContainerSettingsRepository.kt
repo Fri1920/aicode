@@ -1,6 +1,7 @@
 package com.aicode.feature.settings.data.repository
 
 import android.content.Context
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
@@ -28,6 +29,8 @@ class ContainerSettingsRepository @Inject constructor(
     private companion object {
         val ACTIVE_PROFILE_ID_KEY = stringPreferencesKey("active_profile_id")
         val CUSTOM_PROFILES_KEY = stringPreferencesKey("custom_profiles_json")
+        /** 首次启动是否已写入内置 Alpine 默认项；置位后用户删光列表不再自动补回。 */
+        val INITIALIZED_KEY = booleanPreferencesKey("initialized")
         val profileSerializer = ListSerializer(ContainerProfile.serializer())
         val json = Json { ignoreUnknownKeys = true }
     }
@@ -46,6 +49,26 @@ class ContainerSettingsRepository @Inject constructor(
 
     suspend fun setActiveProfile(id: String) {
         context.containerDataStore.edit { it[ACTIVE_PROFILE_ID_KEY] = id }
+    }
+
+    /**
+     * 首次启动（或旧版本升级）兜底：把内置 Alpine 补入列表（若缺），保证列表始终有内置项。
+     * 置位初始化标记后不再自动补回——用户后续删光列表由空态手动恢复。
+     * 存量设备已配自定义镜像时同样补入（旧版列表始终含内置项，升级不能让它消失）。
+     */
+    suspend fun ensureBuiltinDefault() {
+        context.containerDataStore.edit { prefs ->
+            if (prefs[INITIALIZED_KEY] == true) return@edit
+            prefs[INITIALIZED_KEY] = true
+            val current = prefs[CUSTOM_PROFILES_KEY]?.let { raw ->
+                runCatching { json.decodeFromString(profileSerializer, raw) }.getOrNull()
+            } ?: emptyList()
+            if (current.none { it.id == ContainerProfile.BUILTIN_ID }) {
+                prefs[CUSTOM_PROFILES_KEY] = json.encodeToString(
+                    profileSerializer, listOf(ContainerProfile.BUILTIN_ALPINE) + current
+                )
+            }
+        }
     }
 
     /** 新增或覆盖同名 id 的自定义 profile。 */

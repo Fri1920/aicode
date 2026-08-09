@@ -49,7 +49,7 @@ import compose.icons.feathericons.Search
 
 /** 当前是否浅色模式（据此切换浅灰/主题深色配色）。 */
 @Composable
-private fun settingsLightMode(): Boolean =
+internal fun settingsLightMode(): Boolean =
     MaterialTheme.colorScheme.background.luminance() > 0.5f
 
 /** 设置页背景：浅色模式用浅灰 #F8F8F8，深色模式沿用主题背景。 */
