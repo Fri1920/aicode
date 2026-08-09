@@ -6,6 +6,7 @@ import com.aicode.core.util.FileLogger
 import com.aicode.core.util.LogLevel
 import com.aicode.feature.agent.domain.container.ConnectionState
 import com.aicode.feature.agent.domain.container.ContainerInstaller
+import com.aicode.feature.agent.domain.container.ContainerOsDetector
 import com.aicode.feature.agent.domain.container.ContainerProfile
 import com.aicode.feature.agent.domain.container.RemoteSshConnection
 import com.aicode.feature.agent.domain.container.RootfsSource
@@ -88,6 +89,7 @@ class SettingsViewModel @Inject constructor(
     private val compactionModelSettingsRepository: CompactionModelSettingsRepository,
     private val containerSettingsRepository: ContainerSettingsRepository,
     private val containerInstaller: ContainerInstaller,
+    private val containerOsDetector: ContainerOsDetector,
     private val executionModeRepository: ExecutionModeRepository,
     private val executionModeHolder: ExecutionModeHolder,
     private val remoteSshConnection: RemoteSshConnection,
@@ -174,6 +176,9 @@ class SettingsViewModel @Inject constructor(
     /** 全部 profile（内置 Alpine 也作为普通一项持久化在列表里，首次启动自动写入）。 */
     val profiles: StateFlow<List<ContainerProfile>> = customProfiles
         .stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.Eagerly, listOf(ContainerProfile.BUILTIN_ALPINE))
+
+    /** 各容器已识别的系统类型（profile id → os id），UI 据此显示对应系统图标。 */
+    val containerOsMap: StateFlow<Map<String, String>> = containerOsDetector.osMap
 
     /** 当前执行模式（本地 PRoot / 远程 SSH），供 UI 判断是否显示远程连接指示器。 */
     val executionMode: StateFlow<ExecutionMode> = executionModeHolder.mode

@@ -114,6 +114,7 @@ fun SettingsScreen(
     val modelMetadata by viewModel.modelMetadata.collectAsStateWithLifecycle()
     val containerProfiles by viewModel.profiles.collectAsStateWithLifecycle()
     val activeProfileId by viewModel.activeProfileId.collectAsStateWithLifecycle()
+    val containerOsMap by viewModel.containerOsMap.collectAsStateWithLifecycle()
     val remoteConnections by viewModel.remoteConnections.collectAsStateWithLifecycle()
 
     val currentLanguageDisplayName = if (languageTag.isNullOrBlank()) {
@@ -289,6 +290,7 @@ fun SettingsScreen(
                 SettingsSection.Container -> ContainerSection(
                     profiles = containerProfiles,
                     activeProfileId = activeProfileId,
+                    osMap = containerOsMap,
                     showAddSheetExternal = showContainerAddSheet,
                     onDismissAddSheet = { showContainerAddSheet = false },
                     onSelect = { viewModel.setActiveContainerProfile(it) },

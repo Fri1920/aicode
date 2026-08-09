@@ -66,11 +66,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -111,6 +113,7 @@ import kotlin.math.roundToInt
 internal fun ContainerSection(
     profiles: List<ContainerProfile>,
     activeProfileId: String,
+    osMap: Map<String, String> = emptyMap(),
     showAddSheetExternal: Boolean = false,
     onDismissAddSheet: () -> Unit = {},
     onSelect: (String) -> Unit,
@@ -169,6 +172,7 @@ internal fun ContainerSection(
                     ContainerRow(
                         profile = profile,
                         active = profile.id == activeProfileId,
+                        osId = osMap[profile.id],
                         subtitle = profileSubtitle(context, profile, remoteConnections),
                         onSelect = { if (profile.id != activeProfileId) pendingSwitch = profile },
                         onEdit = { editingProfile = profile },
@@ -271,6 +275,16 @@ private fun deleteHint(context: Context, profile: ContainerProfile): String = wh
     else -> context.getString(R.string.container_rootfs_will_be_cleared)
 }
 
+/** 系统 logo 映射：已识别的系统返回对应单色图标，未知/未识别返回 null（调用方回退通用图标）。 */
+@Composable
+private fun osLogo(osId: String?): Painter? = when (osId) {
+    "alpine" -> painterResource(R.drawable.logo_alpine)
+    "centos" -> painterResource(R.drawable.logo_centos)
+    "ubuntu" -> painterResource(R.drawable.logo_ubuntu)
+    "debian" -> painterResource(R.drawable.logo_debian)
+    else -> null
+}
+
 /**
  * 单个容器行：分组内白底行，左侧图标方块 + 名称（内置带徽章）/副标题，右侧选中勾选 + 编辑/重置按钮，左滑删除。
  * 行主体点击切换镜像（未选中时弹确认）；滑动手势与点击用 [Animatable] 偏移协调，与 MCP 列表一致。
@@ -279,6 +293,7 @@ private fun deleteHint(context: Context, profile: ContainerProfile): String = wh
 private fun ContainerRow(
     profile: ContainerProfile,
     active: Boolean,
+    osId: String?,
     subtitle: String,
     onSelect: () -> Unit,
     onEdit: () -> Unit,
@@ -419,14 +434,26 @@ private fun ContainerRow(
                         shape = RoundedCornerShape(8.dp)
                     )
             ) {
-                Icon(
-                    imageVector = if (profile.mode == ExecutionMode.REMOTE_SSH) FeatherIcons.Server else FeatherIcons.HardDrive,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier
-                        .size(22.dp)
-                        .align(Alignment.Center)
-                )
+                val osIcon = osLogo(osId)
+                if (osIcon != null) {
+                    Icon(
+                        painter = osIcon,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier
+                            .size(22.dp)
+                            .align(Alignment.Center)
+                    )
+                } else {
+                    Icon(
+                        imageVector = if (profile.mode == ExecutionMode.REMOTE_SSH) FeatherIcons.Server else FeatherIcons.HardDrive,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier
+                            .size(22.dp)
+                            .align(Alignment.Center)
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.width(Spacing.md))

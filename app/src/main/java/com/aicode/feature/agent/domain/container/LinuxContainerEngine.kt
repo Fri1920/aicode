@@ -3,6 +3,7 @@ package com.aicode.feature.agent.domain.container
 import com.aicode.core.util.FileLogger
 import com.aicode.feature.workspace.domain.WorkspacePathMapper
 import com.aicode.R
+import com.aicode.feature.settings.data.repository.ExecutionMode
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -74,6 +75,7 @@ data class ProotInvocation(
 class LinuxContainerEngine @Inject constructor(
     @param:ApplicationContext private val context: android.content.Context,
     private val containerInstaller: ContainerInstaller,
+    private val containerOsDetector: ContainerOsDetector,
     private val containerSettingsRepository: com.aicode.feature.settings.data.repository.ContainerSettingsRepository,
     private val workspacePathMapper: WorkspacePathMapper
 ) : CommandEngine {
@@ -540,6 +542,7 @@ class LinuxContainerEngine @Inject constructor(
         if (containerInstaller.isInstalledFor(profile) && isProvisioned()) {
             _initProgress.value = ContainerInitState.Ready
             refreshContainerHome()
+            detectAndCacheOsIfNeeded(profile)
             return
         }
         // 启动或复用后台初始化 job；initMutex 只保护 job 的创建/复用，真正的耗时工作在 initScope 里跑。
@@ -556,6 +559,7 @@ class LinuxContainerEngine @Inject constructor(
         if (rootfsReady && (isProvisioned() || !profile.isBuiltin)) {
             _initProgress.value = ContainerInitState.Ready
             refreshContainerHome()
+            detectAndCacheOsIfNeeded(profile)
         } else {
             val reason = if (rootfsReady)
                 "容器基础包安装未完成（可能是网络问题），请重试"
@@ -580,6 +584,27 @@ class LinuxContainerEngine @Inject constructor(
             val home = result.output.trim().ifEmpty { null }
             if (home != null) workspacePathMapper.containerHome = home
         }.onFailure { FileLogger.w(TAG, "查容器 \$HOME 失败", it) }
+    }
+
+    /**
+     * 容器首次运行后识别系统类型（读 /etc/os-release 的 ID 字段）并写入缓存；
+     * 已有缓存或识别失败跳过，下次运行再试。远程 SSH 无本地 rootfs，不检测。
+     */
+    private suspend fun detectAndCacheOsIfNeeded(profile: ContainerProfile) {
+        if (profile.mode == ExecutionMode.REMOTE_SSH) return
+        if (containerOsDetector.cachedOs(profile.id) != null) return
+        runCatching {
+            val result = execCaptured(
+                "if [ -f /etc/os-release ]; then . /etc/os-release 2>/dev/null; echo \"\$ID\"; fi",
+                projectPath = null,
+                timeoutMs = 3000
+            )
+            val osId = result.output.trim().lowercase().ifBlank { null }
+            if (osId != null && result.exitCode == 0) {
+                containerOsDetector.cacheOs(profile.id, osId)
+                FileLogger.i(TAG, "容器系统识别: ${profile.id} -> $osId")
+            }
+        }.onFailure { FileLogger.w(TAG, "容器系统识别失败: ${profile.id}", it) }
     }
 
     /**

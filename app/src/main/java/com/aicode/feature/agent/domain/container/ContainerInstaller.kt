@@ -23,7 +23,8 @@ import javax.inject.Singleton
  */
 @Singleton
 class ContainerInstaller @Inject constructor(
-    @param:ApplicationContext private val context: Context
+    @param:ApplicationContext private val context: Context,
+    private val containerOsDetector: ContainerOsDetector
 ) {
     companion object {
         private const val TAG = "ContainerInstaller"
@@ -273,6 +274,9 @@ class ContainerInstaller @Inject constructor(
     ) = withContext(Dispatchers.IO) {
         if (isInstalledFor(profile)) return@withContext
 
+        // rootfs 将被重新解压，容器系统可能变化，清掉旧的识别缓存让下次运行重新检测。
+        containerOsDetector.clear(profile.id)
+
         if (profile.isBuiltin) {
             installRootfsIfNeed(onProgress)
             return@withContext
@@ -310,6 +314,8 @@ class ContainerInstaller @Inject constructor(
 
     /** 删除自定义 profile 的 rootfs 目录（删 profile 时调用）。内置 rootfs 不可删，远程 SSH 无 rootfs 可删。 */
     fun deleteCustomRootfs(profile: ContainerProfile) {
+        // profile 被删除或换镜像，缓存随之作废（重新运行时重新检测）。
+        containerOsDetector.clear(profile.id)
         if (profile.isBuiltin) return
         if (profile.rootfsSource is RootfsSource.RemoteSsh) return
         rootfsDirFor(profile).deleteRecursively()
