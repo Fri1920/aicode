@@ -10,9 +10,10 @@
 4. **远程服务器与云端工作区 (Remote Servers)**：请读取 `~/.aicode/docs/remote-servers.md`
 5. **日志查看、私有目录挂载与后台保活**：请读取 `~/.aicode/docs/logs-and-private-dir.md`
 6. **容器镜像 (Container)**：请读取 `~/.aicode/docs/container-image.md`
-7. **备份与还原 (Backup)**：请读取 `~/.aicode/docs/backup-and-restore.md`
-8. **Git 版本管理**：请读取 `~/.aicode/docs/git-page.md`
-9. **自定义提示词 (Custom Prompts)**：请读取 `~/.aicode/docs/custom-prompts.md`
+7. **软件权限 (App Permissions)**：请读取 `~/.aicode/docs/app-permissions.md`
+8. **备份与还原 (Backup)**：请读取 `~/.aicode/docs/backup-and-restore.md`
+9. **Git 版本管理**：请读取 `~/.aicode/docs/git-page.md`
+10. **自定义提示词 (Custom Prompts)**：请读取 `~/.aicode/docs/custom-prompts.md`
 
 ---
 
@@ -79,14 +80,15 @@ AI 工作时输入框仍然可用，输入后回车（或点击发送键前的�
 *   **AI 提供商**：显示已添加数量与当前启用提供商；进入「AI 提供商」二级页管理（详见 providers-and-models.md）。
 *   **默认模型**：进入「默认模型」二级页，管理识图模型等默认偏好；点击其中的「识图模型」项可直接弹出模型选择弹窗。
 *   **MCP 服务器**：显示已配置数量与已连接数；进入「MCP 服务器」二级页（详见 mcp-and-skills.md）。
-*   **容器镜像**：显示当前镜像 profile 名（默认“内置 Alpine”）；进入「容器镜像」二级页（详见 container-image.md）。该页以列表单选切换当前生效的 profile，选中本地镜像即走 PRoot 容器，选中远程 SSH 镜像即连接远程服务器执行命令。远程模式下命令执行走 SSH exec channel、文件读写走 SFTP，MCP stdio server 仍走本地 PRoot。
+*   **容器镜像**：显示当前镜像 profile 名（默认“内置 Alpine”）；进入「容器镜像」二级页（详见 container-image.md）。该页以列表单选切换当前生效的 profile，选中本地镜像即走 PRoot 容器，选中远程 SSH 镜像即进入**远程工作区模式**（AI 读写文件、执行命令、跑终端全部在远端服务器上）。远程模式下命令执行与文件读写都走 SSH exec channel，MCP stdio server 仍走本地 PRoot。
 *   **日志等级**：显示当前等级名；进入「日志等级」二级页选择等级。
 *   **日志查看**：查看最近日志，支持 MCP 名称过滤；进入「日志查看」二级页。
 *   **工具授权**：显示已保存授权规则条数；进入「工具授权」二级页。
+*   **软件权限**：进入「软件权限」二级页，集中管理后台运行保活、安装未知应用、访问存储空间等系统权限（详见 `~/.aicode/docs/app-permissions.md`）。
 *   **连接与同步**：管理 SFTP / FTP 工作区同步；进入「连接与同步」二级页（详见 remote-servers.md）。
 *   **外观主题**：点击弹出窗口选择（自动/深色/浅色）。
 *   **语言**：点击弹出窗口选择（跟随系统/语言列表）。
-*   **后台运行保活**：首页内联开关，开启后显示前台通知避免后台被杀。
+*   **后台运行保活**：已移入「软件权限」二级页，开启后显示前台通知避免后台被杀。
 *   **备份与还原**：加密导出/导入配置、聊天历史与凭据；进入「备份与还原」二级页（详见 backup-and-restore.md）。
 *   **关于**：版本检查 · GitHub · 许可证；进入「关于」二级页。
 
@@ -105,7 +107,12 @@ AI 工作时输入框仍然可用，输入后回车（或点击发送键前的�
 
 ---
 
-## 6. 关于 (About)
+## 6. 软件权限 (App Permissions)
+集中展示并管理系统级权限（后台运行保活、Agent 完成通知、安装未知应用、访问存储空间、忽略电池优化、自启动管理）。请读取 `~/.aicode/docs/app-permissions.md` 获取完整说明。
+
+---
+
+## 7. 关于 (About)
 “设置”首页「关于」入口（图标为信息圆圈）。这是一个纯展示型页面，无任何持久化设置，点击进入后展示下列信息：
 *   **应用信息**：顶部卡片左侧显示 App 图标，右上为应用名 `AiCode`，右下为一句简介。
 *   **版本（点击检查更新）**：单独一行卡片，显示当前版本号 `v<versionName>`（通过系统 PackageManager 读取，即对外发布版本，与 git tag `v<versionName>` 一致）。点击该行会自动通过 GitHub API `https://api.github.com/repos/jieapi/aicode/releases/latest` 查询最新 Release 的 tag，与当前版本号比对：
