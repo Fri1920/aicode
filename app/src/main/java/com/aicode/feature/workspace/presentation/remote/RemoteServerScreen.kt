@@ -1,16 +1,25 @@
 package com.aicode.feature.workspace.presentation.remote
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.aicode.core.theme.Spacing
+import com.aicode.feature.settings.presentation.component.SettingsDivider
+import com.aicode.feature.settings.presentation.component.SettingsGroup
+import com.aicode.feature.settings.presentation.component.settingsPageBackground
 import com.aicode.feature.workspace.domain.model.RemoteConnection
 import com.aicode.feature.workspace.domain.model.RemoteMount
 import compose.icons.FeatherIcons
@@ -32,129 +41,120 @@ fun RemoteServerScreen(
     var connectionToEdit by remember { mutableStateOf<RemoteConnection?>(null) }
     var mountToEdit by remember { mutableStateOf<RemoteMount?>(null) }
 
-    val syncIgnoredPatterns by viewModel.syncIgnoredPatterns.collectAsStateWithLifecycle()
     val syncUseGitIgnore by viewModel.syncUseGitIgnore.collectAsStateWithLifecycle()
     val maxSyncBatchSize by viewModel.maxSyncBatchSize.collectAsStateWithLifecycle()
 
     Scaffold(
-        containerColor = MaterialTheme.colorScheme.background,
+        containerColor = settingsPageBackground(),
         topBar = {
             Column {
                 TopAppBar(
-                    colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = settingsPageBackground(),
+                        titleContentColor = MaterialTheme.colorScheme.onBackground
+                    ),
                     title = { Text(stringResource(R.string.remote_workspace_title)) },
                     navigationIcon = {
                         IconButton(onClick = onNavigateBack) {
                             Icon(FeatherIcons.ArrowLeft, contentDescription = stringResource(R.string.common_back))
                         }
+                    },
+                    actions = {
+                        if (selectedTab == 0 || selectedTab == 1) {
+                            IconButton(onClick = {
+                                if (selectedTab == 0) {
+                                    connectionToEdit = null
+                                    showAddConnectionDialog = true
+                                } else {
+                                    mountToEdit = null
+                                    showAddMountDialog = true
+                                }
+                            }) {
+                                Icon(FeatherIcons.Plus, contentDescription = stringResource(R.string.common_add))
+                            }
+                        }
                     }
                 )
-                PrimaryTabRow(selectedTabIndex = selectedTab) {
-                    Tab(
-                        selected = selectedTab == 0,
-                        onClick = { selectedTab = 0 },
-                        text = { Text(stringResource(R.string.remote_tab_connections)) }
+                SegmentTabs(
+                    selected = selectedTab,
+                    onSelect = { selectedTab = it },
+                    tabs = listOf(
+                        stringResource(R.string.remote_tab_connections),
+                        stringResource(R.string.remote_tab_mounts),
+                        stringResource(R.string.remote_tab_ftp),
+                        stringResource(R.string.remote_tab_sync)
                     )
-                    Tab(
-                        selected = selectedTab == 1,
-                        onClick = { selectedTab = 1 },
-                        text = { Text(stringResource(R.string.remote_tab_mounts)) }
-                    )
-                    Tab(
-                        selected = selectedTab == 2,
-                        onClick = { selectedTab = 2 },
-                        text = { Text(stringResource(R.string.remote_tab_ftp)) }
-                    )
-                    Tab(
-                        selected = selectedTab == 3,
-                        onClick = { selectedTab = 3 },
-                        text = { Text(stringResource(R.string.remote_tab_sync)) }
-                    )
-                }
-            }
-        },
-        floatingActionButton = {
-            if (selectedTab == 0 || selectedTab == 1) {
-                FloatingActionButton(onClick = {
-                    if (selectedTab == 0) {
-                        connectionToEdit = null
-                        showAddConnectionDialog = true
-                    } else {
-                        mountToEdit = null
-                        showAddMountDialog = true
-                    }
-                }) {
-                    Icon(FeatherIcons.Plus, contentDescription = stringResource(R.string.common_add))
-                }
+                )
             }
         }
     ) { paddingValues ->
         Box(modifier = Modifier.padding(paddingValues).fillMaxSize()) {
-            if (selectedTab == 0) {
-                if (uiState.connections.isEmpty()) {
-                    Text(
-                        text = stringResource(R.string.remote_no_connections),
-                        modifier = Modifier.align(Alignment.Center),
-                        style = MaterialTheme.typography.bodyLarge
-                    )
-                } else {
-                    LazyColumn(
-                        modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        items(uiState.connections) { conn ->
-                            RemoteConnectionCard(
-                                conn = conn,
-                                onEdit = {
-                                    connectionToEdit = it
-                                    showAddConnectionDialog = true
-                                },
-                                onDelete = { viewModel.deleteConnection(it.id) }
-                            )
+            when (selectedTab) {
+                0 -> {
+                    if (uiState.connections.isEmpty()) {
+                        EmptyState(
+                            title = stringResource(R.string.remote_no_connections),
+                            desc = stringResource(R.string.remote_no_connections_desc),
+                            onAdd = {
+                                connectionToEdit = null
+                                showAddConnectionDialog = true
+                            }
+                        )
+                    } else {
+                        SettingsList {
+                            uiState.connections.forEachIndexed { index, conn ->
+                                if (index > 0) {
+                                    SettingsDivider()
+                                }
+                                RemoteConnectionCard(
+                                    conn = conn,
+                                    onEdit = {
+                                        connectionToEdit = it
+                                        showAddConnectionDialog = true
+                                    },
+                                    onDelete = { viewModel.deleteConnection(it.id) }
+                                )
+                            }
                         }
                     }
                 }
-            } else if (selectedTab == 1) {
-                if (uiState.mounts.isEmpty()) {
-                    Text(
-                        text = stringResource(R.string.remote_no_workspaces),
-                        modifier = Modifier.align(Alignment.Center),
-                        style = MaterialTheme.typography.bodyLarge
-                    )
-                } else {
-                    LazyColumn(
-                        modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        items(uiState.mounts) { mount ->
-                            RemoteMountCard(
-                                mount = mount,
-                                isFailed = mount.id in uiState.failedMountIds,
-                                onEdit = {
-                                    mountToEdit = it
-                                    showAddMountDialog = true
-                                },
-                                onDelete = { viewModel.deleteMount(it.id) },
-                                onUpload = { viewModel.forceUploadMount(it.id) },
-                                onDownload = { viewModel.forceDownloadMount(it.id) },
-                                onConnect = { viewModel.connectMount(it.id) },
-                                onDisconnect = { viewModel.disconnectMount(it.id) }
-                            )
+                1 -> {
+                    if (uiState.mounts.isEmpty()) {
+                        EmptyState(
+                            title = stringResource(R.string.remote_no_workspaces),
+                            desc = stringResource(R.string.remote_no_workspaces_desc),
+                            onAdd = {
+                                mountToEdit = null
+                                showAddMountDialog = true
+                            }
+                        )
+                    } else {
+                        SettingsList {
+                            uiState.mounts.forEachIndexed { index, mount ->
+                                if (index > 0) {
+                                    SettingsDivider()
+                                }
+                                RemoteMountCard(
+                                    mount = mount,
+                                    isFailed = mount.id in uiState.failedMountIds,
+                                    onEdit = {
+                                        mountToEdit = it
+                                        showAddMountDialog = true
+                                    },
+                                    onDelete = { viewModel.deleteMount(it.id) },
+                                    onUpload = { viewModel.forceUploadMount(it.id) },
+                                    onDownload = { viewModel.forceDownloadMount(it.id) },
+                                    onConnect = { viewModel.connectMount(it.id) },
+                                    onDisconnect = { viewModel.disconnectMount(it.id) }
+                                )
+                            }
                         }
                     }
                 }
-            }
-
-            if (selectedTab == 2) {
-                WiFiFtpServerSection(viewModel)
-            } else if (selectedTab == 3) {
-                SyncSettingsSection(
-                    ignoredPatterns = syncIgnoredPatterns,
+                2 -> WiFiFtpServerSection(viewModel)
+                3 -> SyncSettingsSection(
                     useGitIgnore = syncUseGitIgnore,
                     maxSyncBatchSize = maxSyncBatchSize,
-                    onPatternsChange = { viewModel.setSyncIgnoredPatterns(it) },
                     onUseGitIgnoreChange = { viewModel.setSyncUseGitIgnore(it) },
                     onMaxSyncBatchSizeChange = { viewModel.setMaxSyncBatchSize(it) }
                 )
@@ -233,5 +233,91 @@ fun RemoteServerScreen(
             )
         }
     }
+}
 
+/** iOS 风格分段控件：圆角浅灰容器 + 白色选中块，样式与容器镜像弹窗的分段选择器一致。 */
+@Composable
+internal fun SegmentTabs(
+    selected: Int,
+    onSelect: (Int) -> Unit,
+    tabs: List<String>
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = Spacing.lg, vertical = Spacing.sm)
+            .background(
+                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                RoundedCornerShape(12.dp)
+            )
+            .padding(3.dp),
+        horizontalArrangement = Arrangement.spacedBy(3.dp)
+    ) {
+        tabs.forEachIndexed { index, title ->
+            val isSelected = index == selected
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(if (isSelected) MaterialTheme.colorScheme.surface else Color.Transparent)
+                    .clickable { onSelect(index) }
+                    .padding(vertical = 8.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                    ),
+                    color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1
+                )
+            }
+        }
+    }
+}
+
+/** 居中空态：标题 + 描述 + 添加按钮，样式与容器镜像空态一致。 */
+@Composable
+private fun EmptyState(
+    title: String,
+    desc: String,
+    onAdd: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(Spacing.xl),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+        Text(
+            text = desc,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = Spacing.xs, bottom = Spacing.lg)
+        )
+        Button(onClick = onAdd) {
+            Text(stringResource(R.string.common_add))
+        }
+    }
+}
+
+/** 分组列表容器：垂直滚动 + 白色圆角分组，与容器镜像页列表一致。 */
+@Composable
+private fun SettingsList(content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = Spacing.lg)
+            .padding(bottom = Spacing.xl)
+    ) {
+        SettingsGroup(content = content)
+    }
 }

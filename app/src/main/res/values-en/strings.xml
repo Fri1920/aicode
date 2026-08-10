@@ -610,7 +610,6 @@
     <!-- Remote Dialogs -->
     <string name="remote_edit_connection">Edit Connection Channel</string>
     <string name="remote_add_connection">Add Connection Channel</string>
-    <string name="remote_protocol_type">Protocol:</string>
     <string name="remote_channel_name_hint">Channel name (e.g. Internal storage image)</string>
     <string name="remote_connection_name_hint">Connection name (e.g. Tencent Cloud Server)</string>
     <string name="remote_internal_dir">Internal Storage Target Directory</string>
@@ -619,7 +618,6 @@
     <string name="remote_port">Port</string>
     <string name="remote_password">Password</string>
     <string name="remote_toggle_password">Toggle password visibility</string>
-    <string name="remote_internal_dir_desc">This directory serves as the image root. The workspace will sync here one-way for apps that can only access regular directories.</string>
     <string name="remote_test_dir">Test Directory</string>
     <string name="remote_test_connection">Test Connection</string>
     <string name="remote_edit_workspace">Edit Workspace</string>
@@ -643,7 +641,7 @@
 
     <!-- Remote FTP -->
     <string name="ftp_usage_title">Usage Guide</string>
-    <string name="ftp_usage_desc">1. Phone and computer must be on the same WiFi network.\n2. After starting the service, access the FTP address below from your computer\'s file explorer (or FileZilla).\n3. Once connected, you can directly view and edit all code projects under the phone\'s workspace root (projects) from your computer.</string>
+    <string name="ftp_usage_desc">Phone and computer must be on the same WiFi. Open the address below in your computer\'s file explorer to manage projects in the phone\'s workspace.</string>
     <string name="ftp_running">Running: %1$s</string>
     <string name="ftp_not_running">Service not running</string>
     <string name="ftp_error">Error: %1$s</string>
@@ -657,6 +655,8 @@
     <string name="ftp_auto_start_desc">Automatically start FTP service in background on app launch</string>
     <string name="ftp_config_saved">Configuration saved</string>
     <string name="ftp_save_config">Save Configuration</string>
+    <string name="ftp_copy_address">Copy address</string>
+    <string name="ftp_address_copied">Address copied</string>
 
     <!-- Remote Server -->
     <string name="remote_workspace_title">Connections &amp; Sync</string>
@@ -664,8 +664,10 @@
     <string name="remote_tab_mounts">Mounted Directories</string>
     <string name="remote_tab_ftp">Built-in FTP</string>
     <string name="remote_tab_sync">Sync Settings</string>
-    <string name="remote_no_connections">No connections yet, tap to add.</string>
-    <string name="remote_no_workspaces">No workspaces yet, tap to add.</string>
+    <string name="remote_no_connections">No connections yet</string>
+    <string name="remote_no_connections_desc">Add an SFTP, FTP or local channel to link your phone workspace with a remote or local directory.</string>
+    <string name="remote_no_workspaces">No mounted directories yet</string>
+    <string name="remote_no_workspaces_desc">Map a directory from a channel to a local workspace. Local changes sync one-way to the remote.</string>
     <string name="remote_hint_title">Hint</string>
     <string name="remote_add_channel_first">Please add a remote channel in "Connections" first.</string>
     <string name="remote_go_add">Go Add</string>
@@ -680,21 +682,14 @@
     <string name="remote_unknown_error">Unknown error</string>
 
     <!-- Remote Sync -->
-    <string name="sync_ignore_list">Directory/File Ignore List</string>
-    <string name="sync_ignore_desc">Separate multiple rules with commas. Directories and files with these names will not be synced to the remote server (e.g. node_modules).</string>
-    <string name="sync_ignore_rules">Ignore Rules</string>
-    <string name="sync_ignore_saved">Ignore rules saved</string>
-    <string name="sync_save_rules">Save Rules</string>
+    <string name="sync_save_settings">Save Settings</string>
+    <string name="sync_saved">Sync settings saved</string>
     <string name="sync_follow_gitignore">Follow .gitignore rules</string>
-    <string name="sync_gitignore_desc">If a .gitignore exists in the project root, it will also be read and ignored.</string>
-    <string name="sync_gitignore_enabled">.gitignore filtering enabled</string>
-    <string name="sync_gitignore_disabled">.gitignore filtering disabled</string>
+    <string name="sync_gitignore_desc">Automatically reads the project root .gitignore and ignores its contents.</string>
     <string name="sync_max_batch_size">Max Sync Batch Size</string>
-    <string name="sync_batch_size_desc">Prevents sudden mass file modifications from overwhelming the server and causing disconnection. Operations exceeding this limit will be queued and processed in batches with brief pauses between batches.</string>
+    <string name="sync_batch_size_desc">Operations exceeding this limit are queued and processed in batches to avoid disconnects.</string>
     <string name="sync_max_batch_count">Max Count</string>
-    <string name="sync_batch_size_saved">Max batch size saved</string>
-    <string name="sync_save_batch_size">Save Count</string>
-    <string name="sync_via_connection">Via: %1$s</string>
+    <string name="sync_path_mapping">%1$s → %2$s</string>
     <string name="status_connected">Connected</string>
     <string name="status_disconnected">Disconnected</string>
     <string name="status_connection_failed">Connection Failed</string>

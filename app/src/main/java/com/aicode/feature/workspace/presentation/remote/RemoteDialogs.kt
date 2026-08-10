@@ -1,32 +1,169 @@
 package com.aicode.feature.workspace.presentation.remote
 
-import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import android.net.Uri
 import android.provider.DocumentsContract
-import com.aicode.core.theme.Spacing
+import com.aicode.feature.settings.presentation.component.rememberSheetFlingFix
 import com.aicode.feature.workspace.domain.model.RemoteConnection
 import com.aicode.feature.workspace.domain.model.RemoteMount
 import com.aicode.feature.workspace.domain.model.RemoteProtocol
 import compose.icons.FeatherIcons
+import compose.icons.feathericons.Check
 import compose.icons.feathericons.Eye
 import compose.icons.feathericons.EyeOff
 import compose.icons.feathericons.Folder
 import androidx.compose.ui.res.stringResource
 import com.aicode.R
+
+/** 弹窗内统一输入框：12dp 圆角 + 浅色容器底，样式与容器镜像弹窗一致。 */
+@Composable
+private fun SheetOutlinedTextField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    label: @Composable (() -> Unit)?,
+    modifier: Modifier = Modifier,
+    singleLine: Boolean = true,
+    enabled: Boolean = true,
+    readOnly: Boolean = false,
+    placeholder: (@Composable () -> Unit)? = null,
+    trailingIcon: (@Composable () -> Unit)? = null,
+    visualTransformation: VisualTransformation = VisualTransformation.None
+) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        label = label,
+        singleLine = singleLine,
+        modifier = modifier,
+        enabled = enabled,
+        readOnly = readOnly,
+        placeholder = placeholder,
+        trailingIcon = trailingIcon,
+        visualTransformation = visualTransformation,
+        shape = RoundedCornerShape(12.dp),
+        colors = OutlinedTextFieldDefaults.colors(
+            unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
+            focusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
+            unfocusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f),
+            focusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f)
+        )
+    )
+}
+
+/** 弹窗顶部居中标题：与容器镜像弹窗一致的结构。 */
+@Composable
+private fun SheetTitle(text: String) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Spacer(modifier = Modifier.size(36.dp))
+        Text(
+            text = text,
+            style = MaterialTheme.typography.titleMedium.copy(
+                fontWeight = FontWeight.Bold,
+                fontSize = 16.sp
+            ),
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.weight(1f),
+            textAlign = TextAlign.Center
+        )
+        Spacer(modifier = Modifier.size(36.dp))
+    }
+}
+
+/** 紧凑分段选择器：样式与 MCP 编辑弹窗的分段控件一致（无额外外边距）。 */
+@Composable
+private fun CompactSegments(
+    selected: Int,
+    onSelect: (Int) -> Unit,
+    tabs: List<String>
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(
+                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                RoundedCornerShape(12.dp)
+            )
+            .padding(3.dp),
+        horizontalArrangement = Arrangement.spacedBy(3.dp)
+    ) {
+        tabs.forEachIndexed { index, title ->
+            val isSelected = index == selected
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(if (isSelected) MaterialTheme.colorScheme.surface else Color.Transparent)
+                    .clickable { onSelect(index) }
+                    .padding(vertical = 8.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                    ),
+                    color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
+
+/** 弹窗底部固定保存按钮：全宽 44dp + Check 图标 + 加粗文字，样式与 MCP 编辑弹窗一致。 */
+@Composable
+private fun SheetSaveButton(
+    text: String,
+    enabled: Boolean,
+    onClick: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Button(
+            enabled = enabled,
+            onClick = onClick,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(44.dp),
+            shape = RoundedCornerShape(12.dp)
+        ) {
+            Icon(FeatherIcons.Check, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(text, style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold))
+        }
+    }
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -57,138 +194,135 @@ fun AddRemoteConnectionDialog(
     }
 
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val configuration = LocalConfiguration.current
+    val screenHeight = configuration.screenHeightDp.dp
+    val flingFix = rememberSheetFlingFix(sheetState)
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = MaterialTheme.colorScheme.surface
+        containerColor = MaterialTheme.colorScheme.surface,
+        contentWindowInsets = { WindowInsets(0.dp) }
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = Spacing.lg)
-                .padding(bottom = Spacing.xl)
-                .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+                .heightIn(max = screenHeight * 0.88f)
         ) {
-            Text(
-                text = if (initialConnection != null) stringResource(R.string.remote_edit_connection) else stringResource(R.string.remote_add_connection),
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(bottom = Spacing.xs)
+            SheetTitle(
+                text = if (initialConnection != null) stringResource(R.string.remote_edit_connection) else stringResource(R.string.remote_add_connection)
             )
 
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(stringResource(R.string.remote_protocol_type), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
-                Spacer(modifier = Modifier.width(12.dp))
-                FilterChip(
-                    selected = protocol == RemoteProtocol.SFTP,
-                    onClick = { protocol = RemoteProtocol.SFTP; port = "22" },
-                    label = { Text("SFTP") }
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                FilterChip(
-                    selected = protocol == RemoteProtocol.FTP,
-                    onClick = { protocol = RemoteProtocol.FTP; port = "21" },
-                    label = { Text("FTP") }
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                FilterChip(
-                    selected = protocol == RemoteProtocol.LOCAL,
-                    onClick = { protocol = RemoteProtocol.LOCAL; port = "0"; username = "local"; password = "" },
-                    label = { Text(stringResource(R.string.common_local)) }
-                )
-            }
-            OutlinedTextField(
-                value = name,
-                onValueChange = { name = it },
-                label = { Text(if (isLocal) stringResource(R.string.remote_channel_name_hint) else stringResource(R.string.remote_connection_name_hint)) },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth()
-            )
-            OutlinedTextField(
-                value = host,
-                onValueChange = { host = it },
-                label = { Text(if (isLocal) stringResource(R.string.remote_internal_dir) else stringResource(R.string.remote_host_address)) },
-                placeholder = if (isLocal) {
-                    { Text("/storage/emulated/0/AICode/projects") }
-                } else {
-                    null
+            CompactSegments(
+                selected = when (protocol) {
+                    RemoteProtocol.SFTP -> 0
+                    RemoteProtocol.FTP -> 1
+                    RemoteProtocol.LOCAL -> 2
                 },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-                trailingIcon = if (isLocal) {
-                    {
-                        IconButton(onClick = { folderPicker.launch(null) }) {
-                            Icon(FeatherIcons.Folder, contentDescription = stringResource(R.string.remote_select_dir), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                onSelect = { index ->
+                    protocol = when (index) {
+                        0 -> RemoteProtocol.SFTP
+                        1 -> RemoteProtocol.FTP
+                        else -> RemoteProtocol.LOCAL
+                    }
+                    when (protocol) {
+                        RemoteProtocol.SFTP -> port = "22"
+                        RemoteProtocol.FTP -> port = "21"
+                        RemoteProtocol.LOCAL -> {
+                            port = "0"
+                            username = "local"
+                            password = ""
                         }
                     }
-                } else null
-            )
-            if (!isLocal) {
-                OutlinedTextField(value = port, onValueChange = { port = it }, label = { Text(stringResource(R.string.remote_port)) }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(value = username, onValueChange = { username = it }, label = { Text(stringResource(R.string.common_username)) }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(
-                    value = password,
-                    onValueChange = { password = it },
-                    label = { Text(stringResource(R.string.remote_password)) },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                    visualTransformation = if (passwordVisible) androidx.compose.ui.text.input.VisualTransformation.None else androidx.compose.ui.text.input.PasswordVisualTransformation(),
-                    trailingIcon = {
-                        val image = if (passwordVisible) FeatherIcons.Eye else FeatherIcons.EyeOff
-                        IconButton(onClick = { passwordVisible = !passwordVisible }) {
-                            Icon(image, stringResource(R.string.remote_toggle_password), tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                    }
-                )
-            } else {
-                Text(
-                    text = stringResource(R.string.remote_internal_dir_desc),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-
-            Spacer(modifier = Modifier.height(4.dp))
-            OutlinedButton(
-                onClick = {
-                    isTesting = true
-                    onTestConnection(host, port, username, password, protocol) { success, msg ->
-                        isTesting = false
-                        android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_LONG).show()
-                    }
                 },
-                modifier = Modifier.fillMaxWidth(),
-                enabled = !isTesting && host.isNotBlank() && (isLocal || username.isNotBlank())
-            ) {
-                if (isTesting) {
-                    CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
-                } else {
-                    Text(if (isLocal) stringResource(R.string.remote_test_dir) else stringResource(R.string.remote_test_connection))
-                }
-            }
+                tabs = listOf("SFTP", "FTP", stringResource(R.string.common_local))
+            )
 
-            Row(
+            Spacer(modifier = Modifier.height(10.dp))
+
+            Box(
                 modifier = Modifier
+                    .weight(1f)
                     .fillMaxWidth()
-                    .padding(top = Spacing.md),
-                horizontalArrangement = Arrangement.End,
-                verticalAlignment = Alignment.CenterVertically
+                    .nestedScroll(flingFix)
             ) {
-                TextButton(onClick = onDismiss) {
-                    Text(stringResource(R.string.common_cancel), color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                Spacer(modifier = Modifier.width(Spacing.sm))
-                Button(
-                    onClick = {
-                        onAdd(name, host, port, username, password, protocol)
-                    },
-                    enabled = host.isNotBlank() && (isLocal || username.isNotBlank())
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = 20.dp, vertical = 8.dp)
+                        .navigationBarsPadding(),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Text(if (initialConnection != null) stringResource(R.string.common_save) else stringResource(R.string.common_add))
+                    SheetOutlinedTextField(
+                        value = name,
+                        onValueChange = { name = it },
+                        label = { Text(if (isLocal) stringResource(R.string.remote_channel_name_hint) else stringResource(R.string.remote_connection_name_hint)) },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    SheetOutlinedTextField(
+                        value = host,
+                        onValueChange = { host = it },
+                        label = { Text(if (isLocal) stringResource(R.string.remote_internal_dir) else stringResource(R.string.remote_host_address)) },
+                        placeholder = if (isLocal) {
+                            { Text("/storage/emulated/0/AICode/projects") }
+                        } else {
+                            null
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        trailingIcon = if (isLocal) {
+                            {
+                                IconButton(onClick = { folderPicker.launch(null) }) {
+                                    Icon(FeatherIcons.Folder, contentDescription = stringResource(R.string.remote_select_dir), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            }
+                        } else null
+                    )
+                    if (!isLocal) {
+                        SheetOutlinedTextField(value = port, onValueChange = { port = it }, label = { Text(stringResource(R.string.remote_port)) }, modifier = Modifier.fillMaxWidth())
+                        SheetOutlinedTextField(value = username, onValueChange = { username = it }, label = { Text(stringResource(R.string.common_username)) }, modifier = Modifier.fillMaxWidth())
+                        SheetOutlinedTextField(
+                            value = password,
+                            onValueChange = { password = it },
+                            label = { Text(stringResource(R.string.remote_password)) },
+                            modifier = Modifier.fillMaxWidth(),
+                            visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                            trailingIcon = {
+                                val image = if (passwordVisible) FeatherIcons.Eye else FeatherIcons.EyeOff
+                                IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                                    Icon(image, stringResource(R.string.remote_toggle_password), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            }
+                        )
+                    }
+
+                    OutlinedButton(
+                        onClick = {
+                            isTesting = true
+                            onTestConnection(host, port, username, password, protocol) { success, msg ->
+                                isTesting = false
+                                android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_LONG).show()
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = !isTesting && host.isNotBlank() && (isLocal || username.isNotBlank())
+                    ) {
+                        if (isTesting) {
+                            CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                        } else {
+                            Text(if (isLocal) stringResource(R.string.remote_test_dir) else stringResource(R.string.remote_test_connection))
+                        }
+                    }
                 }
             }
+
+            SheetSaveButton(
+                text = stringResource(if (initialConnection != null) R.string.common_save else R.string.common_add),
+                enabled = host.isNotBlank() && (isLocal || username.isNotBlank()),
+                onClick = {
+                    onAdd(name, host, port, username, password, protocol)
+                }
+            )
         }
     }
 }
@@ -216,157 +350,156 @@ fun AddRemoteMountDialog(
     val isLocalConnection = selectedConnection?.protocol == RemoteProtocol.LOCAL
 
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val configuration = LocalConfiguration.current
+    val screenHeight = configuration.screenHeightDp.dp
+    val flingFix = rememberSheetFlingFix(sheetState)
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = MaterialTheme.colorScheme.surface
+        containerColor = MaterialTheme.colorScheme.surface,
+        contentWindowInsets = { WindowInsets(0.dp) }
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = Spacing.lg)
-                .padding(bottom = Spacing.xl)
-                .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+                .heightIn(max = screenHeight * 0.88f)
         ) {
-            Text(
-                text = if (initialMount != null) stringResource(R.string.remote_edit_workspace) else stringResource(R.string.remote_add_workspace),
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(bottom = Spacing.xs)
+            SheetTitle(
+                text = if (initialMount != null) stringResource(R.string.remote_edit_workspace) else stringResource(R.string.remote_add_workspace)
             )
 
-            ExposedDropdownMenuBox(
-                expanded = connExpanded,
-                onExpandedChange = { connExpanded = !connExpanded }
-            ) {
-                val selectedName = connections.find { it.id == selectedConnectionId }?.name ?: stringResource(R.string.remote_select_channel)
-                OutlinedTextField(
-                    value = selectedName,
-                    onValueChange = {},
-                    readOnly = true,
-                    label = { Text(stringResource(R.string.remote_link_channel)) },
-                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = connExpanded) },
-                    modifier = Modifier.fillMaxWidth().menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable)
-                )
-                ExposedDropdownMenu(
-                    expanded = connExpanded,
-                    onDismissRequest = { connExpanded = false },
-                    modifier = Modifier.background(MaterialTheme.colorScheme.surface)
-                ) {
-                    connections.forEach { conn ->
-                        DropdownMenuItem(
-                            text = { Text(conn.name) },
-                            onClick = {
-                                selectedConnectionId = conn.id
-                                if (conn.protocol == RemoteProtocol.LOCAL && remotePath.isBlank()) {
-                                    remotePath = "/"
-                                }
-                                connExpanded = false
-                            }
-                        )
-                    }
-                }
-            }
-
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                OutlinedTextField(
-                    value = remotePath,
-                    onValueChange = { remotePath = it },
-                    label = { Text(if (isLocalConnection) stringResource(R.string.remote_mount_subdir) else stringResource(R.string.remote_target_dir)) },
-                    placeholder = if (isLocalConnection) {
-                        { Text("/") }
-                    } else {
-                        null
-                    },
-                    singleLine = true,
-                    modifier = Modifier.weight(1f)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                IconButton(
-                    onClick = { showBrowser = true },
-                    enabled = selectedConnectionId.isNotEmpty()
-                ) {
-                    Icon(FeatherIcons.Folder, contentDescription = stringResource(R.string.remote_browse_dir), tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-            }
-
-            if (isLocalConnection) {
-                Text(
-                    text = stringResource(R.string.remote_local_channel_subdir_desc),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-
-            ExposedDropdownMenuBox(
-                expanded = wsExpanded,
-                onExpandedChange = { wsExpanded = !wsExpanded }
-            ) {
-                val selectedWsName = workspaces.find { it.path == selectedWorkspacePath }?.name ?: stringResource(R.string.remote_select_local_workspace)
-                OutlinedTextField(
-                    value = selectedWsName,
-                    onValueChange = {},
-                    readOnly = true,
-                    label = { Text(stringResource(R.string.remote_map_to_local)) },
-                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = wsExpanded) },
-                    modifier = Modifier.fillMaxWidth().menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable)
-                )
-                ExposedDropdownMenu(
-                    expanded = wsExpanded,
-                    onDismissRequest = { wsExpanded = false },
-                    modifier = Modifier.background(MaterialTheme.colorScheme.surface)
-                ) {
-                    workspaces.forEach { ws ->
-                        DropdownMenuItem(
-                            text = { Text(ws.name) },
-                            onClick = {
-                                selectedWorkspacePath = ws.path
-                                wsExpanded = false
-                            }
-                        )
-                    }
-                }
-            }
-
-            if (workspaces.isEmpty()) {
-                Text(stringResource(R.string.remote_no_local_workspace), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
-            }
-
-            Spacer(modifier = Modifier.height(4.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(stringResource(R.string.remote_auto_connect_on_start), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
-                    Text(stringResource(R.string.remote_auto_connect_and_sync), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                Switch(checked = autoConnect, onCheckedChange = { autoConnect = it })
-            }
-
-            Row(
+            Box(
                 modifier = Modifier
+                    .weight(1f)
                     .fillMaxWidth()
-                    .padding(top = Spacing.md),
-                horizontalArrangement = Arrangement.End,
-                verticalAlignment = Alignment.CenterVertically
+                    .nestedScroll(flingFix)
             ) {
-                TextButton(onClick = onDismiss) {
-                    Text(stringResource(R.string.common_cancel), color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                Spacer(modifier = Modifier.width(Spacing.sm))
-                Button(
-                    onClick = {
-                        onAdd(selectedConnectionId, remotePath, selectedWorkspacePath, autoConnect)
-                    },
-                    enabled = selectedWorkspacePath.isNotEmpty() && selectedConnectionId.isNotEmpty()
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = 20.dp, vertical = 8.dp)
+                        .navigationBarsPadding(),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Text(if (initialMount != null) stringResource(R.string.common_save) else stringResource(R.string.remote_add_workspace))
+                    ExposedDropdownMenuBox(
+                        expanded = connExpanded,
+                        onExpandedChange = { connExpanded = !connExpanded }
+                    ) {
+                        val selectedName = connections.find { it.id == selectedConnectionId }?.name ?: stringResource(R.string.remote_select_channel)
+                        SheetOutlinedTextField(
+                            value = selectedName,
+                            onValueChange = {},
+                            readOnly = true,
+                            label = { Text(stringResource(R.string.remote_link_channel)) },
+                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = connExpanded) },
+                            modifier = Modifier.fillMaxWidth().menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable)
+                        )
+                        ExposedDropdownMenu(
+                            expanded = connExpanded,
+                            onDismissRequest = { connExpanded = false },
+                            modifier = Modifier.background(MaterialTheme.colorScheme.surface)
+                        ) {
+                            connections.forEach { conn ->
+                                DropdownMenuItem(
+                                    text = { Text(conn.name) },
+                                    onClick = {
+                                        selectedConnectionId = conn.id
+                                        if (conn.protocol == RemoteProtocol.LOCAL && remotePath.isBlank()) {
+                                            remotePath = "/"
+                                        }
+                                        connExpanded = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        SheetOutlinedTextField(
+                            value = remotePath,
+                            onValueChange = { remotePath = it },
+                            label = { Text(if (isLocalConnection) stringResource(R.string.remote_mount_subdir) else stringResource(R.string.remote_target_dir)) },
+                            placeholder = if (isLocalConnection) {
+                                { Text("/") }
+                            } else {
+                                null
+                            },
+                            modifier = Modifier.weight(1f)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        IconButton(
+                            onClick = { showBrowser = true },
+                            enabled = selectedConnectionId.isNotEmpty()
+                        ) {
+                            Icon(FeatherIcons.Folder, contentDescription = stringResource(R.string.remote_browse_dir), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+
+                    if (isLocalConnection) {
+                        Text(
+                            text = stringResource(R.string.remote_local_channel_subdir_desc),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+
+                    ExposedDropdownMenuBox(
+                        expanded = wsExpanded,
+                        onExpandedChange = { wsExpanded = !wsExpanded }
+                    ) {
+                        val selectedWsName = workspaces.find { it.path == selectedWorkspacePath }?.name ?: stringResource(R.string.remote_select_local_workspace)
+                        SheetOutlinedTextField(
+                            value = selectedWsName,
+                            onValueChange = {},
+                            readOnly = true,
+                            label = { Text(stringResource(R.string.remote_map_to_local)) },
+                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = wsExpanded) },
+                            modifier = Modifier.fillMaxWidth().menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable)
+                        )
+                        ExposedDropdownMenu(
+                            expanded = wsExpanded,
+                            onDismissRequest = { wsExpanded = false },
+                            modifier = Modifier.background(MaterialTheme.colorScheme.surface)
+                        ) {
+                            workspaces.forEach { ws ->
+                                DropdownMenuItem(
+                                    text = { Text(ws.name) },
+                                    onClick = {
+                                        selectedWorkspacePath = ws.path
+                                        wsExpanded = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+
+                    if (workspaces.isEmpty()) {
+                        Text(stringResource(R.string.remote_no_local_workspace), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(stringResource(R.string.remote_auto_connect_on_start), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
+                            Text(stringResource(R.string.remote_auto_connect_and_sync), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        Switch(checked = autoConnect, onCheckedChange = { autoConnect = it })
+                    }
                 }
             }
+
+            SheetSaveButton(
+                text = stringResource(if (initialMount != null) R.string.common_save else R.string.remote_add_workspace),
+                enabled = selectedWorkspacePath.isNotEmpty() && selectedConnectionId.isNotEmpty(),
+                onClick = {
+                    onAdd(selectedConnectionId, remotePath, selectedWorkspacePath, autoConnect)
+                }
+            )
         }
     }
 

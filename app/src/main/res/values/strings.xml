@@ -611,7 +611,6 @@
     <!-- Remote Dialogs -->
     <string name="remote_edit_connection">编辑连接通道</string>
     <string name="remote_add_connection">添加连接通道</string>
-    <string name="remote_protocol_type">协议类型:</string>
     <string name="remote_channel_name_hint">通道名称 (如: 内部存储镜像)</string>
     <string name="remote_connection_name_hint">连接名称 (如: 腾讯云云服务器)</string>
     <string name="remote_internal_dir">内部存储目标目录</string>
@@ -620,7 +619,6 @@
     <string name="remote_port">端口</string>
     <string name="remote_password">密码</string>
     <string name="remote_toggle_password">切换密码可见性</string>
-    <string name="remote_internal_dir_desc">该目录作为镜像根目录。工作区会单向同步到这里，供只能访问普通目录的 App 使用。</string>
     <string name="remote_test_dir">测试目录</string>
     <string name="remote_test_connection">测试连通性</string>
     <string name="remote_edit_workspace">编辑工作区</string>
@@ -644,7 +642,7 @@
 
     <!-- Remote FTP -->
     <string name="ftp_usage_title">使用说明</string>
-    <string name="ftp_usage_desc">1. 手机与电脑需连接至同一 WiFi 局域网。\n2. 开启服务后，在电脑的文件资源管理器（或 FileZilla）地址栏访问下方 FTP 地址。\n3. 连接成功后，即可在电脑端直接查看并编辑手机工作区根目录（projects）下的全部代码项目。</string>
+    <string name="ftp_usage_desc">手机与电脑需连接同一 WiFi，在电脑文件资源管理器地址栏访问下方地址，即可管理手机工作区（projects）中的项目。</string>
     <string name="ftp_running">运行中: %1$s</string>
     <string name="ftp_not_running">服务未开启</string>
     <string name="ftp_error">错误: %1$s</string>
@@ -658,6 +656,8 @@
     <string name="ftp_auto_start_desc">应用启动时后台自动运行 FTP 服务</string>
     <string name="ftp_config_saved">配置已保存</string>
     <string name="ftp_save_config">保存配置</string>
+    <string name="ftp_copy_address">复制地址</string>
+    <string name="ftp_address_copied">地址已复制</string>
 
     <!-- Remote Server -->
     <string name="remote_workspace_title">连接与同步</string>
@@ -665,8 +665,10 @@
     <string name="remote_tab_mounts">挂载目录</string>
     <string name="remote_tab_ftp">内置FTP</string>
     <string name="remote_tab_sync">同步设置</string>
-    <string name="remote_no_connections">暂无连接配置，请点击添加。</string>
-    <string name="remote_no_workspaces">暂无工作区，请点击添加。</string>
+    <string name="remote_no_connections">暂无连接配置</string>
+    <string name="remote_no_connections_desc">添加 SFTP / FTP 或本地通道，把手机工作区与远程或本地目录连接起来。</string>
+    <string name="remote_no_workspaces">暂无挂载目录</string>
+    <string name="remote_no_workspaces_desc">把某个通道的目录映射到本地工作区，本地改动将自动单向同步到远程。</string>
     <string name="remote_hint_title">提示</string>
     <string name="remote_add_channel_first">请先在「连接配置」中添加一个远程通道。</string>
     <string name="remote_go_add">去添加</string>
@@ -681,22 +683,14 @@
     <string name="remote_unknown_error">未知错误</string>
 
     <!-- Remote Sync -->
-    <string name="sync_ignore_list">目录/文件忽略列表</string>
-    <string name="sync_ignore_desc">多个规则请用英文逗号分隔。这些名称的目录及文件将不会被同步到远程服务器（如 node_modules）。</string>
-    <string name="sync_ignore_rules">忽略规则</string>
-    <string name="sync_ignore_saved">忽略规则已保存</string>
-    <string name="sync_save_rules">保存规则</string>
+    <string name="sync_save_settings">保存设置</string>
+    <string name="sync_saved">同步设置已保存</string>
     <string name="sync_follow_gitignore">遵循 .gitignore 规则</string>
-    <string name="sync_gitignore_desc">如果项目根目录存在 .gitignore，也会自动读取并忽略其中的文件与目录。</string>
-    <string name="sync_gitignore_enabled">已开启 .gitignore 过滤</string>
-    <string name="sync_gitignore_disabled">已关闭 .gitignore 过滤</string>
+    <string name="sync_gitignore_desc">自动读取项目根目录的 .gitignore 并忽略其中内容。</string>
     <string name="sync_max_batch_size">单次最大同步队列数量</string>
-    <string name="sync_batch_size_desc">防止突发性大量文件修改同时请求服务端导致断开连接。超过此数量的操作将排队按批次执行（批次间稍作停顿）。</string>
+    <string name="sync_batch_size_desc">超出此数量的操作将分批排队执行，防止突发大量修改导致断连。</string>
     <string name="sync_max_batch_count">最大数量</string>
-    <string name="sync_batch_size_saved">最大队列数量已保存</string>
-    <string name="sync_save_batch_size">保存数量</string>
-    <string name="sync_via_connection">通过: %1$s</string>
-    <string name="status_connected">已连接</string>
+    <string name="sync_path_mapping">%1$s → %2$s</string>    <string name="status_connected">已连接</string>
     <string name="status_disconnected">未连接</string>
     <string name="status_connection_failed">连接失败</string>
     <string name="sync_auto_connect">自动连接</string>

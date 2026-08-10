@@ -36,7 +36,6 @@ class RemoteServerViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(RemoteServerUiState())
     val uiState: StateFlow<RemoteServerUiState> = _uiState.asStateFlow()
 
-    val syncIgnoredPatterns = syncSettingsRepository.ignoredPatterns
     val syncUseGitIgnore = syncSettingsRepository.useGitIgnore
     val maxSyncBatchSize = syncSettingsRepository.maxSyncBatchSize
 
@@ -57,15 +56,7 @@ class RemoteServerViewModel @Inject constructor(
                 repository.getMounts()
                     .catch { e -> _uiState.value = _uiState.value.copy(error = e.message) }
                     .collect { mounts ->
-                        val wasEmpty = _uiState.value.mounts.isEmpty()
                         _uiState.value = _uiState.value.copy(mounts = mounts)
-                        
-                        // Auto-connect mounts on load
-                        if (wasEmpty) {
-                            mounts.filter { it.autoConnect && !it.isActive }.forEach {
-                                connectMount(it.id)
-                            }
-                        }
                     }
             }
             launch {
@@ -248,10 +239,6 @@ class RemoteServerViewModel @Inject constructor(
                 onResult(false, emptyList(), result.exceptionOrNull()?.message ?: context.getString(R.string.remote_unknown_error))
             }
         }
-    }
-
-    fun setSyncIgnoredPatterns(patterns: String) {
-        syncSettingsRepository.setIgnoredPatterns(patterns)
     }
 
     fun setSyncUseGitIgnore(use: Boolean) {

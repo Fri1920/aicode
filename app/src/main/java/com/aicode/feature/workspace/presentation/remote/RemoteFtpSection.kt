@@ -1,6 +1,6 @@
 package com.aicode.feature.workspace.presentation.remote
 
-import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -9,15 +9,25 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.ClipEntry
+import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import android.content.ClipData
+import com.aicode.core.theme.Spacing
+import com.aicode.feature.settings.presentation.component.SettingsGroup
+import com.aicode.feature.settings.presentation.component.SettingsGroupHeader
+import com.aicode.feature.settings.presentation.component.settingsLightMode
 import compose.icons.FeatherIcons
+import compose.icons.feathericons.Copy
 import compose.icons.feathericons.Info
-import compose.icons.feathericons.Settings
 import compose.icons.feathericons.Share2
 import androidx.compose.ui.res.stringResource
 import com.aicode.R
+import kotlinx.coroutines.launch
 
 @Composable
 fun WiFiFtpServerSection(viewModel: RemoteServerViewModel) {
@@ -36,135 +46,141 @@ fun WiFiFtpServerSection(viewModel: RemoteServerViewModel) {
     var editAnonymous by remember(isAnonymous) { mutableStateOf(isAnonymous) }
     var editAutoStart by remember(autoStart) { mutableStateOf(autoStart) }
     val context = androidx.compose.ui.platform.LocalContext.current
+    val clipboard = LocalClipboard.current
+    val scope = rememberCoroutineScope()
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+            .padding(horizontal = Spacing.lg)
+            .padding(bottom = Spacing.xl),
+        verticalArrangement = Arrangement.spacedBy(Spacing.md)
     ) {
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(12.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
-        ) {
+        SettingsGroupHeader(text = stringResource(R.string.ftp_usage_title))
+        SettingsGroup {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(16.dp),
+                    .padding(horizontal = Spacing.lg, vertical = 11.dp),
                 verticalAlignment = Alignment.Top
             ) {
                 Icon(
                     FeatherIcons.Info,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(20.dp).padding(top = 2.dp)
+                    tint = if (settingsLightMode()) Color(0xFF0F0F0F) else MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(16.dp).padding(top = 2.dp)
                 )
-                Spacer(modifier = Modifier.width(16.dp))
+                Spacer(modifier = Modifier.width(Spacing.md))
                 Column {
-                    Text(
-                        text = stringResource(R.string.ftp_usage_title),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Normal,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
                     Text(
                         text = stringResource(R.string.ftp_usage_desc),
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(top = 4.dp)
+                        color = if (settingsLightMode()) Color(0xFF8E8E93) else MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
         }
 
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(12.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            FeatherIcons.Share2,
-                            contentDescription = null,
-                            tint = if (isRunning) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(24.dp)
+        SettingsGroupHeader(text = stringResource(R.string.remote_tab_ftp))
+        SettingsGroup {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = Spacing.lg, vertical = 11.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                    Icon(
+                        FeatherIcons.Share2,
+                        contentDescription = null,
+                        tint = if (settingsLightMode()) Color(0xFF0F0F0F) else MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(Spacing.md))
+                    Column {
+                        Text(
+                            text = stringResource(R.string.remote_tab_ftp),
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = FontWeight.Normal,
+                            color = if (settingsLightMode()) Color(0xFF0F0F0F) else MaterialTheme.colorScheme.onSurface
                         )
-                        Spacer(modifier = Modifier.width(16.dp))
-                        Column {
+                        if (isRunning) {
+                            Row(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .clickable {
+                                        scope.launch {
+                                            clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("ftp", serverUrl)))
+                                        }
+                                        android.widget.Toast.makeText(context, context.getString(R.string.ftp_address_copied), android.widget.Toast.LENGTH_SHORT).show()
+                                    }
+                                    .padding(top = 2.dp, end = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = stringResource(R.string.ftp_running, serverUrl),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = if (settingsLightMode()) Color(0xFF8E8E93) else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Icon(
+                                    FeatherIcons.Copy,
+                                    contentDescription = stringResource(R.string.ftp_copy_address),
+                                    tint = if (settingsLightMode()) Color(0xFF8E8E93) else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(12.dp)
+                                )
+                            }
+                        } else {
                             Text(
-                                text = "FTP",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Normal,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            Text(
-                                text = if (isRunning) stringResource(R.string.ftp_running, serverUrl) else stringResource(R.string.ftp_not_running),
+                                text = stringResource(R.string.ftp_not_running),
                                 style = MaterialTheme.typography.bodySmall,
-                                color = if (isRunning) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                color = if (settingsLightMode()) Color(0xFF8E8E93) else MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.padding(top = 2.dp)
                             )
                         }
                     }
-                    Switch(
-                        checked = isRunning,
-                        onCheckedChange = { viewModel.toggleFtpServer() }
-                    )
                 }
+                Switch(
+                    checked = isRunning,
+                    onCheckedChange = { viewModel.toggleFtpServer() }
+                )
+            }
 
-                if (errorMessage != null) {
-                    val error = errorMessage
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Text(
-                        text = context.getString(R.string.ftp_error, error),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error
-                    )
-                }
+            if (errorMessage != null) {
+                val error = errorMessage
+                Text(
+                    text = context.getString(R.string.ftp_error, error),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.padding(start = Spacing.lg, end = Spacing.lg, bottom = Spacing.sm)
+                )
             }
         }
 
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(12.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
-        ) {
+        SettingsGroupHeader(text = stringResource(R.string.ftp_config_title))
+        SettingsGroup {
             Column(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = Spacing.lg, vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        FeatherIcons.Settings,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Spacer(modifier = Modifier.width(16.dp))
-                    Text(
-                        text = stringResource(R.string.ftp_config_title),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Normal,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                }
-
                 OutlinedTextField(
                     value = editPort,
                     onValueChange = { editPort = it.filter { char -> char.isDigit() } },
                     label = { Text(stringResource(R.string.ftp_listen_port)) },
                     modifier = Modifier.fillMaxWidth(),
-                    singleLine = true
+                    singleLine = true,
+                    shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
+                        focusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
+                        unfocusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f),
+                        focusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f)
+                    )
                 )
 
                 OutlinedTextField(
@@ -173,7 +189,14 @@ fun WiFiFtpServerSection(viewModel: RemoteServerViewModel) {
                     label = { Text(stringResource(R.string.ftp_login_username)) },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
-                    enabled = !editAnonymous
+                    enabled = !editAnonymous,
+                    shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
+                        focusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
+                        unfocusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f),
+                        focusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f)
+                    )
                 )
 
                 OutlinedTextField(
@@ -182,7 +205,14 @@ fun WiFiFtpServerSection(viewModel: RemoteServerViewModel) {
                     label = { Text(stringResource(R.string.ftp_login_password)) },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
-                    enabled = !editAnonymous
+                    enabled = !editAnonymous,
+                    shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
+                        focusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
+                        unfocusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f),
+                        focusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f)
+                    )
                 )
 
                 Row(
@@ -191,8 +221,8 @@ fun WiFiFtpServerSection(viewModel: RemoteServerViewModel) {
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
-                        Text(text = stringResource(R.string.ftp_allow_anonymous), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
-                        Text(text = stringResource(R.string.ftp_anonymous_desc), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(text = stringResource(R.string.ftp_allow_anonymous), style = MaterialTheme.typography.bodyMedium, color = if (settingsLightMode()) Color(0xFF0F0F0F) else MaterialTheme.colorScheme.onSurface)
+                        Text(text = stringResource(R.string.ftp_anonymous_desc), style = MaterialTheme.typography.bodySmall, color = if (settingsLightMode()) Color(0xFF8E8E93) else MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     Switch(checked = editAnonymous, onCheckedChange = { editAnonymous = it })
                 }
@@ -203,8 +233,8 @@ fun WiFiFtpServerSection(viewModel: RemoteServerViewModel) {
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
-                        Text(text = stringResource(R.string.ftp_auto_start), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
-                        Text(text = stringResource(R.string.ftp_auto_start_desc), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(text = stringResource(R.string.ftp_auto_start), style = MaterialTheme.typography.bodyMedium, color = if (settingsLightMode()) Color(0xFF0F0F0F) else MaterialTheme.colorScheme.onSurface)
+                        Text(text = stringResource(R.string.ftp_auto_start_desc), style = MaterialTheme.typography.bodySmall, color = if (settingsLightMode()) Color(0xFF8E8E93) else MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     Switch(checked = editAutoStart, onCheckedChange = { editAutoStart = it })
                 }
