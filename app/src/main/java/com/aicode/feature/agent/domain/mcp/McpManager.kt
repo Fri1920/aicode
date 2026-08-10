@@ -1,8 +1,11 @@
 package com.aicode.feature.agent.domain.mcp
 
 import com.aicode.core.util.FileLogger
+import com.aicode.feature.agent.domain.container.ContainerProfile
 import com.aicode.feature.agent.domain.container.LinuxContainerEngine
 import com.aicode.feature.agent.domain.tool.ToolRegistry
+import com.aicode.feature.settings.data.repository.ContainerSettingsRepository
+import com.aicode.feature.settings.data.repository.ExecutionMode
 import com.aicode.feature.workspace.data.repository.WorkspaceRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -13,6 +16,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -37,7 +42,8 @@ class McpManager @Inject constructor(
     private val toolRegistry: ToolRegistry,
     private val okHttpClient: OkHttpClient,
     private val containerEngine: LinuxContainerEngine,
-    private val workspaceRepository: WorkspaceRepository
+    private val workspaceRepository: WorkspaceRepository,
+    private val containerSettingsRepository: ContainerSettingsRepository
 ) {
     private companion object {
         const val TAG = "McpManager"
@@ -58,6 +64,21 @@ class McpManager @Inject constructor(
         scope.launch {
             workspaceRepository.current.collectLatest {
                 reload()
+            }
+        }
+        // 容器 profile 切换：stdio server 的进程跑在旧容器的 rootfs 上，必须重建才能用新容器；
+        // HTTP server 不依赖容器，不受影响。drop(1) 跳过启动首帧（reload 已处理）。
+        scope.launch {
+            containerSettingsRepository.activeProfileIdFlow.drop(1).collect {
+                reloadStdioServers()
+            }
+        }
+        // 默认容器变化：远程模式下 stdio server 运行在默认容器上，同样需要重建。
+        scope.launch {
+            containerSettingsRepository.defaultContainerIdFlow.drop(1).collect {
+                if (currentActiveProfile().mode == ExecutionMode.REMOTE_SSH) {
+                    reloadStdioServers()
+                }
             }
         }
     }
@@ -100,8 +121,10 @@ class McpManager @Inject constructor(
         return try {
             FileLogger.i(TAG, "[${cfg.name}] 开始连接（${if (cfg.isStdio) "stdio" else "HTTP"}）")
             val transport = if (cfg.isStdio) {
-                // 本地 stdio server 需要容器就绪；未就绪不自动初始化，直接失败并引导去终端页完成初始化。
-                containerEngine.notReadyHint()?.let {
+                // stdio server 跑在「运行时容器」上：本地模式用当前容器，远程 SSH 模式用默认容器。
+                // 容器未就绪不自动初始化，直接失败并引导去终端页完成初始化。
+                val runtimeProfile = resolveMcpRuntimeProfile()
+                containerEngine.notReadyHintFor(runtimeProfile)?.let {
                     throw IllegalStateException(it)
                 }
                 StdioTransport(
@@ -110,7 +133,8 @@ class McpManager @Inject constructor(
                     program = cfg.command!!,
                     programArgs = cfg.args,
                     projectPath = workspaceRepository.currentPath(),
-                    extraEnv = cfg.env
+                    extraEnv = cfg.env,
+                    runtimeProfile = runtimeProfile
                 )
             } else {
                 StreamableHttpTransport(
@@ -177,6 +201,56 @@ class McpManager @Inject constructor(
         for (cfg in servers) {
             val connected = synchronized(activeClients) { activeClients.containsKey(cfg.name) }
             if (connected) continue
+            if (_statuses.value.none { it.name == cfg.name }) {
+                _statuses.value = _statuses.value + McpServerStatus(cfg.name, McpServerStatus.State.CONNECTING)
+            }
+            _statuses.value = _statuses.value.map {
+                if (it.name == cfg.name) McpServerStatus(cfg.name, McpServerStatus.State.CONNECTING) else it
+            }
+            val result = withContext(Dispatchers.IO) { connectOne(cfg) }
+            _statuses.value = _statuses.value.map { if (it.name == cfg.name) result else it }
+        }
+    }
+
+    /**
+     * 异步兜底重连未连接的 server（不阻塞调用方）。新会话创建不应等待 MCP 就绪：
+     * stdio server 首跑可能长时间卡在下载依赖/握手超时，同步等待会让「新建会话」看起来卡死。
+     */
+    fun reconnectUnconnectedAsync() {
+        scope.launch { reconnectUnconnected() }
+    }
+
+    /** 解析 stdio server 的运行时容器：本地模式用当前 profile，远程 SSH 模式用默认容器。 */
+    private suspend fun resolveMcpRuntimeProfile(): ContainerProfile {
+        val active = currentActiveProfile()
+        return if (active.mode == ExecutionMode.REMOTE_SSH) resolveDefaultContainerProfile() else active
+    }
+
+    /** 当前激活 profile：按 id 从配置列表解析，找不到回退内置 Alpine。 */
+    private suspend fun currentActiveProfile(): ContainerProfile {
+        val id = containerSettingsRepository.activeProfileIdFlow.first()
+        val profiles = containerSettingsRepository.customProfilesFlow.first()
+        return profiles.firstOrNull { it.id == id } ?: ContainerProfile.BUILTIN_ALPINE
+    }
+
+    /** 默认容器：设置的 id 且为本地 PRoot 模式；找不到/被删/是远程则回退内置 Alpine。 */
+    private suspend fun resolveDefaultContainerProfile(): ContainerProfile {
+        val id = containerSettingsRepository.defaultContainerIdFlow.first()
+        val profiles = containerSettingsRepository.customProfilesFlow.first()
+        return profiles.firstOrNull { it.id == id && it.mode == ExecutionMode.LOCAL_PROOT }
+            ?: ContainerProfile.BUILTIN_ALPINE
+    }
+
+    /**
+     * 容器相关配置变化后重建所有 stdio server（HTTP 不依赖容器，不动）。
+     * 旧进程钉在旧容器的 rootfs 上，必须 teardown 后才能用新容器拉起；单个 server 失败不影响其它。
+     */
+    private suspend fun reloadStdioServers() = reloadMutex.withLock {
+        val servers = configRepository.getEffectiveServers().filter { it.enabled && it.isStdio }
+        if (servers.isEmpty()) return@withLock
+        FileLogger.i(TAG, "容器配置变化，重建 ${servers.size} 个 stdio MCP server")
+        for (cfg in servers) {
+            teardownServer(cfg.name)
             if (_statuses.value.none { it.name == cfg.name }) {
                 _statuses.value = _statuses.value + McpServerStatus(cfg.name, McpServerStatus.State.CONNECTING)
             }

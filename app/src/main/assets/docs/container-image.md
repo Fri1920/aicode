@@ -53,6 +53,9 @@ App 自带 Alpine 镜像（来自内置资源），首次启动默认添加并�
 *   **文件读写**：SSH exec channel（文本用 `cat`/重定向读写，二进制用 `base64` 中转；不使用 SFTP——sshj 的 SFTP 实现有崩溃 bug）。
 *   **终端交互**：SSH shell channel。
 
+### 默认容器
+远程模式下仍需要本地跑的服务（如 MCP stdio server）运行在**默认容器**上——默认内置 Alpine，可在列表下方的「默认容器」分组改为任意本地容器。切换容器（含切到远程 SSH）后，所有 stdio MCP server 会自动断开并用新容器重新连接；HTTP MCP 不依赖容器、不受影响。
+
 ### 前置：配置 SFTP 通道
 远程 SSH 复用「连接与同步」页（详见 `remote-servers.md`）里配置的 **SFTP** 通道的连接信息（主机、端口、用户名、密码）。因此先在那里建好一个 SFTP 连接通道；FTP 与本地通道不支持 SSH exec，不会出现在可选列表中。
 

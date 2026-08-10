@@ -49,6 +49,7 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -113,10 +114,12 @@ import kotlin.math.roundToInt
 internal fun ContainerSection(
     profiles: List<ContainerProfile>,
     activeProfileId: String,
+    defaultContainerId: String = ContainerProfile.BUILTIN_ID,
     osMap: Map<String, String> = emptyMap(),
     showAddSheetExternal: Boolean = false,
     onDismissAddSheet: () -> Unit = {},
     onSelect: (String) -> Unit,
+    onSetDefaultContainer: (String) -> Unit = {},
     onSaveCustom: (ContainerProfile) -> Unit,
     onEditCustom: (ContainerProfile) -> Unit,
     onDeleteProfile: (ContainerProfile) -> Unit,
@@ -172,6 +175,7 @@ internal fun ContainerSection(
                     ContainerRow(
                         profile = profile,
                         active = profile.id == activeProfileId,
+                        defaultContainerId = defaultContainerId,
                         osId = osMap[profile.id],
                         subtitle = profileSubtitle(context, profile, remoteConnections),
                         onSelect = { if (profile.id != activeProfileId) pendingSwitch = profile },
@@ -186,20 +190,21 @@ internal fun ContainerSection(
     if (showAddSheet) {
         ProfileEditSheet(
             initial = null,
+            defaultContainerId = defaultContainerId,
             remoteConnections = remoteConnections,
             onDismiss = {
                 showAddSheetInternal = false
                 onDismissAddSheet()
             },
-            onConfirm = { profile ->
+            onConfirm = { profile, setDefault ->
                 val id = "custom-${System.currentTimeMillis()}"
-                onSaveCustom(
-                    if (profile.mode == ExecutionMode.REMOTE_SSH) {
-                        profile.copy(id = id, name = profile.name.ifBlank { context.getString(R.string.container_remote_ssh) })
-                    } else {
-                        profile.copy(id = id, name = profile.name.ifBlank { context.getString(R.string.container_custom_image) })
-                    }
-                )
+                val final = if (profile.mode == ExecutionMode.REMOTE_SSH) {
+                    profile.copy(id = id, name = profile.name.ifBlank { context.getString(R.string.container_remote_ssh) })
+                } else {
+                    profile.copy(id = id, name = profile.name.ifBlank { context.getString(R.string.container_custom_image) })
+                }
+                onSaveCustom(final)
+                if (setDefault) onSetDefaultContainer(final.id)
                 showAddSheetInternal = false
                 onDismissAddSheet()
             }
@@ -209,11 +214,20 @@ internal fun ContainerSection(
     editingProfile?.let { editing ->
         ProfileEditSheet(
             initial = editing,
+            defaultContainerId = defaultContainerId,
             remoteConnections = remoteConnections,
             onDismiss = { editingProfile = null },
             onReset = { pendingReset = editing },
-            onConfirm = { profile ->
+            onConfirm = { profile, setDefault ->
                 onEditCustom(profile.copy(id = editing.id))
+                // 本地镜像才可作默认容器；关闭默认时若原本就是默认则回退内置 Alpine。
+                if (profile.mode == ExecutionMode.LOCAL_PROOT) {
+                    if (setDefault) {
+                        onSetDefaultContainer(editing.id)
+                    } else if (editing.id == defaultContainerId) {
+                        onSetDefaultContainer(ContainerProfile.BUILTIN_ID)
+                    }
+                }
                 editingProfile = null
             }
         )
@@ -293,6 +307,7 @@ private fun osLogo(osId: String?): Painter? = when (osId) {
 private fun ContainerRow(
     profile: ContainerProfile,
     active: Boolean,
+    defaultContainerId: String = ContainerProfile.BUILTIN_ID,
     osId: String?,
     subtitle: String,
     onSelect: () -> Unit,
@@ -488,6 +503,13 @@ private fun ContainerRow(
                             color = MaterialTheme.colorScheme.tertiary
                         )
                     }
+                    if (profile.id == defaultContainerId) {
+                        Spacer(modifier = Modifier.width(Spacing.xs))
+                        SourceBadge(
+                            text = stringResource(R.string.container_default_badge),
+                            color = Color(0xFFF59E0B)
+                        )
+                    }
                 }
                 Text(
                     text = subtitle,
@@ -558,10 +580,11 @@ private fun profileSubtitle(context: Context, profile: ContainerProfile, connect
 @Composable
 private fun ProfileEditSheet(
     initial: ContainerProfile?,
+    defaultContainerId: String = ContainerProfile.BUILTIN_ID,
     remoteConnections: List<RemoteConnection>,
     onDismiss: () -> Unit,
     onReset: (() -> Unit)? = null,
-    onConfirm: (ContainerProfile) -> Unit
+    onConfirm: (ContainerProfile, Boolean) -> Unit
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val configuration = LocalConfiguration.current
@@ -576,6 +599,8 @@ private fun ProfileEditSheet(
 
     var mode by remember { mutableStateOf(initial?.mode ?: ExecutionMode.LOCAL_PROOT) }
     var name by remember { mutableStateOf(initial?.name ?: "") }
+    // 是否设为默认容器（仅本地镜像生效；默认容器是远程模式下本地 MCP 等服务的运行容器）
+    var setAsDefault by remember { mutableStateOf(initial?.id == defaultContainerId) }
     // 本地镜像字段
     var shellPath by remember { mutableStateOf(initial?.shellPath ?: "/bin/sh") }
     val bindingsList = remember {
@@ -786,6 +811,36 @@ private fun ProfileEditSheet(
                         }
                     }
                 }
+
+                // 设为默认容器：远程工作区模式下本地 MCP 等服务的运行容器
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(
+                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+                            RoundedCornerShape(12.dp)
+                        )
+                        .padding(horizontal = 14.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = stringResource(R.string.container_set_as_default),
+                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = stringResource(R.string.container_default_desc),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(top = 2.dp)
+                        )
+                    }
+                    Switch(
+                        checked = setAsDefault,
+                        onCheckedChange = { setAsDefault = it }
+                    )
+                }
             } else {
                 ExposedDropdownMenuBox(
                     expanded = connExpanded,
@@ -835,13 +890,6 @@ private fun ProfileEditSheet(
                         }
                     }
                 }
-                if (sshConnections.isEmpty()) {
-                    Text(
-                        text = stringResource(R.string.container_no_sftp_channel),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error
-                    )
-                }
                 OutlinedTextField(
                     value = remotePath,
                     onValueChange = { remotePath = it },
@@ -856,11 +904,6 @@ private fun ProfileEditSheet(
                         focusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f)
                     ),
                     modifier = Modifier.fillMaxWidth()
-                )
-                Text(
-                    text = stringResource(R.string.container_remote_workspace_desc),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
 
@@ -891,7 +934,9 @@ private fun ProfileEditSheet(
                             selectedConnId = selectedConnId,
                             remotePath = remotePath
                         )
-                        if (profile != null) onConfirm(profile)
+                        if (profile != null) {
+                            onConfirm(profile, setAsDefault && profile.mode == ExecutionMode.LOCAL_PROOT)
+                        }
                     }
                 },
                 enabled = !importing && canConfirm(mode, pickedUri, initialAsset, selectedConnId, sshConnections),

@@ -893,8 +893,9 @@ class AIAgentViewModel @Inject constructor(
             setChanges(curId, emptyList())
             return@launch
         }
-        // 新会话时重连未连接的 MCP server，让 manageMcp 新增的配置真正生效。
-        mcpManager.reconnectUnconnected()
+        // 新会话时异步重连未连接的 MCP server，让 manageMcp 新增的配置真正生效；
+        // 不阻塞会话创建——MCP 环境未就绪/超时时不能卡住「新建会话」。
+        mcpManager.reconnectUnconnectedAsync()
         val s = createSession(_currentWorkspace.value)
         sessionUseCase.upsertSession(s)
         _currentSessionId.value = s.id

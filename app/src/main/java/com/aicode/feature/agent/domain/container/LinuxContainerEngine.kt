@@ -495,8 +495,11 @@ class LinuxContainerEngine @Inject constructor(
      * 基础包是否已配置完成（按当前 profile 的标记）。所有容器（内置/自定义）首次初始化都会执行
      * 通用依赖安装脚本（见 [provisionIfNeeded]），完成后写标记；脚本失败不写标记、下次重试。
      */
-    override fun isProvisioned(): Boolean {
-        val marker = provisionMarker(currentProfile)
+    override fun isProvisioned(): Boolean = isProvisionedFor(currentProfile)
+
+    /** 按指定 profile 判断基础包配置是否完成（MCP 等按指定容器启动时用）。 */
+    fun isProvisionedFor(profile: ContainerProfile): Boolean {
+        val marker = provisionMarker(profile)
         return marker.exists() && marker.readText().trim() == PROVISION_VERSION
     }
 
@@ -505,9 +508,12 @@ class LinuxContainerEngine @Inject constructor(
      * 自定义镜像只要求 rootfs 就绪：初始化脚本失败不阻塞使用，由用户自行补齐工具。
      * 命令执行入口据此不自动初始化、直接失败并引导用户去终端页完成初始化。
      */
-    override fun notReadyHint(): String? {
-        if (containerInstaller.isInstalledFor(currentProfile) &&
-            (isProvisioned() || !currentProfile.isBuiltin)
+    override fun notReadyHint(): String? = notReadyHintFor(currentProfile)
+
+    /** 按指定 profile 判断容器是否就绪（MCP 按运行时容器启动前检查用）。 */
+    fun notReadyHintFor(profile: ContainerProfile): String? {
+        if (containerInstaller.isInstalledFor(profile) &&
+            (isProvisionedFor(profile) || !profile.isBuiltin)
         ) return null
         return context.getString(R.string.container_not_ready_hint)
     }
@@ -632,9 +638,10 @@ class LinuxContainerEngine @Inject constructor(
         program: String,
         programArgs: List<String>,
         projectPath: String?,
-        extraEnv: Map<String, String> = emptyMap()
+        extraEnv: Map<String, String> = emptyMap(),
+        profile: ContainerProfile = currentProfile
     ): Process {
-        val invocation = buildStdioInvocation(program, programArgs, projectPath, extraEnv)
+        val invocation = buildStdioInvocation(program, programArgs, projectPath, extraEnv, profile)
         val pb = buildProcessBuilder(invocation)
         // 刻意不 redirectErrorStream：stdout 留给 JSON-RPC，stderr 由调用方单独消费。
         return pb.start()
@@ -648,15 +655,16 @@ class LinuxContainerEngine @Inject constructor(
         program: String,
         programArgs: List<String>,
         projectPath: String?,
-        extraEnv: Map<String, String>
+        extraEnv: Map<String, String>,
+        profile: ContainerProfile
     ): ProotInvocation {
-        val argv = buildBaseProotArgv(projectPath)
+        val argv = buildBaseProotArgv(projectPath, profile)
         argv.add("/bin/sh")
         argv.add("-c")
         argv.add("exec \"\$0\" \"\$@\"")
         argv.add(program)
         argv.addAll(programArgs)
-        return ProotInvocation(argv, buildContainerEnv() + currentProfile.env + extraEnv)
+        return ProotInvocation(argv, buildContainerEnv() + profile.env + extraEnv)
     }
 
     /**
@@ -664,7 +672,7 @@ class LinuxContainerEngine @Inject constructor(
      * 暴露给终端会话：Termux TerminalSession 需要把可执行文件与参数分开传入。
      */
     fun buildProotInvocation(command: String, projectPath: String?): ProotInvocation {
-        val argv = buildBaseProotArgv(projectPath)
+        val argv = buildBaseProotArgv(projectPath, currentProfile)
         // 用 [defaultShell]：bash 装好后 AI 命令与终端会话都走 bash；装机期间/失败回退 /bin/sh。
         argv.add(defaultShell())
         argv.add("-c")
@@ -676,8 +684,7 @@ class LinuxContainerEngine @Inject constructor(
      * 构造 PRoot 调用的公共前缀 argv：proot 二进制 + rootfs + 标准绑定 + 伪 root + 工作区绑定，
      * 但**不含**最终的客户机命令（由各调用方自行追加 `/bin/sh -c …` 或 `exec` 形式）。
      */
-    private fun buildBaseProotArgv(projectPath: String?): MutableList<String> {
-        val profile = currentProfile
+    private fun buildBaseProotArgv(projectPath: String?, profile: ContainerProfile): MutableList<String> {
         val rootfs = containerInstaller.rootfsDirFor(profile).absolutePath
         val prootBin = containerInstaller.prootBin.absolutePath
 

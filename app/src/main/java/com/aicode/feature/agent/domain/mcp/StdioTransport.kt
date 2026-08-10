@@ -1,6 +1,7 @@
 package com.aicode.feature.agent.domain.mcp
 
 import com.aicode.core.util.FileLogger
+import com.aicode.feature.agent.domain.container.ContainerProfile
 import com.aicode.feature.agent.domain.container.LinuxContainerEngine
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
@@ -37,6 +38,7 @@ class StdioTransport(
     private val programArgs: List<String>,
     private val projectPath: String?,
     private val extraEnv: Map<String, String> = emptyMap(),
+    private val runtimeProfile: ContainerProfile = ContainerProfile.BUILTIN_ALPINE,
     private val json: Json = DEFAULT_JSON
 ) : McpTransport {
 
@@ -119,7 +121,7 @@ class StdioTransport(
 
         FileLogger.i(TAG, "[$serverName] 启动 stdio server: $program ${programArgs.joinToString(" ")}")
         val p = try {
-            engine.startStdioProcess(program, programArgs, projectPath, extraEnv)
+            engine.startStdioProcess(program, programArgs, projectPath, extraEnv, runtimeProfile)
         } catch (e: Exception) {
             throw McpException(message = "[$serverName] 启动子进程失败: ${e.message}", cause = e)
         }

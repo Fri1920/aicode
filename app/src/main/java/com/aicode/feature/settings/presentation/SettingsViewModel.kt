@@ -170,6 +170,9 @@ class SettingsViewModel @Inject constructor(
     private val _activeProfileId = MutableStateFlow(ContainerProfile.BUILTIN_ID)
     val activeProfileId: StateFlow<String> = _activeProfileId.asStateFlow()
 
+    private val _defaultContainerId = MutableStateFlow(ContainerProfile.BUILTIN_ID)
+    val defaultContainerId: StateFlow<String> = _defaultContainerId.asStateFlow()
+
     private val _customProfiles = MutableStateFlow<List<ContainerProfile>>(emptyList())
     val customProfiles: StateFlow<List<ContainerProfile>> = _customProfiles.asStateFlow()
 
@@ -268,6 +271,12 @@ class SettingsViewModel @Inject constructor(
             launch {
                 containerSettingsRepository.activeProfileIdFlow.collectLatest {
                     _activeProfileId.value = it
+                }
+            }
+
+            launch {
+                containerSettingsRepository.defaultContainerIdFlow.collectLatest {
+                    _defaultContainerId.value = it
                 }
             }
 
@@ -495,6 +504,13 @@ class SettingsViewModel @Inject constructor(
     fun setActiveContainerProfile(id: String) {
         viewModelScope.launch {
             applyProfile(id)
+        }
+    }
+
+    /** 设置远程工作区模式下的默认容器（仅本地 PRoot 容器可选）。 */
+    fun setDefaultContainerId(id: String) {
+        viewModelScope.launch {
+            containerSettingsRepository.setDefaultContainerId(id)
         }
     }
 

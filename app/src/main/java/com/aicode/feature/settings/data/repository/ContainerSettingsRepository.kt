@@ -29,6 +29,8 @@ class ContainerSettingsRepository @Inject constructor(
     private companion object {
         val ACTIVE_PROFILE_ID_KEY = stringPreferencesKey("active_profile_id")
         val CUSTOM_PROFILES_KEY = stringPreferencesKey("custom_profiles_json")
+        /** 远程工作区模式下本地 MCP stdio 等服务的运行容器；无值时默认内置 Alpine。 */
+        val DEFAULT_CONTAINER_ID_KEY = stringPreferencesKey("default_container_profile_id")
         /** 首次启动是否已写入内置 Alpine 默认项；置位后用户删光列表不再自动补回。 */
         val INITIALIZED_KEY = booleanPreferencesKey("initialized")
         val profileSerializer = ListSerializer(ContainerProfile.serializer())
@@ -40,6 +42,11 @@ class ContainerSettingsRepository @Inject constructor(
         prefs[ACTIVE_PROFILE_ID_KEY]?.takeIf { it.isNotBlank() } ?: ContainerProfile.BUILTIN_ID
     }
 
+    /** 远程模式下的默认容器 id；无值时默认内置 Alpine。 */
+    val defaultContainerIdFlow: Flow<String> = context.containerDataStore.data.map { prefs ->
+        prefs[DEFAULT_CONTAINER_ID_KEY]?.takeIf { it.isNotBlank() } ?: ContainerProfile.BUILTIN_ID
+    }
+
     /** 用户自定义 profile 列表（不含内置）。解析失败回退空列表。 */
     val customProfilesFlow: Flow<List<ContainerProfile>> = context.containerDataStore.data.map { prefs ->
         prefs[CUSTOM_PROFILES_KEY]?.let { raw ->
@@ -49,6 +56,10 @@ class ContainerSettingsRepository @Inject constructor(
 
     suspend fun setActiveProfile(id: String) {
         context.containerDataStore.edit { it[ACTIVE_PROFILE_ID_KEY] = id }
+    }
+
+    suspend fun setDefaultContainerId(id: String) {
+        context.containerDataStore.edit { it[DEFAULT_CONTAINER_ID_KEY] = id }
     }
 
     /**
