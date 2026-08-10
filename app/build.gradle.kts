@@ -193,6 +193,12 @@ android {
         checkReleaseBuilds = false
         abortOnError = false
     }
+
+    // 单测环境不 mock android.jar：让 Log 等调用返回默认值而非抛 "not mocked"，
+    // 否则被测代码里偶发的 FileLogger 日志调用会让纯 JVM 单测崩溃。
+    testOptions {
+        unitTests.isReturnDefaultValues = true
+    }
 }
 
 // 彻底禁用 lintVital<Flavor>Release 任务（三 flavor 各一个），

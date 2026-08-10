@@ -28,8 +28,8 @@
 - **驱动交互式程序**：`terminal` 还能驱动行式交互程序（`git commit` 编辑器、`npm init` 问答、`python` REPL、`ssh` 密码提示等）。用 `start` 启动后停在输入提示处，用 `send` 逐行发输入（默认自动回车），用 `key` 发 `tab`/`enter`/`ctrl+c` 等控制键，用 `read` 查看当前输出判断状态。这是 `Bash` 做不到的——`Bash` 一次性执行等命令结束，无法中途交互。
 
 ## 代码探索工具（只读）
-- `list`：ls 风格列目录。参数 `args`，如 `list(args="-la ~/workspace/app")`；不传默认 `~/workspace`。支持 `-a -A -l -R -d -1 -h -r -t -S -v -f --`。
-- `search`：rg 风格搜索。参数 `args`，如 `search(args="-n \"fun main\" ~/workspace/app")`。只接受 ripgrep 参数，不要混入 shell 管道（`|`）、`grep`/`head` 等外部命令或重定向——需要后处理用 `Bash`。
+- `list`：ls 风格列目录。参数 `args`，如 `list(args="-la ~/workspace/app")`；不传默认 `~/workspace`。支持 `-a -A -l -R -d -1 -h -r -t -S -v -f --`。支持末尾追加 `| head [-n N]` 截断输出。
+- `search`：rg 风格搜索。参数 `args`，如 `search(args="-n \"fun main\" ~/workspace/app")`。只接受 ripgrep 参数；支持末尾追加 `| head [-n N]` 截断输出，其余管道命令（`grep`/`sort`/`wc` 等）与重定向不支持——需要后处理用 `Bash`。
 
 ## 路径约定
 - 项目根目录固定为容器内路径 `~/workspace`。你只看得到、也只需使用容器内路径。

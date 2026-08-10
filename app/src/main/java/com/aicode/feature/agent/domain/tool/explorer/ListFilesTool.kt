@@ -36,7 +36,7 @@ class ListFilesTool @Inject constructor(
     }
 
     override val name = "list"
-    override val description = "按 ls 风格列出文件和目录。例：args=\"-la ~/workspace/app\"。"
+    override val description = "按 ls 风格列出文件和目录。例：args=\"-la ~/workspace/app\"。支持追加 `| head [-n N]` 截断输出。"
     override val permissionPolicy = ToolPermissionPolicy.AUTO_APPROVE
     override val capabilities = setOf(ToolCapability.READ_WORKSPACE)
 
@@ -44,7 +44,7 @@ class ListFilesTool @Inject constructor(
         "args" to ToolParameter(
             name = "args",
             type = ParameterType.STRING,
-            description = "ls 风格参数。不填等同 ~/workspace。支持 -a -A -l -R -d -1 -h -r -t -S -v -f --。",
+            description = "ls 风格参数。不填等同 ~/workspace。支持 -a -A -l -R -d -1 -h -r -t -S -v -f --。支持末尾追加 `| head [-n N]` 截断输出；其它管道命令不支持。",
             required = false
         )
     )
@@ -54,8 +54,15 @@ class ListFilesTool @Inject constructor(
             val rawArgs = args["args"]?.jsonPrimitive?.contentOrNull.orEmpty()
             val tokens = parseShellWords(rawArgs)
                 ?: return ToolResult.Error("args 中存在未闭合的引号", "INVALID_ARGS")
-            val options = parseLsOptions(tokens)
+            val (lsTokens, pipeSegments) = splitPipes(tokens)
+                ?: return ToolResult.Error("管道符前缺少 ls 参数", "INVALID_PIPE")
+            val headLimits = pipeSegments.map { seg ->
+                headLinesOf(seg)
+                    ?: return ToolResult.Error("list 仅支持 | head [-n N] 截断输出，不支持其它管道命令", "INVALID_PIPE")
+            }
+            val options = parseLsOptions(lsTokens)
                 ?: return ToolResult.Error("不支持的 ls 参数。支持：-a, -A, -l, -R, -d, -1, -h, -r, -t, -f, --", "UNSUPPORTED_OPTION")
+            options.maxLines = headLimits.minOrNull()
 
             FileLogger.d(TAG, "list args=$rawArgs paths=${options.paths}")
 
@@ -64,7 +71,7 @@ class ListFilesTool @Inject constructor(
             var truncated = false
 
             fun appendLine(line: String = "") {
-                if (entryCount >= MAX_ENTRIES) {
+                if (entryCount >= (options.maxLines ?: MAX_ENTRIES)) {
                     truncated = true
                     return
                 }
@@ -73,7 +80,7 @@ class ListFilesTool @Inject constructor(
             }
 
             fun listPath(path: String, showHeader: Boolean) {
-                if (entryCount >= MAX_ENTRIES) {
+                if (entryCount >= (options.maxLines ?: MAX_ENTRIES)) {
                     truncated = true
                     return
                 }
@@ -103,7 +110,7 @@ class ListFilesTool @Inject constructor(
 
                 if (options.recursive) {
                     for (entry in children) {
-                        if (entryCount >= MAX_ENTRIES) {
+                        if (entryCount >= (options.maxLines ?: MAX_ENTRIES)) {
                             truncated = true
                             return
                         }
@@ -120,7 +127,7 @@ class ListFilesTool @Inject constructor(
                 listPath(path, showHeaders)
             }
 
-            if (truncated) {
+            if (truncated && options.maxLines == null) {
                 output.append("... (已达 $MAX_ENTRIES 条上限，剩余条目未列出)\n")
             }
 
@@ -183,66 +190,6 @@ class ListFilesTool @Inject constructor(
         }
         if (options.paths.isEmpty()) options.paths.add(WorkspacePathMapper.CONTAINER_ROOT)
         return options
-    }
-
-    private fun parseShellWords(input: String): List<String>? {
-        val result = mutableListOf<String>()
-        val current = StringBuilder()
-        var quote: Char? = null
-        var tokenStarted = false
-        var i = 0
-        while (i < input.length) {
-            val c = input[i]
-            when {
-                quote == '\'' -> {
-                    if (c == '\'') quote = null else current.append(c)
-                    tokenStarted = true
-                }
-                quote == '"' -> {
-                    when (c) {
-                        '"' -> quote = null
-                        '\\' -> {
-                            if (i + 1 < input.length) {
-                                i++
-                                current.append(input[i])
-                            } else {
-                                current.append(c)
-                            }
-                        }
-                        else -> current.append(c)
-                    }
-                    tokenStarted = true
-                }
-                c.isWhitespace() -> {
-                    if (tokenStarted) {
-                        result.add(current.toString())
-                        current.clear()
-                        tokenStarted = false
-                    }
-                }
-                c == '\'' || c == '"' -> {
-                    quote = c
-                    tokenStarted = true
-                }
-                c == '\\' -> {
-                    if (i + 1 < input.length) {
-                        i++
-                        current.append(input[i])
-                    } else {
-                        current.append(c)
-                    }
-                    tokenStarted = true
-                }
-                else -> {
-                    current.append(c)
-                    tokenStarted = true
-                }
-            }
-            i++
-        }
-        if (quote != null) return null
-        if (tokenStarted) result.add(current.toString())
-        return result
     }
 
     private fun listEntries(dirPath: String, options: LsOptions): List<LsEntry> {
@@ -336,6 +283,7 @@ class ListFilesTool @Inject constructor(
         var sortBySize: Boolean = false,
         var naturalSort: Boolean = false,
         var noSort: Boolean = false,
+        var maxLines: Int? = null,
         val paths: MutableList<String> = mutableListOf()
     )
 

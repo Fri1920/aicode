@@ -18,7 +18,8 @@ import kotlinx.serialization.json.jsonPrimitive
 import javax.inject.Inject
 
 /**
- * rg 风格的项目搜索工具。参数原样传给容器内的 ripgrep，容器未就绪则报错。
+ * rg 风格的项目搜索工具。参数原样传给容器内的 ripgrep；支持 `| head [-n N]` 截断输出，
+ * 其余管道命令一律拒绝（见 [buildSearchCommand]），容器未就绪则报错。
  */
 class SearchCodeTool @Inject constructor(
     private val commandEngine: CommandEngine,
@@ -31,7 +32,7 @@ class SearchCodeTool @Inject constructor(
     }
 
     override val name = "search"
-    override val description = "按 rg 风格搜索文本。例：args=\"-n \\\"fun main\\\" ~/workspace/app\"。"
+    override val description = "按 rg 风格搜索文本。例：args=\"-n \\\"fun main\\\" ~/workspace/app\"。支持追加 `| head [-n N]` 截断输出。"
     override val permissionPolicy = ToolPermissionPolicy.AUTO_APPROVE
     override val capabilities = setOf(ToolCapability.READ_WORKSPACE)
 
@@ -39,7 +40,7 @@ class SearchCodeTool @Inject constructor(
         "args" to ToolParameter(
             name = "args",
             type = ParameterType.STRING,
-            description = "rg 风格参数。不填无效。常用：-i -F -e -g --hidden --。不要混入 shell 管道（|）、grep/head 等外部命令或重定向——它们不是 rg 参数。",
+            description = "rg 风格参数。不填无效。常用：-i -F -e -g --hidden --。支持末尾追加 `| head [-n N]` 截断输出；其它管道命令（grep/sort/wc 等）不支持。",
             required = true
         )
     )
@@ -53,9 +54,12 @@ class SearchCodeTool @Inject constructor(
                 ?: return ToolResult.Error("args 中存在未闭合的引号", "INVALID_ARGS")
             if (tokens.isEmpty()) return ToolResult.Error("缺少搜索参数 args", "MISSING_ARGS")
 
+            val command = buildSearchCommand(tokens)
+                ?: return ToolResult.Error("search 仅支持 | head [-n N] 截断输出，不支持其它管道命令", "INVALID_PIPE")
+
             val startedAt = System.currentTimeMillis()
             val result = commandEngine.runCommandSyncIfReady(
-                command = buildRgCommand(tokens),
+                command = command,
                 projectPath = workspaceRepository.currentPath(),
                 timeoutMs = SEARCH_TIMEOUT_MS
             ) ?: return ToolResult.Error("容器未就绪，无法执行 rg", "CONTAINER_NOT_READY")
@@ -81,89 +85,8 @@ class SearchCodeTool @Inject constructor(
         }
     }
 
-    private fun buildRgCommand(tokens: List<String>): String {
-        val args = mutableListOf(
-            "rg",
-            "--line-number",
-            "--no-heading",
-            "--with-filename",
-            "--color",
-            "never"
-        )
-        args.addAll(tokens.map { shellQuote(expandTilde(it)) })
-        return args.joinToString(" ")
-    }
-
-    /** 把 `~/` 开头的路径参数展开为 `/root/`，避免被单引号包裹后 shell 不展开 `~`。 */
-    private fun expandTilde(arg: String): String =
-        if (arg.startsWith("~/")) "/root/" + arg.removePrefix("~/") else arg
-
     private fun isRgMissing(output: String): Boolean {
         return output.contains("command not found", ignoreCase = true) ||
             output.contains("rg: not found", ignoreCase = true)
-    }
-
-    private fun parseShellWords(input: String): List<String>? {
-        val result = mutableListOf<String>()
-        val current = StringBuilder()
-        var quote: Char? = null
-        var tokenStarted = false
-        var i = 0
-        while (i < input.length) {
-            val c = input[i]
-            when {
-                quote == '\'' -> {
-                    if (c == '\'') quote = null else current.append(c)
-                    tokenStarted = true
-                }
-                quote == '"' -> {
-                    when (c) {
-                        '"' -> quote = null
-                        '\\' -> {
-                            if (i + 1 < input.length) {
-                                i++
-                                current.append(input[i])
-                            } else {
-                                current.append(c)
-                            }
-                        }
-                        else -> current.append(c)
-                    }
-                    tokenStarted = true
-                }
-                c.isWhitespace() -> {
-                    if (tokenStarted) {
-                        result.add(current.toString())
-                        current.clear()
-                        tokenStarted = false
-                    }
-                }
-                c == '\'' || c == '"' -> {
-                    quote = c
-                    tokenStarted = true
-                }
-                c == '\\' -> {
-                    if (i + 1 < input.length) {
-                        i++
-                        current.append(input[i])
-                    } else {
-                        current.append(c)
-                    }
-                    tokenStarted = true
-                }
-                else -> {
-                    current.append(c)
-                    tokenStarted = true
-                }
-            }
-            i++
-        }
-        if (quote != null) return null
-        if (tokenStarted) result.add(current.toString())
-        return result
-    }
-
-    private fun shellQuote(value: String): String {
-        return "'" + value.replace("'", "'\"'\"'") + "'"
     }
 }
