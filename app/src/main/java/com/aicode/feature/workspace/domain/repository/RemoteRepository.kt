@@ -1,8 +1,10 @@
 package com.aicode.feature.workspace.domain.repository
 
+import com.aicode.core.util.FileLogger
 import com.aicode.feature.workspace.data.local.dao.RemoteConnectionDao
 import com.aicode.feature.workspace.data.local.entity.RemoteConnectionEntity
 import com.aicode.feature.workspace.data.local.entity.RemoteMountEntity
+import com.aicode.feature.workspace.data.repository.WorkspaceRepository
 import com.aicode.feature.workspace.domain.model.RemoteConnection
 import com.aicode.feature.workspace.domain.model.RemoteMount
 import com.aicode.feature.workspace.domain.model.RemoteProtocol
@@ -11,12 +13,18 @@ import com.aicode.feature.workspace.domain.remote.SyncEngine
 import com.aicode.feature.workspace.domain.remote.ftp.FtpSyncClient
 import com.aicode.feature.workspace.domain.remote.local.LocalSyncClient
 import com.aicode.feature.workspace.domain.remote.sftp.SftpSyncClient
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
@@ -25,10 +33,66 @@ import javax.inject.Singleton
 @Singleton
 class RemoteRepository @Inject constructor(
     private val dao: RemoteConnectionDao,
-    private val syncSettings: com.aicode.feature.settings.data.repository.SyncSettingsRepository
+    private val syncSettings: com.aicode.feature.settings.data.repository.SyncSettingsRepository,
+    private val workspaceRepository: WorkspaceRepository
 ) {
     private val activeEngines = ConcurrentHashMap<String, SyncEngine>()
     private val activeEngineIds = MutableStateFlow<Set<String>>(emptySet())
+
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    /** 每个挂载的自动连接重试协程，切换工作区/手动断开时取消。 */
+    private val autoConnectJobs = ConcurrentHashMap<String, Job>()
+
+    init {
+        // 跟随当前工作区：App 启动（工作区就绪）与切换工作区时，自动断开非当前工作区的挂载、
+        // 连接当前工作区里勾了「应用启动时自动连接」的挂载（失败退避重试直到成功）。
+        scope.launch {
+            workspaceRepository.current.collect { workspace ->
+                if (workspace != null) {
+                    syncMountsToWorkspace(workspace.path)
+                }
+            }
+        }
+    }
+
+    /** 把激活挂载集合对齐到当前工作区。 */
+    private suspend fun syncMountsToWorkspace(workspacePath: String) {
+        val mounts = dao.getAllMountsOnce()
+        // 1. 断开不属于当前工作区的激活挂载（含手动连接的，保证切换后只同步当前工作区）
+        activeEngineIds.value
+            .filter { activeId ->
+                mounts.firstOrNull { it.id == activeId }?.let { !belongsTo(it, workspacePath) } ?: true
+            }
+            .forEach { disconnectMount(it) }
+        // 2. 自动连接当前工作区里勾了 autoConnect 的挂载
+        mounts.filter { it.autoConnect && belongsTo(it, workspacePath) && it.id !in activeEngineIds.value }
+            .forEach { connectMountWithRetry(it.id, workspacePath) }
+    }
+
+    private fun belongsTo(mount: RemoteMountEntity, workspacePath: String): Boolean =
+        mount.localMountPath == workspacePath || mount.localMountPath.startsWith("$workspacePath/")
+
+    /** 带退避重试的自动连接：直到成功，或挂载不再属于当前工作区/被手动断开。 */
+    private fun connectMountWithRetry(mountId: String, workspacePath: String) {
+        autoConnectJobs[mountId]?.cancel()
+        autoConnectJobs[mountId] = scope.launch {
+            var backoffMs = 30_000L
+            while (isActive) {
+                val mount = dao.getMountById(mountId) ?: break
+                if (!belongsTo(mount, workspacePath)) break
+                if (mountId in activeEngineIds.value) break
+                val result = connectMount(mountId)
+                if (result.isSuccess) break
+                FileLogger.w(TAG, "自动连接挂载 ${mount.localMountPath} 失败: ${result.exceptionOrNull()?.message}，${backoffMs / 1000}s 后重试")
+                delay(backoffMs)
+                backoffMs = (backoffMs * 2).coerceAtMost(5 * 60_000L)
+            }
+        }
+    }
+
+    private companion object {
+        const val TAG = "RemoteRepository"
+    }
 
     fun getConnections(): Flow<List<RemoteConnection>> = dao.getAllConnections().map { list ->
         list.map { it.toDomainModel() }
@@ -111,6 +175,11 @@ class RemoteRepository @Inject constructor(
 
     suspend fun connectMount(mountId: String): Result<Unit> = withContext(Dispatchers.IO) {
         try {
+            // 已存在旧连接时先清理，避免重复/并发连接泄漏 engine
+            activeEngines[mountId]?.shutdown()
+            activeEngines.remove(mountId)
+            activeEngineIds.update { it - mountId }
+
             val mountEntity = dao.getMountById(mountId) ?: return@withContext Result.failure(Exception("Mount not found"))
             val connEntity = dao.getConnectionById(mountEntity.connectionId) ?: return@withContext Result.failure(Exception("Connection not found"))
             
@@ -134,7 +203,8 @@ class RemoteRepository @Inject constructor(
             val engine = SyncEngine(
                 mount = mount, 
                 connection = conn, 
-                syncClient = client, 
+                syncClient = client,
+                auth = auth,
                 ignoredPatternsStr = syncSettings.ignoredPatterns.value,
                 useGitIgnore = syncSettings.useGitIgnore.value,
                 maxSyncBatchSize = syncSettings.maxSyncBatchSize.value
@@ -154,6 +224,8 @@ class RemoteRepository @Inject constructor(
     }
 
     suspend fun disconnectMount(mountId: String) {
+        autoConnectJobs[mountId]?.cancel()
+        autoConnectJobs.remove(mountId)
         activeEngines[mountId]?.shutdown()
         activeEngines.remove(mountId)
         activeEngineIds.update { it - mountId }

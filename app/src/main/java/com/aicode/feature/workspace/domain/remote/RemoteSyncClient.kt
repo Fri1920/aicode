@@ -9,6 +9,10 @@ interface RemoteSyncClient {
     suspend fun createDirectory(remotePath: String)
     suspend fun delete(remotePath: String)
     suspend fun isConnected(): Boolean
+
+    /** 轻量探活：连接是否仍然可用。默认复用 isConnected 标志，网络协议可覆盖为真实往返（如 SFTP stat / FTP NOOP），
+     *  以便发现 TCP 半开等 isConnected 检测不到的断连。 */
+    suspend fun ping(): Boolean = isConnected()
 }
 
 data class RemoteFileInfo(

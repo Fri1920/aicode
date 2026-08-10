@@ -12,11 +12,16 @@ import java.io.File
 
 class SftpSyncClient : RemoteSyncClient {
 
+    companion object {
+        private const val CONNECT_TIMEOUT_MS = 15_000L
+    }
+
     private var sshClient: SSHClient? = null
     private var sftpClient: SFTPClient? = null
 
     override suspend fun connect(host: String, port: Int, username: String, auth: RemoteAuth) = withContext(Dispatchers.IO) {
         sshClient = SSHClient().apply {
+            setConnectTimeout(CONNECT_TIMEOUT_MS.toInt())
             addHostKeyVerifier(PromiscuousVerifier()) // 简化：暂时信任所有主机密钥
             connect(host, port)
             
@@ -88,4 +93,19 @@ class SftpSyncClient : RemoteSyncClient {
     }
 
     override suspend fun isConnected(): Boolean = sshClient?.isConnected == true && sshClient?.isAuthenticated == true
+
+    override suspend fun ping(): Boolean = withContext(Dispatchers.IO) {
+        val ssh = sshClient ?: return@withContext false
+        val sftp = sftpClient ?: return@withContext false
+        if (!ssh.isConnected || !ssh.isAuthenticated) return@withContext false
+        try {
+            // 任何 SFTP 协议响应（含"路径不存在"等业务错误）都证明连接活着；仅传输/socket 异常才判断开
+            sftp.stat(".")
+            true
+        } catch (e: net.schmizz.sshj.sftp.SFTPException) {
+            true
+        } catch (e: Exception) {
+            false
+        }
+    }
 }

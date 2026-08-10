@@ -102,6 +102,10 @@ class AIEditorApp : Application(), Configuration.Provider {
     @Inject
     lateinit var workspaceRepository: com.aicode.feature.workspace.data.repository.WorkspaceRepository
 
+    /** 连接与同步仓库：注入以在启动早期创建 @Singleton 实例，其内部跟随当前工作区自动连接/断开挂载。 */
+    @Inject
+    lateinit var remoteRepository: com.aicode.feature.workspace.domain.repository.RemoteRepository
+
     /** 模型元数据服务：启动即异步刷新 models.dev 目录（24h 缓存，失败静默，兜底内置数据）。 */
     @Inject
     lateinit var modelMetadataService: ModelMetadataService
@@ -170,6 +174,8 @@ class AIEditorApp : Application(), Configuration.Provider {
                 }
             }
         }
+        // 连接与同步的「跟随当前工作区」由 RemoteRepository 内部监听工作区变化自动执行（启动注入即就绪）：
+        // 工作区就绪/切换时，自动断开非当前工作区的挂载，连接当前工作区里勾了「应用启动时自动连接」的挂载。
         // 后台保活常驻通知的唯一反应器：监听开关，启停 TerminalKeepaliveService 的常驻模式。
         // 既覆盖设置页实时切换，也覆盖冷启动恢复。仅在「由开变关」时发 disable，
         // 避免为关闭而凭空拉起从未开过的 Service。

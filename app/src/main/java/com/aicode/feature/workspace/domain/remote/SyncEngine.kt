@@ -18,12 +18,16 @@ class SyncEngine(
     private val mount: com.aicode.feature.workspace.domain.model.RemoteMount,
     private val connection: com.aicode.feature.workspace.domain.model.RemoteConnection,
     private val syncClient: RemoteSyncClient,
+    private val auth: RemoteAuth,
     private val ignoredPatternsStr: String,
     private val useGitIgnore: Boolean,
     private val maxSyncBatchSize: Int
 ) {
     companion object {
         private const val TAG = "SyncEngine"
+        private const val PING_INTERVAL_MS = 30_000L
+        private const val RECONNECT_BASE_MS = 5_000L
+        private const val RECONNECT_MAX_MS = 60_000L
     }
 
     private val customIgnores = ignoredPatternsStr.split(",").map { it.trim() }.filter { it.isNotEmpty() }.toSet()
@@ -117,6 +121,32 @@ class SyncEngine(
                 // 如果达到批次上限，说明可能正处于大量修改阶段，短暂延迟让服务器缓冲一下
                 if (batch.size >= maxSyncBatchSize) {
                     delay(300)
+                }
+            }
+        }
+
+        // 断线自动重连 supervisor：定期探活，断开则按退避重连。本地镜像无网络连接，跳过。
+        if (connection.protocol != com.aicode.feature.workspace.domain.model.RemoteProtocol.LOCAL) {
+            scope.launch {
+                var backoffMs = RECONNECT_BASE_MS
+                while (isActive) {
+                    delay(PING_INTERVAL_MS)
+                    if (!syncClient.ping()) {
+                        FileLogger.w(TAG, "Sync: 连接已断开（${connection.name}），开始自动重连")
+                        while (isActive && !syncClient.ping()) {
+                            delay(backoffMs)
+                            try {
+                                syncClient.disconnect()
+                                syncClient.connect(connection.host, connection.port, connection.username, auth)
+                                startWatching()
+                                backoffMs = RECONNECT_BASE_MS
+                                FileLogger.i(TAG, "Sync: 自动重连成功（${connection.name}）")
+                            } catch (e: Exception) {
+                                FileLogger.e(TAG, "Sync: 自动重连失败（${connection.name}），${backoffMs / 1000}s 后重试: ${e.message}")
+                                backoffMs = (backoffMs * 2).coerceAtMost(RECONNECT_MAX_MS)
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -302,7 +332,7 @@ class SyncEngine(
                 connection.host,
                 connection.port,
                 connection.username,
-                RemoteAuth.Password(connection.password)
+                auth
             )
             FileLogger.i(TAG, "Sync: Force reconnected to server successfully.")
         } catch (e: Exception) {

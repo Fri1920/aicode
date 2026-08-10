@@ -14,6 +14,10 @@ import java.io.FileOutputStream
 
 class FtpSyncClient : RemoteSyncClient {
 
+    companion object {
+        private const val CONNECT_TIMEOUT_MS = 15_000
+    }
+
     private val ftpClient = FTPClient()
     private var isConnected = false
 
@@ -22,6 +26,7 @@ class FtpSyncClient : RemoteSyncClient {
             throw IllegalArgumentException("FTP only supports Password authentication")
         }
 
+        ftpClient.connectTimeout = CONNECT_TIMEOUT_MS
         ftpClient.connect(host, port)
         val reply = ftpClient.replyCode
         if (!FTPReply.isPositiveCompletion(reply)) {
@@ -102,4 +107,13 @@ class FtpSyncClient : RemoteSyncClient {
     }
 
     override suspend fun isConnected(): Boolean = isConnected && ftpClient.isConnected
+
+    override suspend fun ping(): Boolean = withContext(Dispatchers.IO) {
+        if (!ftpClient.isConnected) return@withContext false
+        try {
+            ftpClient.sendNoOp()
+        } catch (e: Exception) {
+            false
+        }
+    }
 }
