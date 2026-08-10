@@ -74,9 +74,21 @@ fun WiFiFtpServerSection(viewModel: RemoteServerViewModel) {
                 Spacer(modifier = Modifier.width(Spacing.md))
                 Column {
                     Text(
-                        text = stringResource(R.string.ftp_usage_desc),
+                        text = "• " + stringResource(R.string.ftp_usage_item_1),
                         style = MaterialTheme.typography.bodySmall,
                         color = if (settingsLightMode()) Color(0xFF8E8E93) else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = "• " + stringResource(R.string.ftp_usage_item_2),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (settingsLightMode()) Color(0xFF8E8E93) else MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 2.dp)
+                    )
+                    Text(
+                        text = "• " + stringResource(R.string.ftp_usage_item_3),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (settingsLightMode()) Color(0xFF8E8E93) else MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 2.dp)
                     )
                 }
             }

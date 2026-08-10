@@ -350,7 +350,6 @@
     <string name="container_select_ssh_channel">Select SSH Channel</string>
     <string name="container_ssh_channel">SSH Channel</string>
     <string name="container_remote_workspace_path">Remote Workspace Path</string>
-    <string name="container_remote_workspace_desc">AI\'s ~/workspace will be mapped to this remote path. Commands run via SSH exec, file I/O via SFTP.</string>
 
     <!-- Credential Editor -->
     <string name="credential_edit">Edit Credential</string>
@@ -641,7 +640,9 @@
 
     <!-- Remote FTP -->
     <string name="ftp_usage_title">Usage Guide</string>
-    <string name="ftp_usage_desc">Phone and computer must be on the same WiFi. Open the address below in your computer\'s file explorer to manage projects in the phone\'s workspace.</string>
+    <string name="ftp_usage_item_1">Phone and computer on the same WiFi</string>
+    <string name="ftp_usage_item_2">Enter the address below in the computer\'s file explorer</string>
+    <string name="ftp_usage_item_3">Manage projects in the phone\'s workspace</string>
     <string name="ftp_running">Running: %1$s</string>
     <string name="ftp_not_running">Service not running</string>
     <string name="ftp_error">Error: %1$s</string>
@@ -667,7 +668,7 @@
     <string name="remote_no_connections">No connections yet</string>
     <string name="remote_no_connections_desc">Add an SFTP, FTP or local channel to link your phone workspace with a remote or local directory.</string>
     <string name="remote_no_workspaces">No mounted directories yet</string>
-    <string name="remote_no_workspaces_desc">Map a directory from a channel to a local workspace. Local changes sync one-way to the remote.</string>
+    <string name="remote_no_workspaces_desc">Map a remote directory to the local workspace with auto sync</string>
     <string name="remote_hint_title">Hint</string>
     <string name="remote_add_channel_first">Please add a remote channel in "Connections" first.</string>
     <string name="remote_go_add">Go Add</string>
