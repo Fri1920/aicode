@@ -12,6 +12,7 @@ import org.apache.commons.compress.archivers.tar.TarArchiveEntry
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream
 import org.apache.commons.compress.compressors.xz.XZCompressorInputStream
 import java.io.File
+import java.io.IOException
 import java.util.zip.GZIPInputStream
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -59,15 +60,27 @@ class ContainerInstaller @Inject constructor(
             val destDir = File(File(context.filesDir, "aicode"), "prompts")
             destDir.mkdirs()
             runCatching {
-                val prompts = context.assets.list("prompts") ?: return
-                for (prompt in prompts) {
-                    val destFile = File(destDir, prompt)
-                    context.assets.open("prompts/$prompt").use { input ->
-                        destFile.outputStream().use { output -> input.copyTo(output) }
-                    }
-                }
+                extractPromptsRecursive(context, "prompts", destDir)
             }.onFailure {
                 FileLogger.w(TAG, "提取内置提示词失败: ${it.message}", it)
+            }
+        }
+
+        /** 递归复制 assets 下的提示词目录到目标目录，支持子目录（如 prompts/agent/）。 */
+        private fun extractPromptsRecursive(context: Context, assetDir: String, destDir: File) {
+            val entries = context.assets.list(assetDir) ?: return
+            destDir.mkdirs()
+            for (entry in entries) {
+                val assetPath = "$assetDir/$entry"
+                val destFile = File(destDir, entry)
+                try {
+                    context.assets.open(assetPath).use { input ->
+                        destFile.outputStream().use { output -> input.copyTo(output) }
+                    }
+                } catch (e: IOException) {
+                    // 目录项：assets.open 对目录抛 IOException，递归处理
+                    extractPromptsRecursive(context, assetPath, destFile)
+                }
             }
         }
 

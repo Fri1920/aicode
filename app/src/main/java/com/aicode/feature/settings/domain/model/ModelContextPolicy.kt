@@ -4,7 +4,7 @@ object ModelContextPolicy {
     const val DEFAULT_CONTEXT_TOKENS = 128_000
     const val DEFAULT_OUTPUT_RESERVE_TOKENS = 20_000
     const val MIN_PRESERVE_RECENT_TOKENS = 2_000
-    const val MAX_PRESERVE_RECENT_TOKENS = 8_000
+    const val MAX_PRESERVE_RECENT_TOKENS = 20_000
     const val CHARS_PER_TOKEN = 4
 
     fun usableInputTokens(metadata: ModelMetadata): Int {

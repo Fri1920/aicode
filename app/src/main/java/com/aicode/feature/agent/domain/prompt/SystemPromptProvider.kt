@@ -264,7 +264,7 @@ class SystemPromptProvider @Inject constructor(
      * 本地副本由 [ContainerInstaller.extractPrompts] 在启动时全量释放，
      * App 升级后随之更新；用户只需在 prompts.custom/ 放同名文件即可覆盖，无需改内置。
      */
-    private fun resolvePrompt(name: String): String {
+    fun resolvePrompt(name: String): String {
         val customDir = File(containerInstaller.aicodeDir, "prompts.custom")
         val customFile = File(customDir, name)
         if (customFile.isFile) {

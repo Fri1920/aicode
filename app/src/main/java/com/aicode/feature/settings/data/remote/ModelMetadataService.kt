@@ -83,7 +83,9 @@ class ModelMetadataService @Inject constructor(
     private fun isFresh(cache: Cache): Boolean =
         System.currentTimeMillis() - cache.loadedAtMs < CACHE_MAX_AGE_MS
 
-    /** 纯只读链路：内存 → 磁盘缓存(24h 内) → 内置 assets → 空目录（由调用方回退默认值），绝不发网络请求。 */
+    /** 纯只读链路：内存 → 磁盘缓存(24h 内) → 内置 assets → 空目录（由调用方回退默认值），绝不发网络请求。
+     *  网络刷新失败时（[fetchCatalogFromNetwork]），会把过期磁盘缓存降级塞入内存 [cached]，
+     *  避免回退到更旧的内置 assets 快照。 */
     private fun loadCatalog(): Map<String, Map<String, ModelMetadata>> {
         cached?.let {
             return it.catalog
@@ -120,6 +122,8 @@ class ModelMetadataService @Inject constructor(
             cached = Cache(System.currentTimeMillis(), catalog)
         }.onFailure { e ->
             FileLogger.w(TAG, "拉取 models.dev 模型元数据失败", e)
+            // 拉取失败：降级使用磁盘缓存（即使已过期），避免回退到更旧的内置 assets 快照
+            loadCatalogFromDisk()?.let { cached = it }
         }
     }
 

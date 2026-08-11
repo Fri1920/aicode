@@ -7,6 +7,7 @@ import com.aicode.feature.agent.domain.model.AgentMessage
 import com.aicode.feature.agent.domain.model.CONTEXT_COMPACTION_MARKER
 import com.aicode.feature.agent.domain.model.CONTEXT_SUMMARY_LEGACY_PREFIX
 import com.aicode.feature.agent.domain.model.id
+import com.aicode.feature.agent.domain.prompt.SystemPromptProvider
 import com.aicode.feature.agent.domain.provider.AIProvider
 import com.aicode.feature.agent.presentation.MessageRole
 import com.aicode.feature.settings.data.remote.ModelMetadataService
@@ -19,13 +20,16 @@ import javax.inject.Singleton
 @Singleton
 class ContextCompactor @Inject constructor(
     private val agentMessageDao: AgentMessageDao,
-    private val modelMetadataService: ModelMetadataService
+    private val modelMetadataService: ModelMetadataService,
+    private val systemPromptProvider: SystemPromptProvider
 ) {
 
     private companion object {
         const val TAG = "ContextCompactor"
 
         const val TOOL_OUTPUT_MAX_CHARS = 2_000
+        const val COMPACT_PROMPT_FILE = "agent/compact-summary.md"
+        val LEADING_COMMENT = Regex("(?s)^\\s*<!--.*?-->\\s*")
     }
 
     /**
@@ -45,18 +49,24 @@ class ContextCompactor @Inject constructor(
         aiProvider: AIProvider,
         sessionId: String? = null,
         force: Boolean = false,
+        lastInputTokens: Int = 0,
         onEvent: suspend (AgentEvent) -> Unit = {}
     ): List<AgentMessage> {
-        val totalTokens = estimateTokens(messages)
+        val estimatedTokens = estimateTokens(messages)
         val metadata = modelMetadataService.resolve(aiProvider.providerId, inferProviderType(aiProvider), aiProvider.model)
         val contextLimit = metadata.contextTokens.takeIf { it > 0 } ?: ModelContextPolicy.DEFAULT_CONTEXT_TOKENS
         val triggerThreshold = (contextLimit * 0.9f).toInt()
-        if (messages.size <= 2 || (!force && totalTokens < triggerThreshold)) {
+        // 真实 usage 优先（含 system prompt + tools，与上下文窗口同口径）；取不到（0）回退本地估算
+        val currentTokens = lastInputTokens.takeIf { it > 0 } ?: estimatedTokens
+        val reachedThreshold = currentTokens >= triggerThreshold
+        val reachedHardLimit = currentTokens >= contextLimit
+        if (messages.size <= 2 || (!force && !reachedThreshold && !reachedHardLimit)) {
             return messages.toList()
         }
 
-        FileLogger.i(TAG, "上下文约 $totalTokens tokens，${if (force) "手动强制压缩" else "达到 90% 上下文上限阈值 ($triggerThreshold/$contextLimit)，触发自动压缩机制"}。")
-        onEvent(AgentEvent.CompactionStarted(totalTokens))
+        val tokensSource = if (lastInputTokens > 0) "真实 usage" else "本地估算"
+        FileLogger.i(TAG, "上下文约 $currentTokens tokens（$tokensSource），${if (force) "手动强制压缩" else "达到压缩触发条件（阈值 $triggerThreshold/$contextLimit 或硬上限），触发自动压缩"}。")
+        onEvent(AgentEvent.CompactionStarted(currentTokens))
 
         // 拆分 Head（需要压缩的老数据）和 Tail（保留的新数据）
         var splitIndex = selectTailStartIndex(messages, triggerThreshold)
@@ -258,47 +268,10 @@ class ContextCompactor @Inject constructor(
             """.trimIndent()
         }
 
-        return """
-            你是一个高度专业的上下文压缩引擎。$instruction
-
-            必须严格输出以下 Markdown 结构，保持标题顺序不变：
-            ## Goal
-            - [一句话概括用户目标]
-
-            ## Constraints & Preferences
-            - [用户约束、偏好、规格，或 "(none)"]
-
-            ## Progress
-            ### Done
-            - [已完成工作，或 "(none)"]
-
-            ### In Progress
-            - [正在进行的工作，或 "(none)"]
-
-            ### Blocked
-            - [阻塞问题，或 "(none)"]
-
-            ## Key Decisions
-            - [关键决定及原因，或 "(none)"]
-
-            ## Next Steps
-            - [接下来按顺序执行的步骤，或 "(none)"]
-
-            ## Critical Context
-            - [重要技术事实、错误、开放问题，或 "(none)"]
-
-            ## Relevant Files
-            - [文件或目录路径：相关原因，或 "(none)"]
-
-            规则：
-            - 每个章节都必须保留。
-            - 使用简短 bullet，不写客套话。
-            - 保留精确文件路径、命令、错误文本和标识符。
-            - 不要提到“摘要过程”或“上下文已压缩”。
-
-            对话历史：
-            $headContent
-        """.trimIndent()
+        return systemPromptProvider.resolvePrompt(COMPACT_PROMPT_FILE)
+            .replace(LEADING_COMMENT, "")
+            .replace("{{INSTRUCTION}}", instruction)
+            .replace("{{HEAD_CONTENT}}", headContent)
     }
 
     private fun extractPreviousSummary(messages: List<AgentMessage>): String? {
