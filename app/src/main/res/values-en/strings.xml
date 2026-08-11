@@ -10,6 +10,7 @@
     <string name="settings_default_models_subtitle">Configure default preferences like vision model</string>
     <string name="settings_vision_model">Vision Model</string>
     <string name="settings_compaction_model">Compaction Model</string>
+    <string name="settings_title_model">Title Model</string>
     <string name="settings_mcp">MCP Servers</string>
     <string name="settings_container">Container Image</string>
     <string name="settings_log">Log Level</string>
@@ -34,6 +35,7 @@
     <string name="settings_providers_active"> · Active: %1$s</string>
     <string name="settings_vision_follow_chat">Follow current chat model</string>
     <string name="settings_compaction_follow_chat">Follow current chat model</string>
+    <string name="settings_title_follow_chat">Follow current chat model</string>
     <string name="settings_mcp_empty">No MCP servers configured</string>
     <string name="settings_mcp_count_connected">%1$d · Connected %2$d</string>
     <string name="settings_log_current">Current: %1$s</string>
@@ -734,6 +736,7 @@
 
     <!-- Compaction Model -->
     <string name="compaction_no_models">No models available. Please add and configure a model in "AI Providers" before selecting a dedicated compaction model.</string>
+    <string name="title_no_models">No models available. Please add and configure a model in "AI Providers" before selecting a dedicated title model.</string>
 
     <!-- Web Search Result -->
     <string name="web_search_title">Web Search</string>

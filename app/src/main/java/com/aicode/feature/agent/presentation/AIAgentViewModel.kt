@@ -624,7 +624,13 @@ class AIAgentViewModel @Inject constructor(
                 val userMsgId = UUID.randomUUID().toString()
                 messagePersistenceUseCase.persist(sessionId, MessageRole.USER, request, id = userMsgId, attachments = inputAttachments)
                 checkpointManager.createCheckpoint(sessionId, userMsgId, request)
-                if (isFirst) sessionUseCase.updateTitle(sessionId, sessionUseCase.deriveTitle(request))
+                if (isFirst) {
+                    sessionUseCase.updateTitle(sessionId, sessionUseCase.deriveTitle(request))
+                    // 后台异步用 LLM 生成更贴切的标题替换临时标题；失败/取不到时保留临时标题
+                    viewModelScope.launch {
+                        agentWorkflow.generateTitle(sessionId, request)?.let { sessionUseCase.updateTitle(sessionId, it) }
+                    }
+                }
             }
             sessionUseCase.touch(sessionId, messagePersistenceUseCase.nextTimestamp())
 

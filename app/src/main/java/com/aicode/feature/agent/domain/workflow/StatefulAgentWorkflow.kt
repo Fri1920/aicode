@@ -30,6 +30,7 @@ import com.aicode.feature.agent.domain.tool.toTransportString
 import com.aicode.feature.agent.presentation.AgentAttachment
 import com.aicode.feature.settings.data.remote.ModelMetadataService
 import com.aicode.feature.settings.data.repository.CompactionModelSettingsRepository
+import com.aicode.feature.settings.data.repository.TitleModelSettingsRepository
 import com.aicode.feature.settings.data.repository.VisionModelSettingsRepository
 import com.aicode.feature.settings.domain.model.AIProviderConfig
 import com.aicode.feature.agent.data.remote.anthropic.AnthropicApi
@@ -76,6 +77,7 @@ class StatefulAgentWorkflow @Inject constructor(
     private val modelMetadataService: ModelMetadataService,
     private val visionModelSettingsRepository: VisionModelSettingsRepository,
     private val compactionModelSettingsRepository: CompactionModelSettingsRepository,
+    private val titleModelSettingsRepository: TitleModelSettingsRepository,
     private val sessionUseCase: SessionUseCase,
     private val messagePersistenceUseCase: MessagePersistenceUseCase,
     private val checkpointManager: CheckpointManager
@@ -86,6 +88,9 @@ class StatefulAgentWorkflow @Inject constructor(
         const val LIVE_TAIL_CHARS = 4_000
         const val PROGRESS_INTERVAL_MS = 250L
         const val USER_REJECTED_CODE = "USER_REJECTED"
+        const val TITLE_GENERATOR_FILE = "agent/title-generator.md"
+        const val TITLE_MAX_CHARS = 50
+        val LEADING_COMMENT = Regex("(?s)^\\s*<!--.*?-->\\s*")
     }
 
     /** 不可变状态树 */
@@ -411,7 +416,8 @@ class StatefulAgentWorkflow @Inject constructor(
                         val providerInUse = visionProvider ?: aiProvider
                         // 压缩轮：若配置了压缩专用模型，使用独立压缩模型压缩
                         val compactionProvider = resolveCompactionFallbackProvider(currentContext.sessionId) ?: providerInUse
-                        val compactedMessages = contextCompactor.compactIfNeeded(state.messages, compactionProvider, context.sessionId) { send(it) }
+                        val sessionLastInputTokens = currentContext.sessionId?.let { sessionUseCase.getSessionById(it)?.lastInputTokens } ?: 0
+                        val compactedMessages = contextCompactor.compactIfNeeded(state.messages, compactionProvider, context.sessionId, lastInputTokens = sessionLastInputTokens) { send(it) }
                         if (compactedMessages !== state.messages) {
                             state = state.copy(messages = compactedMessages)
                         }
@@ -738,6 +744,39 @@ class StatefulAgentWorkflow @Inject constructor(
         if (!config.isEnabled || config.apiKey.isBlank()) return null
         return createStandaloneProvider(config.copy(selectedModel = model), sessionId)
     }
+
+    /**
+     * 标题生成专用 provider 解析。若用户配置了标题总结专用模型且 provider 存在、已启用、有 apiKey，
+     * 则返回全新的独立 AIProvider 实例；否则返回 null（沿用当前聊天模型）。
+     */
+    private suspend fun resolveTitleFallbackProvider(sessionId: String?): AIProvider? {
+        val providerId = titleModelSettingsRepository.getTitleProviderId().trim()
+        if (providerId.isEmpty()) return null
+        val model = titleModelSettingsRepository.getTitleModel().trim()
+        if (model.isEmpty()) return null
+        val config = aiProviderRepository.getProviderById(providerId) ?: return null
+        if (!config.isEnabled || config.apiKey.isBlank()) return null
+        return createStandaloneProvider(config.copy(selectedModel = model), sessionId)
+    }
+
+    /**
+     * 为新建会话生成标题：默认跟随当前聊天模型，配置了标题总结专用模型则用之。
+     * 提示词来自 [SystemPromptProvider] 的 `agent/title-generator.md`。
+     * 生成失败或取不到标题时返回 null（调用方保留临时标题）。
+     */
+    override suspend fun generateTitle(sessionId: String, request: String): String? = runCatching {
+        val provider = resolveTitleFallbackProvider(sessionId) ?: getActiveProvider(sessionId)
+        val prompt = promptProvider.resolvePrompt(TITLE_GENERATOR_FILE)
+            .replace(LEADING_COMMENT, "")
+        val response = provider.complete(
+            systemPrompt = prompt,
+            messages = listOf(AgentMessage.UserMessage(content = request)),
+            tools = emptyList()
+        )
+        response.content.trim().take(TITLE_MAX_CHARS).ifBlank { null }
+    }.onFailure { e ->
+        FileLogger.w(TAG, "生成会话标题失败", e)
+    }.getOrNull()
 
     private suspend fun runToolStream(
         tool: StreamingAgentTool, 

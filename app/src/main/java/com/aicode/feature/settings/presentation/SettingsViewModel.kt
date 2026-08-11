@@ -26,6 +26,7 @@ import com.aicode.feature.settings.data.repository.AppThemeMode
 import com.aicode.feature.settings.data.repository.ContainerSettingsRepository
 import com.aicode.feature.settings.data.repository.ExecutionMode
 import com.aicode.feature.settings.data.repository.CompactionModelSettingsRepository
+import com.aicode.feature.settings.data.repository.TitleModelSettingsRepository
 import com.aicode.feature.settings.data.repository.ExecutionModeHolder
 import com.aicode.feature.settings.data.repository.ExecutionModeRepository
 import com.aicode.feature.settings.data.repository.AgentSoundSettingsRepository
@@ -87,6 +88,7 @@ class SettingsViewModel @Inject constructor(
     private val permissionRulesRepository: PermissionRulesRepository,
     private val visionModelSettingsRepository: VisionModelSettingsRepository,
     private val compactionModelSettingsRepository: CompactionModelSettingsRepository,
+    private val titleModelSettingsRepository: TitleModelSettingsRepository,
     private val containerSettingsRepository: ContainerSettingsRepository,
     private val containerInstaller: ContainerInstaller,
     private val containerOsDetector: ContainerOsDetector,
@@ -118,6 +120,13 @@ class SettingsViewModel @Inject constructor(
 
     private val _compactionModel = MutableStateFlow("")
     val compactionModel: StateFlow<String> = _compactionModel.asStateFlow()
+
+    /** 标题总结专用模型选择：providerId 为空即「跟随当前聊天模型」。 */
+    private val _titleProviderId = MutableStateFlow("")
+    val titleProviderId: StateFlow<String> = _titleProviderId.asStateFlow()
+
+    private val _titleModel = MutableStateFlow("")
+    val titleModel: StateFlow<String> = _titleModel.asStateFlow()
 
     private val _logLevel = MutableStateFlow(LogLevel.VERBOSE)
     val logLevel: StateFlow<LogLevel> = _logLevel.asStateFlow()
@@ -235,6 +244,18 @@ class SettingsViewModel @Inject constructor(
             launch {
                 compactionModelSettingsRepository.modelFlow.collectLatest {
                     _compactionModel.value = it
+                }
+            }
+
+            launch {
+                titleModelSettingsRepository.providerIdFlow.collectLatest {
+                    _titleProviderId.value = it
+                }
+            }
+
+            launch {
+                titleModelSettingsRepository.modelFlow.collectLatest {
+                    _titleModel.value = it
                 }
             }
 
@@ -632,6 +653,20 @@ class SettingsViewModel @Inject constructor(
     fun clearCompactionModel() {
         viewModelScope.launch {
             compactionModelSettingsRepository.clear()
+        }
+    }
+
+    /** 设置标题总结专用模型；providerId 留空等同 [clearTitleModel]（跟随聊天模型）。 */
+    fun setTitleModel(providerId: String, model: String) {
+        viewModelScope.launch {
+            titleModelSettingsRepository.setTitleModel(providerId, model)
+        }
+    }
+
+    /** 清空标题总结专用模型——回退到跟随当前聊天模型。 */
+    fun clearTitleModel() {
+        viewModelScope.launch {
+            titleModelSettingsRepository.clear()
         }
     }
 

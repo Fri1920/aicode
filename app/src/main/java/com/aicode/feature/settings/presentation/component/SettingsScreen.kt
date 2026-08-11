@@ -111,6 +111,8 @@ fun SettingsScreen(
     val visionModel by viewModel.visionModel.collectAsStateWithLifecycle()
     val compactionProviderId by viewModel.compactionProviderId.collectAsStateWithLifecycle()
     val compactionModel by viewModel.compactionModel.collectAsStateWithLifecycle()
+    val titleProviderId by viewModel.titleProviderId.collectAsStateWithLifecycle()
+    val titleModel by viewModel.titleModel.collectAsStateWithLifecycle()
     val modelMetadata by viewModel.modelMetadata.collectAsStateWithLifecycle()
     val containerProfiles by viewModel.profiles.collectAsStateWithLifecycle()
     val activeProfileId by viewModel.activeProfileId.collectAsStateWithLifecycle()
@@ -269,12 +271,16 @@ fun SettingsScreen(
                     visionModel = visionModel,
                     compactionProviderId = compactionProviderId,
                     compactionModel = compactionModel,
+                    titleProviderId = titleProviderId,
+                    titleModel = titleModel,
                     modelMetadata = modelMetadata,
                     onLoadMetadata = { viewModel.loadAllModelMetadata() },
                     onSelectVisionModel = { pid, m -> viewModel.setVisionModel(pid, m) },
                     onClearVisionModel = { viewModel.clearVisionModel() },
                     onSelectCompactionModel = { pid, m -> viewModel.setCompactionModel(pid, m) },
-                    onClearCompactionModel = { viewModel.clearCompactionModel() }
+                    onClearCompactionModel = { viewModel.clearCompactionModel() },
+                    onSelectTitleModel = { pid, m -> viewModel.setTitleModel(pid, m) },
+                    onClearTitleModel = { viewModel.clearTitleModel() }
                 )
                 SettingsSection.Mcp -> McpSection(
                     entries = mcpEntries,

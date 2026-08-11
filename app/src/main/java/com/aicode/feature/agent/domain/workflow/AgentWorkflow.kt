@@ -82,4 +82,11 @@ interface AgentWorkflow {
      * @return 是否实际触发了压缩（历史未超阈值时返回 false，不改动）。
      */
     suspend fun compactSession(sessionId: String, onEvent: suspend (AgentEvent) -> Unit = {}): Boolean
+
+    /**
+     * 为新建会话生成标题（供首条用户消息后异步调用）。
+     * 默认跟随当前聊天模型；若配置了标题总结专用模型且可用则用之。
+     * 生成失败或取不到标题时返回 null（调用方保留临时标题）。
+     */
+    suspend fun generateTitle(sessionId: String, request: String): String?
 }

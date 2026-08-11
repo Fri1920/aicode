@@ -276,6 +276,7 @@ object AgentModule {
         modelMetadataService: ModelMetadataService,
         visionModelSettingsRepository: com.aicode.feature.settings.data.repository.VisionModelSettingsRepository,
         compactionModelSettingsRepository: com.aicode.feature.settings.data.repository.CompactionModelSettingsRepository,
+        titleModelSettingsRepository: com.aicode.feature.settings.data.repository.TitleModelSettingsRepository,
         sessionUseCase: com.aicode.feature.agent.domain.session.SessionUseCase,
         messagePersistenceUseCase: com.aicode.feature.agent.domain.session.MessagePersistenceUseCase,
         checkpointManager: com.aicode.feature.agent.domain.checkpoint.CheckpointManager
@@ -295,6 +296,7 @@ object AgentModule {
             modelMetadataService,
             visionModelSettingsRepository,
             compactionModelSettingsRepository,
+            titleModelSettingsRepository,
             sessionUseCase,
             messagePersistenceUseCase,
             checkpointManager

@@ -51,6 +51,7 @@ import compose.icons.feathericons.ArrowUp
 import compose.icons.feathericons.Check
 import compose.icons.feathericons.Image
 import compose.icons.feathericons.Minimize2
+import compose.icons.feathericons.Type
 
 /**
  * 默认模型二级页：集中管理应用中的默认/特定用途模型设置（如识图模型、压缩模型）。
@@ -62,15 +63,20 @@ internal fun DefaultModelsSection(
     visionModel: String,
     compactionProviderId: String,
     compactionModel: String,
+    titleProviderId: String,
+    titleModel: String,
     modelMetadata: Map<String, ModelMetadata>,
     onLoadMetadata: () -> Unit,
     onSelectVisionModel: (providerId: String, model: String) -> Unit,
     onClearVisionModel: () -> Unit,
     onSelectCompactionModel: (providerId: String, model: String) -> Unit,
-    onClearCompactionModel: () -> Unit
+    onClearCompactionModel: () -> Unit,
+    onSelectTitleModel: (providerId: String, model: String) -> Unit,
+    onClearTitleModel: () -> Unit
 ) {
     var showVisionSheet by remember { mutableStateOf(false) }
     var showCompactionSheet by remember { mutableStateOf(false) }
+    var showTitleSheet by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) { onLoadMetadata() }
 
@@ -84,6 +90,12 @@ internal fun DefaultModelsSection(
         stringResource(R.string.settings_compaction_follow_chat)
     } else {
         compactionModel
+    }
+
+    val titleValue = if (titleProviderId.isBlank() || titleModel.isBlank()) {
+        stringResource(R.string.settings_title_follow_chat)
+    } else {
+        titleModel
     }
 
     Column(
@@ -119,6 +131,23 @@ internal fun DefaultModelsSection(
                 trailing = {
                     Text(
                         text = compactionValue,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        textAlign = TextAlign.End,
+                        modifier = Modifier.weight(2f)
+                    )
+                }
+            )
+            SettingsDivider()
+            SettingsRow(
+                icon = FeatherIcons.Type,
+                title = stringResource(R.string.settings_title_model),
+                onClick = { showTitleSheet = true },
+                trailing = {
+                    Text(
+                        text = titleValue,
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
@@ -168,6 +197,26 @@ internal fun DefaultModelsSection(
                 showCompactionSheet = false
             },
             onDismiss = { showCompactionSheet = false }
+        )
+    }
+
+    if (showTitleSheet) {
+        ModelSelectionSheet(
+            title = stringResource(R.string.settings_title_model),
+            noModelsText = stringResource(R.string.title_no_models),
+            providers = providers,
+            currentProviderId = titleProviderId,
+            currentModel = titleModel,
+            modelMetadata = modelMetadata,
+            onSelect = { pid, model ->
+                onSelectTitleModel(pid, model)
+                showTitleSheet = false
+            },
+            onClear = {
+                onClearTitleModel()
+                showTitleSheet = false
+            },
+            onDismiss = { showTitleSheet = false }
         )
     }
 }
