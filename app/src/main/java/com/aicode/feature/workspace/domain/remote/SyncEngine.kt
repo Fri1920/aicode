@@ -80,8 +80,16 @@ class SyncEngine(
     private fun segMatch(pattern: String, segment: String): Boolean {
         if (pattern == "**") return true
         if ('*' !in pattern) return pattern == segment
-        val regex = Regex("^" + Regex.escape(pattern).replace("\\*", ".*") + "$")
-        return regex.matches(segment)
+        // 手写转义：正则特殊字符加反斜杠，`*` 直接展开为 `.*`。
+        // （Regex.escape 在 Kotlin 2.x 返回 \Q...\E 字面量形式，无法再通过 replace 展开通配符）
+        val escaped = buildString {
+            for (ch in pattern) {
+                if (ch == '*') append(".*")
+                else if (ch in ".+?()[]{}\\^$|") append('\\').append(ch)
+                else append(ch)
+            }
+        }
+        return Regex("^$escaped$").matches(segment)
     }
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
