@@ -21,6 +21,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.luminance
@@ -94,17 +95,21 @@ internal fun SettingsGroup(
  */
 @Composable
 internal fun SettingsRow(
-    icon: ImageVector?,
+    icon: ImageVector? = null,
     title: String,
     onClick: (() -> Unit)? = null,
     trailing: (@Composable RowScope.() -> Unit)? = null,
-    subtitle: String? = null
+    subtitle: String? = null,
+    enabled: Boolean = true
 ) {
     val modifier = Modifier
         .fillMaxWidth()
-        .let { if (onClick != null) it.clickable { onClick() } else it }
+        .let { if (onClick != null && enabled) it.clickable { onClick() } else it }
         .padding(horizontal = Spacing.lg, vertical = 11.dp)
-    Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
+    Row(
+        modifier = modifier.alpha(if (enabled) 1f else 0.5f),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
         if (icon != null) {
             Icon(
                 imageVector = icon,
@@ -130,7 +135,7 @@ internal fun SettingsRow(
             }
         }
         trailing?.invoke(this)
-        if (onClick != null) {
+        if (onClick != null && enabled) {
             Spacer(Modifier.width(Spacing.xs))
             Icon(
                 imageVector = FeatherIcons.ChevronRight,

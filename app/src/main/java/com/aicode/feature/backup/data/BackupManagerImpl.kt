@@ -1,6 +1,7 @@
 package com.aicode.feature.backup.data
 
 import android.content.Context
+import com.aicode.core.util.GitIgnoreMatcher
 import com.aicode.feature.agent.data.local.dao.AgentMessageDao
 import com.aicode.feature.agent.data.local.dao.ChatSessionDao
 import com.aicode.feature.agent.data.local.dao.TodoItemDao
@@ -25,6 +26,7 @@ import com.aicode.feature.backup.domain.RemoteConnectionDto
 import com.aicode.feature.backup.domain.RemoteMountDto
 import com.aicode.feature.backup.domain.RestoreStats
 import com.aicode.feature.backup.domain.TodoItemDto
+import com.aicode.feature.backup.domain.WorkspaceBackupMeta
 import com.aicode.feature.backup.domain.toMetadata
 import com.aicode.feature.credentials.data.local.dao.GitCredentialDao
 import com.aicode.feature.credentials.data.local.entity.GitCredentialEntity
@@ -42,6 +44,7 @@ import com.aicode.feature.workspace.data.local.entity.RemoteConnectionEntity
 import com.aicode.feature.workspace.data.local.entity.RemoteMountEntity
 import com.aicode.feature.workspace.data.repository.WorkspaceRepository
 import com.aicode.feature.workspace.domain.model.RemoteProtocol
+import com.aicode.feature.workspace.domain.model.Workspace
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -212,6 +215,9 @@ class BackupManagerImpl @Inject constructor(
             GzipCompressorOutputStream(fos).use { gz ->
                 TarArchiveOutputStream(gz).use { tar ->
                     writeMetadataEntry(tar, buildMetadata(options))
+                    if (options.workspaceFiles) {
+                        writeWorkspaceEntries(tar)
+                    }
                     if (options.chatHistory) {
                         writeJsonlFileEntry(tar, FILE_SESSIONS) { writer ->
                             var lastTs = 0L
@@ -270,7 +276,8 @@ class BackupManagerImpl @Inject constructor(
         visionModel = if (options.appSettings) visionModelSettingsRepository.getVisionModel() else "",
         compactionProviderId = if (options.appSettings) compactionModelSettingsRepository.getCompactionProviderId() else "",
         compactionModel = if (options.appSettings) compactionModelSettingsRepository.getCompactionModel() else "",
-        syncSettings = if (options.appSettings) syncSettingsRepository.snapshot() else null
+        syncSettings = if (options.appSettings) syncSettingsRepository.snapshot() else null,
+        workspaces = if (options.workspaceFiles) collectWorkspaceMetas() else emptyList()
     )
 
     private fun writeMetadataEntry(tar: TarArchiveOutputStream, metadata: BackupMetadata) {
@@ -310,6 +317,69 @@ class BackupManagerImpl @Inject constructor(
         }
     }
 
+    // ── 工作区文件备份 ──────────────────────────────────────────
+
+    /** 第一遍：统计每个本地工作区将备份的文件数（写 metadata 用）。 */
+    private fun collectWorkspaceMetas(): List<WorkspaceBackupMeta> =
+        workspaceRepository.workspaces.value.mapNotNull { ws ->
+            var count = 0
+            walkWorkspaceFiles(ws) { _, _ -> count++ }
+            if (count > 0) WorkspaceBackupMeta(ws.name, count) else null
+        }
+
+    /** 第二遍：把各本地工作区文件写入 tar（`workspaces/<name>/<相对路径>`）。 */
+    private fun writeWorkspaceEntries(tar: TarArchiveOutputStream) {
+        workspaceRepository.workspaces.value.forEach { ws ->
+            walkWorkspaceFiles(ws) { file, parts ->
+                writeTarFileEntry(tar, "workspaces/${ws.name}/${parts.joinToString("/")}", file)
+            }
+        }
+    }
+
+    /**
+     * 递归遍历本地工作区，按「.gitignore（锚定）+ 同步忽略清单」排除文件；
+     * `.git` 目录强制包含（其内部不参与忽略判断）；符号链接跳过（防循环）。
+     */
+    private fun walkWorkspaceFiles(
+        workspace: Workspace,
+        onFile: (File, List<String>) -> Unit
+    ) {
+        val root = File(workspace.path)
+        if (!root.isDirectory) return  // 远程工作区或不存在：本地无文件可备份
+        val customIgnores = syncSettingsRepository.ignoredPatterns.value
+            .split(",").map { it.trim() }.filter { it.isNotEmpty() }.toSet()
+        val gitignorePatterns = parseGitIgnore(File(root, ".gitignore"))
+
+        fun walk(dir: File, relParts: List<String>) {
+            dir.listFiles()?.forEach { f ->
+                val parts = relParts + f.name
+                if (java.nio.file.Files.isSymbolicLink(f.toPath())) return@forEach
+                if (parts.first() != ".git" &&
+                    (customIgnores.any { it in parts } ||
+                        GitIgnoreMatcher.isIgnored(gitignorePatterns, parts, anchored = true))
+                ) {
+                    return@forEach
+                }
+                if (f.isDirectory) walk(f, parts) else onFile(f, parts)
+            }
+        }
+        walk(root, emptyList())
+    }
+
+    /** 解析工作区根 .gitignore：去空行/注释/结尾斜杠。 */
+    private fun parseGitIgnore(file: File): List<String> =
+        if (!file.isFile) emptyList()
+        else file.readLines()
+            .filter { it.isNotBlank() && !it.startsWith("#") }
+            .map { it.trim().removeSuffix("/") }
+
+    private fun writeTarFileEntry(tar: TarArchiveOutputStream, name: String, file: File) {
+        val entry = TarArchiveEntry(name).apply { size = file.length() }
+        tar.putArchiveEntry(entry)
+        FileInputStream(file).use { it.copyTo(tar) }
+        tar.closeArchiveEntry()
+    }
+
     // ── 导入辅助 ──────────────────────────────────────────────
 
     private suspend fun restoreFromTar(tar: TarArchiveInputStream): RestoreStats {
@@ -344,6 +414,11 @@ class BackupManagerImpl @Inject constructor(
                     stats += RestoreStats(todoItems = restoreJsonl(tar, TodoItemDto.serializer()) { dtos ->
                         todoItemDao.upsertAll(dtos.map { it.toEntity() })
                     })
+                }
+                else -> {
+                    if (entry.name.startsWith(WORKSPACE_PREFIX)) {
+                        stats += restoreWorkspaceEntry(tar, entry.name)
+                    }
                 }
             }
             entry = tar.nextEntry
@@ -458,6 +533,28 @@ class BackupManagerImpl @Inject constructor(
         )
     }
 
+    /** 还原单个工作区文件条目：`workspaces/<name>/<相对路径>`，按同名本地工作区写回。 */
+    private fun restoreWorkspaceEntry(tar: TarArchiveInputStream, entryName: String): RestoreStats {
+        val segments = entryName.split("/", limit = 3)
+        if (segments.size != 3) return RestoreStats()
+        val ws = workspaceRepository.workspaces.value.firstOrNull { it.name == segments[1] }
+            ?: return RestoreStats()
+        val wsDir = File(ws.path)
+        if (!isPathInsideWorkspace(wsDir, segments[2])) return RestoreStats()
+        val target = File(wsDir, segments[2])
+        target.parentFile?.mkdirs()
+        FileOutputStream(target).use { out -> tar.copyTo(out) }
+        return RestoreStats(workspaceFiles = 1)
+    }
+
+    /** 防路径穿越：工作区必须是本地目录，且相对路径规范化后仍位于其内。 */
+    private fun isPathInsideWorkspace(wsDir: File, relPath: String): Boolean {
+        if (!wsDir.isDirectory) return false
+        val root = wsDir.canonicalPath
+        val target = File(wsDir, relPath).canonicalPath
+        return target == root || target.startsWith(root + File.separator)
+    }
+
     private fun createTempFile(): File = File.createTempFile("backup", ".tmp", context.cacheDir)
 
     // ── Entity ↔ DTO 转换 ──────────────────────────────────────
@@ -507,6 +604,7 @@ class BackupManagerImpl @Inject constructor(
         const val FILE_MESSAGES = "messages.jsonl"
         const val FILE_TODOS = "todoItems.jsonl"
         const val FILE_LEGACY_SNAPSHOT = "snapshot.json"
+        const val WORKSPACE_PREFIX = "workspaces/"
     }
 }
 

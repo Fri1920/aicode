@@ -40,7 +40,8 @@ data class BackupOptions(
     val chatHistory: Boolean = true,
     val mcpServers: Boolean = true,
     val permissionRules: Boolean = true,
-    val appSettings: Boolean = true
+    val appSettings: Boolean = true,
+    val workspaceFiles: Boolean = false
 )
 
 data class RestoreStats(
@@ -52,7 +53,8 @@ data class RestoreStats(
     val agentMessages: Int = 0,
     val todoItems: Int = 0,
     val mcpServers: Int = 0,
-    val globalPermissionRules: Int = 0
+    val globalPermissionRules: Int = 0,
+    val workspaceFiles: Int = 0
 ) {
     operator fun plus(other: RestoreStats) = RestoreStats(
         providers = providers + other.providers,
@@ -63,6 +65,7 @@ data class RestoreStats(
         agentMessages = agentMessages + other.agentMessages,
         todoItems = todoItems + other.todoItems,
         mcpServers = mcpServers + other.mcpServers,
-        globalPermissionRules = globalPermissionRules + other.globalPermissionRules
+        globalPermissionRules = globalPermissionRules + other.globalPermissionRules,
+        workspaceFiles = workspaceFiles + other.workspaceFiles
     )
 }

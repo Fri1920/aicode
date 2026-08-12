@@ -207,9 +207,9 @@
     <string name="backup_write_failed">Write failed: %1$s</string>
     <string name="backup_read_failed">Failed to read backup file</string>
     <string name="backup_export_title">Export Backup</string>
-    <string name="backup_export_subtitle">Select data to export, optionally password-encrypted (tar.gz)</string>
+    <string name="backup_export_subtitle">Select data to export, optionally password-encrypted</string>
     <string name="backup_import_title">Import Backup</string>
-    <string name="backup_import_subtitle">Restore data from backup file (merged, existing data preserved)</string>
+    <string name="backup_import_subtitle">Restore data from backup file</string>
     <string name="backup_set_password">Set export password</string>
     <string name="backup_password_hint">Leave empty for unencrypted tar.gz; enter a password for AES-GCM encryption</string>
     <string name="backup_export_btn">Export</string>
@@ -219,15 +219,15 @@
     <string name="backup_operation_failed">Operation failed</string>
     <string name="backup_import_done">Import complete</string>
     <string name="backup_section_title">Backup &amp; Restore</string>
-    <string name="backup_section_desc">Export as tar.gz archive, optionally AES-GCM encrypted, including API keys and credentials. If the password is lost, encrypted backups cannot be recovered. Data remains stored in plaintext within the app after import.</string>
+    <string name="backup_actions">Actions</string>
     <string name="backup_select_data">Select export data</string>
     <string name="backup_data_git_credentials">Git Credentials</string>
-    <string name="backup_data_remote">Remote Connections &amp; Mounts</string>
+    <string name="backup_data_remote">Connections &amp; Sync</string>
     <string name="backup_data_chat_history">Chat History</string>
     <string name="backup_data_mcp">MCP Servers</string>
     <string name="backup_data_permissions">Permission Rules</string>
     <string name="backup_data_app_settings">App Settings</string>
-    <string name="backup_next">Next</string>
+    <string name="backup_data_workspace">Workspace Files</string>
     <string name="backup_password_label">Password (optional)</string>
     <string name="backup_processing">Processing</string>
     <string name="backup_processing_data">Processing data…</string>
@@ -241,6 +241,7 @@
     <string name="backup_stat_todo_items">· Todo Items: %1$s</string>
     <string name="backup_stat_mcp_servers">· MCP Servers: %1$s</string>
     <string name="backup_stat_permission_rules">· Global Permission Rules: %1$s</string>
+    <string name="backup_stat_workspace_files">· Workspace Files: %1$s</string>
     <string name="backup_settings_covered">Theme, keepalive, logging, vision, and sync preferences covered</string>
 
     <!-- Backup ViewModel -->

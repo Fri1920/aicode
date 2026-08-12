@@ -13,15 +13,12 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -29,10 +26,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -43,19 +38,17 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.aicode.R
-import com.aicode.core.theme.Radius
 import com.aicode.core.theme.Spacing
 import compose.icons.FeatherIcons
 import compose.icons.feathericons.Book
-import compose.icons.feathericons.ChevronRight
 import compose.icons.feathericons.Github
 import compose.icons.feathericons.Tag
 
@@ -96,40 +89,48 @@ internal fun AboutSection() {
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(Spacing.lg),
+            .padding(horizontal = Spacing.lg)
+            .padding(bottom = Spacing.xl),
         verticalArrangement = Arrangement.spacedBy(Spacing.md)
     ) {
         AboutHeaderCard(appName = stringResource(R.string.app_name), appIcon = appIcon)
 
-        LinkRow(
-            leading = FeatherIcons.Tag,
-            title = stringResource(R.string.about_version),
-            value = "v${appInfo.name}",
-            onClick = {
-                if (updateDialog == null) {
-                    updateDialog = UpdateDialogState.Checking
-                    scope.launch {
-                        updateDialog = checkUpdate(context, appInfo.name)
+        SettingsGroup {
+            // 版本：点击检查更新
+            SettingsRow(
+                icon = FeatherIcons.Tag,
+                title = stringResource(R.string.about_version),
+                onClick = {
+                    if (updateDialog == null) {
+                        updateDialog = UpdateDialogState.Checking
+                        scope.launch {
+                            updateDialog = checkUpdate(context, appInfo.name)
+                        }
                     }
+                },
+                trailing = {
+                    Text(
+                        text = "v${appInfo.name}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = if (settingsLightMode()) Color(0xFF8E9094) else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
-            }
-        )
-
-        // GitHub 仓库
-        LinkRow(
-            leading = FeatherIcons.Github,
-            title = stringResource(R.string.about_github_repo),
-            value = null,
-            onClick = { openUrl(context, GITHUB_REPO_URL) }
-        )
-
-        // 许可证
-        LinkRow(
-            leading = FeatherIcons.Book,
-            title = stringResource(R.string.about_license),
-            value = null,
-            onClick = { openUrl(context, LICENSE_URL) }
-        )
+            )
+            SettingsDivider()
+            // GitHub 仓库
+            SettingsRow(
+                icon = FeatherIcons.Github,
+                title = stringResource(R.string.about_github_repo),
+                onClick = { openUrl(context, GITHUB_REPO_URL) }
+            )
+            SettingsDivider()
+            // 许可证
+            SettingsRow(
+                icon = FeatherIcons.Book,
+                title = stringResource(R.string.about_license),
+                onClick = { openUrl(context, LICENSE_URL) }
+            )
+        }
     }
 
     // 检查更新结果弹窗
@@ -149,11 +150,11 @@ internal fun AboutSection() {
 /** 顶部信息卡：左 app 图标，右上 app 名，右下一句简介。 */
 @Composable
 private fun AboutHeaderCard(appName: String, appIcon: androidx.compose.ui.graphics.ImageBitmap?) {
-    Card(
+    Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(Radius.md),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+        shape = RoundedCornerShape(14.dp),
+        color = if (settingsLightMode()) Color.White else MaterialTheme.colorScheme.surface,
+        shadowElevation = 0.dp
     ) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(Spacing.lg),
@@ -186,69 +187,6 @@ private fun AboutHeaderCard(appName: String, appIcon: androidx.compose.ui.graphi
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-        }
-    }
-}
-
-/**
- * 单行卡片：左侧可选图标 + 标题，右侧可选文案 + 右箭头。
- *
- * @param leading 左侧图标，null 则留出占位空格使标题与下方卡片左对齐于标题起点。
- * @param value 右侧文案，null 则不显示，仅显示右箭头。
- */
-@Composable
-private fun LinkRow(
-    leading: ImageVector?,
-    title: String,
-    value: String?,
-    onClick: () -> Unit
-) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onClick() },
-        shape = RoundedCornerShape(Radius.md),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(Spacing.lg),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            if (leading != null) {
-                Icon(
-                    imageVector = leading,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(24.dp)
-                )
-                Spacer(Modifier.width(Spacing.md))
-            } else {
-                // 与带图标的行保持左对齐：24dp 图标宽 + md 间距
-                Spacer(Modifier.width(24.dp + Spacing.md))
-            }
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Normal,
-                color = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.weight(1f)
-            )
-            if (value != null) {
-                Text(
-                    text = value,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.primary
-                )
-                Spacer(Modifier.width(Spacing.xs))
-            }
-            Icon(
-                imageVector = FeatherIcons.ChevronRight,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
-            )
         }
     }
 }

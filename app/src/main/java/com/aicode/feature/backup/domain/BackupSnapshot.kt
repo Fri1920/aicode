@@ -59,7 +59,15 @@ data class BackupMetadata(
     val visionModel: String = "",
     val compactionProviderId: String = "",
     val compactionModel: String = "",
-    val syncSettings: SyncSettingsSnapshot? = null
+    val syncSettings: SyncSettingsSnapshot? = null,
+    val workspaces: List<WorkspaceBackupMeta> = emptyList()
+)
+
+/** 备份元数据中的一个工作区段：名称 + 备份的文件数（用于导入摘要）。 */
+@Serializable
+data class WorkspaceBackupMeta(
+    val name: String,
+    val fileCount: Int
 )
 
 fun BackupSnapshot.toMetadata() = BackupMetadata(
