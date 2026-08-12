@@ -43,37 +43,12 @@ class RemoteSftpFileAccess @Inject constructor(
     /** 把 AI 路径映射到远程服务器上的真实路径。
      *  ~/workspace 映射到当前选中工作区（与本地模式 WorkspacePathMapper 行为一致），
      *  其它绝对路径直接作为远程绝对路径使用。 */
-    private fun toRemotePath(path: String): String {
-        val root = currentWorkspaceRoot().trimEnd('/')
-        // CONTAINER_ROOT 是 ~/workspace，展开 ~ 后做前缀匹配
-        val wsRoot = (connection.remoteHome ?: "~").trimEnd('/') + "/workspace"
-        val p = path.trim().let {
-            if (it.startsWith("~/")) {
-                val home = connection.remoteHome
-                if (home != null) home.trimEnd('/') + "/" + it.removePrefix("~/") else it
-            } else it
-        }
-        return when {
-            p == wsRoot || p == "$wsRoot/" || p == CONTAINER_ROOT || p == "$CONTAINER_ROOT/" -> root
-            p.startsWith("$wsRoot/") ->
-                root + "/" + p.removePrefix("$wsRoot/")
-            p.startsWith("/") -> p
-            else -> root + "/" + p
-        }
-    }
+    private fun toRemotePath(path: String): String =
+        remotePathFor(path, currentWorkspaceRoot(), connection.remoteHome)
 
     /** 把远程路径还原为 AI 视角的容器路径（回显用）。 */
-    private fun toDisplayPathFromRemote(remotePath: String): String {
-        val root = currentWorkspaceRoot().trimEnd('/')
-        return when {
-            remotePath == root -> CONTAINER_ROOT
-            remotePath.startsWith("$root/") -> CONTAINER_ROOT + "/" + remotePath.removePrefix("$root/")
-            else -> remotePath
-        }
-    }
-
-    /** 单引号转义：远程路径含单引号时用 `'\''` 绕过，保证 shell 命令安全。 */
-    private fun shellQuote(s: String): String = "'" + s.replace("'", "'\\''") + "'"
+    private fun toDisplayPathFromRemote(remotePath: String): String =
+        displayPathFor(remotePath, currentWorkspaceRoot())
 
     /** 同步执行远程命令并返回完整 stdout。失败时抛友好异常。 */
     private fun execSync(command: String): String = runBlocking {
@@ -200,20 +175,7 @@ class RemoteSftpFileAccess @Inject constructor(
                 "stat -c '%n|%F|%s|%Y|%A' ${shellQuote(remote)}/* 2>/dev/null"
             )
             if (output.isBlank()) return emptyList()
-            output.lines().mapNotNull { line ->
-                val parts = line.split("|")
-                if (parts.size < 5) return@mapNotNull null
-                val name = parts[0].substringAfterLast('/')
-                if (name.isBlank()) return@mapNotNull null
-                FileEntry(
-                    name = name,
-                    isDirectory = parts[1].contains("directory", ignoreCase = true),
-                    size = parts[2].toLongOrNull() ?: 0L,
-                    lastModified = (parts[3].toLongOrNull() ?: 0L) * 1000L,
-                    localFile = null,
-                    permissions = parts[4].takeLast(9).ifBlank { "---" }
-                )
-            }
+            output.lines().mapNotNull { parseStatEntryLine(it) }
         }.getOrElse {
             FileLogger.w(TAG, "listFiles 失败: $remote", it)
             emptyList()
@@ -266,4 +228,53 @@ class RemoteSftpFileAccess @Inject constructor(
     }
 
     override fun toDisplayPath(path: String): String = toDisplayPathFromRemote(toRemotePath(path))
+}
+
+/** AI 路径 → 远程真实路径：`~/workspace` 前缀映射到 [workspaceRoot]，其它绝对路径原样使用。 */
+internal fun remotePathFor(path: String, workspaceRoot: String, remoteHome: String?): String {
+    val root = workspaceRoot.trimEnd('/')
+    // CONTAINER_ROOT 是 ~/workspace，展开 ~ 后做前缀匹配
+    val wsRoot = (remoteHome ?: "~").trimEnd('/') + "/workspace"
+    val p = path.trim().let {
+        if (it.startsWith("~/")) {
+            val home = remoteHome
+            if (home != null) home.trimEnd('/') + "/" + it.removePrefix("~/") else it
+        } else it
+    }
+    return when {
+        p == wsRoot || p == "$wsRoot/" || p == CONTAINER_ROOT || p == "$CONTAINER_ROOT/" -> root
+        p.startsWith("$wsRoot/") ->
+            root + "/" + p.removePrefix("$wsRoot/")
+        p.startsWith("/") -> p
+        else -> root + "/" + p
+    }
+}
+
+/** 远程真实路径 → AI 视角的容器路径（回显用）。 */
+internal fun displayPathFor(remotePath: String, workspaceRoot: String): String {
+    val root = workspaceRoot.trimEnd('/')
+    return when {
+        remotePath == root -> CONTAINER_ROOT
+        remotePath.startsWith("$root/") -> CONTAINER_ROOT + "/" + remotePath.removePrefix("$root/")
+        else -> remotePath
+    }
+}
+
+/** 单引号转义：路径含单引号时用 `'\''` 绕过，保证 shell 命令安全。 */
+internal fun shellQuote(s: String): String = "'" + s.replace("'", "'\\''") + "'"
+
+/** 解析 `stat -c '%n|%F|%s|%Y|%A'` 输出行；字段不足或名称为空返回 null。 */
+internal fun parseStatEntryLine(line: String): FileEntry? {
+    val parts = line.split("|")
+    if (parts.size < 5) return null
+    val name = parts[0].substringAfterLast('/')
+    if (name.isBlank()) return null
+    return FileEntry(
+        name = name,
+        isDirectory = parts[1].contains("directory", ignoreCase = true),
+        size = parts[2].toLongOrNull() ?: 0L,
+        lastModified = (parts[3].toLongOrNull() ?: 0L) * 1000L,
+        localFile = null,
+        permissions = parts[4].takeLast(9).ifBlank { "---" }
+    )
 }
