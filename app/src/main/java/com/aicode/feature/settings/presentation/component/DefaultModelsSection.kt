@@ -223,11 +223,11 @@ internal fun DefaultModelsSection(
 
 /**
  * 模型选择弹窗：风格与拉取模型弹窗保持一致（iOS 胶囊搜索框、提供商分组卡片、能力 Tag）。
- * 识图模型与压缩模型共用此组件，仅文案不同；右上角「重置」清除专用模型配置（回退跟随聊天模型）。
+ * 识图模型、压缩模型与主页聊天模型共用此组件，仅文案不同；右上角「重置」清除专用模型配置（回退跟随聊天模型），主页场景传 null 不显示。
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun ModelSelectionSheet(
+internal fun ModelSelectionSheet(
     title: String,
     noModelsText: String,
     providers: List<AIProviderConfig>,
@@ -235,7 +235,7 @@ private fun ModelSelectionSheet(
     currentModel: String,
     modelMetadata: Map<String, ModelMetadata>,
     onSelect: (providerId: String, model: String) -> Unit,
-    onClear: () -> Unit,
+    onClear: (() -> Unit)?,
     onDismiss: () -> Unit
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -266,12 +266,14 @@ private fun ModelSelectionSheet(
                     color = MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier.weight(1f)
                 )
-                Text(
-                    text = stringResource(R.string.common_reset),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.clickable { onClear() }
-                )
+                onClear?.let { onClear ->
+                    Text(
+                        text = stringResource(R.string.common_reset),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.clickable { onClear() }
+                    )
+                }
             }
 
             ModelSearchField(

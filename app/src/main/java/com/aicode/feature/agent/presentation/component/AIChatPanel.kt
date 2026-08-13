@@ -4,6 +4,7 @@ import android.content.ClipData
 import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
@@ -81,7 +82,6 @@ private data class AutoScrollSignal(
 @Composable
 fun AIChatPanel(
     viewModel: AIAgentViewModel,
-    onNavigateToSettings: () -> Unit,
     onNavigateToTerminal: () -> Unit = {},
     onNavigateToGit: () -> Unit = {},
     settingsViewModel: SettingsViewModel? = null,
@@ -204,7 +204,7 @@ fun AIChatPanel(
     val filePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
         handlePickedAttachments(uris, images = false)
     }
-    val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
+    val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.PickMultipleVisualMedia()) { uris ->
         handlePickedAttachments(uris, images = true)
     }
 
@@ -545,10 +545,10 @@ fun AIChatPanel(
                 onSwitchWorkspaceConfirmed = { viewModel.stopAllAndCloseTerminal() },
                 activeProvider = activeProvider,
                 providers = providers,
+                modelMetadata = modelMetadata,
                 onSelectModel = { p, m ->
                     viewModel.setSessionProviderModel(p, m)
                 },
-                onNavigateToSettings = onNavigateToSettings,
                 currentMode = currentMode,
                 onToggleMode = { viewModel.setSessionMode(it) },
                 reasoningEffort = reasoningEffort,
@@ -558,7 +558,11 @@ fun AIChatPanel(
                 canUploadFiles = canUploadFiles,
                 canUploadImages = canUploadImages,
                 onUploadFile = { filePicker.launch(arrayOf("*/*")) },
-                onUploadImage = { imagePicker.launch(arrayOf("image/*")) },
+                onUploadImage = {
+                    imagePicker.launch(
+                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                    )
+                },
                 onTakePhoto = ::takePhoto,
                 slashCommands = viewModel.slashCommands,
                 queuedRequests = queuedRequests,

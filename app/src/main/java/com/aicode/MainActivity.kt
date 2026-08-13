@@ -315,7 +315,6 @@ fun AppNavigation() {
                     settingsViewModel = settingsViewModel,
                     workspaceViewModel = workspaceViewModel,
                     drawerState = drawerState,
-                    onNavigateToSettings = { navController.navigate("settings") },
                     onNavigateToTerminal = { navController.navigate("terminal") },
                     onNavigateToGit = { navController.navigate("git") }
                 )

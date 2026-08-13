@@ -64,6 +64,7 @@ import com.aicode.feature.agent.domain.tool.mode.PlanApprovalRequest
 import com.aicode.feature.agent.presentation.AgentUIState
 import com.aicode.feature.agent.presentation.QueuedRequest
 import com.aicode.feature.settings.domain.model.AIProviderConfig
+import com.aicode.feature.settings.domain.model.ModelMetadata
 import com.aicode.feature.workspace.presentation.WorkspaceViewModel
 import com.aicode.feature.workspace.presentation.component.WorkspaceIconButton
 import compose.icons.FeatherIcons
@@ -85,8 +86,8 @@ internal fun ChatInputBar(
     onSwitchWorkspaceConfirmed: () -> Unit = {},
     activeProvider: AIProviderConfig?,
     providers: List<AIProviderConfig>,
+    modelMetadata: Map<String, ModelMetadata>,
     onSelectModel: (String, String) -> Unit,
-    onNavigateToSettings: () -> Unit,
     currentMode: AgentMode,
     onToggleMode: (AgentMode) -> Unit,
     reasoningEffort: ReasoningEffort,
@@ -266,8 +267,8 @@ internal fun ChatInputBar(
                         ModelIconButton(
                             provider = activeProvider,
                             providers = providers,
-                            onSelectModel = onSelectModel,
-                            onManage = onNavigateToSettings
+                            modelMetadata = modelMetadata,
+                            onSelectModel = onSelectModel
                         )
 
                         if (workspaceViewModel != null) {
