@@ -3,7 +3,9 @@ package com.aicode
 import android.app.Application
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.content.Intent
 import android.os.Build
+import android.os.Process
 import androidx.work.Configuration
 import androidx.hilt.work.HiltWorkerFactory
 import com.aicode.core.util.AILogger
@@ -31,10 +33,24 @@ import javax.inject.Inject
 @HiltAndroidApp
 class AIEditorApp : Application(), Configuration.Provider {
 
-    private companion object {
+    companion object {
         const val TAG = "AIEditorApp"
         const val LANG_PREFS = "language_prefs_sync"
         const val LANG_KEY = "language_tag"
+        /** 崩溃堆栈经 Intent extra 传递，超出 Binder 上限会抛异常，需截断。 */
+        const val MAX_CRASH_STACK_CHARS = 50_000
+        private const val CRASH_PREFS = "crash_state"
+        private const val KEY_CRASH_UI_SHOWING = "crash_ui_showing"
+
+        /** 当前导航路由（MainActivity 写入），崩溃时随报告带出，用于定位崩溃页面。 */
+        @Volatile
+        var currentRoute: String? = null
+
+        /** 错误页关闭后清除落盘标志，允许下一次崩溃再次进入错误页。 */
+        fun resetCrashUiFlag(context: android.content.Context) {
+            context.getSharedPreferences(CRASH_PREFS, android.content.Context.MODE_PRIVATE)
+                .edit().remove(KEY_CRASH_UI_SHOWING).apply()
+        }
     }
 
     override fun attachBaseContext(base: android.content.Context) {
@@ -240,12 +256,56 @@ class AIEditorApp : Application(), Configuration.Provider {
         SecurityUtils.setSecurityProvider("BC")
     }
 
-    /** 捕获未处理异常并落盘，随后交回系统默认处理器（保留原有崩溃弹窗/上报行为）。 */
+    /**
+     * 捕获未处理异常：落盘后拉起全屏错误页（展示崩溃详情、支持复制），
+     * 随即杀掉进程让系统重启并恢复错误页。
+     *
+     * 必须杀进程：主线程崩溃后其 Looper 已死，不杀进程则错误页窗口虽出现
+     * 但 onCreate 永不执行（白屏），最终被系统当 ANR 杀掉。杀掉后 AMS 检测到
+     * 进程死在 Activity 创建途中，会自动重启进程并恢复 CrashActivity，
+     * 新进程主线程健康，错误页才能正常渲染。
+     *
+     * 防递归：错误页自身崩溃时落盘标志仍在，直接交回系统默认处理器，避免无限重启。
+     */
     private fun installCrashHandler() {
         val previous = Thread.getDefaultUncaughtExceptionHandler()
         Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
             FileLogger.e("CRASH", "线程 ${thread.name} 未捕获异常", throwable)
-            previous?.uncaughtException(thread, throwable)
+            val prefs = getSharedPreferences(CRASH_PREFS, MODE_PRIVATE)
+            if (prefs.getBoolean(KEY_CRASH_UI_SHOWING, false)) {
+                // 错误页自身崩溃：交回系统默认处理器，避免无限重启循环
+                previous?.uncaughtException(thread, throwable)
+                return@setDefaultUncaughtExceptionHandler
+            }
+            prefs.edit().putBoolean(KEY_CRASH_UI_SHOWING, true).apply()
+            try {
+                startActivity(
+                    Intent(this, CrashActivity::class.java).apply {
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+                        putExtra(CrashActivity.EXTRA_THREAD_NAME, thread.name)
+                        putExtra(CrashActivity.EXTRA_STACK, stackTraceOf(throwable))
+                        putExtra(CrashActivity.EXTRA_SCREEN, currentRoute)
+                    }
+                )
+            } catch (t: Throwable) {
+                // 错误页启动失败（如系统限制）：交回默认处理器，不让崩溃被吞掉
+                FileLogger.e(TAG, "启动崩溃错误页失败", t)
+                prefs.edit().remove(KEY_CRASH_UI_SHOWING).apply()
+                previous?.uncaughtException(thread, throwable)
+                return@setDefaultUncaughtExceptionHandler
+            }
+            Process.killProcess(Process.myPid())
+        }
+    }
+
+    private fun stackTraceOf(throwable: Throwable): String {
+        val sw = java.io.StringWriter()
+        throwable.printStackTrace(java.io.PrintWriter(sw))
+        val text = sw.toString()
+        return if (text.length > MAX_CRASH_STACK_CHARS) {
+            text.take(MAX_CRASH_STACK_CHARS) + "\n...[truncated]"
+        } else {
+            text
         }
     }
 

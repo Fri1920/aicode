@@ -34,6 +34,13 @@
             </intent-filter>
         </activity>
 
+        <!-- 未捕获异常时由 AIEditorApp 的全局 handler 拉起，全屏展示崩溃详情供复制反馈。 -->
+        <activity
+            android:name=".CrashActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:theme="@style/Theme.AICode" />
+
         <provider
             android:name=".feature.workspace.data.provider.WorkspaceDocumentsProvider"
             android:authorities="${applicationId}.documents"

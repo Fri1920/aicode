@@ -115,7 +115,8 @@ class OpenAIAdapter @Inject constructor(
             val usage = response.get("usage")?.takeIf { it.isJsonObject }?.asJsonObject
             val inputTokens = usage?.get("input_tokens")?.takeIf { !it.isJsonNull }?.asInt ?: 0
             val outputTokens = usage?.get("output_tokens")?.takeIf { !it.isJsonNull }?.asInt ?: 0
-            return AIResponse(content = content, toolCalls = toolCalls, stopReason = finishReason, inputTokens = inputTokens, outputTokens = outputTokens)
+            val cachedInputTokens = usage?.getAsJsonObject("input_tokens_details")?.get("cached_tokens")?.takeIf { !it.isJsonNull }?.asInt ?: 0
+            return AIResponse(content = content, toolCalls = toolCalls, stopReason = finishReason, inputTokens = inputTokens, outputTokens = outputTokens, cachedInputTokens = cachedInputTokens)
         }
 
         val request = ChatCompletionRequest(
@@ -148,7 +149,7 @@ class OpenAIAdapter @Inject constructor(
         val reasoning = message?.reasoning_content?.takeIf { it.isNotEmpty() }
         val usage = response.usage
 
-        return AIResponse(content = content, toolCalls = toolCalls, stopReason = finishReason, reasoning = reasoning, inputTokens = usage?.prompt_tokens ?: 0, outputTokens = usage?.completion_tokens ?: 0)
+        return AIResponse(content = content, toolCalls = toolCalls, stopReason = finishReason, reasoning = reasoning, inputTokens = usage?.prompt_tokens ?: 0, outputTokens = usage?.completion_tokens ?: 0, cachedInputTokens = usage?.prompt_tokens_details?.cached_tokens ?: 0)
     }
 
     override fun completeStream(
@@ -193,6 +194,7 @@ class OpenAIAdapter @Inject constructor(
                     var finishReason: String? = null
                     var streamInputTokens = 0
                     var streamOutputTokens = 0
+                    var streamCachedInputTokens = 0
 
                     val body = api.streamResponses(
                         url = url,
@@ -259,6 +261,7 @@ class OpenAIAdapter @Inject constructor(
                                             ?.get("usage")?.takeIf { it.isJsonObject }?.asJsonObject
                                         streamInputTokens = usageObj?.get("input_tokens")?.takeIf { !it.isJsonNull }?.asInt ?: 0
                                         streamOutputTokens = usageObj?.get("output_tokens")?.takeIf { !it.isJsonNull }?.asInt ?: 0
+                                        streamCachedInputTokens = usageObj?.getAsJsonObject("input_tokens_details")?.get("cached_tokens")?.takeIf { !it.isJsonNull }?.asInt ?: 0
                                     }
                                 } catch (e: CancellationException) {
                                     throw e
@@ -276,7 +279,7 @@ class OpenAIAdapter @Inject constructor(
                         .filter { it.id.isNotEmpty() || it.name.isNotEmpty() }
                         .map { acc -> ToolCall(id = acc.id, name = acc.name, arguments = parseArgs(acc.args.toString())) }
                     onProduced()
-                    emit(AIStreamChunk.Final(AIResponse(content = textBuilder.toString(), toolCalls = toolCalls, stopReason = finishReason, inputTokens = streamInputTokens, outputTokens = streamOutputTokens)))
+                    emit(AIStreamChunk.Final(AIResponse(content = textBuilder.toString(), toolCalls = toolCalls, stopReason = finishReason, inputTokens = streamInputTokens, outputTokens = streamOutputTokens, cachedInputTokens = streamCachedInputTokens)))
                 },
                 onRetry = { attempt, max -> emit(AIStreamChunk.Retrying(attempt, max)) }
             )
@@ -314,6 +317,7 @@ class OpenAIAdapter @Inject constructor(
             var finishReason: String? = null
             var streamInputTokens = 0
             var streamOutputTokens = 0
+            var streamCachedInputTokens = 0
 
             val body = api.streamChatCompletion(
                 url = url,
@@ -358,6 +362,7 @@ class OpenAIAdapter @Inject constructor(
                             obj.get("usage")?.takeIf { it.isJsonObject }?.asJsonObject?.let { u ->
                                 streamInputTokens = u.get("prompt_tokens")?.takeIf { !it.isJsonNull }?.asInt ?: streamInputTokens
                                 streamOutputTokens = u.get("completion_tokens")?.takeIf { !it.isJsonNull }?.asInt ?: streamOutputTokens
+                                streamCachedInputTokens = u.getAsJsonObject("prompt_tokens_details")?.get("cached_tokens")?.takeIf { !it.isJsonNull }?.asInt ?: streamCachedInputTokens
                             }
                             val choice = obj.getAsJsonArray("choices")?.firstOrNull()?.asJsonObject ?: continue
                             val delta = choice.getAsJsonObject("delta") ?: continue
@@ -415,7 +420,7 @@ class OpenAIAdapter @Inject constructor(
                 .filter { it.id.isNotEmpty() || it.name.isNotEmpty() }
                 .map { acc -> ToolCall(id = acc.id, name = acc.name, arguments = parseArgs(acc.args.toString())) }
             onProduced()
-            emit(AIStreamChunk.Final(AIResponse(content = textBuilder.toString(), toolCalls = toolCalls, stopReason = finishReason, inputTokens = streamInputTokens, outputTokens = streamOutputTokens)))
+            emit(AIStreamChunk.Final(AIResponse(content = textBuilder.toString(), toolCalls = toolCalls, stopReason = finishReason, inputTokens = streamInputTokens, outputTokens = streamOutputTokens, cachedInputTokens = streamCachedInputTokens)))
             },
             onRetry = { attempt, max -> emit(AIStreamChunk.Retrying(attempt, max)) }
             )

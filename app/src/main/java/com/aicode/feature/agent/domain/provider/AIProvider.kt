@@ -21,7 +21,9 @@ data class AIResponse(
     /** 本轮输入 token 数（来自 API 返回的 usage）。取不到时为 0。 */
     val inputTokens: Int = 0,
     /** 本轮输出 token 数（来自 API 返回的 usage）。取不到时为 0。 */
-    val outputTokens: Int = 0
+    val outputTokens: Int = 0,
+    /** 本轮输入中命中服务端缓存的部分（OpenAI cached_tokens / Anthropic cache_read_input_tokens / Gemini cachedContentTokenCount）。取不到时为 0。 */
+    val cachedInputTokens: Int = 0
 ) {
     val isTruncated: Boolean
         get() = stopReason == "max_tokens" || stopReason == "length"

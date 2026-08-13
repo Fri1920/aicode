@@ -2,17 +2,21 @@ package com.aicode.feature.agent.domain.workflow
 
 import com.aicode.core.util.FileLogger
 import com.aicode.feature.agent.data.local.dao.AgentMessageDao
+import com.aicode.feature.agent.data.local.dao.LlmCallRecordDao
 import com.aicode.feature.agent.data.local.entity.AgentMessageEntity
+import com.aicode.feature.agent.data.local.entity.LlmCallRecordEntity
 import com.aicode.feature.agent.domain.model.AgentMessage
 import com.aicode.feature.agent.domain.model.CONTEXT_COMPACTION_MARKER
 import com.aicode.feature.agent.domain.model.CONTEXT_SUMMARY_LEGACY_PREFIX
 import com.aicode.feature.agent.domain.model.id
 import com.aicode.feature.agent.domain.prompt.SystemPromptProvider
 import com.aicode.feature.agent.domain.provider.AIProvider
+import com.aicode.feature.agent.domain.provider.AIResponse
 import com.aicode.feature.agent.presentation.MessageRole
 import com.aicode.feature.settings.data.remote.ModelMetadataService
 import com.aicode.feature.settings.domain.model.ModelContextPolicy
 import com.aicode.feature.settings.domain.model.ProviderType
+import android.os.SystemClock
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -21,7 +25,8 @@ import javax.inject.Singleton
 class ContextCompactor @Inject constructor(
     private val agentMessageDao: AgentMessageDao,
     private val modelMetadataService: ModelMetadataService,
-    private val systemPromptProvider: SystemPromptProvider
+    private val systemPromptProvider: SystemPromptProvider,
+    private val llmCallRecordDao: LlmCallRecordDao
 ) {
 
     private companion object {
@@ -104,19 +109,50 @@ class ContextCompactor @Inject constructor(
 
         val summaryPrompt = buildSummaryPrompt(previousSummary, headContent)
 
+        // 调用统计埋点：压缩也是一次真实 LLM 调用（独立于主循环，kind=compaction）。
+        val callStartElapsed = SystemClock.elapsedRealtime()
+        val callStartWall = System.currentTimeMillis()
+        var callError: String? = null
+        var callCompleted = false
+        var callUsage: AIResponse? = null
+
         val summaryResponse = try {
             val response = aiProvider.complete(
                 systemPrompt = "你是一个上下文压缩引擎。",
                 messages = listOf(AgentMessage.UserMessage(content = summaryPrompt)),
                 tools = emptyList()
             )
+            callUsage = response
+            callCompleted = true
             response.content
         } catch (e: kotlinx.coroutines.CancellationException) {
             throw e
         } catch (e: Exception) {
+            callError = e.message ?: e.javaClass.simpleName
             FileLogger.e(TAG, "压缩上下文失败", e)
             onEvent(AgentEvent.CompactionFinished)
             return messages.toList() // 失败则原样返回，交由上层自行承担溢出风险
+        }
+
+        val durationMillis = (SystemClock.elapsedRealtime() - callStartElapsed).toInt()
+        runCatching {
+            llmCallRecordDao.insert(
+                LlmCallRecordEntity(
+                    sessionId = sessionId,
+                    providerId = aiProvider.providerId.ifBlank { null },
+                    model = aiProvider.model,
+                    kind = "compaction",
+                    inputTokens = callUsage?.inputTokens ?: 0,
+                    outputTokens = callUsage?.outputTokens ?: 0,
+                    cachedInputTokens = callUsage?.cachedInputTokens ?: 0,
+                    ttfbMillis = null,
+                    durationMillis = durationMillis,
+                    status = if (callCompleted) "success" else "error",
+                    errorMessage = callError,
+                    stopReason = callUsage?.stopReason,
+                    createdAt = callStartWall
+                )
+            )
         }
 
         FileLogger.i(TAG, "上下文压缩完成，摘要长度：${summaryResponse.length}")

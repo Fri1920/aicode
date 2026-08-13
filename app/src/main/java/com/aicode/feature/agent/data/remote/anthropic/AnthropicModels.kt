@@ -56,5 +56,9 @@ data class AnthropicMessageResponse(
 
 data class AnthropicUsage(
     val input_tokens: Int,
-    val output_tokens: Int
+    val output_tokens: Int,
+    /** 命中缓存的前缀 token 数（prompt caching 生效时返回）。 */
+    val cache_read_input_tokens: Int? = null,
+    /** 本次写入缓存的新增 token 数。 */
+    val cache_creation_input_tokens: Int? = null
 )

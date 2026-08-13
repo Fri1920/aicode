@@ -218,6 +218,9 @@ dependencies {
     debugImplementation("androidx.compose.ui:ui-tooling")
     implementation("androidx.compose.animation:animation")
 
+    // Vico 图表（Token 统计趋势图）
+    implementation("com.patrykandpatrick.vico:compose-m3:2.4.4")
+
     // Lifecycle + ViewModel
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.9.0")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.9.0")

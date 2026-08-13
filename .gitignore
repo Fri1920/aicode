@@ -28,3 +28,7 @@ keystore.properties
 /*.log
 *.apk
 /test
+
+# Python（模型数据更新脚本）
+__pycache__/
+*.pyc

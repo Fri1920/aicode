@@ -4,6 +4,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.aicode.core.util.FileLogger
 import com.aicode.core.util.LogLevel
+import com.aicode.feature.agent.data.local.dao.LlmCallRecordDao
+import com.aicode.feature.agent.data.local.dao.RecentCallRecord
+import com.aicode.feature.agent.data.local.entity.LlmCallRecordEntity
 import com.aicode.feature.agent.domain.container.ConnectionState
 import com.aicode.feature.agent.domain.container.ContainerInstaller
 import com.aicode.feature.agent.domain.container.ContainerOsDetector
@@ -40,6 +43,7 @@ import com.aicode.feature.workspace.domain.repository.RemoteRepository
 import com.aicode.feature.settings.domain.model.AIProviderConfig
 import com.aicode.feature.settings.domain.model.ModelMetadata
 import com.aicode.feature.settings.domain.model.ProviderType
+import com.aicode.R
 import com.aicode.feature.settings.domain.repository.AIProviderRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -47,6 +51,8 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -73,6 +79,67 @@ data class LogViewerUiState(
     val error: String? = null
 )
 
+/** Token 统计周期：决定统计起始时间与趋势粒度（今天=小时粒度，其余=天粒度）。 */
+enum class TokenStatsPeriod(val labelRes: Int, val startMillis: (Long) -> Long) {
+    TODAY(R.string.settings_token_stats_period_today, { now ->
+        java.util.Calendar.getInstance().apply {
+            timeInMillis = now
+            set(java.util.Calendar.HOUR_OF_DAY, 0)
+            set(java.util.Calendar.MINUTE, 0)
+            set(java.util.Calendar.SECOND, 0)
+            set(java.util.Calendar.MILLISECOND, 0)
+        }.timeInMillis
+    }),
+    LAST_7_DAYS(R.string.settings_token_stats_period_7d, { now -> now - 7 * 86_400_000L }),
+    LAST_30_DAYS(R.string.settings_token_stats_period_30d, { now -> now - 30 * 86_400_000L }),
+    ALL(R.string.settings_token_stats_period_all, { 0L })
+}
+
+/** Token 统计页的完整 UI 状态，由周期 + 5 个聚合 Flow 组合而成。 */
+data class TokenStatsUiState(
+    val period: TokenStatsPeriod = TokenStatsPeriod.LAST_7_DAYS,
+    val summary: com.aicode.feature.agent.data.local.dao.CallSummary? = null,
+    val trend: List<com.aicode.feature.agent.data.local.dao.DayCallStats> = emptyList(),
+    val providers: List<com.aicode.feature.agent.data.local.dao.ProviderCallStats> = emptyList(),
+    val models: List<com.aicode.feature.agent.data.local.dao.ModelCallStats> = emptyList(),
+    val recentCalls: List<RecentCallRecord> = emptyList(),
+    /** 调用明细当前页（0 起）。 */
+    val callsPage: Int = 0,
+    /** 当前周期调用总数，供分页显示总页数。 */
+    val callsTotal: Int = 0,
+    /** 当前周期总费用（USD，按 models.dev 单价估算）。 */
+    val totalCostUsd: Double = 0.0,
+    /** 调用明细分页内每条记录的费用（key=记录 id，null=模型无单价）。 */
+    val recentCallCosts: Map<Long, Double?> = emptyMap()
+)
+
+/**
+ * 把趋势聚合补全为周期内的完整时间轴：无记录的天/小时补 0，避免周期内调用集中在同一天时
+ * 趋势只有单个点而无法绘制折线图。「全部」周期从最早有记录的那天起补到当天。
+ */
+private fun padTrend(
+    period: TokenStatsPeriod,
+    trend: List<com.aicode.feature.agent.data.local.dao.DayCallStats>,
+    tzOffsetMillis: Long
+): List<com.aicode.feature.agent.data.local.dao.DayCallStats> {
+    if (trend.isEmpty()) return emptyList()
+    val now = System.currentTimeMillis()
+    val byDay = trend.associateBy { it.day }
+    val isHourly = period == TokenStatsPeriod.TODAY
+    val bucketMillis = if (isHourly) 3_600_000L else 86_400_000L
+    val endIndex = (now + tzOffsetMillis) / bucketMillis
+    val startIndex = when (period) {
+        TokenStatsPeriod.TODAY -> (period.startMillis(now) + tzOffsetMillis) / bucketMillis
+        TokenStatsPeriod.ALL -> trend.first().day
+        else -> (period.startMillis(now) + tzOffsetMillis) / bucketMillis
+    }
+    if (startIndex > endIndex) return trend
+    return (startIndex..endIndex).map { index ->
+        byDay[index] ?: com.aicode.feature.agent.data.local.dao.DayCallStats(index, 0, 0, 0, 0, 0, null, null)
+    }
+}
+
+@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
     private val repository: AIProviderRepository,
@@ -95,10 +162,14 @@ class SettingsViewModel @Inject constructor(
     private val executionModeRepository: ExecutionModeRepository,
     private val executionModeHolder: ExecutionModeHolder,
     private val remoteSshConnection: RemoteSshConnection,
-    private val remoteRepository: RemoteRepository
+    private val remoteRepository: RemoteRepository,
+    private val llmCallRecordDao: LlmCallRecordDao
 ) : ViewModel() {
     private companion object {
         const val MAX_LOG_LINES = 1200
+        const val CALLS_PAGE_SIZE = 10
+        /** 缓存读价缺失时按输入价的折扣估算。 */
+        const val CACHE_READ_DISCOUNT = 0.1
     }
 
     private val _providers = MutableStateFlow<List<AIProviderConfig>>(emptyList())
@@ -197,6 +268,17 @@ class SettingsViewModel @Inject constructor(
 
     /** 远程 SSH 连接状态，供 UI 显示指示器。 */
     val connectionState: StateFlow<ConnectionState> = remoteSshConnection.connectionState
+
+    /** Token 统计：当前选中的统计周期。 */
+    private val _tokenStatsPeriod = MutableStateFlow(TokenStatsPeriod.LAST_7_DAYS)
+    val tokenStatsPeriod: StateFlow<TokenStatsPeriod> = _tokenStatsPeriod.asStateFlow()
+
+    /** Token 统计：周期内汇总、趋势、渠道、模型、明细的组合状态。 */
+    private val _tokenStats = MutableStateFlow(TokenStatsUiState())
+    val tokenStats: StateFlow<TokenStatsUiState> = _tokenStats.asStateFlow()
+
+    /** Token 统计：调用明细分页页码（0 起）。 */
+    private val _tokenStatsPage = MutableStateFlow(0)
 
     /** 工作区已配置的远程连接通道，供容器镜像 SSH 模式下拉复用。 */
     val remoteConnections: StateFlow<List<RemoteConnection>> = remoteRepository.getConnections()
@@ -328,6 +410,45 @@ class SettingsViewModel @Inject constructor(
                 permissionRulesRepository.currentProjectRulesFlow.collectLatest {
                     _projectRules.value = it
                 }
+            }
+
+            launch {
+                _tokenStatsPeriod.flatMapLatest { period ->
+                    val start = period.startMillis(System.currentTimeMillis())
+                    val tz = java.util.TimeZone.getDefault().getOffset(System.currentTimeMillis()).toLong()
+                    combine(
+                        if (period == TokenStatsPeriod.TODAY) {
+                            llmCallRecordDao.getHourStats(start, tz)
+                        } else {
+                            llmCallRecordDao.getDayStats(start, tz)
+                        },
+                        llmCallRecordDao.getSummary(start),
+                        llmCallRecordDao.getProviderStats(start),
+                        llmCallRecordDao.getModelStats(start),
+                        // 明细分页：页号或总数变化时重查当前页，其余聚合不重复计算
+                        combine(_tokenStatsPage, llmCallRecordDao.getCallsCount(start)) { page, total -> page to total }
+                            .flatMapLatest { (page, total) ->
+                                llmCallRecordDao.getRecentCalls(start, CALLS_PAGE_SIZE, page * CALLS_PAGE_SIZE)
+                                    .map { calls -> Triple(calls, total, page) }
+                            }
+                    ) { rawTrend, summary, providers, models, (calls, total, page) ->
+                        val trend = padTrend(period, rawTrend, tz)
+                        val costs = withContext(Dispatchers.IO) {
+                            val perCall = calls.associate {
+                                it.record.id to callCostUsd(it.record.model, it.record.inputTokens.toLong(), it.record.cachedInputTokens.toLong(), it.record.outputTokens.toLong())
+                            }
+                            val periodTotal = models.sumOf { m ->
+                                callCostUsd(m.model, m.inputTokens, m.cachedInputTokens, m.outputTokens) ?: 0.0
+                            }
+                            perCall to periodTotal
+                        }
+                        TokenStatsUiState(
+                            period, summary, trend, providers, models, calls, page, total,
+                            totalCostUsd = costs.second,
+                            recentCallCosts = costs.first
+                        )
+                    }
+                }.collectLatest { _tokenStats.value = it }
             }
         }
     }
@@ -667,6 +788,38 @@ class SettingsViewModel @Inject constructor(
     fun clearTitleModel() {
         viewModelScope.launch {
             titleModelSettingsRepository.clear()
+        }
+    }
+
+    fun setTokenStatsPeriod(period: TokenStatsPeriod) {
+        _tokenStatsPeriod.value = period
+        // 切周期后明细回到第一页
+        _tokenStatsPage.value = 0
+    }
+
+    /** 单次调用的预估费用（USD）；模型无单价返回 null。缓存读价缺失时按输入价 10% 估算。 */
+    private fun callCostUsd(model: String?, inputTokens: Long, cachedInputTokens: Long, outputTokens: Long): Double? {
+        val modelId = model ?: return null
+        val price = modelMetadataService.findModelCostUsdPerM(modelId) ?: return null
+        val inputPrice = price.first ?: return null
+        val outputPrice = price.second ?: 0.0
+        val cachePrice = price.third ?: inputPrice * CACHE_READ_DISCOUNT
+        val uncached = (inputTokens - cachedInputTokens).coerceAtLeast(0)
+        return (uncached * inputPrice + cachedInputTokens * cachePrice + outputTokens * outputPrice) / 1_000_000.0
+    }
+
+    /** 调用明细翻页；越界时钳制到合法范围。 */
+    fun setTokenStatsPage(page: Int) {
+        val total = _tokenStats.value.callsTotal
+        val lastPage = if (total == 0) 0 else (total - 1) / CALLS_PAGE_SIZE
+        _tokenStatsPage.value = page.coerceIn(0, lastPage)
+    }
+
+    /** 清空全部调用记录（Token 统计页右上角重置）；Room Flow 自动把各聚合刷新为空。 */
+    fun resetTokenStats() {
+        viewModelScope.launch {
+            llmCallRecordDao.deleteAll()
+            _tokenStatsPage.value = 0
         }
     }
 
