@@ -1,7 +1,6 @@
 package com.aicode.feature.agent.presentation.component
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,14 +17,12 @@ import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
@@ -42,13 +39,16 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.aicode.core.theme.Radius
 import com.aicode.core.theme.Spacing
+import com.aicode.feature.settings.presentation.component.SettingsDivider
+import com.aicode.feature.settings.presentation.component.SettingsGroup
+import com.aicode.feature.settings.presentation.component.SettingsGroupHeader
+import com.aicode.feature.settings.presentation.component.SettingsRow
+import com.aicode.feature.settings.presentation.component.settingsPageBackground
 import com.aicode.feature.agent.domain.model.ChatSession
 import com.aicode.feature.agent.presentation.AgentUIState
 import compose.icons.FeatherIcons
@@ -67,7 +67,7 @@ import java.util.Date
 import java.util.Locale
 
 /**
- * 侧边栏内容：顶部「历史记录」标题，中部按最后回复时间分组的会话列表，底部「设置」入口。
+ * 侧边栏内容：按最后回复时间分组的会话卡片列表（设置页风格），底部「设置」入口卡片。
  * 由 AIChatPanel 的 ModalNavigationDrawer 承载，支持左上角按钮点击或右滑打开。
  */
 @Composable
@@ -102,17 +102,12 @@ fun ChatDrawerContent(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.surface)
+            .background(settingsPageBackground())
             .windowInsetsPadding(WindowInsets.systemBars)
-            .padding(horizontal = Spacing.md, vertical = Spacing.lg)
+            .padding(horizontal = Spacing.lg)
+            .padding(bottom = Spacing.xl),
+        verticalArrangement = Arrangement.spacedBy(Spacing.sm)
     ) {
-        Text(
-            text = stringResource(R.string.chat_history),
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(horizontal = Spacing.md, vertical = Spacing.sm)
-        )
-
         Box(modifier = Modifier.weight(1f)) {
             if (sessions.isEmpty()) {
                 Text(
@@ -122,21 +117,20 @@ fun ChatDrawerContent(
                     modifier = Modifier.padding(horizontal = Spacing.md, vertical = Spacing.md)
                 )
             } else {
-                val entries = remember(sessions) {
-                    buildSessionEntries(sessions, System.currentTimeMillis())
+                val groups = remember(sessions) {
+                    buildSessionGroups(sessions, System.currentTimeMillis())
                 }
                 LazyColumn(
                     state = listState,
-                    modifier = Modifier.fillMaxSize(),
-                    verticalArrangement = Arrangement.spacedBy(Spacing.xs)
+                    modifier = Modifier.fillMaxSize()
                 ) {
-                    items(entries, key = { it.key }) { entry ->
-                        when (entry) {
-                            is SessionListEntry.Header -> SessionGroupHeader(
-                                label = sessionGroupLabel(entry.groupKey, entry.anchorSession)
-                            )
-                            is SessionListEntry.Item -> {
-                                val session = entry.session
+                    items(groups, key = { it.groupKey }) { group ->
+                        SettingsGroupHeader(
+                            text = sessionGroupLabel(group.groupKey, group.sessions.first())
+                        )
+                        Column {
+                            group.sessions.forEachIndexed { index, session ->
+                                if (index > 0) SettingsDivider()
                                 val state = agentStates[session.id]
                                 val isExecuting = state is AgentUIState.Loading || state is AgentUIState.Streaming
                                 ChatSessionRow(
@@ -153,29 +147,11 @@ fun ChatDrawerContent(
             }
         }
 
-        HorizontalDivider(
-            color = MaterialTheme.colorScheme.outlineVariant,
-            modifier = Modifier.padding(vertical = Spacing.sm)
-        )
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(Radius.sm))
-                .clickable { onNavigateToSettings() }
-                .padding(horizontal = Spacing.md, vertical = Spacing.md),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(
-                FeatherIcons.Settings,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(20.dp)
-            )
-            Spacer(Modifier.width(Spacing.md))
-            Text(
-                text = stringResource(R.string.chat_settings),
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurface
+        SettingsGroup {
+            SettingsRow(
+                icon = FeatherIcons.Settings,
+                title = stringResource(R.string.chat_settings),
+                onClick = onNavigateToSettings
             )
         }
     }
@@ -340,37 +316,27 @@ private fun SheetActionRow(
     }
 }
 
-/** 侧边栏会话列表条目：分组标题与会话行。 */
-internal sealed interface SessionListEntry {
-    val key: String
-
-    data class Header(
-        override val key: String,
-        val groupKey: String,
-        val anchorSession: ChatSession
-    ) : SessionListEntry
-
-    data class Item(
-        override val key: String,
-        val session: ChatSession
-    ) : SessionListEntry
-}
+/** 侧边栏会话分组：同一时间组（今天 / 昨天 / 7天内 / 30天内 / 月份）内的会话，按最后回复时间降序。 */
+internal data class SessionGroup(
+    val groupKey: String,
+    val sessions: List<ChatSession>
+)
 
 /**
- * 按最后回复时间（updatedAt）降序的会话列表插入分组标题：今天 / 昨天 / 7天内 / 30天内 / 更早按月。
+ * 按最后回复时间（updatedAt）降序的会话列表分组：今天 / 昨天 / 7天内 / 30天内 / 更早按月。
  */
-internal fun buildSessionEntries(sessions: List<ChatSession>, now: Long): List<SessionListEntry> {
-    val entries = mutableListOf<SessionListEntry>()
-    var lastGroup: String? = null
+internal fun buildSessionGroups(sessions: List<ChatSession>, now: Long): List<SessionGroup> {
+    val groups = mutableListOf<SessionGroup>()
     for (session in sessions) {
         val groupKey = sessionGroupKey(session.updatedAt, now)
-        if (groupKey != lastGroup) {
-            entries += SessionListEntry.Header("header-$groupKey", groupKey, session)
-            lastGroup = groupKey
+        val lastIndex = groups.lastIndex
+        if (lastIndex >= 0 && groups[lastIndex].groupKey == groupKey) {
+            groups[lastIndex] = groups[lastIndex].copy(sessions = groups[lastIndex].sessions + session)
+        } else {
+            groups += SessionGroup(groupKey, listOf(session))
         }
-        entries += SessionListEntry.Item(session.id, session)
     }
-    return entries
+    return groups
 }
 
 /** 返回会话所属分组 key；月份分组为 ISO 年月（如 2026-05），其余为固定字面量。 */
@@ -386,16 +352,6 @@ internal fun sessionGroupKey(updatedAt: Long, now: Long): String {
         days <= 30L -> "30d"
         else -> YearMonth.from(day).toString()
     }
-}
-
-@Composable
-private fun SessionGroupHeader(label: String) {
-    Text(
-        text = label,
-        style = MaterialTheme.typography.labelLarge,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(horizontal = Spacing.md, vertical = Spacing.sm)
-    )
 }
 
 @Composable

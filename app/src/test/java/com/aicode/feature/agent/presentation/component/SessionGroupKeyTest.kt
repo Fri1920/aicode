@@ -66,7 +66,7 @@ class SessionGroupKeyTest {
     }
 
     @Test
-    fun buildEntries_insertsHeaderPerGroupInOrder() {
+    fun buildGroups_groupsByTimeBucketInOrder() {
         val sessions = listOf(
             session("s1", at(0)), // 今天
             session("s2", at(1)), // 昨天
@@ -76,48 +76,48 @@ class SessionGroupKeyTest {
             session("s6", at(90)) // 月份 2026-05
         )
 
-        val entries = buildSessionEntries(sessions, now)
+        val groups = buildSessionGroups(sessions, now)
 
-        val keys = entries.map { it.key }
         assertEquals(
-            listOf("header-today", "s1", "header-yesterday", "s2", "header-7d", "s3", "header-30d", "s4", "header-2026-06", "s5", "header-2026-05", "s6"),
-            keys
+            listOf("today", "yesterday", "7d", "30d", "2026-06", "2026-05"),
+            groups.map { it.groupKey }
         )
+        assertEquals(listOf("s1"), groups[0].sessions.map { it.id })
+        assertEquals(listOf("s6"), groups[5].sessions.map { it.id })
     }
 
     @Test
-    fun buildEntries_sameGroupKeepsSessionOrder() {
+    fun buildGroups_sameGroupKeepsSessionOrder() {
         val sessions = listOf(
             session("s1", at(0)),
             session("s2", at(0)),
             session("s3", at(0))
         )
 
-        val entries = buildSessionEntries(sessions, now)
+        val groups = buildSessionGroups(sessions, now)
 
-        assertEquals(listOf("header-today", "s1", "s2", "s3"), entries.map { it.key })
+        assertEquals(1, groups.size)
+        assertEquals("today", groups[0].groupKey)
+        assertEquals(listOf("s1", "s2", "s3"), groups[0].sessions.map { it.id })
     }
 
     @Test
-    fun buildEntries_emptyList_isEmpty() {
-        assertEquals(emptyList<SessionListEntry>(), buildSessionEntries(emptyList(), now))
+    fun buildGroups_emptyList_isEmpty() {
+        assertEquals(emptyList<SessionGroup>(), buildSessionGroups(emptyList(), now))
     }
 
     @Test
-    fun buildEntries_headerAnchorsToFirstSessionOfGroup() {
+    fun buildGroups_multiGroup_keepsSessionsInOrder() {
         val sessions = listOf(
             session("s1", at(0)),
-            session("s2", at(1)),
-            session("s3", at(2))
+            session("s2", at(0)),
+            session("s3", at(1))
         )
 
-        val entries = buildSessionEntries(sessions, now)
+        val groups = buildSessionGroups(sessions, now)
 
-        val header = entries[0] as SessionListEntry.Header
-        assertEquals("today", header.groupKey)
-        assertEquals("s1", header.anchorSession.id)
-        val yesterdayHeader = entries[2] as SessionListEntry.Header
-        assertEquals("yesterday", yesterdayHeader.groupKey)
-        assertEquals("s2", yesterdayHeader.anchorSession.id)
+        assertEquals(listOf("today", "yesterday"), groups.map { it.groupKey })
+        assertEquals(listOf("s1", "s2"), groups[0].sessions.map { it.id })
+        assertEquals(listOf("s3"), groups[1].sessions.map { it.id })
     }
 }

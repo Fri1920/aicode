@@ -56,6 +56,7 @@ import com.aicode.feature.settings.presentation.component.GITHUB_RELEASES_URL
 import com.aicode.feature.settings.presentation.component.SettingsScreen
 import com.aicode.feature.settings.presentation.component.UpdateCheckDialog
 import com.aicode.feature.settings.presentation.component.openUrl
+import com.aicode.feature.settings.presentation.component.settingsPageBackground
 import com.aicode.feature.terminal.domain.TerminalKeepaliveService
 import com.aicode.feature.terminal.presentation.TerminalViewModel
 import com.aicode.feature.terminal.presentation.component.TerminalScreen
@@ -279,7 +280,7 @@ fun AppNavigation() {
         drawerContent = {
             ModalDrawerSheet(
                 drawerShape = RectangleShape,
-                drawerContainerColor = MaterialTheme.colorScheme.surface,
+                drawerContainerColor = settingsPageBackground(),
                 drawerTonalElevation = 0.dp,
                 modifier = Modifier.width(300.dp)
             ) {
