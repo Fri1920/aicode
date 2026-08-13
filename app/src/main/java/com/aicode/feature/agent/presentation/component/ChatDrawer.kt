@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -46,7 +45,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.aicode.core.theme.Radius
@@ -56,14 +54,20 @@ import com.aicode.feature.agent.presentation.AgentUIState
 import compose.icons.FeatherIcons
 import compose.icons.feathericons.Download
 import compose.icons.feathericons.Edit2
-import compose.icons.feathericons.Plus
 import compose.icons.feathericons.Settings
 import compose.icons.feathericons.Trash2
 import androidx.compose.ui.res.stringResource
 import com.aicode.R
+import java.text.SimpleDateFormat
+import java.time.Instant
+import java.time.YearMonth
+import java.time.ZoneId
+import java.time.temporal.ChronoUnit
+import java.util.Date
+import java.util.Locale
 
 /**
- * 侧边栏内容：顶部「新建会话」，中部历史记录列表，底部「设置」入口。
+ * 侧边栏内容：顶部「历史记录」标题，中部按最后回复时间分组的会话列表，底部「设置」入口。
  * 由 AIChatPanel 的 ModalNavigationDrawer 承载，支持左上角按钮点击或右滑打开。
  */
 @Composable
@@ -72,7 +76,6 @@ fun ChatDrawerContent(
     currentSessionId: String?,
     agentStates: Map<String, AgentUIState>,
     onSelect: (ChatSession) -> Unit,
-    onCreate: () -> Unit,
     onDelete: (ChatSession) -> Unit,
     onRename: (ChatSession, String) -> Unit,
     onExport: (ChatSession) -> Unit,
@@ -84,12 +87,14 @@ fun ChatDrawerContent(
     var menuSession by remember { mutableStateOf<ChatSession?>(null) }
     val listState = rememberLazyListState()
 
-    LaunchedEffect(currentSessionId, sessions) {
-        if (sessions.isEmpty()) return@LaunchedEffect
-        val index = sessions.indexOfFirst { it.id == currentSessionId }
-        if (index >= 0) {
-            listState.scrollToItem(index)
-        } else {
+    // 点击会话/重开侧边栏保持原滚动位置；仅当同一会话的最后回复时间变化（发消息/收到回复）时滚回顶部。
+    var lastTouched by remember { mutableStateOf<Pair<String?, Long?>?>(null) }
+    val currentUpdatedAt = sessions.firstOrNull { it.id == currentSessionId }?.updatedAt
+    LaunchedEffect(currentSessionId, currentUpdatedAt) {
+        val cur = currentSessionId to currentUpdatedAt
+        val prev = lastTouched
+        lastTouched = cur
+        if (prev != null && prev.first == cur.first && prev.second != cur.second) {
             listState.scrollToItem(0)
         }
     }
@@ -101,30 +106,6 @@ fun ChatDrawerContent(
             .windowInsetsPadding(WindowInsets.systemBars)
             .padding(horizontal = Spacing.md, vertical = Spacing.lg)
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(Radius.sm))
-                .clickable { onCreate() }
-                .padding(horizontal = Spacing.md, vertical = Spacing.md),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(
-                FeatherIcons.Plus,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(20.dp)
-            )
-            Spacer(Modifier.width(Spacing.md))
-            Text(
-                text = stringResource(R.string.chat_new_session),
-                style = MaterialTheme.typography.bodyLarge,
-                fontWeight = FontWeight.Medium,
-                color = MaterialTheme.colorScheme.primary
-            )
-        }
-
-        Spacer(Modifier.height(Spacing.sm))
         Text(
             text = stringResource(R.string.chat_history),
             style = MaterialTheme.typography.labelLarge,
@@ -141,21 +122,32 @@ fun ChatDrawerContent(
                     modifier = Modifier.padding(horizontal = Spacing.md, vertical = Spacing.md)
                 )
             } else {
+                val entries = remember(sessions) {
+                    buildSessionEntries(sessions, System.currentTimeMillis())
+                }
                 LazyColumn(
                     state = listState,
                     modifier = Modifier.fillMaxSize(),
                     verticalArrangement = Arrangement.spacedBy(Spacing.xs)
                 ) {
-                    items(sessions, key = { it.id }) { session ->
-                        val state = agentStates[session.id]
-                        val isExecuting = state is AgentUIState.Loading || state is AgentUIState.Streaming
-                        ChatSessionRow(
-                            session = session,
-                            selected = session.id == currentSessionId,
-                            isExecuting = isExecuting,
-                            onClick = { onSelect(session) },
-                            onLongClick = { menuSession = session }
-                        )
+                    items(entries, key = { it.key }) { entry ->
+                        when (entry) {
+                            is SessionListEntry.Header -> SessionGroupHeader(
+                                label = sessionGroupLabel(entry.groupKey, entry.anchorSession)
+                            )
+                            is SessionListEntry.Item -> {
+                                val session = entry.session
+                                val state = agentStates[session.id]
+                                val isExecuting = state is AgentUIState.Loading || state is AgentUIState.Streaming
+                                ChatSessionRow(
+                                    session = session,
+                                    selected = session.id == currentSessionId,
+                                    isExecuting = isExecuting,
+                                    onClick = { onSelect(session) },
+                                    onLongClick = { menuSession = session }
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -346,4 +338,74 @@ private fun SheetActionRow(
             )
         }
     }
+}
+
+/** 侧边栏会话列表条目：分组标题与会话行。 */
+internal sealed interface SessionListEntry {
+    val key: String
+
+    data class Header(
+        override val key: String,
+        val groupKey: String,
+        val anchorSession: ChatSession
+    ) : SessionListEntry
+
+    data class Item(
+        override val key: String,
+        val session: ChatSession
+    ) : SessionListEntry
+}
+
+/**
+ * 按最后回复时间（updatedAt）降序的会话列表插入分组标题：今天 / 昨天 / 7天内 / 30天内 / 更早按月。
+ */
+internal fun buildSessionEntries(sessions: List<ChatSession>, now: Long): List<SessionListEntry> {
+    val entries = mutableListOf<SessionListEntry>()
+    var lastGroup: String? = null
+    for (session in sessions) {
+        val groupKey = sessionGroupKey(session.updatedAt, now)
+        if (groupKey != lastGroup) {
+            entries += SessionListEntry.Header("header-$groupKey", groupKey, session)
+            lastGroup = groupKey
+        }
+        entries += SessionListEntry.Item(session.id, session)
+    }
+    return entries
+}
+
+/** 返回会话所属分组 key；月份分组为 ISO 年月（如 2026-05），其余为固定字面量。 */
+internal fun sessionGroupKey(updatedAt: Long, now: Long): String {
+    val zone = ZoneId.systemDefault()
+    val day = Instant.ofEpochMilli(updatedAt).atZone(zone).toLocalDate()
+    val today = Instant.ofEpochMilli(now).atZone(zone).toLocalDate()
+    val days = ChronoUnit.DAYS.between(day, today)
+    return when {
+        days <= 0L -> "today"
+        days == 1L -> "yesterday"
+        days <= 7L -> "7d"
+        days <= 30L -> "30d"
+        else -> YearMonth.from(day).toString()
+    }
+}
+
+@Composable
+private fun SessionGroupHeader(label: String) {
+    Text(
+        text = label,
+        style = MaterialTheme.typography.labelLarge,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(horizontal = Spacing.md, vertical = Spacing.sm)
+    )
+}
+
+@Composable
+private fun sessionGroupLabel(groupKey: String, anchorSession: ChatSession): String = when (groupKey) {
+    "today" -> stringResource(R.string.session_group_today)
+    "yesterday" -> stringResource(R.string.session_group_yesterday)
+    "7d" -> stringResource(R.string.session_group_last_7_days)
+    "30d" -> stringResource(R.string.session_group_last_30_days)
+    else -> SimpleDateFormat(
+        stringResource(R.string.session_group_month_format),
+        Locale.getDefault()
+    ).format(Date(anchorSession.updatedAt))
 }

@@ -291,10 +291,6 @@ fun AppNavigation() {
                         agentViewModel.selectSession(it.id)
                         scope.launch { drawerState.close() }
                     },
-                    onCreate = {
-                        agentViewModel.newSession()
-                        scope.launch { drawerState.close() }
-                    },
                     onDelete = { agentViewModel.deleteSession(it.id) },
                     onRename = { session, title -> agentViewModel.renameSession(session.id, title) },
                     onExport = { session ->

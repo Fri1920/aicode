@@ -292,7 +292,12 @@
 
     <!-- Chat Drawer -->
     <string name="chat_history">历史记录</string>
-    <string name="chat_no_sessions_hint">暂无会话，点击「新建会话」开始</string>
+    <string name="chat_no_sessions_hint">暂无会话</string>
+    <string name="session_group_today">今天</string>
+    <string name="session_group_yesterday">昨天</string>
+    <string name="session_group_last_7_days">7天内</string>
+    <string name="session_group_last_30_days">30天内</string>
+    <string name="session_group_month_format">yyyy年M月</string>
     <string name="chat_settings">设置</string>
     <string name="chat_delete_session">删除会话</string>
     <string name="chat_delete_session_confirm">确定删除「%1$s」？该会话的所有消息都将被清除，且无法恢复。</string>
