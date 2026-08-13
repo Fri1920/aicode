@@ -27,9 +27,29 @@ interface BackupManager {
      * 流式解包并还原备份文件。
      * @param input 调用方负责打开与关闭输入流
      * @param password 备份未加密时传 null 或空；加密文件必须提供正确口令。
+     * @param selectedWorkspaces 非 null 时只恢复这些工作区的文件（导入前由 [previewImport] 勾选）；
+     *   null 表示全量恢复（备份无工作区数据或旧调用）。
      * @return 还原统计（各数据段条目数）；口令错误/格式不符/版本过高时返回失败。
      */
-    suspend fun import(input: InputStream, password: CharArray?): Result<RestoreStats>
+    suspend fun import(
+        input: InputStream,
+        password: CharArray?,
+        selectedWorkspaces: Set<String>? = null
+    ): Result<RestoreStats>
+
+    /**
+     * 导入前预览：校验口令/格式/版本，并读出备份中包含的工作区列表（名称 + 文件数）。
+     * 有工作区数据时 UI 应弹出勾选确认（直接覆盖警告）；无数据时导入无需弹窗。
+     * @param input 调用方负责打开与关闭输入流
+     */
+    suspend fun previewImport(input: InputStream, password: CharArray?): Result<ImportPreview>
+}
+
+/** 导入预览结果：备份中的工作区列表（供勾选）。 */
+data class ImportPreview(
+    val workspaces: List<WorkspaceBackupMeta>
+) {
+    val hasWorkspaceData: Boolean get() = workspaces.isNotEmpty()
 }
 
 /** 导出数据范围选项；未勾选的段在快照中保持空值，导入时跳过。 */

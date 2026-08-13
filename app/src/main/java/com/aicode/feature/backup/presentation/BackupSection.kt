@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -35,10 +36,12 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.aicode.core.theme.Spacing
 import com.aicode.feature.backup.domain.BackupOptions
+import com.aicode.feature.backup.domain.WorkspaceBackupMeta
 import com.aicode.feature.settings.presentation.component.SettingsDivider
 import com.aicode.feature.settings.presentation.component.SettingsGroup
 import com.aicode.feature.settings.presentation.component.SettingsGroupHeader
@@ -280,6 +283,11 @@ internal fun BackupSection(viewModel: BackupViewModel) {
             message = buildImportSummary(context, (state as BackupState.ImportSuccess).stats),
             onDismiss = { viewModel.reset() }
         )
+        is BackupState.WorkspaceSelection -> WorkspaceRestoreDialog(
+            workspaces = (state as BackupState.WorkspaceSelection).workspaces,
+            onConfirm = { selected -> viewModel.confirmImportSelection(selected) },
+            onDismiss = { viewModel.cancelImportSelection() }
+        )
         else -> {}
     }
 }
@@ -305,6 +313,80 @@ private fun WorkspaceBackupHint() {
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
+}
+
+@Composable
+private fun WorkspaceRestoreDialog(
+    workspaces: List<WorkspaceBackupMeta>,
+    onConfirm: (Set<String>) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var checked by remember { mutableStateOf(workspaces.associate { it.name to true }) }
+    val anyChecked = checked.values.any { it }
+    val allChecked = workspaces.isNotEmpty() && checked.values.all { it }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.backup_restore_workspaces_title)) },
+        text = {
+            Column {
+                Text(
+                    text = stringResource(R.string.backup_restore_workspaces_warning),
+                    style = MaterialTheme.typography.bodySmall,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.error
+                )
+                Spacer(Modifier.height(Spacing.md))
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Checkbox(
+                        checked = allChecked,
+                        onCheckedChange = { v -> checked = workspaces.associate { it.name to v } }
+                    )
+                    Text(
+                        text = stringResource(R.string.backup_restore_workspaces_select_all),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+                workspaces.forEach { ws ->
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Checkbox(
+                            checked = checked[ws.name] ?: false,
+                            onCheckedChange = { v -> checked = checked + (ws.name to v) }
+                        )
+                        Text(
+                            text = ws.name,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            maxLines = 1,
+                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f)
+                        )
+                        Text(
+                            text = stringResource(R.string.backup_restore_workspaces_files, ws.fileCount),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { onConfirm(checked.filterValues { it }.keys) },
+                enabled = anyChecked
+            ) {
+                Text(stringResource(R.string.backup_restore_workspaces_confirm))
+            }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_cancel)) } }
+    )
 }
 
 @Composable

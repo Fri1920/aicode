@@ -285,6 +285,11 @@
     <string name="backup_stat_permission_rules">· Global Permission Rules: %1$s</string>
     <string name="backup_stat_workspace_files">· Workspace Files: %1$s</string>
     <string name="backup_settings_covered">Theme, keepalive, logging, vision, and sync preferences covered</string>
+    <string name="backup_restore_workspaces_title">Restore workspaces</string>
+    <string name="backup_restore_workspaces_warning">Files in local workspaces with the same name will be overwritten and cannot be undone. Select carefully.</string>
+    <string name="backup_restore_workspaces_select_all">Select all</string>
+    <string name="backup_restore_workspaces_files">%1$d files</string>
+    <string name="backup_restore_workspaces_confirm">Restore</string>
 
     <!-- Backup ViewModel -->
     <string name="backup_export_failed">Export failed</string>

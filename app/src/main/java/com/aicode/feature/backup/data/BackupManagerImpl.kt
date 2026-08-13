@@ -21,6 +21,7 @@ import com.aicode.feature.backup.domain.BackupOptions
 import com.aicode.feature.backup.domain.BackupSnapshot
 import com.aicode.feature.backup.domain.ChatSessionDto
 import com.aicode.feature.backup.domain.GitCredentialDto
+import com.aicode.feature.backup.domain.ImportPreview
 import com.aicode.feature.backup.domain.ProviderDto
 import com.aicode.feature.backup.domain.RemoteConnectionDto
 import com.aicode.feature.backup.domain.RemoteMountDto
@@ -167,30 +168,16 @@ class BackupManagerImpl @Inject constructor(
         }
     }
 
-    override suspend fun import(input: InputStream, password: CharArray?): Result<RestoreStats> {
+    override suspend fun import(
+        input: InputStream,
+        password: CharArray?,
+        selectedWorkspaces: Set<String>?
+    ): Result<RestoreStats> {
         val pw = password?.takeIf { it.isNotEmpty() }
         return withContext(Dispatchers.IO) {
             runCatching {
-                if (pw != null) {
-                    val temp = createTempFile()
-                    try {
-                        BufferedInputStream(input).use { src ->
-                            FileOutputStream(temp).use { dst -> BackupCrypto.decryptStream(src, dst, pw) }
-                        }
-                        FileInputStream(temp).use { p ->
-                            GzipCompressorInputStream(p).use { gz ->
-                                TarArchiveInputStream(gz).use { tar -> restoreFromTar(tar) }
-                            }
-                        }
-                    } finally {
-                        temp.delete()
-                    }
-                } else {
-                    BufferedInputStream(input).use { p ->
-                        GzipCompressorInputStream(p).use { gz ->
-                            TarArchiveInputStream(gz).use { tar -> restoreFromTar(tar) }
-                        }
-                    }
+                openTar(input, pw).use { source ->
+                    restoreFromTar(source.tar, selectedWorkspaces)
                 }
             }.recoverCatching { e ->
                 when (e) {
@@ -206,6 +193,65 @@ class BackupManagerImpl @Inject constructor(
                     )
                 }
             }
+        }
+    }
+
+    override suspend fun previewImport(input: InputStream, password: CharArray?): Result<ImportPreview> {
+        val pw = password?.takeIf { it.isNotEmpty() }
+        return withContext(Dispatchers.IO) {
+            runCatching {
+                openTar(input, pw).use { source ->
+                    val tar = source.tar
+                    var workspaces: List<WorkspaceBackupMeta> = emptyList()
+                    var entry = tar.nextEntry
+                    while (entry != null) {
+                        if (entry.name == FILE_METADATA) {
+                            val plain = tar.readBytes()
+                            val metadata = json.decodeFromString(BackupMetadata.serializer(), String(plain, Charsets.UTF_8))
+                            checkVersion(metadata.schemaVersion)
+                            workspaces = metadata.workspaces
+                            // 导出时 metadata.json 为首个条目，读到即可停，避免遍历大段 jsonl
+                            break
+                        }
+                        entry = tar.nextEntry
+                    }
+                    ImportPreview(workspaces)
+                }
+            }.recoverCatching { e ->
+                when (e) {
+                    is BackupDecryptionException -> throw e
+                    is IllegalStateException -> throw e
+                    else -> throw IllegalArgumentException(
+                        if (pw != null) {
+                            "备份文件已损坏，或口令与备份文件不匹配"
+                        } else {
+                            "不是有效的 AiCode 备份文件；如果这是加密备份，请输入导出口令"
+                        },
+                        e
+                    )
+                }
+            }
+        }
+    }
+
+    /** 打开 tar 流：先按需解密到临时文件，再解压；调用方负责 [TarSource.close]。 */
+    private fun openTar(input: InputStream, pw: CharArray?): TarSource {
+        if (pw == null) {
+            val p = BufferedInputStream(input)
+            val gz = GzipCompressorInputStream(p)
+            return TarSource(TarArchiveInputStream(gz), null)
+        }
+        val temp = createTempFile()
+        try {
+            BufferedInputStream(input).use { src ->
+                FileOutputStream(temp).use { dst -> BackupCrypto.decryptStream(src, dst, pw) }
+            }
+            val p = FileInputStream(temp)
+            val gz = GzipCompressorInputStream(p)
+            return TarSource(TarArchiveInputStream(gz), temp)
+        } catch (e: Throwable) {
+            temp.delete()
+            throw e
         }
     }
 
@@ -384,7 +430,7 @@ class BackupManagerImpl @Inject constructor(
 
     // ── 导入辅助 ──────────────────────────────────────────────
 
-    private suspend fun restoreFromTar(tar: TarArchiveInputStream): RestoreStats {
+    private suspend fun restoreFromTar(tar: TarArchiveInputStream, selectedWorkspaces: Set<String>?): RestoreStats {
         var metadata: BackupMetadata? = null
         var stats = RestoreStats()
         var entry = tar.nextEntry
@@ -419,7 +465,7 @@ class BackupManagerImpl @Inject constructor(
                 }
                 else -> {
                     if (entry.name.startsWith(WORKSPACE_PREFIX)) {
-                        stats += restoreWorkspaceEntry(tar, entry.name)
+                        stats += restoreWorkspaceEntry(tar, entry.name, selectedWorkspaces)
                     }
                 }
             }
@@ -535,12 +581,24 @@ class BackupManagerImpl @Inject constructor(
         )
     }
 
-    /** 还原单个工作区文件条目：`workspaces/<name>/<相对路径>`，按同名本地工作区写回。 */
-    private fun restoreWorkspaceEntry(tar: TarArchiveInputStream, entryName: String): RestoreStats {
+    /**
+     * 还原单个工作区文件条目：`workspaces/<name>/<相对路径>`。
+     * 仅处理勾选的工作区（[selectedWorkspaces] 非 null 时）；本地无同名工作区时自动创建，
+     * 避免新设备/重装后导入的工作区文件因找不到目标而丢失。
+     */
+    private suspend fun restoreWorkspaceEntry(
+        tar: TarArchiveInputStream,
+        entryName: String,
+        selectedWorkspaces: Set<String>?
+    ): RestoreStats {
         val segments = entryName.split("/", limit = 3)
         if (segments.size != 3) return RestoreStats()
-        val ws = workspaceRepository.workspaces.value.firstOrNull { it.name == segments[1] }
-            ?: return RestoreStats()
+        val wsName = segments[1]
+        if (selectedWorkspaces != null && wsName !in selectedWorkspaces) return RestoreStats()
+        var ws = workspaceRepository.workspaces.value.firstOrNull { it.name == wsName }
+        if (ws == null) {
+            ws = workspaceRepository.createWorkspace(wsName) ?: return RestoreStats()
+        }
         val wsDir = File(ws.path)
         if (!isPathInsideWorkspace(wsDir, segments[2])) return RestoreStats()
         val target = File(wsDir, segments[2])
@@ -623,5 +681,16 @@ private class JsonlWriter(private val out: OutputStream) {
     fun flush() {
         buffer.writeTo(out)
         buffer.reset()
+    }
+}
+
+/** 打开的 tar 流封装：加密导入时附带解密用的临时文件，关闭时一并清理。 */
+private class TarSource(
+    val tar: TarArchiveInputStream,
+    private val temp: File?
+) : AutoCloseable {
+    override fun close() {
+        runCatching { tar.close() }
+        temp?.delete()
     }
 }
