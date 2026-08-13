@@ -13,10 +13,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
@@ -42,6 +44,7 @@ import com.aicode.feature.settings.presentation.component.SettingsGroup
 import com.aicode.feature.settings.presentation.component.SettingsGroupHeader
 import com.aicode.feature.settings.presentation.component.SettingsRow
 import compose.icons.FeatherIcons
+import compose.icons.feathericons.AlertCircle
 import compose.icons.feathericons.Download
 import compose.icons.feathericons.Upload
 import kotlinx.coroutines.Dispatchers
@@ -182,6 +185,7 @@ internal fun BackupSection(viewModel: BackupViewModel) {
                     )
                 }
             )
+            WorkspaceBackupHint()
         }
 
         SettingsGroupHeader(text = stringResource(R.string.backup_actions))
@@ -281,6 +285,27 @@ internal fun BackupSection(viewModel: BackupViewModel) {
 }
 
 private enum class PendingAction { ExportPassword, Import }
+
+@Composable
+private fun WorkspaceBackupHint() {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.sm)
+    ) {
+        Icon(
+            imageVector = FeatherIcons.AlertCircle,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(14.dp)
+        )
+        Spacer(Modifier.width(Spacing.xs))
+        Text(
+            text = stringResource(R.string.backup_workspace_git_hint),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
 
 @Composable
 private fun PasswordDialog(
