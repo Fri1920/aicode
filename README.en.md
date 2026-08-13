@@ -63,6 +63,12 @@ AiCode is an AI-powered coding assistant that runs natively on Android. It integ
 | Crypto | BouncyCastle (bcprov-jdk18on, sshj X25519 key exchange dependency) |
 | FTP | Commons Net |
 
+## Advertisement
+
+|  |  |
+|---|---|
+| <img src="https://opencode.ai/favicon-96x96-v3.png" width="24" alt="OpenCode" /> | **[OpenCode Go](https://opencode.ai/go?ref=8Q5GA5B1NY)** — Low-cost subscription with generous limits and reliable access to the most capable open-source models |
+
 ## Getting Started
 
 ### Prerequisites

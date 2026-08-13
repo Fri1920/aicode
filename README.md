@@ -63,6 +63,12 @@ AiCode 是一款在 Android 手机上运行的 AI 编程工具，将大语言模
 | 加密 | BouncyCastle（bcprov-jdk18on，sshj X25519 密钥交换依赖） |
 | FTP | Commons Net |
 
+## 广告
+
+|  |  |
+|---|---|
+| <img src="https://opencode.ai/favicon-96x96-v3.png" width="24" alt="OpenCode" /> | **[OpenCode Go](https://opencode.ai/go?ref=8Q5GA5B1NY)** — 低价订阅，提供最强大开源模型的慷慨额度与可靠访问 |
+
 ## 快速开始
 
 ### 环境要求
