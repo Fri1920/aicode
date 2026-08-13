@@ -178,7 +178,6 @@ fun ProviderEditorScreen(
         useFullUrl = useFullUrl,
         isEnabled = isEnabled,
         defaultModel = initialProvider?.defaultModel ?: "",
-        isActive = initialProvider?.isActive ?: false,
         models = models.toList(),
         selectedModel = initialProvider?.selectedModel ?: "",
         useResponseApi = useResponseApi

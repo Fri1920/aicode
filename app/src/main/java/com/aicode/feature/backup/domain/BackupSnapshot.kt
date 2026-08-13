@@ -99,7 +99,6 @@ data class ProviderDto(
     val apiKey: String,
     val baseUrl: String,
     val defaultModel: String,
-    val isActive: Boolean,
     val models: String = "",
     val selectedModel: String = "",
     val isEnabled: Boolean = true,

@@ -113,19 +113,25 @@ fun AIChatPanel(
     val pendingQuestion by viewModel.pendingUserQuestion.collectAsStateWithLifecycle()
     val queuedRequests by viewModel.queuedRequests.collectAsStateWithLifecycle()
     val targetRewindMessageId by viewModel.targetRewindMessageId.collectAsStateWithLifecycle()
-    val globalActiveProvider = settingsViewModel?.activeProvider?.collectAsStateWithLifecycle()?.value
     val providers = (settingsViewModel?.providers?.collectAsStateWithLifecycle()?.value ?: emptyList()).filter { it.isEnabled }
     val modelMetadata = settingsViewModel?.modelMetadata?.collectAsStateWithLifecycle()?.value.orEmpty()
     val sessionProviderModel by viewModel.currentSessionProviderModel.collectAsStateWithLifecycle()
+    val defaultProviderId = settingsViewModel?.defaultModelProviderId?.collectAsStateWithLifecycle()?.value ?: ""
+    val defaultModelName = settingsViewModel?.defaultModel?.collectAsStateWithLifecycle()?.value ?: ""
+    // 未绑定会话回退：新会话默认模型（主页空会话中选择后记忆），未设置则为 null（UI 显示默认图标/顶栏模型名留空）。
+    val defaultFallbackProvider = providers
+        .find { it.id == defaultProviderId }
+        ?.takeIf { it.apiKey.isNotBlank() }
+        ?.let { if (defaultModelName.isNotBlank()) it.copy(selectedModel = defaultModelName) else it }
     val activeProvider = run {
         val (boundProviderId, boundModel) = sessionProviderModel
         if (!boundProviderId.isNullOrBlank()) {
-            // 与 workflow.resolveProviderConfig 保持一致：绑定 provider 须启用且已填 apiKey，否则回退全局
+            // 与 workflow.resolveProviderConfig 保持一致：绑定 provider 须启用且已填 apiKey，否则回退默认模型
             providers.find { it.id == boundProviderId }?.takeIf { it.apiKey.isNotBlank() }?.let {
                 if (!boundModel.isNullOrBlank()) it.copy(selectedModel = boundModel) else it
-            } ?: globalActiveProvider
+            } ?: defaultFallbackProvider
         } else {
-            globalActiveProvider
+            defaultFallbackProvider
         }
     }
     val currentWorkspace = workspaceViewModel?.current?.collectAsStateWithLifecycle()?.value

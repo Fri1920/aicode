@@ -30,6 +30,7 @@ import com.aicode.feature.agent.domain.tool.toTransportString
 import com.aicode.feature.agent.presentation.AgentAttachment
 import com.aicode.feature.settings.data.remote.ModelMetadataService
 import com.aicode.feature.settings.data.repository.CompactionModelSettingsRepository
+import com.aicode.feature.settings.data.repository.DefaultModelSettingsRepository
 import com.aicode.feature.settings.data.repository.TitleModelSettingsRepository
 import com.aicode.feature.settings.data.repository.VisionModelSettingsRepository
 import com.aicode.feature.settings.domain.model.AIProviderConfig
@@ -81,6 +82,7 @@ class StatefulAgentWorkflow @Inject constructor(
     private val visionModelSettingsRepository: VisionModelSettingsRepository,
     private val compactionModelSettingsRepository: CompactionModelSettingsRepository,
     private val titleModelSettingsRepository: TitleModelSettingsRepository,
+    private val defaultModelSettingsRepository: DefaultModelSettingsRepository,
     private val sessionUseCase: SessionUseCase,
     private val messagePersistenceUseCase: MessagePersistenceUseCase,
     private val checkpointManager: CheckpointManager,
@@ -167,7 +169,7 @@ class StatefulAgentWorkflow @Inject constructor(
         data class CancelToolBatch(val toolCalls: List<ToolCall>) : AgentSideEffect
     }
 
-    private suspend fun getActiveProvider(sessionId: String?): AIProvider {
+    private suspend fun getEffectiveProvider(sessionId: String?): AIProvider {
         val config = resolveProviderConfig(sessionId)
             ?: throw IllegalStateException("尚未配置 AI 提供商，请到设置中添加并选择一个")
         if (config.apiKey.isBlank()) throw IllegalStateException("「${config.name}」未填写 API Key")
@@ -191,7 +193,16 @@ class StatefulAgentWorkflow @Inject constructor(
                 }
             }
         }
-        return aiProviderRepository.getActiveProviderSync()
+        // 回退：新会话默认模型（主页空会话中选择后记忆）；未设置则返回 null，由调用方报错引导。
+        val defaultProviderId = defaultModelSettingsRepository.getDefaultProviderId()
+        val defaultModel = defaultModelSettingsRepository.getDefaultModel()
+        if (defaultProviderId.isNotBlank() && defaultModel.isNotBlank()) {
+            val config = aiProviderRepository.getProviderById(defaultProviderId)
+            if (config != null && config.isEnabled && config.apiKey.isNotBlank()) {
+                return config.copy(selectedModel = defaultModel)
+            }
+        }
+        return null
     }
 
     override suspend fun compactSession(sessionId: String, onEvent: suspend (AgentEvent) -> Unit): Boolean {
@@ -405,7 +416,7 @@ class StatefulAgentWorkflow @Inject constructor(
         )
 
         var systemPrompt = promptProvider.build(currentContext)
-        val aiProvider = getActiveProvider(currentContext.sessionId)
+        val aiProvider = getEffectiveProvider(currentContext.sessionId)
         // 压缩失败后本轮（本次用户请求内）不再重复尝试压缩，避免每次 LLM 调用都白试一次。
         var compactionAttemptFailed = false
 
@@ -813,7 +824,7 @@ class StatefulAgentWorkflow @Inject constructor(
      * 生成失败或取不到标题时返回 null（调用方保留临时标题）。
      */
     override suspend fun generateTitle(sessionId: String, request: String): String? = runCatching {
-        val provider = resolveTitleFallbackProvider(sessionId) ?: getActiveProvider(sessionId)
+        val provider = resolveTitleFallbackProvider(sessionId) ?: getEffectiveProvider(sessionId)
         val prompt = promptProvider.resolvePrompt(TITLE_GENERATOR_FILE)
             .replace(LEADING_COMMENT, "")
         val response = provider.complete(

@@ -7,7 +7,6 @@ import com.aicode.feature.settings.domain.model.AIProviderConfig
 import com.aicode.feature.settings.domain.model.ProviderType
 import com.aicode.feature.settings.domain.repository.AIProviderRepository
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -27,36 +26,18 @@ class AIProviderRepositoryImpl @Inject constructor(
         }
     }
 
-    override fun getActiveProvider(): Flow<AIProviderConfig?> {
-        return aiProviderDao.getActiveProvider().map { it?.toDomainModel() }
-    }
-
-    override suspend fun getActiveProviderSync(): AIProviderConfig? {
-        return aiProviderDao.getActiveProviderSync()?.toDomainModel()
-    }
-
     override suspend fun getProviderById(id: String): AIProviderConfig? {
         return aiProviderDao.getProviderById(id)?.toDomainModel()
     }
 
     override suspend fun saveProvider(provider: AIProviderConfig) {
-        FileLogger.i(TAG, "保存提供商 id=${provider.id} name=${provider.name} active=${provider.isActive}")
-        val entity = provider.toEntity()
-        if (provider.isActive) {
-            aiProviderDao.deactivateAllProviders()
-        }
-        aiProviderDao.insertProvider(entity)
+        FileLogger.i(TAG, "保存提供商 id=${provider.id} name=${provider.name}")
+        aiProviderDao.insertProvider(provider.toEntity())
     }
 
     override suspend fun deleteProvider(id: String) {
         FileLogger.i(TAG, "删除提供商 id=$id")
         aiProviderDao.deleteProvider(id)
-    }
-
-    override suspend fun setActiveProvider(id: String) {
-        FileLogger.i(TAG, "切换启用提供商 id=$id")
-        aiProviderDao.deactivateAllProviders()
-        aiProviderDao.activateProvider(id)
     }
 
     override suspend fun setSelectedModel(id: String, model: String) {
@@ -74,15 +55,6 @@ class AIProviderRepositoryImpl @Inject constructor(
         aiProviderDao.setProviderEnabled(id, isEnabled)
     }
 
-    override suspend fun ensureActiveProvider() {
-        // 已有激活项则无需处理。
-        if (aiProviderDao.getActiveProviderSync() != null) return
-        val first = aiProviderDao.getAllProviders().first().firstOrNull() ?: return
-        FileLogger.i(TAG, "无激活提供商，自动激活首个: ${first.id} (${first.name})")
-        aiProviderDao.deactivateAllProviders()
-        aiProviderDao.activateProvider(first.id)
-    }
-
     private fun AIProviderEntity.toDomainModel(): AIProviderConfig {
         val modelList = models.split("\n").map { it.substringBefore('|').trim() }.filter { it.isNotEmpty() }
         return AIProviderConfig(
@@ -92,7 +64,6 @@ class AIProviderRepositoryImpl @Inject constructor(
             apiKey = apiKey,
             baseUrl = baseUrl,
             defaultModel = defaultModel,
-            isActive = isActive,
             models = modelList,
             selectedModel = selectedModel.ifBlank { defaultModel },
             isEnabled = isEnabled,
@@ -110,7 +81,6 @@ class AIProviderRepositoryImpl @Inject constructor(
             baseUrl = baseUrl,
             useFullUrl = useFullUrl,
             defaultModel = defaultModel,
-            isActive = isActive,
             models = models.joinToString("\n"),
             selectedModel = selectedModel,
             isEnabled = isEnabled,

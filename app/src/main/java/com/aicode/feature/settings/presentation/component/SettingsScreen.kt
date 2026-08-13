@@ -99,7 +99,6 @@ fun SettingsScreen(
     onStopAllAndCloseTerminal: () -> Unit = {}
 ) {
     val providers by viewModel.providers.collectAsStateWithLifecycle()
-    val activeProvider by viewModel.activeProvider.collectAsStateWithLifecycle()
     val logLevel by viewModel.logLevel.collectAsStateWithLifecycle()
     val logViewerState by viewModel.logViewerState.collectAsStateWithLifecycle()
     val mcpEntries by viewModel.mcpEntries.collectAsStateWithLifecycle()

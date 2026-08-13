@@ -19,12 +19,6 @@ interface AIProviderDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAllProviders(providers: List<AIProviderEntity>)
 
-    @Query("SELECT * FROM ai_providers WHERE isActive = 1 LIMIT 1")
-    fun getActiveProvider(): Flow<AIProviderEntity?>
-
-    @Query("SELECT * FROM ai_providers WHERE isActive = 1 LIMIT 1")
-    suspend fun getActiveProviderSync(): AIProviderEntity?
-
     @Query("SELECT * FROM ai_providers WHERE id = :id")
     suspend fun getProviderById(id: String): AIProviderEntity?
 
@@ -36,12 +30,6 @@ interface AIProviderDao {
 
     @Query("DELETE FROM ai_providers WHERE id = :id")
     suspend fun deleteProvider(id: String)
-
-    @Query("UPDATE ai_providers SET isActive = 0")
-    suspend fun deactivateAllProviders()
-
-    @Query("UPDATE ai_providers SET isActive = 1 WHERE id = :id")
-    suspend fun activateProvider(id: String)
 
     @Query("UPDATE ai_providers SET selectedModel = :model WHERE id = :id")
     suspend fun setSelectedModel(id: String, model: String)

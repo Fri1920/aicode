@@ -29,6 +29,7 @@ import com.aicode.feature.settings.data.repository.AppThemeMode
 import com.aicode.feature.settings.data.repository.ContainerSettingsRepository
 import com.aicode.feature.settings.data.repository.ExecutionMode
 import com.aicode.feature.settings.data.repository.CompactionModelSettingsRepository
+import com.aicode.feature.settings.data.repository.DefaultModelSettingsRepository
 import com.aicode.feature.settings.data.repository.TitleModelSettingsRepository
 import com.aicode.feature.settings.data.repository.ExecutionModeHolder
 import com.aicode.feature.settings.data.repository.ExecutionModeRepository
@@ -156,6 +157,7 @@ class SettingsViewModel @Inject constructor(
     private val visionModelSettingsRepository: VisionModelSettingsRepository,
     private val compactionModelSettingsRepository: CompactionModelSettingsRepository,
     private val titleModelSettingsRepository: TitleModelSettingsRepository,
+    private val defaultModelSettingsRepository: DefaultModelSettingsRepository,
     private val containerSettingsRepository: ContainerSettingsRepository,
     private val containerInstaller: ContainerInstaller,
     private val containerOsDetector: ContainerOsDetector,
@@ -175,8 +177,11 @@ class SettingsViewModel @Inject constructor(
     private val _providers = MutableStateFlow<List<AIProviderConfig>>(emptyList())
     val providers: StateFlow<List<AIProviderConfig>> = _providers.asStateFlow()
 
-    private val _activeProvider = MutableStateFlow<AIProviderConfig?>(null)
-    val activeProvider: StateFlow<AIProviderConfig?> = _activeProvider.asStateFlow()
+    /** 新会话默认模型（主页空会话中选择后记忆），供未绑定会话回退。 */
+    val defaultModelProviderId: StateFlow<String> = defaultModelSettingsRepository.providerIdFlow
+        .stateIn(viewModelScope, SharingStarted.Eagerly, "")
+    val defaultModel: StateFlow<String> = defaultModelSettingsRepository.modelFlow
+        .stateIn(viewModelScope, SharingStarted.Eagerly, "")
 
     /** 识图专用模型选择：providerId 为空即「跟随当前聊天模型」。 */
     private val _visionProviderId = MutableStateFlow("")
@@ -286,22 +291,9 @@ class SettingsViewModel @Inject constructor(
 
     init {
         viewModelScope.launch {
-            // 启动即保证有激活提供商（若库中存在却无激活项），避免主页模型胶囊因 activeProvider=null 消失。
-            repository.ensureActiveProvider()
-
             launch {
                 repository.getAllProviders().collectLatest {
                     _providers.value = it
-                    // 运行期兜底：提供商列表变化后若仍无激活项且有提供商，自动激活首个。
-                    if (_activeProvider.value == null && it.isNotEmpty()) {
-                        repository.ensureActiveProvider()
-                    }
-                }
-            }
-
-            launch {
-                repository.getActiveProvider().collectLatest {
-                    _activeProvider.value = it
                 }
             }
 
@@ -823,12 +815,6 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
-    fun setActiveProvider(id: String) {
-        viewModelScope.launch {
-            repository.setActiveProvider(id)
-        }
-    }
-
     fun setProviderEnabled(id: String, isEnabled: Boolean) {
         viewModelScope.launch {
             repository.setProviderEnabled(id, isEnabled)
@@ -915,17 +901,6 @@ class SettingsViewModel @Inject constructor(
 
     fun selectModel(providerId: String, model: String) {
         viewModelScope.launch {
-            repository.setSelectedModel(providerId, model)
-        }
-    }
-
-    // 主页模型选择：同步更新全局 active provider 的选中模型，使新建会话回退全局时落到用户最近选的模型。
-    fun applyModelGlobally(providerId: String, model: String) {
-        viewModelScope.launch {
-            val activeId = repository.getActiveProviderSync()?.id
-            if (activeId != providerId) {
-                repository.setActiveProvider(providerId)
-            }
             repository.setSelectedModel(providerId, model)
         }
     }
