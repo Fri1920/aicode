@@ -1,44 +1,50 @@
 package com.aicode.feature.settings.presentation.component
 
-import androidx.compose.foundation.BorderStroke
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.aicode.core.theme.Radius
+import androidx.compose.ui.unit.sp
+import com.aicode.R
 import com.aicode.core.theme.Spacing
 import com.aicode.feature.agent.domain.permission.PermissionDecision
 import com.aicode.feature.agent.domain.permission.PermissionRule
 import compose.icons.FeatherIcons
-import compose.icons.feathericons.Trash2
-import androidx.compose.ui.res.stringResource
-import com.aicode.R
+import compose.icons.feathericons.CheckCircle
+import compose.icons.feathericons.ChevronRight
+import compose.icons.feathericons.Globe
+import compose.icons.feathericons.XCircle
 
 /**
- * 「工具授权」二级页：列出当前项目与全局已保存的授权规则，可逐条删除；项目规则可「提升为全局」。
+ * 「工具授权」二级页：与设置页其它二级页一致的 iOS 分组列表。
+ * 按「当前项目 / 全局」分组列出已保存的授权规则，分组可折叠收起；
+ * 规则左滑删除；项目规则可「提升为全局」。
  */
 @Composable
 internal fun PermissionsSection(
@@ -49,118 +55,184 @@ internal fun PermissionsSection(
     onPromote: (PermissionRule) -> Unit,
     onDeleteGlobal: (PermissionRule) -> Unit
 ) {
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(Spacing.lg),
-        verticalArrangement = Arrangement.spacedBy(Spacing.md)
+    var projectExpanded by rememberSaveable { mutableStateOf(true) }
+    var globalExpanded by rememberSaveable { mutableStateOf(true) }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = Spacing.lg)
+            .padding(bottom = Spacing.xl),
+        verticalArrangement = Arrangement.spacedBy(Spacing.sm)
     ) {
-        item {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(Radius.md),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.2f))
-            ) {
-                Column(modifier = Modifier.padding(Spacing.md)) {
-                    Text(
-                        text = stringResource(R.string.perm_builtin_whitelist),
-                        style = MaterialTheme.typography.titleSmall,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                    Spacer(Modifier.height(Spacing.xs))
-                    Text(
-                        text = stringResource(R.string.perm_whitelist_desc),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(Modifier.height(Spacing.sm))
-                    Text(
-                        text = stringResource(R.string.perm_rules_desc),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+        CollapsibleGroupHeader(
+            text = if (projectName != null) {
+                stringResource(R.string.perm_current_project, projectName)
+            } else {
+                stringResource(R.string.perm_current_project_none)
+            },
+            expanded = projectExpanded,
+            onToggle = { projectExpanded = !projectExpanded }
+        )
+        AnimatedVisibility(visible = projectExpanded) {
+            SettingsGroup {
+                if (projectRules.isEmpty()) {
+                    RuleEmptyHint(stringResource(R.string.perm_no_project_rules))
+                } else {
+                    projectRules.forEachIndexed { index, rule ->
+                        if (index > 0) SettingsDivider()
+                        RuleRow(
+                            rule = rule,
+                            onDelete = { onDeleteProject(rule) },
+                            onPromote = { onPromote(rule) }
+                        )
+                    }
                 }
             }
         }
 
-        item { RuleGroupHeader(if (projectName != null) stringResource(R.string.perm_current_project, projectName) else stringResource(R.string.perm_current_project_none)) }
-        if (projectRules.isEmpty()) {
-            item { RuleEmptyHint(stringResource(R.string.perm_no_project_rules)) }
-        } else {
-            items(projectRules) { rule ->
-                RuleRow(rule = rule, onDelete = { onDeleteProject(rule) }, onPromote = { onPromote(rule) })
+        CollapsibleGroupHeader(
+            text = stringResource(R.string.perm_global),
+            expanded = globalExpanded,
+            onToggle = { globalExpanded = !globalExpanded }
+        )
+        AnimatedVisibility(visible = globalExpanded) {
+            SettingsGroup {
+                if (globalRules.isEmpty()) {
+                    RuleEmptyHint(stringResource(R.string.perm_no_global_rules))
+                } else {
+                    globalRules.forEachIndexed { index, rule ->
+                        if (index > 0) SettingsDivider()
+                        RuleRow(
+                            rule = rule,
+                            onDelete = { onDeleteGlobal(rule) },
+                            onPromote = null
+                        )
+                    }
+                }
             }
         }
 
-        item { RuleGroupHeader(stringResource(R.string.perm_global)) }
-        if (globalRules.isEmpty()) {
-            item { RuleEmptyHint(stringResource(R.string.perm_no_global_rules)) }
-        } else {
-            items(globalRules) { rule ->
-                RuleRow(rule = rule, onDelete = { onDeleteGlobal(rule) }, onPromote = null)
-            }
-        }
+        FooterNote(stringResource(R.string.perm_whitelist_short))
+        FooterNote(stringResource(R.string.perm_rules_short))
     }
 }
 
+/** 可折叠分组标题：点击展开/收起，右侧 chevron 指示状态。 */
 @Composable
-internal fun RuleGroupHeader(text: String) {
-    Text(
-        text = text,
-        style = MaterialTheme.typography.titleSmall,
-        color = MaterialTheme.colorScheme.onSurface,
-        modifier = Modifier.padding(top = Spacing.sm)
-    )
+private fun CollapsibleGroupHeader(
+    text: String,
+    expanded: Boolean,
+    onToggle: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onToggle)
+            .padding(start = Spacing.md, end = Spacing.sm, top = Spacing.sm, bottom = Spacing.xs),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelLarge.copy(fontSize = 13.sp),
+            color = if (settingsLightMode()) Color(0xFF8E8E93) else MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.weight(1f)
+        )
+        Icon(
+            imageVector = FeatherIcons.ChevronRight,
+            contentDescription = null,
+            tint = if (settingsLightMode()) Color(0xFFC7C7CC) else MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier
+                .size(16.dp)
+                .rotate(if (expanded) 90f else 0f)
+        )
+    }
 }
 
-@Composable
-internal fun RuleEmptyHint(text: String) {
-    Text(
-        text = text,
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant
-    )
-}
-
-/** 单条规则行：匹配模式（主）+ 工具名/判定（次），右侧「提升为全局」(仅项目规则) 与删除。 */
+/**
+ * 单条规则行：紧凑布局（同设置页行），判定图标（允许对勾 / 禁止叉）+ 工具名（主）+ 匹配范围/判定（次），
+ * 右侧「提升为全局」图标 (仅项目规则)；左滑露出删除按钮。
+ */
 @Composable
 internal fun RuleRow(
     rule: PermissionRule,
     onDelete: () -> Unit,
     onPromote: (() -> Unit)?
 ) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(Radius.md),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
-    ) {
+    val allowed = rule.decision == PermissionDecision.ALLOW
+    val light = settingsLightMode()
+    val iconTint = if (light) Color(0xFF0F0F0F) else MaterialTheme.colorScheme.onSurfaceVariant
+    SwipeToDeleteRow(onDelete = onDelete) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(start = Spacing.md, top = Spacing.xs, bottom = Spacing.xs, end = Spacing.xs),
+                .padding(start = Spacing.lg, end = Spacing.xs, top = 11.dp, bottom = 11.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            Icon(
+                imageVector = if (allowed) FeatherIcons.CheckCircle else FeatherIcons.XCircle,
+                contentDescription = null,
+                tint = iconTint,
+                modifier = Modifier.size(18.dp)
+            )
+            Spacer(Modifier.width(Spacing.md))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = if (rule.pattern == PermissionRule.WHOLE_TOOL) stringResource(R.string.perm_entire_tool) else rule.pattern,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurface,
+                    text = rule.toolName,
+                    style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium),
+                    color = if (light) Color(0xFF0F0F0F) else MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
                 Text(
-                    text = rule.toolName + " · " + if (rule.decision == PermissionDecision.ALLOW) stringResource(R.string.common_allow) else stringResource(R.string.perm_deny),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    text = (if (rule.pattern == PermissionRule.WHOLE_TOOL) {
+                        stringResource(R.string.perm_entire_tool)
+                    } else {
+                        rule.pattern
+                    }) + " · " + if (allowed) {
+                        stringResource(R.string.common_allow)
+                    } else {
+                        stringResource(R.string.perm_deny)
+                    },
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = if (light) Color(0xFF8E8E93) else MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
             if (onPromote != null) {
-                TextButton(onClick = onPromote) { Text(stringResource(R.string.perm_promote_to_global)) }
-            }
-            IconButton(onClick = onDelete) {
-                Icon(FeatherIcons.Trash2, contentDescription = stringResource(R.string.common_delete), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                IconButton(onClick = onPromote) {
+                    Icon(
+                        imageVector = FeatherIcons.Globe,
+                        contentDescription = stringResource(R.string.perm_promote_to_global),
+                        tint = iconTint,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
             }
         }
     }
+}
+
+/** 分组内空状态：一行灰字，与行内容对齐。 */
+@Composable
+private fun RuleEmptyHint(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(horizontal = Spacing.lg, vertical = 12.dp)
+    )
+}
+
+/** 页脚说明：灰色小字。 */
+@Composable
+private fun FooterNote(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(start = Spacing.md, top = Spacing.xs)
+    )
 }
