@@ -151,68 +151,60 @@ internal fun TokenStatsSection(
             )
         }
 
-        // ── 趋势图（无数据或仅单点时保留占位块，避免 Vico 空 series / 单点 xStep 异常）──
-        SettingsGroupHeader(text = stringResource(R.string.settings_token_stats_trend))
-        SettingsGroup {
-            if (state.trend.size <= 1) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(200.dp)
-                        .padding(top = Spacing.md)
-                        .background(
-                            if (settingsLightMode()) Color(0xFFF2F2F7) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
-                            RoundedCornerShape(10.dp)
-                        ),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = stringResource(R.string.settings_token_stats_no_data),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = if (settingsLightMode()) Color(0xFF8E8E93) else MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            } else {
+        // ── 趋势图（无数据或仅单点时整块不渲染，避免 Vico 空 series / 单点 xStep 异常）──
+        if (state.trend.size > 1) {
+            SettingsGroupHeader(text = stringResource(R.string.settings_token_stats_trend))
+            SettingsGroup {
                 TokenTrendChart(
                     trend = state.trend,
                     isHourly = state.period == TokenStatsPeriod.TODAY
                 )
-            }
-            SettingsDivider()
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = Spacing.lg, vertical = 10.dp),
-                horizontalArrangement = Arrangement.spacedBy(Spacing.lg)
-            ) {
-                LegendDot(INPUT_COLOR, stringResource(R.string.settings_token_stats_legend_input))
-                LegendDot(OUTPUT_COLOR, stringResource(R.string.settings_token_stats_legend_output))
-                LegendDot(CACHE_COLOR, stringResource(R.string.settings_token_stats_legend_cached))
+                SettingsDivider()
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = Spacing.lg, vertical = 10.dp),
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.lg)
+                ) {
+                    LegendDot(INPUT_COLOR, stringResource(R.string.settings_token_stats_legend_input))
+                    LegendDot(OUTPUT_COLOR, stringResource(R.string.settings_token_stats_legend_output))
+                    LegendDot(CACHE_COLOR, stringResource(R.string.settings_token_stats_legend_cached))
+                }
             }
         }
 
-        // ── 渠道统计 ──
+        // ── 渠道统计（无数据时显示占位）──
         SettingsGroupHeader(text = stringResource(R.string.settings_token_stats_provider))
         SettingsGroup {
-            state.providers.forEachIndexed { index, p ->
-                if (index > 0) SettingsDivider()
-                ProviderStatsRow(p)
+            if (state.providers.isEmpty()) {
+                EmptyStatsPlaceholder()
+            } else {
+                state.providers.forEachIndexed { index, p ->
+                    if (index > 0) SettingsDivider()
+                    ProviderStatsRow(p)
+                }
             }
         }
 
-        // ── 模型统计 ──
+        // ── 模型统计（无数据时显示占位）──
         SettingsGroupHeader(text = stringResource(R.string.settings_token_stats_model))
         SettingsGroup {
-            state.models.forEachIndexed { index, m ->
-                if (index > 0) SettingsDivider()
-                ModelStatsRow(m)
+            if (state.models.isEmpty()) {
+                EmptyStatsPlaceholder()
+            } else {
+                state.models.forEachIndexed { index, m ->
+                    if (index > 0) SettingsDivider()
+                    ModelStatsRow(m)
+                }
             }
         }
 
-        // ── 调用明细 ──
+        // ── 调用明细（无数据时显示占位）──
         SettingsGroupHeader(text = stringResource(R.string.settings_token_stats_recent_calls))
         SettingsGroup {
-            if (state.recentCalls.isNotEmpty()) {
+            if (state.recentCalls.isEmpty()) {
+                EmptyStatsPlaceholder()
+            } else {
                 CallRecordsTable(
                     calls = state.recentCalls,
                     costs = state.recentCallCosts,
@@ -334,6 +326,27 @@ private fun trendLine(color: Color): LineCartesianLayer.Line = LineCartesianLaye
 
 private fun tzOffsetNow(): Long =
     java.util.TimeZone.getDefault().getOffset(System.currentTimeMillis()).toLong()
+
+@Composable
+private fun EmptyStatsPlaceholder() {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(Spacing.md)
+            .height(80.dp)
+            .background(
+                if (settingsLightMode()) Color(0xFFF2F2F7) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                RoundedCornerShape(10.dp)
+            ),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = stringResource(R.string.settings_token_stats_no_data),
+            style = MaterialTheme.typography.bodyMedium,
+            color = if (settingsLightMode()) Color(0xFF8E8E93) else MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
 
 @Composable
 private fun LegendDot(color: Color, label: String) {
