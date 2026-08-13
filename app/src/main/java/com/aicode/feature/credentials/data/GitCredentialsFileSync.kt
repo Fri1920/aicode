@@ -16,7 +16,7 @@ import javax.inject.Singleton
  *
  * 宿主目录 `filesDir/aicode` 即容器内 `/root/.aicode`（[LinuxContainerEngine] 的 `-b` 绑定，跨 rootfs 升级不丢）。
  * 容器 [buildContainerEnv] 已设 `GIT_CONFIG_GLOBAL=/root/.aicode/.gitconfig`，`.gitconfig` 里的
- * `[credential] helper = store --file=/root/.aicode/git-credentials` 由 [provisionIfNeeded] 装容器时
+ * `[credential] helper = store --file=/root/.aicode/git-credentials` 由容器初始化菜单（provision.sh）
  * 跑一次 `git config --global` 写入（git 自身增量维护 ini）。
  *
  * 本类只负责**凭据文件** `git-credentials`（每 host 默认条一行），直接宿主侧写盘，不进容器、不跑 git 命令。

@@ -88,7 +88,7 @@ class ContainerInstaller @Inject constructor(
          * 从 assets 提取自定义 git credential helper 到 ~/.aicode/git-credential-aicode 并赋可执行位。
          *
          * 经 [LinuxContainerEngine] 的 -b 绑定即容器内 /root/.aicode/git-credential-aicode，
-         * 由 [LinuxContainerEngine.provisionIfNeeded] 在 `.gitconfig` 里登记为第二个 credential.helper，
+         * 由容器初始化菜单（provision.sh）在 `.gitconfig` 里登记为第二个 credential.helper，
          * 排在 `store` 之后兜底未登录（双保险）。helper 详行为见 assets/aicode/git-credential-aicode。
          *
          * 启动即提取、独立于 provisioning 成败：provisioning 失败时 git 没装上，helper 配置不存在也无所谓；
@@ -115,10 +115,10 @@ class ContainerInstaller @Inject constructor(
          * 从 assets 提取容器初始化依赖安装脚本到 ~/.aicode/provision.sh 并赋可执行位。
          *
          * 经 [LinuxContainerEngine] 的 -b 绑定即容器内 /root/.aicode/provision.sh，由
-         * [LinuxContainerEngine.provisionIfNeeded] 在首次初始化时以 `sh` 执行——脚本按包管理器
+         * 首次进入终端的初始化菜单以 `sh` 执行——脚本按包管理器
          * （apk/apt-get/dnf/yum/pacman）安装基础包，包清单维护在脚本内而非代码里。
          * 启动即提取、每次覆盖写（脚本随 App 版本更新）。提取失败仅告警不抛：
-         * provision 缺脚本时会执行失败、不写完成标记、下次初始化自动重试。
+         * 缺脚本时初始化菜单不会出现，用户可手动安装基础工具。
          */
         fun extractProvisionScript(context: Context) {
             val dest = File(File(context.filesDir, "aicode"), "provision.sh")
@@ -277,9 +277,10 @@ class ContainerInstaller @Inject constructor(
         }
 
     /**
-     * 按 [profile] 解压安装 rootfs。内置调现有全流程（proot/resolv/apk 源）；自定义本地镜像只解压 tar.gz
-     * + 装 proot + 写 DNS（不写 apk 源、不 provision）——镜像源与所需工具由用户自行在容器内处理。
-     * 远程 SSH profile 无本地 rootfs，直接返回（命令执行走 [RemoteSshEngine]，不需本地 rootfs）。
+     * 按 [profile] 解压安装 rootfs。内置走 assets 全流程（proot/resolv/apk 源）；自定义本地镜像只解压
+     * tar.gz + 装 proot + 写 DNS（不写 apk 源）。两者都不自动装包——基础工具由进入终端时的
+     * 初始化菜单（assets/aicode/provision.sh）引导用户选择安装。远程 SSH profile 无本地 rootfs，直接返回
+     * （命令执行走 [RemoteSshEngine]，不需本地 rootfs）。
      */
     suspend fun installRootfsIfNeed(
         profile: ContainerProfile,
@@ -336,7 +337,7 @@ class ContainerInstaller @Inject constructor(
 
     /**
      * 重置内置 Alpine 容器：删除其 rootfs 目录（含 .installed / .provisioned 标记），
-     * 下次 [ensureInstalled] 会重新解压 + provision。供内置镜像「重置」按钮调用。
+     * 下次 [ensureInstalled] 会重新解压；进入终端时由初始化菜单重新引导安装。供内置镜像「重置」按钮调用。
      */
     fun resetBuiltinRootfs() {
         if (rootfsDir.exists()) rootfsDir.deleteRecursively()

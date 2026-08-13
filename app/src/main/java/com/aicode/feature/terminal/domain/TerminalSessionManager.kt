@@ -102,8 +102,8 @@ class TerminalSessionManager @Inject constructor(
         val session = buildSession(
             // -w 已把 cwd 设为 /root/workspace，cd 仅作兜底；裸 sh/bash 在 tty 上自动进交互模式，
             // 靠 ENV=/etc/profile 加载登录环境；exec 让 shell 取代外层 sh -c 成为前台交互 shell。
-            // 自定义镜像首次进入终端时先跑初始化交互菜单（脚本自行判断已完成/已跳过则秒退），
-            // 用 `;` 分隔保证脚本任何失败都不阻塞进入 shell；内置镜像由 ensureInstalled 自动装完，脚本秒退。
+            // 首次进入终端时先跑初始化菜单（脚本自行判断已完成/已跳过则秒退），所有容器一致；
+            // 用 `;` 分隔保证脚本任何失败都不阻塞进入 shell。
             shellCommand = "cd ~/workspace 2>/dev/null; export ENV=/etc/profile; " +
                 "[ -f /root/.aicode/provision.sh ] && sh /root/.aicode/provision.sh; " +
                 "exec ${containerEngine.defaultShell()}"
