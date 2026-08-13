@@ -61,6 +61,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ### 操作步骤
 
+0. **发版前更新内置模型数据（手动执行）**：运行 `python3 scripts/update-models-dev-assets.py`，从 models.dev 拉取最新数据更新 `app/src/main/assets/api.official.json`（仅保留内置 12 个官方 provider、不引入新 provider，现有 provider 下的新模型可扩充，含单价字段）。**网络拉取/解析失败时脚本以非零退出且不改动快照——此时跳过此步直接发版，不要强行重试或手动改文件**；更新成功后需将快照改动一并提交。
 1. **零代码修改发版（必须在 `main` 分支）**：无需在代码或配置中修改版本号。所有功能/修补必须先合并到 `main` 分支，在 `main` 最新的提交节点上直接打 Tag（例如 `git tag v1.7.0-rc1`）并推送：`git push origin v1.7.0-rc1`。
 2. CI 接收到 `v*` Tag 后，自动捕获 Tag 版本推导生成 APK，构建 Release 发出。
 3. **真机装 rc 包**，至少跑通 AI 对话 + 终端 + 容器启动三条主线。

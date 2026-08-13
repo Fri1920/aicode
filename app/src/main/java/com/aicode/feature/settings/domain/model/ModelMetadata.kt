@@ -15,7 +15,13 @@ data class ModelMetadata(
     val supportsReasoning: Boolean = false,
     val modelType: ModelType = ModelType.CHAT,
     val supportsImageOutput: Boolean = false,
-    val source: Source = Source.INFERRED
+    val source: Source = Source.INFERRED,
+    /** models.dev cost：输入单价（USD/1M tokens）。 */
+    val inputCostUsdPerM: Double? = null,
+    /** models.dev cost：输出单价（USD/1M tokens）。 */
+    val outputCostUsdPerM: Double? = null,
+    /** models.dev cost：缓存读取单价（USD/1M tokens）。 */
+    val cacheReadCostUsdPerM: Double? = null
 ) {
     enum class ModelType { CHAT, EMBEDDING }
 

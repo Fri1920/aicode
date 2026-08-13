@@ -36,6 +36,8 @@ import com.aicode.feature.settings.domain.model.AIProviderConfig
 import com.aicode.feature.agent.data.remote.anthropic.AnthropicApi
 import com.aicode.feature.agent.data.remote.gemini.GeminiApi
 import com.aicode.feature.agent.data.remote.openai.OpenAIApi
+import com.aicode.feature.agent.data.local.dao.LlmCallRecordDao
+import com.aicode.feature.agent.data.local.entity.LlmCallRecordEntity
 import com.aicode.feature.agent.domain.provider.AnthropicAdapter
 import com.aicode.feature.agent.domain.provider.GeminiAdapter
 import com.aicode.feature.agent.domain.provider.OpenAIAdapter
@@ -55,6 +57,7 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.longOrNull
+import android.os.SystemClock
 import javax.inject.Inject
 
 /**
@@ -80,7 +83,8 @@ class StatefulAgentWorkflow @Inject constructor(
     private val titleModelSettingsRepository: TitleModelSettingsRepository,
     private val sessionUseCase: SessionUseCase,
     private val messagePersistenceUseCase: MessagePersistenceUseCase,
-    private val checkpointManager: CheckpointManager
+    private val checkpointManager: CheckpointManager,
+    private val llmCallRecordDao: LlmCallRecordDao
 ) : AgentWorkflow {
 
     private companion object {
@@ -426,6 +430,14 @@ class StatefulAgentWorkflow @Inject constructor(
                         val reasoningAcc = StringBuilder()
                         var finalResponse: AIResponse? = null
 
+                        // 调用统计埋点：记录请求发出/首字/结束时刻与 usage，失败与取消同样留痕。
+                        val callStartElapsed = SystemClock.elapsedRealtime()
+                        val callStartWall = System.currentTimeMillis()
+                        val callKind = if (state.pendingVisionRound) "vision" else "chat"
+                        var ttfbElapsed: Long? = null
+                        var callError: String? = null
+                        var callCompleted = false
+
                         try {
                             // 发送前按实际模型的视觉能力处理图片（同 execute 路径）。
                             val supportsVision = state.pendingVisionRound || activeModelSupportsVision(currentContext.sessionId)
@@ -433,6 +445,7 @@ class StatefulAgentWorkflow @Inject constructor(
                             providerInUse.completeStream(systemPrompt, messagesToSend, currentTools, currentContext.reasoningEffort).collect { chunk ->
                                 when (chunk) {
                                     is AIStreamChunk.TextDelta -> {
+                                        if (ttfbElapsed == null) ttfbElapsed = SystemClock.elapsedRealtime() - callStartElapsed
                                         acc.append(chunk.text)
                                         send(AgentEvent.AssistantDelta(acc.toString()))
                                     }
@@ -449,6 +462,7 @@ class StatefulAgentWorkflow @Inject constructor(
                                 }
                             }
                             val aiResponse = finalResponse ?: AIResponse(content = acc.toString())
+                            callCompleted = true
                             // 将本轮 reasoning 附加到 AIResponse，以便 reduce 时存入 AssistantMessage 并在下一轮回传
                             val responseWithReasoning = if (reasoningAcc.isNotEmpty()) {
                                 aiResponse.copy(reasoning = reasoningAcc.toString())
@@ -470,7 +484,33 @@ class StatefulAgentWorkflow @Inject constructor(
                                 send(AgentEvent.AssistantText(partial, emptyList(), reasoning))
                             }
                             actionQueue.addLast(AgentAction.LlmError("LLM 调用失败: ${e.message}"))
+                            callError = e.message ?: e.javaClass.simpleName
                         } finally {
+                            val durationMillis = (SystemClock.elapsedRealtime() - callStartElapsed).toInt()
+                            val usage = finalResponse
+                            runCatching {
+                                llmCallRecordDao.insert(
+                                    LlmCallRecordEntity(
+                                        sessionId = currentContext.sessionId,
+                                        providerId = providerInUse.providerId.ifBlank { null },
+                                        model = providerInUse.model,
+                                        kind = callKind,
+                                        inputTokens = usage?.inputTokens ?: 0,
+                                        outputTokens = usage?.outputTokens ?: 0,
+                                        cachedInputTokens = usage?.cachedInputTokens ?: 0,
+                                        ttfbMillis = ttfbElapsed?.toInt(),
+                                        durationMillis = durationMillis,
+                                        status = when {
+                                            callCompleted -> "success"
+                                            callError != null -> "error"
+                                            else -> "cancelled"
+                                        },
+                                        errorMessage = callError,
+                                        stopReason = usage?.stopReason,
+                                        createdAt = callStartWall
+                                    )
+                                )
+                            }
                             if (state.pendingVisionRound) state = state.copy(pendingVisionRound = false)
                         }
                     }

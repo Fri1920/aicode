@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -27,6 +28,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -54,6 +56,7 @@ import com.aicode.feature.settings.domain.model.ModelMetadata
 import com.aicode.feature.settings.presentation.SettingsViewModel
 import compose.icons.FeatherIcons
 import compose.icons.feathericons.ArrowLeft
+import compose.icons.feathericons.BarChart2
 import compose.icons.feathericons.Box
 import compose.icons.feathericons.Cloud
 import compose.icons.feathericons.Cpu
@@ -68,6 +71,7 @@ import compose.icons.feathericons.RefreshCw
 import compose.icons.feathericons.Save
 import compose.icons.feathericons.Server
 import compose.icons.feathericons.Shield
+import compose.icons.feathericons.Trash2
 
 /** 设置页内部二级菜单分区。Menu 为首页菜单，其余为各自的二级页。 */
 internal enum class SettingsSection(@param:StringRes val titleRes: Int) {
@@ -82,6 +86,7 @@ internal enum class SettingsSection(@param:StringRes val titleRes: Int) {
     Permissions(R.string.settings_permissions),
     AppPermissions(R.string.settings_app_permissions),
     RemoteServers(R.string.settings_remote_servers),
+    TokenStats(R.string.settings_token_stats_title),
     Backup(R.string.settings_backup),
     About(R.string.settings_about)
 }
@@ -119,6 +124,7 @@ fun SettingsScreen(
     val defaultContainerId by viewModel.defaultContainerId.collectAsStateWithLifecycle()
     val containerOsMap by viewModel.containerOsMap.collectAsStateWithLifecycle()
     val remoteConnections by viewModel.remoteConnections.collectAsStateWithLifecycle()
+    val tokenStats by viewModel.tokenStats.collectAsStateWithLifecycle()
 
     val currentLanguageDisplayName = if (languageTag.isNullOrBlank()) {
         stringResource(R.string.language_follow_system)
@@ -136,6 +142,7 @@ fun SettingsScreen(
     var showContainerAddSheet by remember { mutableStateOf(false) }
     var showThemeSheet by remember { mutableStateOf(false) }
     var showLanguageSheet by remember { mutableStateOf(false) }
+    var showResetTokenStats by remember { mutableStateOf(false) }
 
     // 处于二级页时，系统返回键先回到上一层；首页时交还给上层导航。
     BackHandler(enabled = section != SettingsSection.Menu) {
@@ -231,6 +238,16 @@ fun SettingsScreen(
                         SettingsSection.LogViewer -> {
                             IconButton(onClick = { viewModel.refreshLogs() }) {
                                 Icon(FeatherIcons.RefreshCw, contentDescription = stringResource(R.string.settings_refresh_logs))
+                            }
+                        }
+                        SettingsSection.TokenStats -> {
+                            IconButton(onClick = { showResetTokenStats = true }) {
+                                Icon(
+                                    FeatherIcons.Trash2,
+                                    contentDescription = stringResource(R.string.settings_token_stats_reset),
+                                    tint = MaterialTheme.colorScheme.onBackground,
+                                    modifier = Modifier.size(22.dp)
+                                )
                             }
                         }
                         else -> {}
@@ -338,6 +355,11 @@ fun SettingsScreen(
                         androidx.hilt.navigation.compose.hiltViewModel()
                     BackupSection(viewModel = backupViewModel)
                 }
+                SettingsSection.TokenStats -> TokenStatsSection(
+                    state = tokenStats,
+                    onSelectPeriod = { viewModel.setTokenStatsPeriod(it) },
+                    onSelectPage = { viewModel.setTokenStatsPage(it) }
+                )
                 SettingsSection.ProviderEditor -> {} // 已在上方 early return 处理
                 SettingsSection.RemoteServers -> {} // 已在上方 early return 处理
                 SettingsSection.About -> AboutSection()
@@ -380,6 +402,23 @@ fun SettingsScreen(
             currentTag = languageTag,
             onSelect = { viewModel.setLanguage(it) },
             onDismiss = { showLanguageSheet = false }
+        )
+    }
+
+    if (showResetTokenStats) {
+        AlertDialog(
+            onDismissRequest = { showResetTokenStats = false },
+            title = { Text(stringResource(R.string.settings_token_stats_reset_title)) },
+            text = { Text(stringResource(R.string.settings_token_stats_reset_confirm)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.resetTokenStats()
+                    showResetTokenStats = false
+                }) { Text(stringResource(R.string.settings_token_stats_reset)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showResetTokenStats = false }) { Text(stringResource(R.string.common_cancel)) }
+            }
         )
     }
 }
@@ -508,6 +547,12 @@ internal fun SettingsMenu(
         // ── 系统 ──
         SettingsGroupHeader(text = stringResource(R.string.settings_category_system))
         SettingsGroup {
+            SettingsRow(
+                icon = FeatherIcons.BarChart2,
+                title = stringResource(SettingsSection.TokenStats.titleRes),
+                onClick = { onOpen(SettingsSection.TokenStats) }
+            )
+            SettingsDivider()
             SettingsRow(
                 icon = FeatherIcons.Save,
                 title = stringResource(SettingsSection.Backup.titleRes),

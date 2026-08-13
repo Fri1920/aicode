@@ -20,12 +20,53 @@
     <string name="settings_backup">备份与还原</string>
     <string name="settings_about">关于</string>
     <string name="settings_language">语言</string>
+    <string name="settings_token_stats_title">Token 统计</string>
+
+    <!-- Token 统计页 -->
+    <string name="settings_token_stats_period_today">今天</string>
+    <string name="settings_token_stats_period_7d">近7天</string>
+    <string name="settings_token_stats_period_30d">近30天</string>
+    <string name="settings_token_stats_period_all">全部</string>
+    <string name="settings_token_stats_total">总消耗</string>
+    <string name="settings_token_stats_requests">请求次数</string>
+    <string name="settings_token_stats_cost">费用</string>
+    <string name="settings_token_stats_cache_hit_rate">缓存命中率</string>
+    <string name="settings_token_stats_cached">缓存 %1$s</string>
+    <string name="settings_token_stats_trend">消耗趋势</string>
+    <string name="settings_token_stats_legend_input">输入</string>
+    <string name="settings_token_stats_legend_output">输出</string>
+    <string name="settings_token_stats_legend_cached">缓存</string>
+    <string name="settings_token_stats_provider">渠道统计</string>
+    <string name="settings_token_stats_model">模型统计</string>
+    <string name="settings_token_stats_success_rate">成功率 %1$s</string>
+    <string name="settings_token_stats_recent_calls">调用记录</string>
+    <string name="settings_token_stats_unknown">未知</string>
+    <string name="settings_token_stats_no_data">暂无数据</string>
+    <string name="settings_token_stats_calls_suffix">次调用</string>
+    <string name="settings_token_stats_calls_suffix2">%1$d 次调用</string>
+    <string name="settings_token_stats_col_model">模型</string>
+    <string name="settings_token_stats_col_provider">渠道</string>
+    <string name="settings_token_stats_col_input">输入</string>
+    <string name="settings_token_stats_col_output">输出</string>
+    <string name="settings_token_stats_col_cached">缓存</string>
+    <string name="settings_token_stats_col_cache_hit_rate">命中率</string>
+    <string name="settings_token_stats_col_ttfb">首字</string>
+    <string name="settings_token_stats_col_duration">耗时</string>
+    <string name="settings_token_stats_col_time">时间</string>
+    <string name="settings_token_stats_col_status">状态</string>
+    <string name="settings_token_stats_col_cost">费用</string>
+    <string name="settings_token_stats_page">第 %1$d / %2$d 页</string>
+    <string name="settings_token_stats_reset">重置</string>
+    <string name="settings_token_stats_reset_title">重置 Token 统计</string>
+    <string name="settings_token_stats_reset_confirm">将清空全部调用记录，此操作不可恢复。确定重置？</string>
 
     <!-- 语言设置页 -->
     <string name="language_follow_system">跟随系统</string>
 
     <!-- SettingsScreen 通用 -->
     <string name="common_back">返回</string>
+    <string name="common_prev">上一页</string>
+    <string name="common_next">下一页</string>
     <string name="settings_add_provider">添加提供商</string>
     <string name="settings_reconnect">重新连接</string>
     <string name="settings_add_mcp_server">添加 MCP 服务器</string>
@@ -765,4 +806,25 @@
     <string name="chat_action_delete">删除消息</string>
     <string name="chat_edit_dialog_title">编辑消息</string>
     <string name="chat_edit_dialog_hint">请输入消息内容</string>
+
+    <!-- 崩溃错误页 -->
+    <string name="crash_title">应用遇到未知错误</string>
+    <string name="crash_message">应用出现异常，错误信息已自动记录。请复制下方内容并反馈给开发者，帮助我们改进应用。</string>
+    <string name="crash_copy">复制错误信息</string>
+    <string name="crash_copied">错误信息已复制</string>
+    <string name="crash_restart">重启应用</string>
+    <string name="crash_exit">退出应用</string>
+    <string name="crash_log_hint">完整日志文件位置：%1$s</string>
+    <string name="crash_report_title">AiCode 崩溃报告</string>
+    <string name="crash_report_time">时间：%1$s</string>
+    <string name="crash_report_version">版本：%1$s</string>
+    <string name="crash_report_device">设备：%1$s</string>
+    <string name="crash_report_thread">线程：%1$s</string>
+    <string name="crash_report_log">日志文件：%1$s</string>
+    <string name="crash_report_screen">页面：%1$s</string>
+    <string name="crash_screen_chat">聊天</string>
+    <string name="crash_screen_settings">设置</string>
+    <string name="crash_screen_terminal">终端</string>
+    <string name="crash_screen_git">Git</string>
+    <string name="crash_screen_unknown">未知</string>
 </resources>

@@ -66,5 +66,11 @@ data class Choice(
 data class Usage(
     val prompt_tokens: Int,
     val completion_tokens: Int,
-    val total_tokens: Int
+    val total_tokens: Int,
+    val prompt_tokens_details: PromptTokensDetails? = null
+)
+
+/** Chat Completions 的输入 token 明细：cached_tokens 为命中缓存的部分。 */
+data class PromptTokensDetails(
+    val cached_tokens: Int? = null
 )

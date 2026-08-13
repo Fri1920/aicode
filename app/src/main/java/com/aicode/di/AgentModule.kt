@@ -7,6 +7,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 import com.aicode.feature.agent.data.local.dao.AgentMessageDao
 import com.aicode.feature.agent.data.local.dao.ChatSessionDao
 import com.aicode.feature.agent.data.local.dao.CheckpointDao
+import com.aicode.feature.agent.data.local.dao.LlmCallRecordDao
 import com.aicode.feature.agent.data.local.dao.TodoItemDao
 import com.aicode.feature.settings.data.local.dao.AIProviderDao
 import com.aicode.feature.settings.domain.repository.AIProviderRepository
@@ -107,6 +108,12 @@ object AgentModule {
     @Singleton
     fun provideRemoteConnectionDao(database: AgentDatabase): com.aicode.feature.workspace.data.local.dao.RemoteConnectionDao {
         return database.remoteConnectionDao()
+    }
+
+    @Provides
+    @Singleton
+    fun provideLlmCallRecordDao(database: AgentDatabase): LlmCallRecordDao {
+        return database.llmCallRecordDao()
     }
 
     @Provides
@@ -279,7 +286,8 @@ object AgentModule {
         titleModelSettingsRepository: com.aicode.feature.settings.data.repository.TitleModelSettingsRepository,
         sessionUseCase: com.aicode.feature.agent.domain.session.SessionUseCase,
         messagePersistenceUseCase: com.aicode.feature.agent.domain.session.MessagePersistenceUseCase,
-        checkpointManager: com.aicode.feature.agent.domain.checkpoint.CheckpointManager
+        checkpointManager: com.aicode.feature.agent.domain.checkpoint.CheckpointManager,
+        llmCallRecordDao: LlmCallRecordDao
     ): AgentWorkflow {
         return com.aicode.feature.agent.domain.workflow.StatefulAgentWorkflow(
             toolRegistry,
@@ -299,7 +307,8 @@ object AgentModule {
             titleModelSettingsRepository,
             sessionUseCase,
             messagePersistenceUseCase,
-            checkpointManager
+            checkpointManager,
+            llmCallRecordDao
         )
     }
 }

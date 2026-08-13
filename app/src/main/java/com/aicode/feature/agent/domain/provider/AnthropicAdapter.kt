@@ -109,7 +109,7 @@ class AnthropicAdapter @Inject constructor(
             }
         }
 
-        return AIResponse(content = contentText, toolCalls = toolCalls, stopReason = response.stop_reason, reasoning = thinkingText.ifEmpty { null }, signature = signature, inputTokens = response.usage.input_tokens, outputTokens = response.usage.output_tokens)
+        return AIResponse(content = contentText, toolCalls = toolCalls, stopReason = response.stop_reason, reasoning = thinkingText.ifEmpty { null }, signature = signature, inputTokens = response.usage.input_tokens, outputTokens = response.usage.output_tokens, cachedInputTokens = response.usage.cache_read_input_tokens ?: 0)
     }
 
     override fun completeStream(
@@ -152,6 +152,7 @@ class AnthropicAdapter @Inject constructor(
             var stopReason: String? = null
             var streamInputTokens = 0
             var streamOutputTokens = 0
+            var streamCachedInputTokens = 0
             // thinking block 的加密签名（signature_delta 事件携带），随 Final 上抛供工具循环回传。
             var signature: String? = null
 
@@ -246,6 +247,9 @@ class AnthropicAdapter @Inject constructor(
                                     usage?.get("output_tokens")?.takeIf { !it.isJsonNull }?.asInt?.let {
                                         streamOutputTokens = it
                                     }
+                                    usage?.get("cache_read_input_tokens")?.takeIf { !it.isJsonNull }?.asInt?.let {
+                                        streamCachedInputTokens = it
+                                    }
                                 }
                             }
                         } catch (e: CancellationException) {
@@ -265,7 +269,7 @@ class AnthropicAdapter @Inject constructor(
                 ToolCall(id = acc.id, name = acc.name, arguments = parseArgs(acc.args.toString()))
             }
             onProduced()
-            emit(AIStreamChunk.Final(AIResponse(content = textBuilder.toString(), toolCalls = toolCalls, stopReason = stopReason, signature = signature, inputTokens = streamInputTokens, outputTokens = streamOutputTokens)))
+            emit(AIStreamChunk.Final(AIResponse(content = textBuilder.toString(), toolCalls = toolCalls, stopReason = stopReason, signature = signature, inputTokens = streamInputTokens, outputTokens = streamOutputTokens, cachedInputTokens = streamCachedInputTokens)))
                 },
                 onRetry = { attempt, max -> emit(AIStreamChunk.Retrying(attempt, max)) }
             )

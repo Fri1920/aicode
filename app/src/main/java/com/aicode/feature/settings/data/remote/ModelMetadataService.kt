@@ -12,6 +12,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
@@ -164,6 +165,22 @@ class ModelMetadataService @Inject constructor(
         source = ModelMetadata.Source.INFERRED
     )
 
+    /**
+     * 按模型 id 查单价（USD/1M tokens），返回 (input, output, cacheRead)。
+     * 仅当输入价存在时视为可计价；查不到返回 null。
+     */
+    fun findModelCostUsdPerM(modelId: String): Triple<Double?, Double?, Double?>? {
+        val normalized = modelId.removePrefix("models/")
+        for (provider in loadCatalog().values) {
+            provider[normalized]?.let { m ->
+                if (m.inputCostUsdPerM != null || m.outputCostUsdPerM != null) {
+                    return Triple(m.inputCostUsdPerM, m.outputCostUsdPerM, m.cacheReadCostUsdPerM)
+                }
+            }
+        }
+        return null
+    }
+
     private fun findMetadata(
         catalog: Map<String, Map<String, ModelMetadata>>,
         type: ProviderType,
@@ -195,6 +212,7 @@ class ModelMetadataService @Inject constructor(
                 val inputModalities = modalities?.get("input")?.jsonArray
                     ?.mapNotNull { it.jsonPrimitive.content }
                     .orEmpty()
+                val cost = model["cost"]?.jsonObject
                 ModelMetadata(
                     id = model["id"]?.jsonPrimitive?.content ?: "",
                     providerId = providerId,
@@ -205,6 +223,9 @@ class ModelMetadataService @Inject constructor(
                     supportsTools = model["tool_call"]?.jsonPrimitive?.booleanOrNull == true,
                     supportsVision = "image" in inputModalities || "video" in inputModalities || "pdf" in inputModalities,
                     supportsReasoning = model["reasoning"]?.jsonPrimitive?.booleanOrNull == true,
+                    inputCostUsdPerM = cost?.get("input")?.jsonPrimitive?.doubleOrNull,
+                    outputCostUsdPerM = cost?.get("output")?.jsonPrimitive?.doubleOrNull,
+                    cacheReadCostUsdPerM = cost?.get("cache_read")?.jsonPrimitive?.doubleOrNull,
                     source = ModelMetadata.Source.MODELS_DEV
                 )
             }
