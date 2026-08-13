@@ -1,5 +1,7 @@
 #!/bin/sh
-# 容器初始化依赖安装脚本（通用）：内置 Alpine 以 `--auto` 非交互自动安装；自定义镜像在终端里交互执行菜单。
+# 容器初始化依赖安装脚本（统一）：内置 Alpine 与自定义镜像一致——首次进入终端时在 PTY 上弹出
+# 交互菜单，由用户选择自动安装基础工具、手动安装不再提示、或退出。脚本按容器内包管理器
+# （apk/apt-get/dnf/yum/pacman）安装同一套工具并可选换国内镜像源。
 # 由 App 启动时提取到 ~/.aicode/provision.sh（容器内 /root/.aicode/provision.sh，经 -b 绑定可见）。
 # 修改包清单/安装逻辑/镜像源后，需同步在 LinuxContainerEngine.PROVISION_VERSION 上 +1 触发存量设备重跑。
 # 注意：apk 源分支 v3.21 需与 assets 内 alpine-rootfs 版本（ContainerInstaller.INSTALL_VERSION）保持一致。
@@ -56,9 +58,24 @@ setup_mirror() {
 setup_apk_mirror() {
     # 用 http 而非 https：minirootfs 无 ca-certificates，apk 对索引与包做独立签名校验，http 不影响完整性。
     mkdir -p /etc/apk
+    # Alpine 大版本分支从镜像自身动态读取，兼容用户导入的不同版本 Alpine 镜像：
+    # 1) 优先从现有 repositories 提取（官方源 / 已换过的源都含 `alpine/<分支>/`，edge 也能拿到）；
+    # 2) 读不到再回退到 /etc/os-release 的 VERSION_ID（如 3.21.3 → v3.21）；
+    # 3) 最后兜底 v3.21（与内置 Alpine 一致）。
+    branch=""
+    if [ -f /etc/apk/repositories ]; then
+        branch=$(sed -n 's#.*alpine/\([^/]*\)/.*#\1#p' /etc/apk/repositories 2>/dev/null | head -1)
+    fi
+    if [ -z "$branch" ] && [ -f /etc/os-release ]; then
+        . /etc/os-release 2>/dev/null
+        if [ "$ID" = "alpine" ] && [ -n "$VERSION_ID" ]; then
+            branch="v$(echo "$VERSION_ID" | cut -d. -f1-2)"
+        fi
+    fi
+    [ -z "$branch" ] && branch="v3.21"
     cat > /etc/apk/repositories <<EOF
-http://$MIRROR/alpine/v3.21/main
-http://$MIRROR/alpine/v3.21/community
+http://$MIRROR/alpine/$branch/main
+http://$MIRROR/alpine/$branch/community
 EOF
 }
 
@@ -181,25 +198,7 @@ git_config() {
     git config --global --add credential.helper '/root/.aicode/git-credential-aicode'
 }
 
-# ── 内置 Alpine：非交互自动安装（不询问换源，直接阿里云 apk 源 + 装包）──
-if [ "$1" = "--auto" ]; then
-    if ! command -v apk >/dev/null 2>&1; then
-        echo "内置容器缺少 apk，应使用 Alpine 镜像" >&2
-        exit 1
-    fi
-    setup_apk_mirror
-    if install_packages; then
-        echo "$PROVISION_VERSION" > "$MARKER"
-        echo "容器基础依赖安装完成"
-    else
-        echo "基础依赖安装失败，将在下次进入终端页时自动重试" >&2
-        exit 1
-    fi
-    git_config
-    exit 0
-fi
-
-# ── 自定义镜像：交互菜单（在终端 PTY 上运行，用户自主选择安装方式）──
+# ── 交互初始化菜单（所有容器统一，在终端 PTY 上运行，用户自主选择安装方式）──
 C_BOLD=$(printf '\033[1m')
 C_CYAN=$(printf '\033[36m')
 C_YELLOW=$(printf '\033[33m')

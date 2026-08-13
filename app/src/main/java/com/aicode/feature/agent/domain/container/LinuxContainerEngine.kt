@@ -157,9 +157,6 @@ class LinuxContainerEngine @Inject constructor(
          * provision-script-skipped），App 端仅读它判断是否完成。
          */
         private const val PROVISION_VERSION = "provision-script-v6"
-
-        /** `apk add` 下载基础包的超时（毫秒）：首次配置需联网拉包，给足时间。 */
-        private const val PROVISION_TIMEOUT_MS = 600_000L
     }
 
     /** 标记基础包已按 [PROVISION_VERSION] 配置完成（内容为版本号，或用户手动安装的跳过标记），按当前 profile 的 rootfs 目录存放（内置/自定义各自独立）。 */
@@ -194,9 +191,9 @@ class LinuxContainerEngine @Inject constructor(
      * 在容器内流式执行命令的「裸」实现：每读到一行就 emit [CommandEvent.Line]，命令结束 emit
      * [CommandEvent.Exit]。**不触发懒安装**（不调 [ensureInstalled]），假定 rootfs 已就绪。
      *
-     * 抽出此方法供 [runCommandStream]（先 [ensureInstalled]）与 [provisionIfNeeded]（先
+     * 抽出此方法供 [runCommandStream]（先 [ensureInstalled]）与初始化脚本执行（先
      * [ContainerInstaller.installRootfsIfNeed]，不能再触发 ensureInstalled 否则递归）共用，
-     * 让 provision 也能逐行拿到 apk 输出以更新进度。
+     * 让初始化也能逐行拿到输出以更新进度。
      *
      * [timeoutMs] 为命令最长执行时间（毫秒），默认 [DEFAULT_TIMEOUT_MS]，上限 [MAX_TIMEOUT_MS]。
      * 超时后强制终止子进程并在末尾追加一行超时提示，[CommandEvent.Exit] 退出码记为 null。
@@ -319,7 +316,7 @@ class LinuxContainerEngine @Inject constructor(
 
     /**
      * 在容器内同步执行命令并捕获输出。**假定 rootfs 已安装**（不做懒安装/配置），
-     * 供 [runCommandSync]（先 [ensureInstalled]）与 [provisionIfNeeded]（先 [installRootfsIfNeed]）复用，
+     * 供 [runCommandSync]（先 [ensureInstalled]）与初始化脚本执行（先 [installRootfsIfNeed]）复用，
      * 避免配置流程反向触发 [ensureInstalled] 形成递归。
      *
      * [timeoutMs] 为命令最长执行时间（毫秒），钳到 [MAX_TIMEOUT_MS]。超时则强杀进程，
@@ -382,45 +379,6 @@ class LinuxContainerEngine @Inject constructor(
         } catch (e: Exception) {
             FileLogger.e(TAG, "执行命令异常: $command", e)
             ExecResult("Error: ${e.message}", null)
-        }
-    }
-
-    /**
-     * 首次初始化时执行通用依赖安装脚本（python3 / git / pip / node / npm / rg 等）。幂等：已按 [PROVISION_VERSION] 配置则直接返回。
-     * **仅内置 Alpine 调用**（[doInit] 对自定义镜像不触发）：以 `--auto` 非交互模式运行，直接阿里云 apk 源 + 装包，
-     * 失败（断网/超时/退出码非 0）不写标记，下次 [ensureInstalled] 自动重试，且**不抛异常**——
-     * 配置失败不应阻塞用户使用容器（只是暂时没有这些工具）。自定义镜像的安装方式由用户在终端交互菜单选择
-     * （见 assets/aicode/provision.sh），App 端不再自动执行。
-     *
-     * 流式执行：用 [streamExecNoInstall]（不触发懒安装，避免与 [ensureInstalled] 递归）逐行拿到脚本输出，
-     * 实时更新 [initProgress]，让 UI 能看到「正在安装…」+ 下载进度行。脚本由 [ContainerInstaller.extractProvisionScript]
-     * 启动即提取到 ~/.aicode/provision.sh（容器内 /root/.aicode/provision.sh，经 -b 绑定对所有 profile 可见）。
-     */
-    private suspend fun provisionIfNeeded() {
-        val marker = provisionMarker(currentProfile)
-        if (marker.exists() && marker.readText().trim() == PROVISION_VERSION) return
-
-        FileLogger.i(TAG, "开始执行容器初始化依赖脚本（内置镜像自动安装，首次需联网，可能耗时较久）")
-        _initProgress.value = ContainerInitState.InstallingPackages(line = "运行初始化脚本…")
-
-        var exitCode: Int? = null
-        // rootfs 此时已由 ensureInstalled→installRootfsIfNeed 解压就绪；streamExecNoInstall 不再触发安装，无递归。
-        streamExecNoInstall("sh /root/.aicode/provision.sh --auto", projectPath = null, timeoutMs = PROVISION_TIMEOUT_MS).collect { event ->
-            when (event) {
-                is CommandEvent.Line ->
-                    _initProgress.value = ContainerInitState.InstallingPackages(line = event.text)
-                is CommandEvent.Exit -> exitCode = event.code
-            }
-        }
-
-        if (exitCode == 0) {
-            marker.writeText(PROVISION_VERSION)
-            FileLogger.i(TAG, "容器初始化依赖脚本执行完成")
-        } else {
-            FileLogger.w(
-                TAG,
-                "容器初始化依赖脚本执行未完成（退出码=$exitCode），将在下次初始化重试"
-            )
         }
     }
 
@@ -492,60 +450,55 @@ class LinuxContainerEngine @Inject constructor(
     override fun isContainerInstalled(): Boolean = containerInstaller.isInstalledFor(currentProfile)
 
     /**
-     * 基础包是否已配置完成（按当前 profile 的标记）。所有容器（内置/自定义）首次初始化都会执行
-     * 通用依赖安装脚本（见 [provisionIfNeeded]），完成后写标记；脚本失败不写标记、下次重试。
+     * 基础包是否已配置完成（按当前 profile 的标记）。首次进入终端时由初始化菜单
+     * （assets/aicode/provision.sh）引导安装，完成后脚本写标记；未完成时不影响进入 shell。
      */
     override fun isProvisioned(): Boolean = isProvisionedFor(currentProfile)
 
-    /** 按指定 profile 判断基础包配置是否完成（MCP 等按指定容器启动时用）。 */
+    /** 按指定 profile 判断基础包配置是否完成（[defaultShell] 据此选 bash/sh）。 */
     fun isProvisionedFor(profile: ContainerProfile): Boolean {
         val marker = provisionMarker(profile)
         return marker.exists() && marker.readText().trim() == PROVISION_VERSION
     }
 
     /**
-     * 容器未就绪（rootfs 未解压，或内置镜像基础包未配置完成）时返回引导文案，就绪返回 null。
-     * 自定义镜像只要求 rootfs 就绪：初始化脚本失败不阻塞使用，由用户自行补齐工具。
+     * 容器未就绪（rootfs 未解压）时返回引导文案，就绪返回 null。
      * 命令执行入口据此不自动初始化、直接失败并引导用户去终端页完成初始化。
      */
     override fun notReadyHint(): String? = notReadyHintFor(currentProfile)
 
     /** 按指定 profile 判断容器是否就绪（MCP 按运行时容器启动前检查用）。 */
     fun notReadyHintFor(profile: ContainerProfile): String? {
-        if (containerInstaller.isInstalledFor(profile) &&
-            (isProvisionedFor(profile) || !profile.isBuiltin)
-        ) return null
+        if (containerInstaller.isInstalledFor(profile)) return null
         return context.getString(R.string.container_not_ready_hint)
     }
 
     /**
-     * 容器默认命令 shell：内置 Alpine 按 provision 状态选 `/bin/bash` 或 `/bin/sh`；
-     * 自定义镜像用 profile 指定的 [ContainerProfile.shellPath]，未指定回退 `/bin/sh`。
-     *
-     * 内置分支与改动前逐字等价。自定义镜像的 shell 路径由用户负责——若不存在，proot 会报错由用户看到。
+     * 容器默认命令 shell：优先用 profile 指定的 [ContainerProfile.shellPath]；未指定时
+     * 按 provision 状态选 `/bin/bash`（脚本已安装 bash）或 `/bin/sh`。
      */
     override fun defaultShell(): String {
         val profile = currentProfile
-        if (!profile.isBuiltin) return profile.shellPath?.takeIf { it.isNotBlank() } ?: "/bin/sh"
+        profile.shellPath?.takeIf { it.isNotBlank() }?.let { return it }
         return if (isProvisioned()) "/bin/bash" else "/bin/sh"
     }
 
     /**
-     * 幂等地确保容器可用：先解压 rootfs/proot（首次耗时），再执行通用依赖安装脚本（首次需联网，
-     * 内置 Alpine 会 provision 基础包；自定义镜像按包管理器自动装包，镜像源与包清单由脚本管理）。
+     * 幂等地确保容器可用：解压 rootfs/proot（首次耗时）。所有容器（内置/自定义）一致——
+     * 基础工具安装不在此阶段自动执行，由进入终端时的初始化菜单（assets/aicode/provision.sh）
+     * 引导用户选择，装包失败也不阻塞进入 shell。
      * 仅由终端页（[TerminalSessionManager]）作为唯一初始化入口调用；命令执行入口不再自动触发。
      *
-     * 耗时初始化（解压/装包）在引擎级 [initScope] 中执行，不随调用方（终端页 viewModelScope）
+     * 耗时初始化（解压）在引擎级 [initScope] 中执行，不随调用方（终端页 viewModelScope）
      * 取消而中断——退出终端页后初始化仍在后台继续，下次进入可复用同一 job 或等待其完成。
-     * 全程通过 [initProgress] 上报阶段进度。rootfs 已解压但基础包配置失败时：内置镜像置 [ContainerInitState.Failed]
-     * 并抛异常（不静默置 Ready），让终端页进入失败态、可重试，避免"依赖缺失却显示成功"；
-     * 自定义镜像不强制——用户自选的镜像可能不需要脚本装的工具，rootfs 就绪即放行，脚本下次进入时重试。
+     * 全程通过 [initProgress] 上报阶段进度。rootfs 解压失败时置 [ContainerInitState.Failed]
+     * 并抛异常（不静默置 Ready），让终端页进入失败态、可重试。
      */
     override suspend fun ensureInstalled() {
         val profile = currentProfile
         // 每次进入终端页前确保提取最新的内置文档
         containerInstaller.extractDocs()
-        if (containerInstaller.isInstalledFor(profile) && isProvisioned()) {
+        if (containerInstaller.isInstalledFor(profile)) {
             _initProgress.value = ContainerInitState.Ready
             refreshContainerHome()
             detectAndCacheOsIfNeeded(profile)
@@ -561,26 +514,21 @@ class LinuxContainerEngine @Inject constructor(
         }
         // 等待完成；若调用方（终端页）被取消，join 抛 CancellationException，但后台 job 继续执行。
         job.join()
-        val rootfsReady = containerInstaller.isInstalledFor(profile)
-        if (rootfsReady && (isProvisioned() || !profile.isBuiltin)) {
+        if (containerInstaller.isInstalledFor(profile)) {
             _initProgress.value = ContainerInitState.Ready
             refreshContainerHome()
             detectAndCacheOsIfNeeded(profile)
         } else {
-            val reason = if (rootfsReady)
-                "容器基础包安装未完成（可能是网络问题），请重试"
-            else
-                "容器未安装（缺少 rootfs/proot）"
+            val reason = "容器未安装（缺少 rootfs/proot）"
             _initProgress.value = ContainerInitState.Failed(reason)
             throw IllegalStateException(reason)
         }
     }
 
-    /** 在 [initScope] 中真正执行一次性初始化：解压 rootfs；内置 Alpine 额外自动安装基础包（自定义镜像由用户在终端交互菜单选择）。 */
+    /** 在 [initScope] 中真正执行一次性初始化：解压 rootfs（基础工具由进入终端时的初始化菜单引导安装）。 */
     private suspend fun doInit(profile: ContainerProfile) {
         // installRootfsIfNeed 在真正解压/部署时回调更新进度（已安装则快路径不回调）
         containerInstaller.installRootfsIfNeed(profile) { _initProgress.value = it }
-        if (profile.isBuiltin) provisionIfNeeded()
     }
 
     /** 查容器内 $HOME 并缓存到 [WorkspacePathMapper]，供文件工具展开 ~。 */
@@ -709,7 +657,7 @@ class LinuxContainerEngine @Inject constructor(
         // 把 AI 配置目录绑定到容器内 /root/.aicode（读写）：内含 skills/（load_skill 读到的指令常引用
         // skill 目录里的脚本，AI 用 execute_command 执行 `python /root/.aicode/skills/<name>/x.py` 等）与
         // mcp.json（MCP 配置）。宿主物理目录独立于 rootfs，容器升级重装不丢用户数据。
-        // 基础解释器 python3(3.12) 与 git 由 [provisionIfNeeded] 在首次初始化时自动 `apk add`；
+        // 基础解释器 python3(3.12) 与 git 由进入终端时的初始化菜单（provision.sh）安装；
         // node 等其他运行时仍由 skill / 用户自行保证。proot 的 -b 要求源路径存在，故先确保目录已建。
         val aicodeDir = containerInstaller.aicodeDir.apply { mkdirs() }
         argv.add("-b")

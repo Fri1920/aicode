@@ -8,6 +8,7 @@ import com.aicode.feature.backup.domain.BackupDecryptionException
 import com.aicode.feature.backup.domain.BackupManager
 import com.aicode.feature.backup.domain.BackupOptions
 import com.aicode.feature.backup.domain.RestoreStats
+import com.aicode.feature.backup.domain.WorkspaceBackupMeta
 import dagger.hilt.android.lifecycle.HiltViewModel
 import com.aicode.R
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -25,6 +26,12 @@ sealed class BackupState {
     data object Working : BackupState()
     data object ExportDone : BackupState()
     data class ImportSuccess(val stats: RestoreStats) : BackupState()
+    /** 导入预览完成，备份含工作区数据：等待用户勾选要恢复的工作区（暂存 uri 与口令）。 */
+    data class WorkspaceSelection(
+        val workspaces: List<WorkspaceBackupMeta>,
+        val uri: Uri,
+        val password: String
+    ) : BackupState()
     data class Error(val message: String) : BackupState()
 }
 
@@ -84,7 +91,7 @@ class BackupViewModel @Inject constructor(
         }
     }
 
-    /** 从 SAF Uri 流式导入并还原。 */
+    /** 从 SAF Uri 流式导入：先预览，备份含工作区数据时进入勾选确认，否则全量还原。 */
     fun import(uri: Uri, password: String) {
         _state.value = BackupState.Working
         viewModelScope.launch {
@@ -94,12 +101,49 @@ class BackupViewModel @Inject constructor(
                     context.contentResolver.openInputStream(uri)
                         ?: throw IllegalArgumentException(context.getString(R.string.backup_read_failed))
                 }
-                input.use { backupManager.import(it, pw) }
-                    .onSuccess { _state.value = BackupState.ImportSuccess(it) }
+                input.use { backupManager.previewImport(it, pw) }
+                    .onSuccess { preview ->
+                        if (preview.hasWorkspaceData) {
+                            _state.value = BackupState.WorkspaceSelection(preview.workspaces, uri, password)
+                        } else {
+                            restoreFromUri(uri, pw, null)
+                        }
+                    }
                     .onFailure { _state.value = BackupState.Error(describeImportError(it)) }
             } catch (e: Exception) {
                 _state.value = BackupState.Error(describeImportError(e))
             }
+        }
+    }
+
+    /** 勾选确认后按所选工作区恢复（重新打开输入流执行真正还原）。 */
+    fun confirmImportSelection(selected: Set<String>) {
+        val current = _state.value as? BackupState.WorkspaceSelection ?: return
+        _state.value = BackupState.Working
+        viewModelScope.launch {
+            val pw = current.password.toCharArray().takeIf { it.isNotEmpty() }
+            restoreFromUri(current.uri, pw, selected)
+        }
+    }
+
+    /** 取消工作区勾选，中止导入。 */
+    fun cancelImportSelection() {
+        if (_state.value is BackupState.WorkspaceSelection) {
+            _state.value = BackupState.Idle
+        }
+    }
+
+    private suspend fun restoreFromUri(uri: Uri, pw: CharArray?, selected: Set<String>?) {
+        try {
+            val input = withContext(Dispatchers.IO) {
+                context.contentResolver.openInputStream(uri)
+                    ?: throw IllegalArgumentException(context.getString(R.string.backup_read_failed))
+            }
+            input.use { backupManager.import(it, pw, selected) }
+                .onSuccess { _state.value = BackupState.ImportSuccess(it) }
+                .onFailure { _state.value = BackupState.Error(describeImportError(it)) }
+        } catch (e: Exception) {
+            _state.value = BackupState.Error(describeImportError(e))
         }
     }
 

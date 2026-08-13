@@ -6,9 +6,9 @@ import kotlinx.serialization.Serializable
 /**
  * 一个可切换的容器配置：镜像来源 + shell 路径 + 额外 proot 绑定/参数。
  *
- * 内置 [BUILTIN_ALPINE] 描述现有 Alpine rootfs（来自 assets），其行为与改动前逐字等价。
- * 用户自定义 profile 通过导入 tar.gz 提供 rootfs，只保证能起 shell 跑命令——不 provision、
- * 不接管镜像源与包管理，所需工具由用户自行在容器内安装。
+ * 内置 [BUILTIN_ALPINE] 描述现有 Alpine rootfs（来自 assets）。用户自定义 profile 通过导入
+ * tar.gz 提供 rootfs。所有容器首次进入终端时统一弹出初始化菜单（见 assets/aicode/provision.sh），
+ * 由用户选择自动安装基础工具或手动安装，装包失败不阻塞进入 shell，处理方式一致。
  *
  * 远程 SSH profile（[mode] == [ExecutionMode.REMOTE_SSH]）不导入本地 rootfs，而是绑定一个
  * 工作区已配置的 SSH 通道（[RootfsSource.RemoteSsh]），命令执行走 [RemoteSshEngine]。
@@ -18,7 +18,7 @@ data class ContainerProfile(
     val id: String,
     val name: String,
     val rootfsSource: RootfsSource,
-    /** 自定义镜像用的 shell（如 /bin/sh 或 /bin/bash）；内置忽略，走 provision 后的 bash/ash 选择。 */
+    /** 自定义镜像用的 shell（如 /bin/sh 或 /bin/bash）；未指定时按 provision 状态自动选择。 */
     val shellPath: String?,
     /** 额外 -b 绑定，如 ["/sdcard:/mnt/sdcard"]，逐项作为 `-b <binding>` 拼进 proot argv。 */
     val extraBindings: List<String> = emptyList(),
