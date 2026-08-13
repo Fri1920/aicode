@@ -387,7 +387,7 @@
     <string name="diff_no_changes">无差异</string>
     <string name="diff_binary_file">二进制文件，不支持文本差异对比</string>
     <string name="diff_file_too_large">文件过大，已跳过差异计算</string>
-    <string name="diff_file_too_large_desc">超过 2000 行的文件不做行级 diff 以避免内存压力。</string>
+    <string name="diff_file_too_large_desc">超过 2000 行或含超长行的文件不做行级 diff，以避免渲染与内存压力。</string>
 
     <!-- Git -->
     <string name="git_credentials_and_identity">凭据与署名</string>

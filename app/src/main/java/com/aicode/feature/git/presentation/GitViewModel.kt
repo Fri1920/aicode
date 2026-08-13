@@ -50,6 +50,8 @@ class GitViewModel @Inject constructor(
         const val TAG = "GitViewModel"
         /** diff 行数上限：超过则跳过 LCS，避免移动端 O(n·m) 内存压力。与 FileTools 对齐。 */
         const val MAX_DIFF_LINES = 2000
+        /** 单行长度上限：超长单行（如压缩的 JSON）渲染会撑爆 Compose Constraints，直接降级提示。 */
+        const val MAX_DIFF_LINE_LENGTH = 2000
     }
 
     data class GitUiState(
@@ -444,7 +446,10 @@ class GitViewModel @Inject constructor(
 
         val oldLines = oldContent.split('\n')
         val newLines = newContent.split('\n')
-        if (maxOf(oldLines.size, newLines.size) > MAX_DIFF_LINES) {
+        if (maxOf(oldLines.size, newLines.size) > MAX_DIFF_LINES ||
+            oldLines.any { it.length > MAX_DIFF_LINE_LENGTH } ||
+            newLines.any { it.length > MAX_DIFF_LINE_LENGTH }
+        ) {
             return DiffData(path, oldRef, newRef, emptyList(), 0, 0, isLarge = true)
         }
 

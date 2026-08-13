@@ -386,7 +386,7 @@
     <string name="diff_no_changes">No differences</string>
     <string name="diff_binary_file">Binary file, text diff not supported</string>
     <string name="diff_file_too_large">File too large, diff calculation skipped</string>
-    <string name="diff_file_too_large_desc">Files over 2000 lines are not diffed line-by-line to avoid memory pressure.</string>
+    <string name="diff_file_too_large_desc">Files over 2000 lines or with extremely long lines are not diffed line-by-line, to avoid rendering and memory pressure.</string>
 
     <!-- Git -->
     <string name="git_credentials_and_identity">Credentials &amp; Identity</string>
