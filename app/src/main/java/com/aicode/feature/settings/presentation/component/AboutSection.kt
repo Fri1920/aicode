@@ -1,17 +1,9 @@
 package com.aicode.feature.settings.presentation.component
 
 import android.content.Context
-import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Canvas
-import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.Drawable
-import android.net.Uri
-import com.google.gson.JsonParser
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import okhttp3.OkHttpClient
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -25,43 +17,57 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.aicode.R
 import com.aicode.core.theme.Spacing
+import com.aicode.feature.settings.data.repository.UpdateChannel
 import compose.icons.FeatherIcons
 import compose.icons.feathericons.Book
+import compose.icons.feathericons.Check
 import compose.icons.feathericons.Github
+import compose.icons.feathericons.Globe
+import compose.icons.feathericons.RefreshCw
 import compose.icons.feathericons.Tag
 
 /**
- * 关于页：顶部应用信息、版本号（点击检查更新）、GitHub 仓库、开源许可证。
- *
- * 纯展示型页面，无持久化。使用带边框独立卡片（Card + RoundedCornerShape(Radius.md)
- * + outlineVariant 边框 + onSurfaceVariant 图标）。
+ * 关于页：顶部应用信息、版本号（点击手动检查更新）、自动检查更新开关、更新通道、
+ * GitHub 仓库、开源许可证。检查更新逻辑与弹窗由全局 [SettingsViewModel] 承载，
+ * 本页只负责触发与展示设置项。
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun AboutSection() {
+internal fun AboutSection(
+    updateCheckEnabled: Boolean,
+    updateCheckChannel: UpdateChannel,
+    onToggleUpdateCheck: (Boolean) -> Unit,
+    onSelectChannel: (UpdateChannel) -> Unit,
+    onCheckUpdate: () -> Unit
+) {
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
+    var showChannelSheet by remember { mutableStateOf(false) }
 
     // 通过 PackageManager 读取 versionName/versionCode（项目未开启 BuildConfig）
     val appInfo = remember {
@@ -82,9 +88,6 @@ internal fun AboutSection() {
     // 在 Compose painterResource 中不被支持的问题（Only VectorDrawables and rasterized types）。
     val appIcon = remember { loadAppIconBitmap(context) }
 
-    // 检查更新弹窗状态
-    var updateDialog by remember { mutableStateOf<UpdateDialogState?>(null) }
-
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -96,21 +99,48 @@ internal fun AboutSection() {
         AboutHeaderCard(appName = stringResource(R.string.app_name), appIcon = appIcon)
 
         SettingsGroup {
-            // 版本：点击检查更新
+            // 版本：点击手动检查更新
             SettingsRow(
                 icon = FeatherIcons.Tag,
                 title = stringResource(R.string.about_version),
-                onClick = {
-                    if (updateDialog == null) {
-                        updateDialog = UpdateDialogState.Checking
-                        scope.launch {
-                            updateDialog = checkUpdate(context, appInfo.name)
-                        }
-                    }
-                },
+                onClick = onCheckUpdate,
                 trailing = {
                     Text(
                         text = "v${appInfo.name}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = if (settingsLightMode()) Color(0xFF8E9094) else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            )
+            SettingsDivider()
+            // 自动检查更新：开关
+            SettingsRow(
+                icon = FeatherIcons.RefreshCw,
+                title = stringResource(R.string.about_auto_check_update),
+                subtitle = stringResource(R.string.about_auto_check_update_desc),
+                trailing = {
+                    Switch(
+                        checked = updateCheckEnabled,
+                        onCheckedChange = onToggleUpdateCheck,
+                        modifier = Modifier.scale(0.8f)
+                    )
+                }
+            )
+            SettingsDivider()
+            // 更新通道
+            SettingsRow(
+                icon = FeatherIcons.Globe,
+                title = stringResource(R.string.about_update_channel),
+                onClick = { showChannelSheet = true },
+                trailing = {
+                    Text(
+                        text = stringResource(
+                            if (updateCheckChannel == UpdateChannel.STABLE) {
+                                R.string.update_channel_stable
+                            } else {
+                                R.string.update_channel_latest
+                            }
+                        ),
                         style = MaterialTheme.typography.bodyMedium,
                         color = if (settingsLightMode()) Color(0xFF8E9094) else MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -133,16 +163,14 @@ internal fun AboutSection() {
         }
     }
 
-    // 检查更新结果弹窗
-    updateDialog?.let { state ->
-        UpdateResultDialog(
-            state = state,
-            currentVersion = appInfo.name,
-            onDismiss = { updateDialog = null },
-            onOpenRelease = {
-                openUrl(context, RELEASES_URL)
-                updateDialog = null
-            }
+    if (showChannelSheet) {
+        UpdateChannelSheet(
+            current = updateCheckChannel,
+            onSelect = {
+                onSelectChannel(it)
+                showChannelSheet = false
+            },
+            onDismiss = { showChannelSheet = false }
         )
     }
 }
@@ -191,74 +219,86 @@ private fun AboutHeaderCard(appName: String, appIcon: androidx.compose.ui.graphi
     }
 }
 
-/** 检查更新结果弹窗。 */
+/** 更新通道底部弹窗：稳定版 / 最新版 单选，样式对齐语言切换。 */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun UpdateResultDialog(
-    state: UpdateDialogState,
-    currentVersion: String,
-    onDismiss: () -> Unit,
-    onOpenRelease: () -> Unit
+private fun UpdateChannelSheet(
+    current: UpdateChannel,
+    onSelect: (UpdateChannel) -> Unit,
+    onDismiss: () -> Unit
 ) {
-    when (state) {
-        UpdateDialogState.Checking -> AlertDialog(
-            onDismissRequest = onDismiss,
-            title = { Text(stringResource(R.string.about_check_update)) },
-            text = { Text(stringResource(R.string.about_checking_update)) },
-            confirmButton = {}
-        )
-        is UpdateDialogState.UpToDate -> AlertDialog(
-            onDismissRequest = onDismiss,
-            title = { Text(stringResource(R.string.about_up_to_date)) },
-            text = { Text(stringResource(R.string.about_up_to_date_detail, currentVersion)) },
-            confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_got_it)) } }
-        )
-        is UpdateDialogState.NewVersion -> AlertDialog(
-            onDismissRequest = onDismiss,
-            title = { Text(stringResource(R.string.about_new_version_found)) },
-            text = { Text(stringResource(R.string.about_new_version_detail, currentVersion, state.latestTag)) },
-            confirmButton = { TextButton(onClick = onOpenRelease) { Text(stringResource(R.string.about_download)) } },
-            dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.about_later)) } }
-        )
-        is UpdateDialogState.Error -> AlertDialog(
-            onDismissRequest = onDismiss,
-            title = { Text(stringResource(R.string.about_check_failed)) },
-            text = { Text(state.message) },
-            confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.about_ok)) } }
-        )
-    }
-}
+    val sheetState = rememberModalBottomSheetState()
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = MaterialTheme.colorScheme.surface
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = Spacing.xl)
+        ) {
+            Text(
+                text = stringResource(R.string.about_update_channel),
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier
+                    .padding(horizontal = Spacing.lg)
+                    .padding(bottom = Spacing.md)
+            )
 
-/** 用隐式 Intent 打开浏览器，捕获异常避免崩溃。 */
-private fun openUrl(context: android.content.Context, url: String) {
-    runCatching {
-        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
-    }
-}
-
-/**
- * 拉取 GitHub /repos/{owner}/{repo}/releases/latest，比对最新 tag 与当前 versionName。
- */
-private suspend fun checkUpdate(context: Context, currentVersion: String): UpdateDialogState = withContext(Dispatchers.IO) {
-    runCatching {
-        val req = okhttp3.Request.Builder()
-            .url(GITHUB_LATEST_API)
-            .header("Accept", "application/vnd.github+json")
-            .build()
-        SHARED_CLIENT.newCall(req).execute().use { resp ->
-            if (!resp.isSuccessful) {
-                return@use UpdateDialogState.Error("HTTP ${resp.code}")
-            }
-            val body = resp.body?.string().orEmpty()
-            val tag = JsonParser.parseString(body).asJsonObject?.get("tag_name")?.asString
-                ?: return@use UpdateDialogState.Error(context.getString(R.string.about_parse_version_failed))
-            val latest = parseVersionTag(tag) ?: tag
-            if (isUpToDate(latest, currentVersion)) {
-                UpdateDialogState.UpToDate
-            } else {
-                UpdateDialogState.NewVersion(latestTag = latest)
+            listOf(
+                UpdateChannel.STABLE to stringResource(R.string.update_channel_stable),
+                UpdateChannel.LATEST to stringResource(R.string.update_channel_latest)
+            ).forEach { (channel, label) ->
+                val selected = channel == current
+                Surface(
+                    onClick = {
+                        onDismiss()
+                        onSelect(channel)
+                    },
+                    color = Color.Transparent
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = Spacing.lg, vertical = Spacing.md),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = label,
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal
+                            )
+                            Text(
+                                text = stringResource(
+                                    if (channel == UpdateChannel.STABLE) {
+                                        R.string.update_channel_stable_desc
+                                    } else {
+                                        R.string.update_channel_latest_desc
+                                    }
+                                ),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        if (selected) {
+                            Icon(
+                                imageVector = FeatherIcons.Check,
+                                contentDescription = null,
+                                modifier = Modifier.size(20.dp),
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+                }
             }
         }
-    }.getOrElse { UpdateDialogState.Error(it.message ?: context.getString(R.string.about_network_error)) }
+    }
 }
 
 /** GitHub tag 形如 v1.7.0 / 1.7.0 / v1.7.0-rc1，提取出纯版本号。 */
@@ -318,22 +358,13 @@ internal fun splitVersion(v: String): Pair<String, String> {
 
 private data class AppVersion(val name: String, val code: Long)
 
-private sealed interface UpdateDialogState {
-    data object Checking : UpdateDialogState
-    data object UpToDate : UpdateDialogState
-    data class NewVersion(val latestTag: String) : UpdateDialogState
-    data class Error(val message: String) : UpdateDialogState
-}
-
-private val SHARED_CLIENT by lazy { OkHttpClient.Builder().build() }
-
 /**
  * 通过 PackageManager.loadIcon 加载应用图标并转为 ImageBitmap，兼容自适应图标
  * (adaptive icon XML)。解决 painterResource(R.mipmap.ic_launcher) 在 v26+ 设备上
  * 因解析到 mipmap-anydpi-v26/ic_launcher.xml 而抛 IllegalArgumentException 的问题。
  * 失败返回 null（调用方预留占位）。
  */
-private fun loadAppIconBitmap(context: android.content.Context): ImageBitmap? {
+private fun loadAppIconBitmap(context: Context): ImageBitmap? {
     return runCatching {
         val pm = context.packageManager
         val drawable: Drawable = pm.getApplicationInfo(context.packageName, 0).loadIcon(pm)
@@ -351,6 +382,4 @@ private fun loadAppIconBitmap(context: android.content.Context): ImageBitmap? {
 
 private const val GITHUB_REPO_URL = "https://github.com/jieapi/aicode"
 private const val LICENSE_URL = "https://github.com/jieapi/aicode/blob/main/LICENSE"
-private const val RELEASES_URL = "https://github.com/jieapi/aicode/releases/latest"
-private const val GITHUB_LATEST_API = "https://api.github.com/repos/jieapi/aicode/releases/latest"
 private const val ICON_PX_DP = 48

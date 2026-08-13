@@ -15,8 +15,7 @@
     <string name="settings_log_no_files">还没有日志文件</string>
     <string name="settings_log_read_failed">读取日志失败: %1$s</string>
     <string name="settings_models_fetch_failed">拉取失败</string>
-    <string name="settings_log">日志等级</string>
-    <string name="settings_log_viewer">日志查看</string>
+    <string name="settings_log">日志</string>
     <string name="settings_permissions">工具授权</string>
     <string name="settings_remote_servers">连接与同步</string>
     <string name="settings_backup">备份与还原</string>
@@ -146,15 +145,21 @@
     <string name="common_hide">隐藏</string>
 
     <!-- Log -->
-    <string name="log_all">全部日志</string>
-    <string name="log_filter_prefix">筛选：%1$s</string>
+    <string name="log_files">日志文件</string>
     <string name="log_mcp_prefix">MCP 日志：%1$s</string>
-    <string name="log_no_file">未选择文件</string>
-    <string name="log_no_filter">未筛选</string>
     <string name="log_no_match">当前筛选条件下没有日志</string>
-    <string name="log_reading">正在读取日志...</string>
+    <string name="log_search_hint">搜索日志</string>
+    <string name="log_search_results">匹配 %1$s 行</string>
     <string name="log_show_last_lines">显示最后 %1$s/%2$s 行</string>
     <string name="log_show_lines">显示 %1$s 行</string>
+    <string name="log_copy">复制</string>
+    <string name="log_copied">已复制</string>
+    <string name="log_clear_filter">清除筛选</string>
+    <string name="log_copy_menu_title">复制日志</string>
+    <string name="log_copy_line">复制本条日志</string>
+    <string name="log_copy_with_stack">复制本条及堆栈</string>
+    <string name="log_copy_message">复制消息内容</string>
+    <string name="log_follow_latest">实时滚动</string>
 
     <!-- ? -->
     <string name="sync_unknown_connection">未知连接</string>
@@ -217,6 +222,15 @@
     <string name="about_ok">好</string>
     <string name="about_parse_version_failed">无法解析最新版本号</string>
     <string name="about_network_error">网络错误</string>
+    <string name="about_auto_check_update">自动检查更新</string>
+    <string name="about_auto_check_update_desc">打开 App 时自动检测新版本</string>
+    <string name="about_update_channel">更新通道</string>
+    <string name="update_channel_stable">稳定版</string>
+    <string name="update_channel_stable_desc">仅检测正式版更新</string>
+    <string name="update_channel_latest">最新版</string>
+    <string name="update_channel_latest_desc">包含预览版（RC）更新</string>
+    <string name="about_update_changelog">更新日志</string>
+    <string name="about_no_changelog">暂无更新说明</string>
 
     <!-- Ask User Question -->
     <string name="ask_confirm_title">AI 需要你的确认</string>

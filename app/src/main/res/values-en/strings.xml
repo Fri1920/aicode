@@ -15,8 +15,7 @@
     <string name="settings_log_no_files">No log files yet</string>
     <string name="settings_log_read_failed">Failed to read log: %1$s</string>
     <string name="settings_models_fetch_failed">Fetch failed</string>
-    <string name="settings_log">Log Level</string>
-    <string name="settings_log_viewer">Log Viewer</string>
+    <string name="settings_log">Log</string>
     <string name="settings_permissions">Tool Permissions</string>
     <string name="settings_remote_servers">Connections &amp; Sync</string>
     <string name="settings_backup">Backup &amp; Restore</string>
@@ -146,15 +145,21 @@
     <string name="common_hide">Hide</string>
 
     <!-- Log -->
-    <string name="log_all">All Logs</string>
-    <string name="log_filter_prefix">Filter: %1$s</string>
+    <string name="log_files">Log Files</string>
     <string name="log_mcp_prefix">MCP Log: %1$s</string>
-    <string name="log_no_file">No file selected</string>
-    <string name="log_no_filter">No filter</string>
     <string name="log_no_match">No logs match the current filter</string>
-    <string name="log_reading">Reading logs...</string>
+    <string name="log_search_hint">Search logs</string>
+    <string name="log_search_results">%1$s matches</string>
     <string name="log_show_last_lines">Showing last %1$s/%2$s lines</string>
     <string name="log_show_lines">Showing %1$s lines</string>
+    <string name="log_copy">Copy</string>
+    <string name="log_copied">Copied</string>
+    <string name="log_clear_filter">Clear filter</string>
+    <string name="log_copy_menu_title">Copy Log</string>
+    <string name="log_copy_line">Copy this line</string>
+    <string name="log_copy_with_stack">Copy with stack trace</string>
+    <string name="log_copy_message">Copy message</string>
+    <string name="log_follow_latest">Live</string>
 
     <!-- ? -->
     <string name="sync_unknown_connection">Unknown connection</string>
@@ -217,6 +222,15 @@
     <string name="about_ok">OK</string>
     <string name="about_parse_version_failed">Cannot parse the latest version number</string>
     <string name="about_network_error">Network error</string>
+    <string name="about_auto_check_update">Auto check for updates</string>
+    <string name="about_auto_check_update_desc">Check for new versions when the app opens</string>
+    <string name="about_update_channel">Update Channel</string>
+    <string name="update_channel_stable">Stable</string>
+    <string name="update_channel_stable_desc">Stable releases only</string>
+    <string name="update_channel_latest">Latest</string>
+    <string name="update_channel_latest_desc">Includes pre-releases (RC)</string>
+    <string name="about_update_changelog">Changelog</string>
+    <string name="about_no_changelog">No changelog available</string>
 
     <!-- Ask User Question -->
     <string name="ask_confirm_title">AI needs your confirmation</string>

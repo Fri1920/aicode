@@ -51,7 +51,11 @@ import com.aicode.feature.settings.data.repository.KeepaliveSettingsRepository
 import com.aicode.feature.settings.data.repository.AppThemeMode
 import com.aicode.feature.settings.data.repository.ThemeSettingsRepository
 import com.aicode.feature.settings.presentation.SettingsViewModel
+import com.aicode.feature.settings.presentation.UpdateCheckUiState
+import com.aicode.feature.settings.presentation.component.GITHUB_RELEASES_URL
 import com.aicode.feature.settings.presentation.component.SettingsScreen
+import com.aicode.feature.settings.presentation.component.UpdateCheckDialog
+import com.aicode.feature.settings.presentation.component.openUrl
 import com.aicode.feature.terminal.domain.TerminalKeepaliveService
 import com.aicode.feature.terminal.presentation.TerminalViewModel
 import com.aicode.feature.terminal.presentation.component.TerminalScreen
@@ -218,6 +222,11 @@ fun AppNavigation() {
     val settingsViewModel: SettingsViewModel = hiltViewModel()
     val workspaceViewModel: WorkspaceViewModel = hiltViewModel()
 
+    // 自动检查更新：进入主页时异步检测（开关开启且每天最多一次，失败静默）
+    LaunchedEffect(Unit) {
+        settingsViewModel.checkUpdate(manual = false)
+    }
+
     // 侧边栏打开时，系统返回键先收起侧边栏。
     BackHandler(enabled = drawerState.isOpen) {
         scope.launch { drawerState.close() }
@@ -349,5 +358,24 @@ fun AppNavigation() {
                 )
             }
         }
+    }
+
+    // 检查更新弹窗（全局宿主：自动检测与关于页手动检查共用，覆盖所有页面）
+    val updateCheckState by settingsViewModel.updateCheckState.collectAsStateWithLifecycle()
+    if (updateCheckState != UpdateCheckUiState.Idle) {
+        val version = remember {
+            runCatching {
+                context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "unknown"
+            }.getOrDefault("unknown")
+        }
+        UpdateCheckDialog(
+            state = updateCheckState,
+            currentVersion = version,
+            onDismiss = { settingsViewModel.dismissUpdateCheck() },
+            onOpenRelease = {
+                openUrl(context, GITHUB_RELEASES_URL)
+                settingsViewModel.dismissUpdateCheck()
+            }
+        )
     }
 }

@@ -26,6 +26,10 @@ import com.aicode.feature.agent.domain.permission.PermissionRulesRepository
 import com.aicode.feature.settings.data.remote.ModelApiService
 import com.aicode.feature.settings.data.remote.ModelMetadataService
 import com.aicode.feature.settings.data.remote.ModelTestResult
+import com.aicode.feature.settings.data.remote.UpdateCheckResult
+import com.aicode.feature.settings.data.remote.UpdateCheckService
+import com.aicode.feature.settings.data.repository.UpdateCheckSettingsRepository
+import com.aicode.feature.settings.data.repository.UpdateChannel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import com.aicode.feature.settings.data.repository.AppThemeMode
 import com.aicode.feature.settings.data.repository.ContainerSettingsRepository
@@ -81,6 +85,15 @@ data class LogViewerUiState(
     val loading: Boolean = false,
     val error: String? = null
 )
+
+/** 检查更新弹窗状态（全局弹窗宿主在主页 AppNavigation 层渲染，自动/手动共用）。 */
+sealed interface UpdateCheckUiState {
+    data object Idle : UpdateCheckUiState
+    data object Checking : UpdateCheckUiState
+    data object UpToDate : UpdateCheckUiState
+    data class NewVersion(val latestTag: String, val changelog: String) : UpdateCheckUiState
+    data class Error(val message: String) : UpdateCheckUiState
+}
 
 /** Token 统计周期：决定统计起始时间与趋势粒度（今天=小时粒度，其余=天粒度）。 */
 enum class TokenStatsPeriod(val labelRes: Int, val startMillis: (Long) -> Long) {
@@ -168,7 +181,9 @@ class SettingsViewModel @Inject constructor(
     private val executionModeHolder: ExecutionModeHolder,
     private val remoteSshConnection: RemoteSshConnection,
     private val remoteRepository: RemoteRepository,
-    private val llmCallRecordDao: LlmCallRecordDao
+    private val llmCallRecordDao: LlmCallRecordDao,
+    private val updateCheckSettingsRepository: UpdateCheckSettingsRepository,
+    private val updateCheckService: UpdateCheckService
 ) : ViewModel() {
     private companion object {
         const val MAX_LOG_LINES = 1200
@@ -212,6 +227,15 @@ class SettingsViewModel @Inject constructor(
 
     private val _logViewerState = MutableStateFlow(LogViewerUiState())
     val logViewerState: StateFlow<LogViewerUiState> = _logViewerState.asStateFlow()
+
+    private val _updateCheckState = MutableStateFlow<UpdateCheckUiState>(UpdateCheckUiState.Idle)
+    val updateCheckState: StateFlow<UpdateCheckUiState> = _updateCheckState.asStateFlow()
+
+    private val _updateCheckEnabled = MutableStateFlow(updateCheckSettingsRepository.autoCheckEnabled)
+    val updateCheckEnabled: StateFlow<Boolean> = _updateCheckEnabled.asStateFlow()
+
+    private val _updateCheckChannel = MutableStateFlow(updateCheckSettingsRepository.channel)
+    val updateCheckChannel: StateFlow<UpdateChannel> = _updateCheckChannel.asStateFlow()
 
     private val _keepaliveEnabled = MutableStateFlow(false)
     val keepaliveEnabled: StateFlow<Boolean> = _keepaliveEnabled.asStateFlow()
@@ -541,10 +565,77 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
-    fun refreshLogs(filterServerName: String? = _logViewerState.value.filterServerName) {
+    // ── 检查更新 ──
+
+    /**
+     * 检查更新。手动模式（关于页点击）不受开关与每日限制；自动模式（主页启动）
+     * 需开关开启且当天未检测过，失败时静默（不弹错误窗），无论结果都记录当天已检。
+     */
+    fun checkUpdate(manual: Boolean) {
+        if (!manual) {
+            if (!updateCheckSettingsRepository.autoCheckEnabled) return
+            if (updateCheckSettingsRepository.hasCheckedToday()) return
+        }
+        if (_updateCheckState.value == UpdateCheckUiState.Checking) return
+        viewModelScope.launch {
+            // 手动检查显示「检测中」反馈；自动检查全程无感，仅检测到新版本才弹窗
+            if (manual) {
+                _updateCheckState.value = UpdateCheckUiState.Checking
+            }
+            val result = updateCheckService.checkForUpdate(
+                currentVersion = currentVersionName(),
+                channel = updateCheckSettingsRepository.channel
+            )
+            _updateCheckState.value = when (result) {
+                is UpdateCheckResult.UpToDate -> {
+                    if (manual) UpdateCheckUiState.UpToDate else UpdateCheckUiState.Idle
+                }
+                is UpdateCheckResult.NewVersion -> UpdateCheckUiState.NewVersion(
+                    latestTag = result.info.latestTag,
+                    changelog = result.info.changelog
+                )
+                is UpdateCheckResult.Error -> {
+                    if (manual) UpdateCheckUiState.Error(result.message) else UpdateCheckUiState.Idle
+                }
+            }
+            // 无论结果如何，都刷新 ~/.aicode/update-info.json 供 AI 读取
+            updateCheckSettingsRepository.writeUpdateInfo(
+                currentVersion = currentVersionName(),
+                channel = updateCheckSettingsRepository.channel,
+                result = result
+            )
+            if (!manual) {
+                updateCheckSettingsRepository.markCheckedToday()
+            }
+        }
+    }
+
+    /** 关闭更新弹窗。 */
+    fun dismissUpdateCheck() {
+        _updateCheckState.value = UpdateCheckUiState.Idle
+    }
+
+    /** 自动检查更新开关（默认开启）。 */
+    fun setUpdateCheckEnabled(enabled: Boolean) {
+        updateCheckSettingsRepository.autoCheckEnabled = enabled
+        _updateCheckEnabled.value = enabled
+    }
+
+    /** 更新通道：稳定版 / 最新版。 */
+    fun setUpdateCheckChannel(channel: UpdateChannel) {
+        updateCheckSettingsRepository.channel = channel
+        _updateCheckChannel.value = channel
+    }
+
+    private fun currentVersionName(): String = runCatching {
+        context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "unknown"
+    }.getOrDefault("unknown")
+
+    fun refreshLogs(filterServerName: String? = _logViewerState.value.filterServerName, silent: Boolean = false) {
         loadLogs(
             filterServerName = filterServerName?.takeIf { it.isNotBlank() },
-            preferredFileName = _logViewerState.value.selectedFileName
+            preferredFileName = _logViewerState.value.selectedFileName,
+            silent = silent
         )
     }
 
@@ -555,19 +646,24 @@ class SettingsViewModel @Inject constructor(
         )
     }
 
-    private fun loadLogs(filterServerName: String?, preferredFileName: String?) {
+    private fun loadLogs(filterServerName: String?, preferredFileName: String?, silent: Boolean = false) {
         viewModelScope.launch {
-            _logViewerState.update {
-                it.copy(
-                    loading = true,
-                    filterServerName = filterServerName,
-                    error = null
-                )
+            if (!silent) {
+                _logViewerState.update {
+                    it.copy(
+                        loading = true,
+                        filterServerName = filterServerName,
+                        error = null
+                    )
+                }
             }
             val state = withContext(Dispatchers.IO) {
                 runCatching {
                     val files = FileLogger.listLogFiles()
-                    val selected = files.firstOrNull { it.name == preferredFileName } ?: files.lastOrNull()
+                    val todayName = "log-${java.time.LocalDate.now()}.txt"
+                    val selected = files.firstOrNull { it.name == preferredFileName }
+                        ?: files.firstOrNull { it.name == todayName }
+                        ?: files.lastOrNull()
                     if (selected == null) {
                         return@runCatching LogViewerUiState(
                             filterServerName = filterServerName,

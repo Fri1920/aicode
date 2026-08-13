@@ -82,7 +82,6 @@ internal enum class SettingsSection(@param:StringRes val titleRes: Int) {
     Mcp(R.string.settings_mcp),
     Container(R.string.settings_container),
     Log(R.string.settings_log),
-    LogViewer(R.string.settings_log_viewer),
     Permissions(R.string.settings_permissions),
     AppPermissions(R.string.settings_app_permissions),
     RemoteServers(R.string.settings_remote_servers),
@@ -124,6 +123,8 @@ fun SettingsScreen(
     val containerOsMap by viewModel.containerOsMap.collectAsStateWithLifecycle()
     val remoteConnections by viewModel.remoteConnections.collectAsStateWithLifecycle()
     val tokenStats by viewModel.tokenStats.collectAsStateWithLifecycle()
+    val updateCheckEnabled by viewModel.updateCheckEnabled.collectAsStateWithLifecycle()
+    val updateCheckChannel by viewModel.updateCheckChannel.collectAsStateWithLifecycle()
 
     val currentLanguageDisplayName = if (languageTag.isNullOrBlank()) {
         stringResource(R.string.language_follow_system)
@@ -147,7 +148,7 @@ fun SettingsScreen(
     BackHandler(enabled = section != SettingsSection.Menu) {
         when (section) {
             SettingsSection.ProviderEditor -> section = SettingsSection.Providers
-            SettingsSection.LogViewer -> section = logReturnSection
+            SettingsSection.Log -> section = logReturnSection
             else -> section = SettingsSection.Menu
         }
     }
@@ -189,7 +190,7 @@ fun SettingsScreen(
                     IconButton(onClick = {
                         if (section == SettingsSection.Menu) {
                             onNavigateBack()
-                        } else if (section == SettingsSection.LogViewer) {
+                        } else if (section == SettingsSection.Log) {
                             section = logReturnSection
                         } else {
                             section = SettingsSection.Menu
@@ -234,7 +235,7 @@ fun SettingsScreen(
                         SettingsSection.Container -> IconButton(onClick = { showContainerAddSheet = true }) {
                             Icon(FeatherIcons.Plus, contentDescription = stringResource(R.string.container_add_image))
                         }
-                        SettingsSection.LogViewer -> {
+                        SettingsSection.Log -> {
                             IconButton(onClick = { viewModel.refreshLogs() }) {
                                 Icon(FeatherIcons.RefreshCw, contentDescription = stringResource(R.string.settings_refresh_logs))
                             }
@@ -267,7 +268,7 @@ fun SettingsScreen(
                     onOpenThemeSheet = { showThemeSheet = true },
                     onOpenLanguageSheet = { showLanguageSheet = true },
                     onOpen = {
-                        if (it == SettingsSection.LogViewer) {
+                        if (it == SettingsSection.Log) {
                             logReturnSection = SettingsSection.Menu
                             viewModel.refreshLogs(filterServerName = null)
                         }
@@ -329,11 +330,11 @@ fun SettingsScreen(
                 )
                 SettingsSection.Log -> LogSection(
                     current = logLevel,
-                    onSelect = { viewModel.setLogLevel(it) }
-                )
-                SettingsSection.LogViewer -> LogViewerSection(
+                    onSelect = { viewModel.setLogLevel(it) },
                     state = logViewerState,
-                    onSelectFile = { viewModel.selectLogFile(it) }
+                    onSelectFile = { viewModel.selectLogFile(it) },
+                    onClearFilter = { viewModel.refreshLogs(filterServerName = null) },
+                    onRefresh = { viewModel.refreshLogs(silent = true) }
                 )
                 SettingsSection.Permissions -> PermissionsSection(
                     projectName = currentProjectName,
@@ -361,7 +362,13 @@ fun SettingsScreen(
                 )
                 SettingsSection.ProviderEditor -> {} // 已在上方 early return 处理
                 SettingsSection.RemoteServers -> {} // 已在上方 early return 处理
-                SettingsSection.About -> AboutSection()
+                SettingsSection.About -> AboutSection(
+                    updateCheckEnabled = updateCheckEnabled,
+                    updateCheckChannel = updateCheckChannel,
+                    onToggleUpdateCheck = { viewModel.setUpdateCheckEnabled(it) },
+                    onSelectChannel = { viewModel.setUpdateCheckChannel(it) },
+                    onCheckUpdate = { viewModel.checkUpdate(manual = true) }
+                )
             }
         }
     }
@@ -377,7 +384,7 @@ fun SettingsScreen(
                     showMcpDialog = false
                     logReturnSection = SettingsSection.Mcp
                     viewModel.refreshLogs(filterServerName = existing.server.name)
-                    section = SettingsSection.LogViewer
+                    section = SettingsSection.Log
                 }
             },
             onDismiss = { showMcpDialog = false },
@@ -496,12 +503,6 @@ internal fun SettingsMenu(
                 icon = FeatherIcons.FileText,
                 title = stringResource(SettingsSection.Log.titleRes),
                 onClick = { onOpen(SettingsSection.Log) }
-            )
-            SettingsDivider()
-            SettingsRow(
-                icon = FeatherIcons.FileText,
-                title = stringResource(SettingsSection.LogViewer.titleRes),
-                onClick = { onOpen(SettingsSection.LogViewer) }
             )
         }
 
