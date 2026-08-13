@@ -212,14 +212,23 @@ class TerminalSessionTool @Inject constructor(
         }
     }
 
-    override suspend fun execute(args: Map<String, JsonElement>): ToolResult = when (actionOf(args)) {
-        "start" -> start(args)
-        "send" -> send(args)
-        "key" -> sendKey(args)
-        "read" -> read(args)
-        "close" -> close(args)
-        else -> ToolResult.Error("缺少或非法的 action 参数（应为 start/send/key/read/close）")
-    }
+    override suspend fun execute(args: Map<String, JsonElement>): ToolResult = execute(args, null)
+
+    /** 非流式兜底路径也带上发起会话 id，与 [executeStream] 保持一致（后台命令通知能回投到源会话）。 */
+    override suspend fun executeWithContext(
+        args: Map<String, JsonElement>,
+        context: com.aicode.feature.agent.domain.model.AgentContext
+    ): ToolResult = execute(args, context.sessionId)
+
+    private suspend fun execute(args: Map<String, JsonElement>, sourceSessionId: String?): ToolResult =
+        when (actionOf(args)) {
+            "start" -> start(args, sourceSessionId)
+            "send" -> send(args)
+            "key" -> sendKey(args)
+            "read" -> read(args)
+            "close" -> close(args)
+            else -> ToolResult.Error("缺少或非法的 action 参数（应为 start/send/key/read/close）")
+        }
 
     /**
      * 事件流路径下，让 start/send 像 Bash 一样把等待窗口内的新输出实时推给 UI。
@@ -324,13 +333,13 @@ class TerminalSessionTool @Inject constructor(
      *
      * TerminalSessionManager 内部需主线程，故整段切到 Main。
      */
-    private suspend fun start(args: Map<String, JsonElement>): ToolResult = withContext(Dispatchers.Main) {
+    private suspend fun start(args: Map<String, JsonElement>, sourceSessionId: String?): ToolResult = withContext(Dispatchers.Main) {
         val command = args["command"]?.asPlainString()
             ?: return@withContext ToolResult.Error("start 操作缺少必需参数: command")
         val title = args["title"]?.asPlainString()
         val notify = args["notify"]?.asPlainString()?.toBooleanStrictOrNull() ?: false
         try {
-            val tabId = sessionManager.startBackgroundCommand(command, title, notify)
+            val tabId = sessionManager.startBackgroundCommand(command, title, notify, sourceSessionId)
             FileLogger.i(TAG, "后台命令已启动 tab=$tabId: $command")
 
             // 轮询捕获初始输出：命令退出则提前结束，否则最多等满 START_CAPTURE_MS。

@@ -18,7 +18,6 @@ import com.aicode.feature.agent.domain.checkpoint.CheckpointManager
 import com.aicode.feature.agent.data.local.dao.CheckpointDao
 import com.aicode.feature.agent.data.local.dao.ChatSessionDao
 import com.aicode.feature.agent.data.local.entity.ChatSessionEntity
-import com.aicode.feature.agent.data.CodeChangeTracker
 import com.aicode.feature.agent.domain.container.ContainerInitState
 import com.aicode.feature.agent.domain.container.LinuxContainerEngine
 import com.aicode.feature.settings.domain.repository.AIProviderRepository
@@ -28,11 +27,8 @@ import com.aicode.feature.agent.domain.model.AgentContext
 import com.aicode.feature.agent.domain.model.AgentImage
 import com.aicode.feature.agent.domain.model.AgentMessage
 import com.aicode.feature.agent.domain.model.AgentMode
-import com.aicode.feature.agent.domain.model.ChangeType
 import com.aicode.feature.agent.domain.model.ChatSession
-import com.aicode.feature.agent.domain.model.CodeChange
 import com.aicode.feature.agent.domain.model.ReasoningEffort
-import com.aicode.feature.agent.domain.model.WorkflowStatus
 import com.aicode.feature.agent.domain.permission.PermissionChoice
 import com.aicode.feature.agent.domain.mcp.McpManager
 import com.aicode.feature.agent.domain.workflow.AgentWorkflow
@@ -75,7 +71,6 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import java.io.File
 import java.io.OutputStream
 import java.util.UUID
 import javax.inject.Inject
@@ -85,7 +80,6 @@ import javax.inject.Inject
 class AIAgentViewModel @Inject constructor(
     private val agentWorkflow: AgentWorkflow,
     private val toolRegistry: ToolRegistry,
-    private val codeChangeTracker: CodeChangeTracker,
     private val agentMessageDao: AgentMessageDao,
     private val chatSessionDao: ChatSessionDao,
     private val aiProviderRepository: AIProviderRepository,
@@ -215,18 +209,6 @@ class AIAgentViewModel @Inject constructor(
         }
         .stateIn(viewModelScope, SharingStarted.Eagerly, ChatMessagesState(null, emptyList(), loaded = false))
 
-
-    private val _changesMap = MutableStateFlow<Map<String, List<CodeChange>>>(emptyMap())
-    val changes: StateFlow<List<CodeChange>> = _currentSessionId
-        .flatMapLatest { id ->
-            if (id == null) flowOf(emptyList())
-            else _changesMap.map { it[id] ?: emptyList() }
-        }
-        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
-
-    private fun setChanges(sessionId: String, changes: List<CodeChange>) {
-        _changesMap.value = if (changes.isEmpty()) _changesMap.value - sessionId else _changesMap.value + (sessionId to changes)
-    }
 
     private val _runningTools = MutableStateFlow<Map<String, Map<String, RunningToolOutput>>>(emptyMap())
     val runningTool: StateFlow<List<RunningToolOutput>> = _currentSessionId
@@ -652,7 +634,7 @@ class AIAgentViewModel @Inject constructor(
             agentWorkflow.executeEvents(
                 userRequest = modelRequest,
                 context = agentContext,
-                tools = toolRegistry.getAvailableTools(mode)
+                tools = toolRegistry.getAvailableTools()
             ).collect { event ->
                 when (event) {
                     is AgentEvent.AssistantDelta -> {
@@ -906,7 +888,6 @@ class AIAgentViewModel @Inject constructor(
         val curId = _currentSessionId.value
         if (curId != null && sessionUseCase.isSessionEmpty(curId)) {
             setAgentState(curId, AgentUIState.Idle)
-            setChanges(curId, emptyList())
             return@launch
         }
         // 新会话时异步重连未连接的 MCP server，让 manageMcp 新增的配置真正生效；
@@ -1063,7 +1044,6 @@ class AIAgentViewModel @Inject constructor(
         _streamingReasonings.value = _streamingReasonings.value - id
         _runningTools.value = _runningTools.value - id
         _retryStates.value = _retryStates.value - id
-        _changesMap.value = _changesMap.value - id
         _queuedRequests.value = _queuedRequests.value - id
 
         if (_currentSessionId.value == id) {
@@ -1173,80 +1153,6 @@ class AIAgentViewModel @Inject constructor(
     }
 
     // endregion
-
-    fun applyChanges(changes: List<CodeChange>) = viewModelScope.launch {
-        try {
-            withContext(Dispatchers.IO) {
-                for (change in changes) {
-                    when (change.type) {
-                        ChangeType.CREATE -> {
-                            val file = File(change.filePath)
-                            file.parentFile?.mkdirs()
-                            file.writeText(change.newCode)
-                        }
-
-                        ChangeType.REPLACE -> {
-                            val file = File(change.filePath)
-                            val lines = file.readLines().toMutableList()
-                            val start = (change.startLine - 1).coerceIn(0, lines.size)
-                            val end = (change.endLine - 1).coerceIn(0, lines.size - 1)
-
-                            if (start <= end && start < lines.size) {
-                                repeat(end - start + 1) {
-                                    if (start < lines.size) lines.removeAt(start)
-                                }
-                                change.newCode.lines().reversed().forEach { line ->
-                                    lines.add(start, line)
-                                }
-                                file.writeText(lines.joinToString("\n"))
-                            }
-                        }
-
-                        ChangeType.INSERT -> {
-                            val file = File(change.filePath)
-                            val lines = file.readLines().toMutableList()
-                            val insertLine = (change.startLine - 1).coerceIn(0, lines.size)
-                            change.newCode.lines().reversed().forEach { line ->
-                                lines.add(insertLine, line)
-                            }
-                            file.writeText(lines.joinToString("\n"))
-                        }
-
-                        ChangeType.DELETE -> {
-                            val file = File(change.filePath)
-                            val lines = file.readLines().toMutableList()
-                            val start = (change.startLine - 1).coerceIn(0, lines.size)
-                            val end = (change.endLine - 1).coerceIn(0, lines.size - 1)
-
-                            for (i in end downTo start) {
-                                if (i < lines.size) lines.removeAt(i)
-                            }
-                            file.writeText(lines.joinToString("\n"))
-                        }
-
-                        else -> {}
-                    }
-                }
-            }
-            val sessionId = _currentSessionId.value
-            if (sessionId != null) {
-                setAgentState(sessionId, AgentUIState.Applied)
-                setChanges(sessionId, emptyList())
-            }
-        } catch (e: Exception) {
-            FileLogger.e(TAG, "applyChanges 失败", e)
-            val sessionId = _currentSessionId.value
-            if (sessionId != null) {
-                setAgentState(sessionId, AgentUIState.Error(context.getString(R.string.agent_apply_changes_failed, e.message)))
-            }
-        }
-    }
-
-    fun rejectChanges() {
-        val sessionId = _currentSessionId.value ?: return
-        setAgentState(sessionId, AgentUIState.Idle)
-        setChanges(sessionId, emptyList())
-    }
 
     fun updateMessageContent(messageId: String, newContent: String) = viewModelScope.launch {
         try {

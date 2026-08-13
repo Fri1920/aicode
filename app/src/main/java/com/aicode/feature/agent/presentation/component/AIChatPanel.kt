@@ -94,7 +94,6 @@ fun AIChatPanel(
     val agentState by viewModel.agentState.collectAsStateWithLifecycle()
     val messagesState by viewModel.messagesState.collectAsStateWithLifecycle()
     val messages = messagesState.messages
-    val changes by viewModel.changes.collectAsStateWithLifecycle()
 
     val currentSessionId by viewModel.currentSessionId.collectAsStateWithLifecycle()
     val sessions by viewModel.sessions.collectAsStateWithLifecycle()
@@ -482,18 +481,6 @@ fun AIChatPanel(
                         }
                     }
                 }
-            }
-
-            AnimatedVisibility(
-                visible = changes.isNotEmpty(),
-                enter = fadeIn(),
-                exit = fadeOut()
-            ) {
-                ChangePreviewPanel(
-                    changes = changes,
-                    onApply = { viewModel.applyChanges(changes) },
-                    onReject = { viewModel.rejectChanges() }
-                )
             }
 
             StatusBanner(state = agentState)

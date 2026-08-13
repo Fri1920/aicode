@@ -1,7 +1,9 @@
 package com.aicode.feature.terminal.presentation
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.aicode.R
 import com.aicode.core.util.FileLogger
 import com.aicode.feature.agent.domain.container.ContainerInitState
 import com.aicode.feature.agent.domain.container.LinuxContainerEngine
@@ -11,6 +13,7 @@ import com.aicode.feature.terminal.domain.RemoteTerminalSessionManager
 import com.aicode.feature.terminal.domain.TerminalSessionManager
 import com.aicode.feature.terminal.presentation.component.TerminalKeyModifiers
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -26,6 +29,7 @@ import javax.inject.Inject
  */
 @HiltViewModel
 class TerminalViewModel @Inject constructor(
+    @param:ApplicationContext private val context: Context,
     private val localManager: TerminalSessionManager,
     private val remoteManager: RemoteTerminalSessionManager,
     private val modeHolder: ExecutionModeHolder,
@@ -69,7 +73,7 @@ class TerminalViewModel @Inject constructor(
                 _prepareState.value = PrepareState.Ready
             } catch (e: Exception) {
                 FileLogger.e(TAG, "终端准备失败", e)
-                _prepareState.value = PrepareState.Error(e.message ?: "未知错误")
+                _prepareState.value = PrepareState.Error(e.message ?: context.getString(R.string.terminal_prepare_error_unknown))
             }
         }
     }

@@ -7,12 +7,14 @@
     <string name="settings_providers">AI Providers</string>
     <string name="settings_provider_editor">Provider</string>
     <string name="settings_default_models">Default Models</string>
-    <string name="settings_default_models_subtitle">Configure default preferences like vision model</string>
     <string name="settings_vision_model">Vision Model</string>
     <string name="settings_compaction_model">Compaction Model</string>
     <string name="settings_title_model">Title Model</string>
     <string name="settings_mcp">MCP Servers</string>
     <string name="settings_container">Container Image</string>
+    <string name="settings_log_no_files">No log files yet</string>
+    <string name="settings_log_read_failed">Failed to read log: %1$s</string>
+    <string name="settings_models_fetch_failed">Fetch failed</string>
     <string name="settings_log">Log Level</string>
     <string name="settings_log_viewer">Log Viewer</string>
     <string name="settings_permissions">Tool Permissions</string>
@@ -70,23 +72,9 @@
     <string name="settings_add_provider">Add provider</string>
     <string name="settings_reconnect">Reconnect</string>
     <string name="settings_add_mcp_server">Add MCP server</string>
-    <string name="settings_refresh_logs">Refresh logs</string>
-    <string name="settings_providers_empty">No providers added</string>
-    <string name="settings_providers_count">%1$d</string>
-    <string name="settings_providers_active"> · Active: %1$s</string>
-    <string name="settings_vision_follow_chat">Follow current chat model</string>
+    <string name="settings_refresh_logs">Refresh logs</string>    <string name="settings_vision_follow_chat">Follow current chat model</string>
     <string name="settings_compaction_follow_chat">Follow current chat model</string>
-    <string name="settings_title_follow_chat">Follow current chat model</string>
-    <string name="settings_mcp_empty">No MCP servers configured</string>
-    <string name="settings_mcp_count_connected">%1$d · Connected %2$d</string>
-    <string name="settings_log_current">Current: %1$s</string>
-    <string name="settings_log_viewer_subtitle">View recent logs, supports MCP name filter</string>
-    <string name="settings_permissions_empty">No permission rules saved</string>
-    <string name="settings_permissions_count">%1$d rules saved</string>
-    <string name="settings_remote_subtitle">Manage SFTP / FTP workspace sync</string>
-    <string name="settings_theme_title">Appearance</string>
-    <string name="settings_theme_subtitle">Follow system or fixed light/dark mode</string>
-    <string name="theme_auto">Auto</string>
+    <string name="settings_title_follow_chat">Follow current chat model</string>    <string name="settings_theme_title">Appearance</string>    <string name="theme_auto">Auto</string>
     <string name="theme_dark">Dark</string>
     <string name="theme_light">Light</string>
     <string name="settings_keepalive_title">Background keepalive</string>
@@ -95,6 +83,8 @@
     <string name="settings_agent_sound_subtitle">Pop a notification when agent finishes in background</string>
     <string name="agent_complete_notification_title">Task complete</string>
     <string name="agent_complete_notification_body">Tap to view</string>
+    <string name="notification_channel_terminal_service">Terminal Services</string>
+    <string name="notification_channel_terminal_service_desc">Notifications for background terminal tasks</string>
     <string name="notification_channel_agent_complete">Agent completion notifications</string>
     <string name="notification_channel_agent_complete_desc">Notifications shown when the agent finishes in background</string>
     <string name="settings_app_permissions">App Permissions</string>
@@ -111,9 +101,6 @@
     <string name="settings_permission_notification_title">Notification permission required</string>
     <string name="settings_permission_notification_denied_desc">Background keepalive and agent completion notifications need the notification permission, but the system prompt cannot be shown. Please enable it manually in system settings</string>
     <string name="settings_permission_storage_denied_desc">Storage permission was denied and can no longer be requested. Please enable it manually in system settings</string>
-    <string name="settings_backup_subtitle">Encrypted export/import config, chat history and credentials</string>
-    <string name="settings_about_subtitle">Version check · GitHub · License</string>
-
     <!-- Settings category titles -->
     <string name="settings_category_ai">AI Configuration</string>
     <string name="settings_category_environment">Environment</string>
@@ -139,9 +126,8 @@
     <string name="common_image_preview">Image Preview</string>
     <string name="common_expand">Expand</string>
     <string name="common_workspace">Workspace</string>
-    <string name="common_tool">Tool</string>
-    <string name="common_current">Current</string>
-    <string name="common_collapse">Collapse</string>
+    <string name="common_tool">Tool</string>    <string name="common_collapse">Collapse</string>
+    <string name="common_reset">Reset</string>
     <string name="common_collapse_action">Collapse</string>
     <string name="chat_new_session">New Session</string>
     <string name="common_new_tab">New Tab</string>
@@ -211,13 +197,9 @@
 
     <!-- Agent Status -->
     <string name="agent_stopped_by_user">Stopped by user</string>
-    <string name="agent_tool_executing">%1$s running…</string>
-    <string name="agent_context_compacted">Context compacted</string>
-    <string name="agent_context_no_compaction">No compaction needed (too few messages)</string>
+    <string name="agent_tool_executing">%1$s running…</string>    <string name="agent_context_no_compaction">No compaction needed (too few messages)</string>
     <string name="agent_compaction_failed">Compaction failed: %1$s</string>
     <string name="agent_model_not_selected">Not selected</string>
-    <string name="agent_apply_changes_failed">Failed to apply changes: %1$s</string>
-
     <!-- About -->
     <string name="about_version">Version</string>
     <string name="about_github_repo">GitHub Repository</string>
@@ -258,9 +240,7 @@
     <string name="backup_password_optional_hint">Leave empty if backup is unencrypted</string>
     <string name="backup_import_btn">Import</string>
     <string name="backup_operation_failed">Operation failed</string>
-    <string name="backup_import_done">Import complete</string>
-    <string name="backup_section_title">Backup &amp; Restore</string>
-    <string name="backup_actions">Actions</string>
+    <string name="backup_import_done">Import complete</string>    <string name="backup_actions">Actions</string>
     <string name="backup_select_data">Select export data</string>
     <string name="backup_data_git_credentials">Git Credentials</string>
     <string name="backup_data_remote">Connections &amp; Sync</string>
@@ -310,20 +290,14 @@
     <string name="chat_queue_remove">Remove from queue</string>
     <string name="chat_upload_file">Upload File</string>
     <string name="chat_upload_image">Upload Image</string>
-    <string name="chat_remove_attachment">Remove attachment</string>
-    <string name="chat_manage">Manage</string>
-    <string name="chat_no_models_hint">No models available, add one in "Manage"</string>
+    <string name="chat_remove_attachment">Remove attachment</string>    <string name="chat_no_models_hint">No models available, add one in "Manage"</string>
     <string name="chat_stop">Stop</string>
     <string name="chat_send">Send</string>
     <string name="chat_perm_single_use_desc">Contains command substitution/pipes/redirects, cannot be remembered, single-use only</string>
     <string name="chat_perm_always_tool_desc">"Always allow" will remember all calls of this tool for this project</string>
     <string name="chat_perm_always_prefix">"Always allow" will remember for this project:</string>
     <string name="chat_perm_deny">Deny</string>
-    <string name="chat_perm_always_allow">Always Allow</string>
-    <string name="chat_code_changes_applied">Code changes applied</string>
-    <string name="chat_preview_changes">Preview code changes · %1$s</string>
-    <string name="chat_apply">Apply</string>
-    <string name="chat_plan_completed">Plan completed</string>
+    <string name="chat_perm_always_allow">Always Allow</string>    <string name="chat_plan_completed">Plan completed</string>
     <string name="chat_continue_feedback">Continue feedback</string>
     <string name="chat_approve_and_implement">Approve and implement</string>
 
@@ -408,8 +382,6 @@
     <string name="credential_alias">Alias (optional)</string>
     <string name="credential_set_default">Set as default credential for this host</string>
     <string name="credential_default_hint">For multiple accounts on the same host, the default one is injected first</string>
-    <string name="credential_fields_required">Host, username, and token are all required</string>
-
     <!-- Credential Toast -->
     <string name="credential_toast_saved">Credential saved</string>
     <string name="credential_toast_save_failed">Save failed: %1$s</string>
@@ -472,9 +444,7 @@
     <string name="git_delete_local_branch_confirm">Delete local branch %1$s?</string>
     <string name="git_rename_branch">Rename Branch</string>
     <string name="git_rename_to">Rename %1$s to:</string>
-    <string name="git_new_branch_name">New branch name</string>
-    <string name="git_new_tag">New Tag</string>
-    <string name="git_create_tag_desc">Create lightweight tag from current HEAD (%1$s)</string>
+    <string name="git_new_branch_name">New branch name</string>    <string name="git_create_tag_desc">Create lightweight tag from current HEAD (%1$s)</string>
     <string name="git_tag_name">Tag name</string>
     <string name="git_delete_tag">Delete Tag</string>
     <string name="git_delete_tag_confirm">Delete local tag %1$s?</string>
@@ -527,9 +497,6 @@
     <string name="git_identity_title">Commit Identity</string>
     <string name="git_identity_desc">Used as author for every commit. Applies globally in the container, shared across all workspaces.</string>
     <string name="git_remote_url">remote.origin.url</string>
-    <string name="git_actual_identity_none">Actual git identity: (not configured)</string>
-    <string name="git_actual_identity">Actual git identity: %1$s</string>
-
     <!-- Main Activity -->
 
     <!-- MCP Editor -->
@@ -605,9 +572,7 @@
     <!-- Provider Editor -->
     <string name="provider_section_basic">General</string>
     <string name="provider_section_type">Provider Type</string>
-    <string name="provider_section_options">Options</string>
-    <string name="provider_section_models">Models</string>
-    <string name="provider_show_api_key">Show API Key</string>
+    <string name="provider_section_options">Options</string>    <string name="provider_show_api_key">Show API Key</string>
     <string name="provider_hide_api_key">Hide API Key</string>
     <string name="provider_model_context_input">Input Window (tokens)</string>
     <string name="provider_model_context_output">Output Window (tokens)</string>
@@ -622,9 +587,7 @@
     <string name="provider_response_api">Response API (new)</string>
     <string name="provider_models_count">Models (%1$s)</string>
     <string name="provider_fetch_models">Fetch Models</string>
-    <string name="provider_model_name">Model Name</string>
-    <string name="provider_model_name_hint">e.g. gpt-4o</string>
-    <string name="provider_model_already_added">This model has already been added</string>
+    <string name="provider_model_name">Model Name</string>    <string name="provider_model_already_added">This model has already been added</string>
     <string name="provider_edit_model">Edit Model</string>
     <string name="provider_model_input_mode">Input Mode</string>
     <string name="provider_model_output_mode">Output Mode</string>
@@ -641,9 +604,7 @@
 
     <!-- Provider Logo -->
     <string name="provider_brand_doubao">Doubao</string>
-    <string name="provider_brand_zhipu">Zhipu</string>
-    <string name="provider_brand_tongyi">Tongyi</string>
-    <string name="provider_brand_tongyi_qianwen">Tongyi Qianwen</string>
+    <string name="provider_brand_zhipu">Zhipu</string>    <string name="provider_brand_tongyi_qianwen">Tongyi Qianwen</string>
     <string name="provider_model_icon">Model icon</string>
 
     <!-- Providers & Log -->
@@ -653,8 +614,6 @@
     <string name="log_file_location">Log files are located at Android/data/&lt;package&gt;/files/logs/.</string>
     <string name="provider_no_models">No Models</string>
     <string name="provider_no_models_hint">Tap the button in the top-right to add a model</string>
-    <string name="provider_model_summary">Model: %1$s · %2$s total</string>
-
     <!-- Remote Dialogs -->
     <string name="remote_edit_connection">Edit Connection Channel</string>
     <string name="remote_add_connection">Add Connection Channel</string>
@@ -742,12 +701,7 @@
     <string name="sync_path_mapping">%1$s → %2$s</string>
     <string name="status_connected">Connected</string>
     <string name="status_disconnected">Disconnected</string>
-    <string name="status_connection_failed">Connection Failed</string>
-    <string name="sync_auto_connect">Auto-connect</string>
-    <string name="sync_mount_subdir">Mount subdir: %1$s</string>
-    <string name="sync_remote_path">Remote path: %1$s</string>
-    <string name="sync_local_path">Local path: %1$s</string>
-    <string name="sync_disconnect">Disconnect</string>
+    <string name="status_connection_failed">Connection Failed</string>    <string name="sync_disconnect">Disconnect</string>
     <string name="sync_all">Sync All</string>
     <string name="sync_upload_all">Upload All</string>
     <string name="sync_download_all">Download All</string>
@@ -755,6 +709,7 @@
 
     <!-- Terminal -->
     <string name="terminal_title">Terminal</string>
+    <string name="terminal_prepare_error_unknown">Unknown error</string>
     <string name="terminal_reconnect_tab">Reconnect current tab</string>
     <string name="terminal_start_failed">Cannot start terminal:\n%1$s</string>
     <string name="terminal_retry">Retry</string>

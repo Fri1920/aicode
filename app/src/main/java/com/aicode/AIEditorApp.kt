@@ -314,10 +314,10 @@ class AIEditorApp : Application(), Configuration.Provider {
             val notificationManager = getSystemService(NotificationManager::class.java)
             val channel = NotificationChannel(
                 "terminal_service",
-                "Terminal Services",
+                getString(R.string.notification_channel_terminal_service),
                 NotificationManager.IMPORTANCE_LOW
             ).apply {
-                description = "Notifications for background terminal tasks"
+                description = getString(R.string.notification_channel_terminal_service_desc)
                 setShowBadge(false)
             }
             notificationManager.createNotificationChannel(channel)

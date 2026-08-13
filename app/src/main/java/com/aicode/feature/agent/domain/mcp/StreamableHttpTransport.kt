@@ -107,19 +107,20 @@ class StreamableHttpTransport(
             .build()
     }
 
-    /** 从 SSE 流里取第一条 `data:` 负载（可能跨多行），拼成完整 JSON 文本。 */
+    /** 从 SSE 流里取第一条 `data:` 负载（可能跨多行），拼成完整 JSON 文本。
+     * 多行 data 属于同一事件，按 SSE 规范以换行连接（JSON 允许空白，拼接后仍可解析）。 */
     private fun extractSseJson(reader: java.io.BufferedReader?): String? {
         reader ?: return null
         val data = StringBuilder()
         var line = reader.readLine()
         while (line != null) {
             when {
-                line.startsWith("data:") -> data.append(line.removePrefix("data:").trim())
-                line.isBlank() && data.isNotEmpty() -> return data.toString()
+                line.startsWith("data:") -> data.append(line.removePrefix("data:").trim()).append('\n')
+                line.isBlank() && data.isNotEmpty() -> return data.toString().trimEnd('\n')
             }
             line = reader.readLine()
         }
-        return data.takeIf { it.isNotEmpty() }?.toString()
+        return data.takeIf { it.isNotEmpty() }?.toString()?.trimEnd('\n')
     }
 
     private fun parseAndValidate(rawJson: String, expectedId: Long, method: String): JsonRpcResponse {

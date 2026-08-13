@@ -1,6 +1,5 @@
 package com.aicode.feature.agent.domain.tool
 
-import com.aicode.feature.agent.domain.model.AgentMode
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive
 import org.junit.Assert.assertEquals
@@ -64,33 +63,5 @@ class ToolRegistryTest {
         assertEquals(2, available.size)
         assertTrue(available.contains(tool1))
         assertTrue(available.contains(tool2))
-    }
-
-    @Test
-    fun getAvailableTools_withMode_returnsAllTools() {
-        val tool = FakeAgentTool(name = "write_file")
-        registry.register("write_file", tool)
-
-        // PLAN 模式和 BUILD 模式下 getAvailableTools(mode) 都应返回注册的工具定义
-        val planTools = registry.getAvailableTools(AgentMode.PLAN)
-        val buildTools = registry.getAvailableTools(AgentMode.BUILD)
-
-        assertEquals(1, planTools.size)
-        assertEquals(1, buildTools.size)
-        assertEquals(tool, planTools.first())
-    }
-
-    @Test
-    fun getAllToolDefinitions_mapsToolsToDefinitions() {
-        val tool = FakeAgentTool(
-            name = "search_tool",
-            description = "Searches codebase"
-        )
-        registry.register("search_tool", tool)
-
-        val definitions = registry.getAllToolDefinitions()
-        assertEquals(1, definitions.size)
-        assertEquals("search_tool", definitions.first().name)
-        assertEquals("Searches codebase", definitions.first().description)
     }
 }

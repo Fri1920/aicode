@@ -6,7 +6,6 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -37,8 +36,6 @@ object Brand {
     val IconGray = Color(0xFF424242)
     val PageBg = Color(0xFFFAFAFA)
 }
-
-val LocalSpacing = staticCompositionLocalOf { Spacing }
 
 private val DarkColorScheme = darkColorScheme(
     primary = Color(0xFF60A5FA),

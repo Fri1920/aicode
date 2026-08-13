@@ -73,10 +73,11 @@ class McpClient(
     }
 
     /**
-     * 执行一次工具调用，返回扁平化为文本的结果（喂回模型）。
+     * 执行一次工具调用，返回扁平化为文本的结果（喂回模型）与是否报错。
      * MCP 的 `tools/call` 结果是 content 块数组；这里把 text 块拼接，其它类型给出占位描述。
+     * [McpCallResult.isError] 直接取自结果里的 `isError` 字段，避免把文本前缀当判据。
      */
-    suspend fun callTool(toolName: String, arguments: JsonObject): String {
+    suspend fun callTool(toolName: String, arguments: JsonObject): McpCallResult {
         val params = buildJsonObject {
             put("name", toolName)
             put("arguments", arguments)
@@ -86,7 +87,7 @@ class McpClient(
 
         val isError = (result["isError"] as? JsonPrimitive)?.contentOrNull == "true"
         val text = flattenContent(result["content"])
-        return if (isError) "Error: $text" else text
+        return McpCallResult(text, isError)
     }
 
     /** 把 content 数组里的块转成纯文本：text 块取 text；其它块给类型占位。 */
@@ -108,3 +109,6 @@ class McpClient(
 
     fun close() = transport.close()
 }
+
+/** 一次 `tools/call` 的结果：扁平化文本 + 是否报错（源自 MCP 结果的 `isError` 字段）。 */
+data class McpCallResult(val text: String, val isError: Boolean)

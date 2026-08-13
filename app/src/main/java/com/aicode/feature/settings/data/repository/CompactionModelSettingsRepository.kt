@@ -1,13 +1,8 @@
 package com.aicode.feature.settings.data.repository
 
 import android.content.Context
-import androidx.datastore.preferences.core.edit
-import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import dagger.hilt.android.qualifiers.ApplicationContext
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -22,32 +17,20 @@ private val Context.compactionModelDataStore by preferencesDataStore(name = "com
  */
 @Singleton
 class CompactionModelSettingsRepository @Inject constructor(
-    @param:ApplicationContext private val context: Context
+    @ApplicationContext context: Context
+) : ModelSelectionSettingsRepository(
+    context.compactionModelDataStore, "compaction_provider_id", "compaction_model"
 ) {
-    private companion object {
-        val PROVIDER_ID_KEY = stringPreferencesKey("compaction_provider_id")
-        val MODEL_KEY = stringPreferencesKey("compaction_model")
-    }
 
-    val providerIdFlow: Flow<String> = context.compactionModelDataStore.data.map { it[PROVIDER_ID_KEY] ?: "" }
+    /** 写入压缩专用模型（设空字符串即等同 [clear]）。 */
+    suspend fun setCompactionModel(providerId: String, model: String) = setSelection(providerId, model)
 
-    val modelFlow: Flow<String> = context.compactionModelDataStore.data.map { it[MODEL_KEY] ?: "" }
+    /** 清空配置——回退到「跟随当前聊天模型」。 */
+    suspend fun clear() = clearSelection()
 
-    suspend fun setCompactionModel(providerId: String, model: String) {
-        context.compactionModelDataStore.edit {
-            it[PROVIDER_ID_KEY] = providerId
-            it[MODEL_KEY] = model
-        }
-    }
+    /** 读取一次当前压缩专用 providerId（冷读用）。 */
+    suspend fun getCompactionProviderId(): String = readProviderId()
 
-    suspend fun clear() {
-        context.compactionModelDataStore.edit {
-            it.remove(PROVIDER_ID_KEY)
-            it.remove(MODEL_KEY)
-        }
-    }
-
-    suspend fun getCompactionProviderId(): String = providerIdFlow.first()
-
-    suspend fun getCompactionModel(): String = modelFlow.first()
+    /** 读取一次当前压缩专用 model（冷读用）。 */
+    suspend fun getCompactionModel(): String = readModel()
 }

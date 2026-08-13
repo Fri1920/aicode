@@ -1,13 +1,8 @@
 package com.aicode.feature.settings.data.repository
 
 import android.content.Context
-import androidx.datastore.preferences.core.edit
-import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import dagger.hilt.android.qualifiers.ApplicationContext
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -21,32 +16,20 @@ private val Context.titleModelDataStore by preferencesDataStore(name = "title_mo
  */
 @Singleton
 class TitleModelSettingsRepository @Inject constructor(
-    @param:ApplicationContext private val context: Context
+    @ApplicationContext context: Context
+) : ModelSelectionSettingsRepository(
+    context.titleModelDataStore, "title_provider_id", "title_model"
 ) {
-    private companion object {
-        val PROVIDER_ID_KEY = stringPreferencesKey("title_provider_id")
-        val MODEL_KEY = stringPreferencesKey("title_model")
-    }
 
-    val providerIdFlow: Flow<String> = context.titleModelDataStore.data.map { it[PROVIDER_ID_KEY] ?: "" }
+    /** 写入标题总结专用模型（设空字符串即等同 [clear]）。 */
+    suspend fun setTitleModel(providerId: String, model: String) = setSelection(providerId, model)
 
-    val modelFlow: Flow<String> = context.titleModelDataStore.data.map { it[MODEL_KEY] ?: "" }
+    /** 清空配置——回退到「跟随当前聊天模型」。 */
+    suspend fun clear() = clearSelection()
 
-    suspend fun setTitleModel(providerId: String, model: String) {
-        context.titleModelDataStore.edit {
-            it[PROVIDER_ID_KEY] = providerId
-            it[MODEL_KEY] = model
-        }
-    }
+    /** 读取一次当前标题总结专用 providerId（冷读用）。 */
+    suspend fun getTitleProviderId(): String = readProviderId()
 
-    suspend fun clear() {
-        context.titleModelDataStore.edit {
-            it.remove(PROVIDER_ID_KEY)
-            it.remove(MODEL_KEY)
-        }
-    }
-
-    suspend fun getTitleProviderId(): String = providerIdFlow.first()
-
-    suspend fun getTitleModel(): String = modelFlow.first()
+    /** 读取一次当前标题总结专用 model（冷读用）。 */
+    suspend fun getTitleModel(): String = readModel()
 }

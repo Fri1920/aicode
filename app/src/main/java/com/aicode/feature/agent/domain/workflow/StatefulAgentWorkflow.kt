@@ -1007,14 +1007,4 @@ class StatefulAgentWorkflow @Inject constructor(
             }
         }
     }
-
-    private fun extractFinalContent(state: AgentSessionState): String {
-        for (i in state.messages.indices.reversed()) {
-            val msg = state.messages[i]
-            if (msg is AgentMessage.AssistantMessage && msg.content.isNotBlank()) {
-                return msg.content.trim()
-            }
-        }
-        return ""
-    }
 }

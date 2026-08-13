@@ -1,5 +1,6 @@
 package com.aicode.feature.settings.presentation
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.aicode.core.util.FileLogger
@@ -25,6 +26,7 @@ import com.aicode.feature.agent.domain.permission.PermissionRulesRepository
 import com.aicode.feature.settings.data.remote.ModelApiService
 import com.aicode.feature.settings.data.remote.ModelMetadataService
 import com.aicode.feature.settings.data.remote.ModelTestResult
+import dagger.hilt.android.qualifiers.ApplicationContext
 import com.aicode.feature.settings.data.repository.AppThemeMode
 import com.aicode.feature.settings.data.repository.ContainerSettingsRepository
 import com.aicode.feature.settings.data.repository.ExecutionMode
@@ -143,6 +145,7 @@ private fun padTrend(
 @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
+    @param:ApplicationContext private val context: Context,
     private val repository: AIProviderRepository,
     private val modelApiService: ModelApiService,
     private val modelMetadataService: ModelMetadataService,
@@ -568,7 +571,7 @@ class SettingsViewModel @Inject constructor(
                     if (selected == null) {
                         return@runCatching LogViewerUiState(
                             filterServerName = filterServerName,
-                            error = "还没有日志文件"
+                            error = context.getString(R.string.settings_log_no_files)
                         )
                     }
 
@@ -594,7 +597,7 @@ class SettingsViewModel @Inject constructor(
                 }.getOrElse { e ->
                     LogViewerUiState(
                         filterServerName = filterServerName,
-                        error = "读取日志失败: ${e.message}"
+                        error = context.getString(R.string.settings_log_read_failed, e.message ?: "")
                     )
                 }
             }
@@ -841,7 +844,7 @@ class SettingsViewModel @Inject constructor(
                     _fetchState.value = FetchState.Success(it)
                     resolveModelMetadata(provider.id, provider.type, it)
                 }
-                .onFailure { _fetchState.value = FetchState.Error(it.message ?: "拉取失败") }
+                .onFailure { _fetchState.value = FetchState.Error(it.message ?: context.getString(R.string.settings_models_fetch_failed)) }
         }
     }
 

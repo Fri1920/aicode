@@ -142,10 +142,10 @@ class AnthropicAdapter @Inject constructor(
         // 累积原始 SSE，整轮结束（或失败）后整体落盘，避免高频写盘。
         val rawSse = StringBuilder()
 
-        // 首字节前失败可安全重试；一旦开始吐字（onProduced 已调用）再失败则上抛，避免重复文本。
+        // 流式请求整体可重试；重试前上层会收到 Retrying 事件并清空已展示文本。
         try {
             streamWithStaircaseRetry(
-                attemptOnce = { onProduced ->
+                attemptOnce = {
             val textBuilder = StringBuilder()
             // content block index -> 累积中的 tool_use（仅 tool_use 块建条目，保序）。
             val toolBlocks = LinkedHashMap<Int, ToolBlockAcc>()
@@ -214,7 +214,6 @@ class AnthropicAdapter @Inject constructor(
                                             if (t.isNotEmpty()) {
                                                 textBuilder.append(t)
                                                 if (firstByteReceived.compareAndSet(false, true)) watchdog.cancel()
-                                                onProduced()
                                                 emit(AIStreamChunk.TextDelta(t))
                                             }
                                         }
@@ -268,7 +267,6 @@ class AnthropicAdapter @Inject constructor(
             val toolCalls = toolBlocks.values.map { acc ->
                 ToolCall(id = acc.id, name = acc.name, arguments = parseArgs(acc.args.toString()))
             }
-            onProduced()
             emit(AIStreamChunk.Final(AIResponse(content = textBuilder.toString(), toolCalls = toolCalls, stopReason = stopReason, signature = signature, inputTokens = streamInputTokens, outputTokens = streamOutputTokens, cachedInputTokens = streamCachedInputTokens)))
                 },
                 onRetry = { attempt, max -> emit(AIStreamChunk.Retrying(attempt, max)) }

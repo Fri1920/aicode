@@ -188,7 +188,7 @@ class OpenAIAdapter @Inject constructor(
             AILogger.logRequest(logSessionId, "OpenAI", model, "POST", url, request)
             val rawSse = StringBuilder()
             try {
-                streamWithStaircaseRetry(attemptOnce = { onProduced ->
+                streamWithStaircaseRetry(attemptOnce = {
                     val textBuilder = StringBuilder()
                     val toolAccs = LinkedHashMap<Int, OpenAIToolAcc>()
                     var finishReason: String? = null
@@ -233,7 +233,6 @@ class OpenAIAdapter @Inject constructor(
                                         if (delta.isNotEmpty()) {
                                             textBuilder.append(delta)
                                             if (firstByteReceived.compareAndSet(false, true)) watchdog.cancel()
-                                            onProduced()
                                             emit(AIStreamChunk.TextDelta(delta))
                                         }
                                     } else if (eventType == "response.completed") {
@@ -278,7 +277,6 @@ class OpenAIAdapter @Inject constructor(
                     val toolCalls = toolAccs.values
                         .filter { it.id.isNotEmpty() || it.name.isNotEmpty() }
                         .map { acc -> ToolCall(id = acc.id, name = acc.name, arguments = parseArgs(acc.args.toString())) }
-                    onProduced()
                     emit(AIStreamChunk.Final(AIResponse(content = textBuilder.toString(), toolCalls = toolCalls, stopReason = finishReason, inputTokens = streamInputTokens, outputTokens = streamOutputTokens, cachedInputTokens = streamCachedInputTokens)))
                 },
                 onRetry = { attempt, max -> emit(AIStreamChunk.Retrying(attempt, max)) }
@@ -307,10 +305,10 @@ class OpenAIAdapter @Inject constructor(
         // 累积原始 SSE，整轮结束（或失败）后整体落盘，避免高频写盘。
         val rawSse = StringBuilder()
 
-        // 首字节前失败可安全重试；一旦开始吐字（onProduced 已调用）再失败则上抛，避免重复文本。
+        // 流式请求整体可重试；重试前上层会收到 Retrying 事件并清空已展示文本。
         try {
             streamWithStaircaseRetry(
-                attemptOnce = { onProduced ->
+                attemptOnce = {
             val textBuilder = StringBuilder()
             // tool_call index -> 累积中的工具调用（保序）。
             val toolAccs = LinkedHashMap<Int, OpenAIToolAcc>()
@@ -376,11 +374,10 @@ class OpenAIAdapter @Inject constructor(
                                 if (c.isNotEmpty()) {
                                     textBuilder.append(c)
                                     if (firstByteReceived.compareAndSet(false, true)) watchdog.cancel()
-                                    onProduced()
                                     emit(AIStreamChunk.TextDelta(c))
                                 }
                             }
-                            // 思考过程增量（reasoning_content）：仅 UI 实时展示，不计入正文、不触发 onProduced
+                            // 思考过程增量（reasoning_content）：仅 UI 实时展示，不计入正文
                             // （思考不落库，重试时重新流出即可，无重复文本风险），但收到即说明连接已活，取消首字节超时。
                             delta.get("reasoning_content")?.takeIf { !it.isJsonNull }?.asString?.let { r ->
                                 if (r.isNotEmpty()) {
@@ -419,7 +416,6 @@ class OpenAIAdapter @Inject constructor(
             val toolCalls = toolAccs.values
                 .filter { it.id.isNotEmpty() || it.name.isNotEmpty() }
                 .map { acc -> ToolCall(id = acc.id, name = acc.name, arguments = parseArgs(acc.args.toString())) }
-            onProduced()
             emit(AIStreamChunk.Final(AIResponse(content = textBuilder.toString(), toolCalls = toolCalls, stopReason = finishReason, inputTokens = streamInputTokens, outputTokens = streamOutputTokens, cachedInputTokens = streamCachedInputTokens)))
             },
             onRetry = { attempt, max -> emit(AIStreamChunk.Retrying(attempt, max)) }

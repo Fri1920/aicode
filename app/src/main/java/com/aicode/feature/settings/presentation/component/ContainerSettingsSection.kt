@@ -722,35 +722,17 @@ private fun ProfileEditSheet(
                 }
             }
 
-            OutlinedTextField(
+            ContainerField(
                 value = name,
                 onValueChange = { name = it },
-                label = { Text(stringResource(R.string.common_name)) },
-                singleLine = true,
-                shape = RoundedCornerShape(12.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
-                    focusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
-                    unfocusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f),
-                    focusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f)
-                ),
-                modifier = Modifier.fillMaxWidth()
+                label = stringResource(R.string.common_name)
             )
 
             if (mode == ExecutionMode.LOCAL_PROOT) {
-                OutlinedTextField(
+                ContainerField(
                     value = shellPath,
                     onValueChange = { shellPath = it },
-                    label = { Text(stringResource(R.string.container_shell_path)) },
-                    singleLine = true,
-                    shape = RoundedCornerShape(12.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
-                        focusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
-                        unfocusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f),
-                        focusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f)
-                    ),
-                    modifier = Modifier.fillMaxWidth()
+                    label = stringResource(R.string.container_shell_path)
                 )
 
                 MountListEditor(
@@ -785,7 +767,6 @@ private fun ProfileEditSheet(
                     Spacer(modifier = Modifier.size(Spacing.xs))
                     Surface(
                         onClick = { pickLauncher.launch(arrayOf("*/*")) },
-                        shape = RoundedCornerShape(12.dp),
                         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f)
                     ) {
                         Row(
@@ -848,22 +829,13 @@ private fun ProfileEditSheet(
                 ) {
                     val selectedName = sshConnections.firstOrNull { it.id == selectedConnId }?.name
                         ?: stringResource(R.string.container_select_ssh_channel)
-                    OutlinedTextField(
+                    ContainerField(
                         value = selectedName,
                         onValueChange = {},
                         readOnly = true,
-                        label = { Text(stringResource(R.string.container_ssh_channel)) },
+                        label = stringResource(R.string.container_ssh_channel),
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = connExpanded) },
-                        shape = RoundedCornerShape(12.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
-                            focusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
-                            unfocusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f),
-                            focusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f)
-                        ),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable)
+                        modifier = Modifier.menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable)
                     )
                     ExposedDropdownMenu(
                         expanded = connExpanded,
@@ -890,20 +862,11 @@ private fun ProfileEditSheet(
                         }
                     }
                 }
-                OutlinedTextField(
+                ContainerField(
                     value = remotePath,
                     onValueChange = { remotePath = it },
-                    label = { Text(stringResource(R.string.container_remote_workspace_path)) },
-                    placeholder = { Text("/home/user/workspace") },
-                    singleLine = true,
-                    shape = RoundedCornerShape(12.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
-                        focusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
-                        unfocusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f),
-                        focusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f)
-                    ),
-                    modifier = Modifier.fillMaxWidth()
+                    label = stringResource(R.string.container_remote_workspace_path),
+                    placeholder = "/home/user/workspace"
                 )
             }
 
@@ -996,20 +959,11 @@ private fun StringListEditor(
                         .padding(12.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    OutlinedTextField(
+                    ContainerField(
                         value = value,
                         onValueChange = { items[index] = it },
-                        label = { Text(itemLabel) },
-                        placeholder = itemHint?.let { { Text(it) } },
-                        singleLine = true,
-                        shape = RoundedCornerShape(12.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
-                            focusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
-                            unfocusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f),
-                            focusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f)
-                        ),
-                        modifier = Modifier.fillMaxWidth()
+                        label = itemLabel,
+                        placeholder = itemHint,
                     )
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -1034,7 +988,6 @@ private fun StringListEditor(
     Row {
         Surface(
             onClick = { items.add("") },
-            shape = RoundedCornerShape(12.dp),
             color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f)
         ) {
             Row(
@@ -1090,35 +1043,17 @@ private fun MountListEditor(
                         .padding(12.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    OutlinedTextField(
+                    ContainerField(
                         value = local,
                         onValueChange = { items[index] = it to container },
-                        label = { Text(stringResource(R.string.container_mount_local)) },
-                        placeholder = { Text("/sdcard") },
-                        singleLine = true,
-                        shape = RoundedCornerShape(12.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
-                            focusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
-                            unfocusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f),
-                            focusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f)
-                        ),
-                        modifier = Modifier.fillMaxWidth()
+                        label = stringResource(R.string.container_mount_local),
+                        placeholder = "/sdcard",
                     )
-                    OutlinedTextField(
+                    ContainerField(
                         value = container,
                         onValueChange = { items[index] = local to it },
-                        label = { Text(stringResource(R.string.container_mount_container)) },
-                        placeholder = { Text("/mnt/sdcard") },
-                        singleLine = true,
-                        shape = RoundedCornerShape(12.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
-                            focusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
-                            unfocusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f),
-                            focusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f)
-                        ),
-                        modifier = Modifier.fillMaxWidth()
+                        label = stringResource(R.string.container_mount_container),
+                        placeholder = "/mnt/sdcard",
                     )
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -1143,7 +1078,6 @@ private fun MountListEditor(
     Row {
         Surface(
             onClick = { items.add("" to "") },
-            shape = RoundedCornerShape(12.dp),
             color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f)
         ) {
             Row(
@@ -1203,35 +1137,17 @@ private fun PairListEditor(
                         .padding(12.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    OutlinedTextField(
+                    ContainerField(
                         value = k,
                         onValueChange = { items[index] = it to v },
-                        label = { Text(keyLabel) },
-                        placeholder = keyHint?.let { { Text(it) } },
-                        singleLine = true,
-                        shape = RoundedCornerShape(12.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
-                            focusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
-                            unfocusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f),
-                            focusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f)
-                        ),
-                        modifier = Modifier.fillMaxWidth()
+                        label = keyLabel,
+                        placeholder = keyHint,
                     )
-                    OutlinedTextField(
+                    ContainerField(
                         value = v,
                         onValueChange = { items[index] = k to it },
-                        label = { Text(valueLabel) },
-                        placeholder = valueHint?.let { { Text(it) } },
-                        singleLine = true,
-                        shape = RoundedCornerShape(12.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
-                            focusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
-                            unfocusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f),
-                            focusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f)
-                        ),
-                        modifier = Modifier.fillMaxWidth()
+                        label = valueLabel,
+                        placeholder = valueHint,
                     )
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -1256,7 +1172,6 @@ private fun PairListEditor(
     Row {
         Surface(
             onClick = { items.add("" to "") },
-            shape = RoundedCornerShape(12.dp),
             color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f)
         ) {
             Row(
@@ -1377,4 +1292,38 @@ private fun queryImageDisplayName(context: Context, uriString: String): String? 
         }.getOrNull()
     }
     return uri.lastPathSegment
+}
+
+/**
+ * 本文件统一的输入框样式：圆角 + 定制 colors + 全宽。
+ * 历史上有 19 处整块复制，抽成此组件消除重复；需要 readOnly/placeholder/trailingIcon 的场景也走这里。
+ */
+@Composable
+private fun ContainerField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    label: String,
+    modifier: Modifier = Modifier,
+    placeholder: String? = null,
+    singleLine: Boolean = true,
+    readOnly: Boolean = false,
+    trailingIcon: (@Composable () -> Unit)? = null
+) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        label = { Text(label) },
+        placeholder = placeholder?.let { { Text(it) } },
+        singleLine = singleLine,
+        readOnly = readOnly,
+        trailingIcon = trailingIcon,
+        shape = RoundedCornerShape(12.dp),
+        colors = OutlinedTextFieldDefaults.colors(
+            unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
+            focusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
+            unfocusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f),
+            focusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f)
+        ),
+        modifier = modifier.fillMaxWidth()
+    )
 }

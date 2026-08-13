@@ -449,10 +449,10 @@ class GitRepository @Inject constructor(
 
     /**
      * 读取指定 ref（提交/分支/标签）下某文件的完整内容（`git show <ref>:<path>`）。
- * 用于提交文件 diff：取 `<hash>^:<path>`（改动前）与 `<hash>:<path>`（改动后）对比。
- * 文件在指定 ref 不存在时（如新增文件的首个提交）git 报错输出 `fatal:`，此处检测到即返回空串，
- * 上层据空串判定为「新增/删除」，整个文件按全增或全删呈现。
- */
+     * 用于提交文件 diff：取 `<hash>^:<path>`（改动前）与 `<hash>:<path>`（改动后）对比。
+     * 文件在指定 ref 不存在时（如新增文件的首个提交）git 报错输出 `fatal:`，此处检测到即返回空串，
+     * 上层据空串判定为「新增/删除」，整个文件按全增或全删呈现。
+     */
     suspend fun showFileContent(ref: String, path: String): String {
         val out = git("show", "$ref:$path")
         // git show 对不存在的路径输出 fatal 到 stderr，runCommandSync 合并了 stdout+stderr。
@@ -462,8 +462,8 @@ class GitRepository @Inject constructor(
 
     /**
      * 读取工作区当前文件内容。用于工作区改动 diff：与 `HEAD:<path>` 对比看出未暂存的改动。
- * 文件不存在或读取失败返回空串。经容器内直接读文件而非 git show，因为工作区文件即当前内容。
- */
+     * 文件不存在或读取失败返回空串。经容器内直接读文件而非 git show，因为工作区文件即当前内容。
+     */
     suspend fun worktreeFileContent(path: String): String =
         withContext(Dispatchers.IO) {
             runCatching {

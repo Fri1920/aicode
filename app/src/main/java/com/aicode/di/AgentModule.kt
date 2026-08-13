@@ -12,7 +12,6 @@ import com.aicode.feature.agent.data.local.dao.TodoItemDao
 import com.aicode.feature.settings.data.local.dao.AIProviderDao
 import com.aicode.feature.settings.domain.repository.AIProviderRepository
 import com.aicode.feature.agent.data.local.database.AgentDatabase
-import com.aicode.feature.agent.data.CodeChangeTracker
 import dagger.hilt.android.qualifiers.ApplicationContext
 import com.aicode.feature.agent.data.remote.anthropic.AnthropicApi
 import com.aicode.feature.agent.data.remote.gemini.GeminiApi
@@ -63,6 +62,24 @@ import javax.inject.Named
 import javax.inject.Singleton
 
 import com.aicode.core.db.MigrationLoader
+import com.aicode.feature.agent.domain.checkpoint.CheckpointManager
+import com.aicode.feature.agent.domain.session.MessagePersistenceUseCase
+import com.aicode.feature.agent.domain.session.SessionUseCase
+import com.aicode.feature.agent.domain.tool.mcp.ManageMcpTool
+import com.aicode.feature.agent.domain.tool.memory.MemoryTool
+import com.aicode.feature.agent.domain.tool.mode.PlanApprovalManager
+import com.aicode.feature.agent.domain.tool.mode.SwitchModeTool
+import com.aicode.feature.agent.domain.tool.search.WebFetchTool
+import com.aicode.feature.agent.domain.tool.search.WebSearchTool
+import com.aicode.feature.agent.domain.workflow.ContextCompactor
+import com.aicode.feature.agent.domain.workflow.StatefulAgentWorkflow
+import com.aicode.feature.credentials.data.local.dao.GitCredentialDao
+import com.aicode.feature.settings.data.repository.CompactionModelSettingsRepository
+import com.aicode.feature.settings.data.repository.DefaultModelSettingsRepository
+import com.aicode.feature.settings.data.repository.TitleModelSettingsRepository
+import com.aicode.feature.settings.data.repository.VisionModelSettingsRepository
+import com.aicode.feature.workspace.data.local.dao.RemoteConnectionDao
+import com.aicode.feature.workspace.data.repository.WorkspaceRepository
 
 @Module
 @InstallIn(SingletonComponent::class)
@@ -106,7 +123,7 @@ object AgentModule {
 
     @Provides
     @Singleton
-    fun provideRemoteConnectionDao(database: AgentDatabase): com.aicode.feature.workspace.data.local.dao.RemoteConnectionDao {
+    fun provideRemoteConnectionDao(database: AgentDatabase): RemoteConnectionDao {
         return database.remoteConnectionDao()
     }
 
@@ -124,7 +141,7 @@ object AgentModule {
 
     @Provides
     @Singleton
-    fun provideGitCredentialDao(database: AgentDatabase): com.aicode.feature.credentials.data.local.dao.GitCredentialDao {
+    fun provideGitCredentialDao(database: AgentDatabase): GitCredentialDao {
         return database.gitCredentialDao()
     }
 
@@ -187,8 +204,8 @@ object AgentModule {
 
     @Provides
     @Singleton
-    fun provideGeminiApi(@Named("Gemini") retrofit: Retrofit): com.aicode.feature.agent.data.remote.gemini.GeminiApi {
-        return retrofit.create(com.aicode.feature.agent.data.remote.gemini.GeminiApi::class.java)
+    fun provideGeminiApi(@Named("Gemini") retrofit: Retrofit): GeminiApi {
+        return retrofit.create(GeminiApi::class.java)
     }
 
     @Provides
@@ -206,16 +223,16 @@ object AgentModule {
     @Provides
     @Singleton
     fun provideDelegatingTerminalSessionProvider(
-        modeHolder: com.aicode.feature.settings.data.repository.ExecutionModeHolder,
+        modeHolder: ExecutionModeHolder,
         local: TerminalSessionManager,
-        remote: com.aicode.feature.terminal.domain.RemoteTerminalSessionManager
+        remote: RemoteTerminalSessionManager
     ): DelegatingTerminalSessionProvider = DelegatingTerminalSessionProvider(modeHolder, local, remote)
 
     @Provides
     @Singleton
     fun provideRemoteSftpFileAccess(
         connection: RemoteSshConnection,
-        workspaceRepository: com.aicode.feature.workspace.data.repository.WorkspaceRepository
+        workspaceRepository: WorkspaceRepository
     ): RemoteSftpFileAccess = RemoteSftpFileAccess(connection, workspaceRepository)
 
     @Provides
@@ -232,12 +249,12 @@ object AgentModule {
         searchCodeTool: SearchCodeTool,
         loadSkillTool: LoadSkillTool,
         askUserQuestionTool: AskUserQuestionTool,
-        manageMcpTool: com.aicode.feature.agent.domain.tool.mcp.ManageMcpTool,
-        webSearchTool: com.aicode.feature.agent.domain.tool.search.WebSearchTool,
-        webFetchTool: com.aicode.feature.agent.domain.tool.search.WebFetchTool,
-        switchModeTool: com.aicode.feature.agent.domain.tool.mode.SwitchModeTool,
+        manageMcpTool: ManageMcpTool,
+        webSearchTool: WebSearchTool,
+        webFetchTool: WebFetchTool,
+        switchModeTool: SwitchModeTool,
         todoTool: TodoTool,
-        memoryTool: com.aicode.feature.agent.domain.tool.memory.MemoryTool
+        memoryTool: MemoryTool
     ): ToolRegistry {
         return ToolRegistry().apply {
             register("readFile", readFileTool)
@@ -262,12 +279,6 @@ object AgentModule {
 
     @Provides
     @Singleton
-    fun provideCodeChangeTracker(): CodeChangeTracker {
-        return CodeChangeTracker()
-    }
-
-    @Provides
-    @Singleton
     fun provideAgentWorkflow(
         toolRegistry: ToolRegistry,
         aiProviderRepository: AIProviderRepository,
@@ -277,20 +288,20 @@ object AgentModule {
         promptProvider: SystemPromptProvider,
         permissionManager: ToolPermissionManager,
         policyEngine: ToolPermissionPolicyEngine,
-        contextCompactor: com.aicode.feature.agent.domain.workflow.ContextCompactor,
-        planApprovalManager: com.aicode.feature.agent.domain.tool.mode.PlanApprovalManager,
+        contextCompactor: ContextCompactor,
+        planApprovalManager: PlanApprovalManager,
         toolOutputStore: ToolOutputStore,
         modelMetadataService: ModelMetadataService,
-        visionModelSettingsRepository: com.aicode.feature.settings.data.repository.VisionModelSettingsRepository,
-        compactionModelSettingsRepository: com.aicode.feature.settings.data.repository.CompactionModelSettingsRepository,
-        titleModelSettingsRepository: com.aicode.feature.settings.data.repository.TitleModelSettingsRepository,
-        defaultModelSettingsRepository: com.aicode.feature.settings.data.repository.DefaultModelSettingsRepository,
-        sessionUseCase: com.aicode.feature.agent.domain.session.SessionUseCase,
-        messagePersistenceUseCase: com.aicode.feature.agent.domain.session.MessagePersistenceUseCase,
-        checkpointManager: com.aicode.feature.agent.domain.checkpoint.CheckpointManager,
+        visionModelSettingsRepository: VisionModelSettingsRepository,
+        compactionModelSettingsRepository: CompactionModelSettingsRepository,
+        titleModelSettingsRepository: TitleModelSettingsRepository,
+        defaultModelSettingsRepository: DefaultModelSettingsRepository,
+        sessionUseCase: SessionUseCase,
+        messagePersistenceUseCase: MessagePersistenceUseCase,
+        checkpointManager: CheckpointManager,
         llmCallRecordDao: LlmCallRecordDao
     ): AgentWorkflow {
-        return com.aicode.feature.agent.domain.workflow.StatefulAgentWorkflow(
+        return StatefulAgentWorkflow(
             toolRegistry,
             aiProviderRepository,
             openAIApi,

@@ -217,7 +217,8 @@ class SystemPromptProvider @Inject constructor(
             // 没有变化，维持基线不变，仅向大模型注入极简指令，大幅降低重复 Token 处理
             "当前上下文: [未发生变化，请参考之前的会话记忆]"
         } else {
-            // 发生变化，输出完整内容并更新本次快照
+            // 发生变化，输出完整内容并更新本次快照；容量超限时整体重建，避免删除会话后残留累积。
+            if (sessionSnapshots.size > MAX_SESSION_SNAPSHOTS) sessionSnapshots.clear()
             sessionSnapshots[sessionId] = snapshot.copy(lastWorkspaceContext = currentWorkspaceContext)
             currentWorkspaceContext
         }
@@ -290,6 +291,8 @@ class SystemPromptProvider @Inject constructor(
         const val AGENTS_FILE = "AGENTS.md"
         const val CLAUDE_FILE = "CLAUDE.md"
         const val MAX_AGENTS_CHARS = 32_000
+        /** 会话快照缓存上限：删除会话后不会清理该 map，超限时整体重建防累积。 */
+        const val MAX_SESSION_SNAPSHOTS = 200
         val LEADING_COMMENT = Regex("(?s)^\\s*<!--.*?-->\\s*")
     }
 }

@@ -101,7 +101,7 @@ class ListFilesTool @Inject constructor(
                 if (showHeader) appendLine("${containerPath.trimEnd('/')}:")
                 val children = listEntries(path, options)
                 for (entry in children) {
-                    if (entryCount >= MAX_ENTRIES) {
+                    if (entryCount >= (options.maxLines ?: MAX_ENTRIES)) {
                         truncated = true
                         return
                     }
@@ -248,7 +248,8 @@ class ListFilesTool @Inject constructor(
             if (s[i].isDigit()) {
                 val start = i
                 while (i < s.length && s[i].isDigit()) i++
-                sb.append(s.substring(start, i).toInt().toString().padStart(10, '0'))
+                // 数字段补零到固定宽度，使字典序等价数值序；不 toInt 以避免超长数字段溢出崩溃。
+                sb.append(s.substring(start, i).padStart(20, '0'))
             } else {
                 sb.append(s[i])
                 i++

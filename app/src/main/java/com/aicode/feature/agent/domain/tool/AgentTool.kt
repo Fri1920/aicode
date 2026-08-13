@@ -116,21 +116,6 @@ abstract class AgentTool {
         )
     }
 
-    fun toToolDefinition(): ToolDefinition {
-        return ToolDefinition(
-            name = name,
-            description = description,
-            parameters = parameters.values.map {
-                ParameterDefinition(
-                    name = it.name,
-                    type = it.type.name.lowercase(),
-                    description = it.description,
-                    required = it.required
-                )
-            }
-        )
-    }
-
     /**
      * 生成符合 JSON Schema 的参数描述，用于真正传给大模型的 function-calling 接口
      * （OpenAI 的 function.parameters / Anthropic 的 input_schema）。
@@ -157,19 +142,6 @@ abstract class AgentTool {
         )
     }
 }
-
-data class ToolDefinition(
-    val name: String,
-    val description: String,
-    val parameters: List<ParameterDefinition>
-)
-
-data class ParameterDefinition(
-    val name: String,
-    val type: String,
-    val description: String,
-    val required: Boolean
-)
 
 @Serializable
 data class ToolCall(

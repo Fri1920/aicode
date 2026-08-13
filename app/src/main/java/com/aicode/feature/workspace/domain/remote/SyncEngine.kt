@@ -34,13 +34,19 @@ class SyncEngine(
     private val customIgnores = ignoredPatternsStr.split(",").map { it.trim() }.filter { it.isNotEmpty() }.toSet()
     private var gitIgnorePatterns = emptyList<String>()
 
-    private fun isIgnored(path: String, fileName: String? = null): Boolean {
-        val nameToCheck = fileName ?: File(path).name
-        val parts = path.split(File.separatorChar, '/')
-        
+    private fun isIgnored(path: String): Boolean {
+        // 统一转为「相对挂载根」的路径段再匹配：GitIgnoreMatcher 契约是相对路径段，
+        // 直接传宿主/远程绝对路径会让前缀段参与匹配，可能误命中（如 gitignore 写了 `data` 而
+        // 宿主路径恰好有 /data 前缀）。本地路径剥 localMountPath，远程路径剥 remotePath。
+        val relative = path
+            .removePrefix(mount.localMountPath)
+            .removePrefix(mount.remotePath)
+            .trimStart('/', File.separatorChar)
+        val parts = relative.split(File.separatorChar, '/').filter { it.isNotEmpty() }
+
         // 1. 检查自定义忽略规则 (主要针对目录名和文件名)
         if (parts.any { it in customIgnores }) return true
-        
+
         // 2. 检查 .gitignore 规则
         if (useGitIgnore && gitIgnorePatterns.isNotEmpty()) {
             if (GitIgnoreMatcher.isIgnored(gitIgnorePatterns, parts)) {
@@ -134,7 +140,7 @@ class SyncEngine(
         suspend fun pull(remoteDir: String, localDir: File) {
             val files = syncClient.listFiles(remoteDir)
             for (file in files) {
-                if (isIgnored("$remoteDir/${file.name}", file.name)) continue
+                if (isIgnored("$remoteDir/${file.name}")) continue
                 val rPath = "$remoteDir/${file.name}"
                 val lFile = File(localDir, file.name)
                 if (file.isDirectory) {
@@ -167,9 +173,10 @@ class SyncEngine(
         suspend fun push(localDir: File, remoteDir: String) {
             val files = localDir.listFiles() ?: return
             for (file in files) {
-                if (isIgnored(file.absolutePath, file.name)) continue
+                if (isIgnored(file.absolutePath)) continue
                 val rPath = "$remoteDir/${file.name}"
                 if (file.isDirectory) {
+                    // 远程目录可能已由先前同步创建，已存在时报错可忽略。
                     try { syncClient.createDirectory(rPath) } catch (e: Exception) {}
                     push(file, rPath)
                 } else {
@@ -291,6 +298,7 @@ class SyncEngine(
 
     private suspend fun forceReconnect() {
         try {
+            // 断开旧连接可能因网络中断本身失败，忽略后继续尝试重连。
             syncClient.disconnect()
         } catch (e: Exception) {}
         try {

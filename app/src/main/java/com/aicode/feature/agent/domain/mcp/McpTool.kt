@@ -65,11 +65,11 @@ class McpTool(
     override suspend fun execute(args: Map<String, JsonElement>): ToolResult {
         return try {
             FileLogger.d(TAG, "调用 MCP 工具 $name (remote=$remoteName) args=${args.keys}")
-            val text = client.callTool(remoteName, JsonObject(args))
-            if (text.startsWith("Error:")) {
-                ToolResult.Error(text.removePrefix("Error:").trim())
+            val call = client.callTool(remoteName, JsonObject(args))
+            if (call.isError) {
+                ToolResult.Error(call.text)
             } else {
-                ToolResult.Success(JsonPrimitive(text))
+                ToolResult.Success(JsonPrimitive(call.text))
             }
         } catch (e: McpException) {
             FileLogger.e(TAG, "MCP 工具调用失败: $name", e)

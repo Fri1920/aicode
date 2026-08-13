@@ -55,8 +55,6 @@ import com.aicode.core.theme.Spacing
 import com.aicode.core.ui.rememberImeBottomInset
 import com.aicode.feature.agent.domain.command.SlashCommandHandler
 import com.aicode.feature.agent.domain.model.AgentMode
-import com.aicode.feature.agent.domain.model.ChangeType
-import com.aicode.feature.agent.domain.model.CodeChange
 import com.aicode.feature.agent.domain.model.ReasoningEffort
 import com.aicode.feature.agent.domain.permission.PermissionChoice
 import com.aicode.feature.agent.domain.tool.PendingToolPermission
@@ -504,7 +502,7 @@ internal fun ToolPermissionPanel(
 @Composable
 internal fun StatusBanner(state: AgentUIState) {
     androidx.compose.animation.AnimatedVisibility(
-        visible = state is AgentUIState.Error || state is AgentUIState.Applied,
+        visible = state is AgentUIState.Error,
         enter = androidx.compose.animation.fadeIn(),
         exit = androidx.compose.animation.fadeOut()
     ) {
@@ -514,13 +512,6 @@ internal fun StatusBanner(state: AgentUIState) {
                 container = MaterialTheme.colorScheme.errorContainer,
                 content = MaterialTheme.colorScheme.onErrorContainer,
                 icon = FeatherIcons.AlertCircle
-            )
-
-            is AgentUIState.Applied -> InfoBanner(
-                text = stringResource(R.string.chat_code_changes_applied),
-                container = MaterialTheme.colorScheme.primaryContainer,
-                content = MaterialTheme.colorScheme.onPrimaryContainer,
-                icon = FeatherIcons.Check
             )
 
             else -> {}
@@ -550,89 +541,6 @@ internal fun InfoBanner(
             Spacer(Modifier.width(Spacing.sm))
             Text(text, color = content, style = MaterialTheme.typography.bodyMedium)
         }
-    }
-}
-
-@Composable
-fun ChangePreviewPanel(
-    changes: List<CodeChange>,
-    onApply: () -> Unit,
-    onReject: () -> Unit
-) {
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = Spacing.lg, vertical = Spacing.xs),
-        color = MaterialTheme.colorScheme.surface,
-        shape = RoundedCornerShape(Radius.md),
-        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
-    ) {
-        Column(modifier = Modifier.padding(Spacing.md)) {
-            Text(
-                stringResource(R.string.chat_preview_changes, changes.size),
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-            Spacer(Modifier.height(Spacing.sm))
-
-            LazyColumn(
-                modifier = Modifier.heightIn(max = 180.dp),
-                verticalArrangement = Arrangement.spacedBy(Spacing.xs)
-            ) {
-                items(changes) { change -> ChangeItem(change) }
-            }
-
-            Spacer(Modifier.height(Spacing.md))
-
-            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                AgentActionButton(
-                    text = stringResource(R.string.chat_perm_deny),
-                    onClick = onReject,
-                    modifier = Modifier.weight(1f),
-                    tone = AgentActionTone.Danger
-                )
-                AgentActionButton(
-                    text = stringResource(R.string.chat_apply),
-                    onClick = onApply,
-                    modifier = Modifier.weight(1f),
-                    tone = AgentActionTone.Success
-                )
-            }
-        }
-    }
-}
-
-@Composable
-fun ChangeItem(change: CodeChange) {
-    val accent = when (change.type) {
-        ChangeType.CREATE -> MaterialTheme.colorScheme.tertiary
-        ChangeType.DELETE -> MaterialTheme.colorScheme.error
-        else -> MaterialTheme.colorScheme.secondary
-    }
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(
-            text = when (change.type) {
-                ChangeType.CREATE -> "+"
-                ChangeType.DELETE -> "−"
-                ChangeType.REPLACE -> "~"
-                else -> "→"
-            },
-            modifier = Modifier.width(20.dp),
-            color = accent,
-            style = MaterialTheme.typography.labelLarge,
-            fontWeight = FontWeight.Bold
-        )
-        Text(
-            text = "${change.filePath.substringAfterLast('/')} · L${change.startLine}-${change.endLine}",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f)
-        )
     }
 }
 

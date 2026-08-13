@@ -170,7 +170,7 @@ class GeminiAdapter @Inject constructor(
 
         try {
             streamWithStaircaseRetry(
-                attemptOnce = { onProduced ->
+                attemptOnce = {
                 val textBuilder = StringBuilder()
                 val toolCalls = mutableListOf<ToolCall>()
                 var currentFinishReason: String? = null
@@ -218,13 +218,12 @@ class GeminiAdapter @Inject constructor(
                                             val text = part.get("text")?.asString ?: ""
                                             if (text.isNotEmpty()) {
                                                 if (isThought) {
-                                                    // 思考增量：仅 UI 实时展示，不计入正文、不触发 onProduced（不落库可安全重试）
+                                                    // 思考增量：仅 UI 实时展示，不计入正文、不计入正文（不落库，重试时可安全重新流出）
                                                     if (firstByteReceived.compareAndSet(false, true)) watchdog.cancel()
                                                     emit(AIStreamChunk.ReasoningDelta(text))
                                                 } else {
                                                     textBuilder.append(text)
                                                     if (firstByteReceived.compareAndSet(false, true)) watchdog.cancel()
-                                                    onProduced()
                                                     emit(AIStreamChunk.TextDelta(text))
                                                 }
                                             }
@@ -252,7 +251,6 @@ class GeminiAdapter @Inject constructor(
                     }
                 }
 
-                onProduced()
                 emit(AIStreamChunk.Final(AIResponse(content = textBuilder.toString(), toolCalls = toolCalls, stopReason = currentFinishReason, inputTokens = streamInputTokens, outputTokens = streamOutputTokens, cachedInputTokens = streamCachedInputTokens)))
                 },
                 onRetry = { attempt, max -> emit(AIStreamChunk.Retrying(attempt, max)) }

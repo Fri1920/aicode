@@ -4,14 +4,11 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Skill 仓库，现已升级为聚合层（Composite）。
- * 它负责聚合各个 SkillSource（如 LocalDirectorySkillSource, UrlSkillSource 等）提供的技能。
+ * Skill 仓库，聚合各 [SkillSource]（当前为 [LocalDirectorySkillSource]）提供的技能。
  */
 @Singleton
 class SkillRepository @Inject constructor(
     private val localDirectorySkillSource: LocalDirectorySkillSource
-    // 未来可在这里注入更多的 SkillSource，例如：
-    // private val urlSkillSource: UrlSkillSource
 ) {
     /** 扫描并聚合当前所有合法的 skill。 */
     fun listSkills(): List<Skill> {

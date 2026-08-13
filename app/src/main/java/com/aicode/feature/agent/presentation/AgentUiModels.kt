@@ -2,15 +2,18 @@ package com.aicode.feature.agent.presentation
 
 import androidx.compose.runtime.Immutable
 import com.aicode.feature.agent.domain.model.AgentImage
-import com.aicode.feature.agent.domain.model.WorkflowStatus
 import kotlinx.serialization.Serializable
+
+/** 单轮工作流的最终结果状态（供 [AgentUIState.Result] 使用）。 */
+enum class WorkflowStatus {
+    SUCCESS, PARTIAL_SUCCESS, FAILED, CANCELLED
+}
 
 sealed class AgentUIState {
     object Idle : AgentUIState()
     object Loading : AgentUIState()
     object Streaming : AgentUIState()
     data class Result(val status: WorkflowStatus) : AgentUIState()
-    object Applied : AgentUIState()
     data class Error(val message: String) : AgentUIState()
 }
 

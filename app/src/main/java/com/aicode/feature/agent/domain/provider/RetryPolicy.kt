@@ -212,13 +212,13 @@ suspend fun <T> retryStaircase(
  *                调用方在其中通过 Flow 的 emit() 推送重试事件。
  */
 suspend fun streamWithStaircaseRetry(
-    attemptOnce: suspend (onProduced: () -> Unit) -> Unit,
+    attemptOnce: suspend () -> Unit,
     onRetry: (suspend (attempt: Int, maxRetries: Int) -> Unit)? = null
 ) {
     var attempt = 0
     while (true) {
         try {
-            attemptOnce { }
+            attemptOnce()
             return
         } catch (e: CancellationException) {
             throw e
