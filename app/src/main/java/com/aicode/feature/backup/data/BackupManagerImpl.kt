@@ -126,6 +126,7 @@ class BackupManagerImpl @Inject constructor(
                 FileOutputStream(temp).use { fos ->
                     GzipCompressorOutputStream(fos).use { gz ->
                         TarArchiveOutputStream(gz).use { tar ->
+                            tar.setLongFileMode(TarArchiveOutputStream.LONGFILE_GNU)
                             writeMetadataEntry(tar, BackupMetadata(
                                 schemaVersion = currentSchemaVersion(),
                                 appVersion = appVersionName(),
@@ -214,6 +215,7 @@ class BackupManagerImpl @Inject constructor(
         FileOutputStream(file).use { fos ->
             GzipCompressorOutputStream(fos).use { gz ->
                 TarArchiveOutputStream(gz).use { tar ->
+                    tar.setLongFileMode(TarArchiveOutputStream.LONGFILE_GNU)
                     writeMetadataEntry(tar, buildMetadata(options))
                     if (options.workspaceFiles) {
                         writeWorkspaceEntries(tar)
