@@ -36,6 +36,12 @@
 
 AiCode is an AI-powered coding assistant that runs natively on Android. It integrates large language models with a local Linux development environment. The built-in Alpine Linux container and terminal emulator let the AI directly read/write files, execute shell commands, and run build tools. It also supports remote SSH servers as the execution backend, turning your phone into a mobile workstation for remote projects.
 
+## Advertisement
+
+| Icon | Description |
+|------|-------------|
+| <img src="https://opencode.ai/favicon-96x96-v3.png" width="24" alt="OpenCode" /> | **[OpenCode Go](https://opencode.ai/go?ref=8Q5GA5B1NY)** — Low-cost subscription with generous limits and reliable access to the most capable open-source models |
+
 ## Features
 
 - **AI Agent** — Supports Anthropic (Claude), OpenAI (GPT), Gemini, and other providers. Deeply interacts with the dev environment via a tool system (file operations, shell execution, terminal management, web search, etc.). Supports streaming output, context compression, and multi-session management
@@ -62,12 +68,6 @@ AiCode is an AI-powered coding assistant that runs natively on Android. It integ
 | Remote SSH | SSHJ (exec channel + SFTP + shell channel) |
 | Crypto | BouncyCastle (bcprov-jdk18on, sshj X25519 key exchange dependency) |
 | FTP | Commons Net |
-
-## Advertisement
-
-|  |  |
-|---|---|
-| <img src="https://opencode.ai/favicon-96x96-v3.png" width="24" alt="OpenCode" /> | **[OpenCode Go](https://opencode.ai/go?ref=8Q5GA5B1NY)** — Low-cost subscription with generous limits and reliable access to the most capable open-source models |
 
 ## Getting Started
 

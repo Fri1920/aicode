@@ -36,6 +36,12 @@
 
 AiCode 是一款在 Android 手机上运行的 AI 编程工具，将大语言模型与本地 Linux 开发环境深度集成。它内置 Alpine Linux 容器和终端模拟器，让 AI 能直接读写文件、执行 Shell 命令、运行构建工具；同时支持远程 SSH 服务器作为执行后端，把手机变成远程项目的移动工作站。
 
+## 广告
+
+| 图标 | 描述 |
+|------|------|
+| <img src="https://opencode.ai/favicon-96x96-v3.png" width="24" alt="OpenCode" /> | **[OpenCode Go](https://opencode.ai/go?ref=8Q5GA5B1NY)** — 低价订阅，提供最强大开源模型的慷慨额度与可靠访问 |
+
 ## 功能特性
 
 - **AI Agent** — 支持 Anthropic（Claude）、OpenAI（GPT）、Gemini 等多家提供商，通过工具系统（文件操作、Shell 执行、终端管理、网页搜索等）与开发环境深度交互；支持流式输出、上下文压缩、多会话管理
@@ -62,12 +68,6 @@ AiCode 是一款在 Android 手机上运行的 AI 编程工具，将大语言模
 | 远程 SSH | SSHJ（exec channel + SFTP + shell channel） |
 | 加密 | BouncyCastle（bcprov-jdk18on，sshj X25519 密钥交换依赖） |
 | FTP | Commons Net |
-
-## 广告
-
-|  |  |
-|---|---|
-| <img src="https://opencode.ai/favicon-96x96-v3.png" width="24" alt="OpenCode" /> | **[OpenCode Go](https://opencode.ai/go?ref=8Q5GA5B1NY)** — 低价订阅，提供最强大开源模型的慷慨额度与可靠访问 |
 
 ## 快速开始
 
