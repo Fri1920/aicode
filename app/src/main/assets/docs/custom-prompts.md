@@ -19,9 +19,13 @@ AiCode 的系统提示词支持用户自定义覆盖。默认提示词随 App �
 │   ├── 60-tools-and-paths.md
 │   ├── 70-skills-and-mcp.md
 │   ├── 80-plan-mode.md
-│   └── 81-auto-mode.md
+│   ├── 81-auto-mode.md
+│   └── agent/        子目录片段（压缩总结、标题生成等，随编号片段一同释放）
+│       ├── compact-summary.md
+│       └── title-generator.md
 ├── prompts.custom/   用户自定义覆盖（同名即覆盖，App 升级不碰这里）
-│   └── 50-safety.md  只放你想覆盖的片段
+│   ├── 50-safety.md  只放你想覆盖的片段
+│   └── agent/        子目录同样支持同名覆盖
 ├── skills/
 └── docs/
 ```
@@ -39,7 +43,7 @@ AiCode 的系统提示词支持用户自定义覆盖。默认提示词随 App �
 ## 3. 如何自定义
 
 ### 只想改某几个片段（推荐）
-1. 在 `~/.aicode/prompts.custom/` 目录下（不存在则手动创建）放入你想覆盖的片段文件，文件名必须与默认片段**完全一致**（如 `50-safety.md`）。
+1. 在 `~/.aicode/prompts.custom/` 目录下（不存在则手动创建）放入你想覆盖的片段文件，文件名必须与默认片段**完全一致**（如 `50-safety.md`）。子目录片段（如 `agent/title-generator.md`）对应放到 `~/.aicode/prompts.custom/agent/` 下同名覆盖。
 2. 编辑文件内容为你想要的提示词。
 3. **重启 App 后生效**。提示词在 App 进程启动时加载并缓存，新开会话不会重新读取——必须重启 App 才会加载修改后的自定义提示词。
 
@@ -70,6 +74,8 @@ AiCode 的系统提示词支持用户自定义覆盖。默认提示词随 App �
 | `70-skills-and-mcp.md` | 技能与 MCP 集成说明 |
 | `80-plan-mode.md` | PLAN 计划模式专属约束 |
 | `81-auto-mode.md` | AUTO 自动模式专属约束 |
+| `agent/compact-summary.md` | 长对话上下文压缩（摘要）提示词 |
+| `agent/title-generator.md` | 会话标题生成提示词 |
 
 ## 6. 编辑方式
 
@@ -83,6 +89,6 @@ AiCode 的系统提示词支持用户自定义覆盖。默认提示词随 App �
 
 ## 8. 注意事项
 
-* 自定义片段的文件名必须与默认片段**完全一致**（区分大小写），否则不会被识别为覆盖。
+* 自定义片段的文件名必须与默认片段**完全一致**（区分大小写），否则不会被识别为覆盖。子目录片段（`agent/`）需放在 `prompts.custom/agent/` 下同名覆盖。
 * 提示词在整个 App 进程生命周期内只加载一次并缓存，修改文件后需**重启 App**（不是新开会话）才会生效。
 * `60-tools-and-paths.md` 等片段会随工具变更而更新，如果你覆盖了它，升级后不会自动获得新版工具描述——如需更新，请手动同步或删除你的自定义版本让默认版本重新生效。
