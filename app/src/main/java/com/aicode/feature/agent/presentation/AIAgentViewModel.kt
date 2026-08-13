@@ -553,6 +553,9 @@ class AIAgentViewModel @Inject constructor(
     }
 
     private fun processNextInQueue(sessionId: String) {
+        // 已有活跃 job（可能是本次收尾前由通知合并/flush 等入口启动的）时不消费，
+        // 避免队列被多个收尾入口重复消费、同一会话并发跑两个 job。
+        if (sessionJobs[sessionId]?.isActive == true) return
         val queue = _queuedRequests.value[sessionId] ?: return
         val next = queue.firstOrNull() ?: return
         _queuedRequests.value = _queuedRequests.value + (sessionId to queue.drop(1))
@@ -776,13 +779,20 @@ class AIAgentViewModel @Inject constructor(
             }
 
             sessionUseCase.touch(sessionId, messagePersistenceUseCase.nextTimestamp())
-            if (!failed) {
+            // 仅当本 job 仍持有忙状态时才置完成态：并发场景下队列/通知可能已启动新的 job
+            // 并把状态改为 Streaming，不能被先结束的 job 误覆盖成 Result（按钮会提前变回发送）。
+            val finishedState = _agentStates.value[sessionId]
+            if (!failed && (finishedState is AgentUIState.Loading || finishedState is AgentUIState.Streaming)) {
                 setAgentState(sessionId, AgentUIState.Result(WorkflowStatus.SUCCESS))
             }
             setStreamingText(sessionId, null)
 
         } catch (e: CancellationException) {
-            setAgentState(sessionId, AgentUIState.Idle)
+            // 取消收尾同样带保护：若已有新的 job 把状态改为 Streaming，不能覆盖成 Idle。
+            val cancelledState = _agentStates.value[sessionId]
+            if (cancelledState is AgentUIState.Loading || cancelledState is AgentUIState.Streaming) {
+                setAgentState(sessionId, AgentUIState.Idle)
+            }
             throw e
         } catch (e: Exception) {
              FileLogger.e(TAG, "executeAgentRequestStream 失败: request=$request", e)
