@@ -202,7 +202,7 @@ class StatefulAgentWorkflow @Inject constructor(
         val provider = createStandaloneProvider(config, sessionId)
         val history = messagePersistenceUseCase.buildHistory(sessionId, "__manual_compress__")
         if (history.size <= 2) return false
-        val compactionProvider = resolveCompactionFallbackProvider() ?: provider
+        val compactionProvider = resolveCompactionFallbackProvider(sessionId) ?: provider
         val compacted = contextCompactor.compactIfNeeded(history, compactionProvider, sessionId, force = true, onEvent = onEvent)
         return compacted.size != history.size
     }
@@ -406,6 +406,8 @@ class StatefulAgentWorkflow @Inject constructor(
 
         var systemPrompt = promptProvider.build(currentContext)
         val aiProvider = getActiveProvider(currentContext.sessionId)
+        // 压缩失败后本轮（本次用户请求内）不再重复尝试压缩，避免每次 LLM 调用都白试一次。
+        var compactionAttemptFailed = false
 
         while (!state.isFinished && actionQueue.isNotEmpty()) {
             val action = actionQueue.removeFirst()
@@ -420,10 +422,16 @@ class StatefulAgentWorkflow @Inject constructor(
                         val providerInUse = visionProvider ?: aiProvider
                         // 压缩轮：若配置了压缩专用模型，使用独立压缩模型压缩
                         val compactionProvider = resolveCompactionFallbackProvider(currentContext.sessionId) ?: providerInUse
-                        val sessionLastInputTokens = currentContext.sessionId?.let { sessionUseCase.getSessionById(it)?.lastInputTokens } ?: 0
-                        val compactedMessages = contextCompactor.compactIfNeeded(state.messages, compactionProvider, context.sessionId, lastInputTokens = sessionLastInputTokens) { send(it) }
-                        if (compactedMessages !== state.messages) {
-                            state = state.copy(messages = compactedMessages)
+                        var compactedMessages = state.messages
+                        if (!compactionAttemptFailed) {
+                            val sessionLastInputTokens = currentContext.sessionId?.let { sessionUseCase.getSessionById(it)?.lastInputTokens } ?: 0
+                            compactedMessages = contextCompactor.compactIfNeeded(state.messages, compactionProvider, context.sessionId, lastInputTokens = sessionLastInputTokens, windowProvider = aiProvider) { event ->
+                                if (event is AgentEvent.CompactionFailed) compactionAttemptFailed = true
+                                send(event)
+                            }
+                            if (compactedMessages !== state.messages) {
+                                state = state.copy(messages = compactedMessages)
+                            }
                         }
 
                         val acc = StringBuilder()

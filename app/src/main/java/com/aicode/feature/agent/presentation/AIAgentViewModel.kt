@@ -200,7 +200,6 @@ class AIAgentViewModel @Inject constructor(
                 ChatMessagesState(
                     sessionId = id,
                     messages = list.asSequence()
-                        .filterNot { it.isContextSummary }
                         .filterNot {
                             it.role == MessageRole.ASSISTANT.name &&
                                 !it.content.hasVisibleContent() &&
@@ -676,6 +675,17 @@ class AIAgentViewModel @Inject constructor(
                     AgentEvent.CompactionFinished -> {
                         setCompacting(sessionId, false)
                     }
+                    is AgentEvent.CompactionFailed -> {
+                        setCompacting(sessionId, false)
+                        // 落库为无配对的 TOOL 消息：UI 渲染失败卡片，buildHistory 回放自动丢弃，不进模型上下文。
+                        messagePersistenceUseCase.persist(
+                            sessionId,
+                            MessageRole.TOOL,
+                            event.reason,
+                            toolName = COMPACTION_FAILURE_TOOL_NAME,
+                            isError = true
+                        )
+                    }
                     is AgentEvent.AssistantText -> {
                         val normalized = if (event.content.hasVisibleContent()) event.content else ""
                         val reasoning = event.reasoning.takeIf { it.hasVisibleContent() }
@@ -690,12 +700,12 @@ class AIAgentViewModel @Inject constructor(
                             outputTokens = event.outputTokens
                         )
                         if (event.inputTokens > 0 || event.outputTokens > 0) {
-                            viewModelScope.launch {
-                                runCatching {
-                                    chatSessionDao.addTokenUsage(sessionId, event.inputTokens, event.outputTokens)
-                                    if (event.inputTokens > 0) {
-                                        chatSessionDao.updateLastInputTokens(sessionId, event.inputTokens)
-                                    }
+                            // 同步写库：工具循环下一轮 CallLlm 前会重读 lastInputTokens 判断压缩，
+                            // 异步写库可能读到压缩前的旧大值导致重复触发压缩。
+                            runCatching {
+                                chatSessionDao.addTokenUsage(sessionId, event.inputTokens, event.outputTokens)
+                                if (event.inputTokens > 0) {
+                                    chatSessionDao.updateLastInputTokens(sessionId, event.inputTokens)
                                 }
                             }
                         }
@@ -970,20 +980,36 @@ class AIAgentViewModel @Inject constructor(
         sessionJobs[sid]?.let { if (it.isActive) return }
         val job = viewModelScope.launch {
             setCompacting(sid, true)
+            var failed = false
             try {
                 val changed = agentWorkflow.compactSession(sid) { event ->
                     when (event) {
                         is AgentEvent.CompactionStarted -> setCompacting(sid, true)
                         AgentEvent.CompactionFinished -> setCompacting(sid, false)
+                        is AgentEvent.CompactionFailed -> {
+                            failed = true
+                            setCompacting(sid, false)
+                            // 与自动压缩一致：落库无配对的 TOOL 消息渲染失败卡片，buildHistory 回放丢弃。
+                            messagePersistenceUseCase.persist(
+                                sessionId = sid,
+                                role = MessageRole.TOOL,
+                                content = event.reason,
+                                toolName = COMPACTION_FAILURE_TOOL_NAME,
+                                isError = true
+                            )
+                        }
                         else -> {}
                     }
                 }
-                val resultText = if (changed) context.getString(R.string.agent_context_compacted) else context.getString(R.string.agent_context_no_compaction)
-                messagePersistenceUseCase.persist(
-                    sessionId = sid,
-                    role = MessageRole.ASSISTANT,
-                    content = resultText
-                )
+                // 压缩成功时 marker 分隔线 + 摘要卡片已提供反馈，不再落库重复的提示气泡；
+                // 仅「无需压缩」（head 为空/无可压缩内容）时给出一条提示。
+                if (!failed && !changed) {
+                    messagePersistenceUseCase.persist(
+                        sessionId = sid,
+                        role = MessageRole.ASSISTANT,
+                        content = context.getString(R.string.agent_context_no_compaction)
+                    )
+                }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {

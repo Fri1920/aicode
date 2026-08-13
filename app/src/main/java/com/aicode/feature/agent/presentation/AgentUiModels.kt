@@ -37,6 +37,10 @@ data class AgentUIMessage(
     val reasoning: String? = null,
     // 上下文压缩内部锚点：不显示用户气泡，渲染为压缩分隔线。
     val isCompactionMarker: Boolean = false,
+    // 上下文压缩生成的摘要消息：渲染为可展开的压缩摘要卡片，颜色与工具调用区分。
+    val isContextSummary: Boolean = false,
+    // 上下文压缩失败记录（TOOL 消息）：渲染为可展开的失败卡片，展示失败原因。
+    val isCompactionFailure: Boolean = false,
     // 后台任务完成通知：参与模型上下文但不显示为普通用户气泡，渲染为轻量提示条。
     val isBackgroundNotification: Boolean = false,
     val inputTokens: Int = 0,
@@ -63,6 +67,12 @@ enum class MessageRole {
  * 也是 UI 层识别此类消息（不渲染为普通用户气泡）的依据。改这里需同步两边。
  */
 const val BACKGROUND_NOTIFICATION_PREFIX = "[系统通知 - 非用户输入]"
+
+/**
+ * 上下文压缩失败记录的 TOOL 消息 toolName。既是落库时的标记，也是 UI 识别失败卡片的依据；
+ * 该消息无配对 toolCallId，[MessagePersistenceUseCase.buildHistory] 回放时会自动丢弃，不进入模型上下文。
+ */
+const val COMPACTION_FAILURE_TOOL_NAME = "上下文压缩"
 
 /**
  * 一次会话消息查询的结果快照。
