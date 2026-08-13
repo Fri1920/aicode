@@ -36,6 +36,7 @@ import com.aicode.feature.terminal.domain.TabFinishedEvent
 import com.aicode.feature.terminal.domain.TAIL_LINES
 import com.aicode.feature.terminal.domain.TerminalSessionManager
 import com.aicode.feature.terminal.domain.takeTailLines
+import com.aicode.feature.workspace.domain.FileAccessProvider
 import com.aicode.feature.agent.domain.workflow.AgentEvent
 import com.aicode.feature.agent.domain.tool.ToolPermissionManager
 import com.aicode.feature.agent.domain.tool.ToolRegistry
@@ -97,6 +98,7 @@ class AIAgentViewModel @Inject constructor(
     private val backupManager: BackupManager,
     private val mcpManager: McpManager,
     private val agentSoundSettings: AgentSoundSettingsRepository,
+    val fileAccess: FileAccessProvider,
     @param:ApplicationContext private val context: Context
 ) : ViewModel(), SlashCommandContext {
 

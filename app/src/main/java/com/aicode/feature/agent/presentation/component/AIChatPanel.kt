@@ -25,6 +25,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -388,7 +389,14 @@ fun AIChatPanel(
     val connectionState = settingsViewModel?.connectionState?.collectAsStateWithLifecycle()?.value
     val isRemote = executionMode == com.aicode.feature.settings.data.repository.ExecutionMode.REMOTE_SSH
 
-    Scaffold(
+    val markdownImageTransformer = remember(viewModel.fileAccess) {
+        MarkdownImageTransformer(viewModel.fileAccess)
+    }
+
+    CompositionLocalProvider(
+        LocalMarkdownImageTransformer provides markdownImageTransformer
+    ) {
+        Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
@@ -608,6 +616,7 @@ fun AIChatPanel(
                 )
             }
         }
+    }
     }
 }
 

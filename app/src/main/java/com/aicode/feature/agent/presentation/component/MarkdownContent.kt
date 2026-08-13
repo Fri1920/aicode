@@ -144,6 +144,7 @@ internal fun MarkdownContent(
                 dimens = mdDimens,
                 // 关闭段落文本的 animateContentSize：快速流式更新下它会持续追赶目标高度，反而弹性抖动。
                 animations = markdownAnimations(animateTextSize = { this }),
+                imageTransformer = LocalMarkdownImageTransformer.current,
                 components = markdownComponents(
                     codeFence = {
                         MarkdownHighlightedCodeFence(
