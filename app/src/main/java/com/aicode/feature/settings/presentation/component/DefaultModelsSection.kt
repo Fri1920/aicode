@@ -348,7 +348,7 @@ private fun ModelSelectionRow(
         modifier = Modifier
             .fillMaxWidth()
             .clickable { onClick() }
-            .padding(vertical = Spacing.sm, horizontal = Spacing.xs),
+            .padding(vertical = Spacing.sm, horizontal = Spacing.lg),
         verticalAlignment = Alignment.CenterVertically
     ) {
         ModelLogoIcon(modelName = model, size = 20.dp)
