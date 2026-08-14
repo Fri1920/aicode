@@ -1,6 +1,7 @@
 package com.aicode.feature.git.presentation
 
 import android.content.Context
+import android.content.res.Configuration
 import androidx.annotation.StringRes
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -21,6 +22,8 @@ import com.aicode.feature.git.presentation.component.DiffData
 import com.aicode.feature.git.presentation.component.DiffRow
 import com.aicode.feature.git.presentation.component.highlightCode
 import com.aicode.feature.git.presentation.component.inferSyntaxLanguage
+import com.aicode.feature.settings.data.repository.AppThemeMode
+import com.aicode.feature.settings.data.repository.ThemeSettingsRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CancellationException
@@ -29,6 +32,7 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -43,7 +47,8 @@ import javax.inject.Inject
 @HiltViewModel
 class GitViewModel @Inject constructor(
     private val repository: GitRepository,
-    @param:ApplicationContext private val context: Context
+    @param:ApplicationContext private val context: Context,
+    private val themeSettings: ThemeSettingsRepository
 ) : ViewModel() {
 
     private companion object {
@@ -457,8 +462,10 @@ class GitViewModel @Inject constructor(
         val language = inferSyntaxLanguage(path)
 
         // 对旧/新文件整体各跑一次高亮，拿到全文的 token 区间；渲染时按行偏移截取对应 SpanStyle。
-        val oldHighlighted = highlightCode(oldContent, language)
-        val newHighlighted = highlightCode(newContent, language)
+        // 语法主题跟随当前 UI 主题，避免深色模式下 light 主题的 token 色（如 = 和 {}）看不清。
+        val darkMode = currentDarkMode()
+        val oldHighlighted = highlightCode(oldContent, language, darkMode)
+        val newHighlighted = highlightCode(newContent, language, darkMode)
 
         // 构建行号 + 高亮截取。oldLineOffsets/newLineOffsets 为每行在全文中的起始偏移。
         val oldOffsets = lineOffsets(oldContent)
@@ -484,6 +491,20 @@ class GitViewModel @Inject constructor(
         val added = rows.count { it.type == LineDiff.LineType.ADD }
         val removed = rows.count { it.type == LineDiff.LineType.REMOVE }
         return DiffData(path, oldRef, newRef, rows, added, removed)
+    }
+
+    /**
+     * 当前实际深色模式：AUTO 跟随系统，与 MainActivity 里 AIEditorTheme 的 darkTheme 判定保持一致。
+     */
+    private suspend fun currentDarkMode(): Boolean {
+        val themeMode = themeSettings.themeModeFlow.first()
+        val systemDark = (context.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) ==
+            Configuration.UI_MODE_NIGHT_YES
+        return when (themeMode) {
+            AppThemeMode.AUTO -> systemDark
+            AppThemeMode.DARK -> true
+            AppThemeMode.LIGHT -> false
+        }
     }
 
     /**

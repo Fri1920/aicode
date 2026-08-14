@@ -316,14 +316,15 @@ private fun LargeFileHint(diffData: DiffData, padding: androidx.compose.foundati
 /**
  * 对一段文本做语法高亮，返回带 SpanStyle 的 AnnotatedString。
  * language 为 null 时返回 null（调用方降级为纯文本）。
+ * darkMode 决定语法主题，须与当前 UI 主题一致，否则深色背景下 token 颜色不可见。
  */
-fun highlightCode(code: String, language: SyntaxLanguage?): AnnotatedString? {
+fun highlightCode(code: String, language: SyntaxLanguage?, darkMode: Boolean): AnnotatedString? {
     if (language == null || code.isBlank()) return null
     return try {
         val highlights = Highlights.Builder()
             .code(code)
             .language(language)
-            .theme(SyntaxThemes.default(darkMode = false))
+            .theme(SyntaxThemes.default(darkMode = darkMode))
             .build()
         val codeHighlights = highlights.getHighlights()
         buildAnnotatedString {
