@@ -2,12 +2,8 @@ package com.aicode.feature.settings.presentation.component
 
 import android.content.Intent
 import android.net.Uri
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
@@ -17,15 +13,13 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.aicode.R
-import com.aicode.core.theme.Spacing
 import com.aicode.feature.settings.presentation.UpdateCheckUiState
 
 /**
  * 检查更新结果弹窗（全局宿主渲染，自动/手动共用）。
- * 新版本弹窗内嵌从当前版本到最新版本的更新日志，可滚动。
+ * 新版本弹窗直接列出从当前版本到最新版本的更新日志，可滚动。
  */
 @Composable
 internal fun UpdateCheckDialog(
@@ -51,31 +45,15 @@ internal fun UpdateCheckDialog(
             onDismissRequest = onDismiss,
             title = { Text(stringResource(R.string.about_new_version_found)) },
             text = {
-                Column(
+                Text(
+                    text = state.changelog,
                     modifier = Modifier
                         .fillMaxWidth()
                         .verticalScroll(rememberScrollState())
-                        .heightIn(max = 320.dp)
-                ) {
-                    Text(
-                        text = stringResource(R.string.about_new_version_detail, currentVersion, state.latestTag),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Spacer(Modifier.height(Spacing.md))
-                    Text(
-                        text = stringResource(R.string.about_update_changelog),
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Spacer(Modifier.height(Spacing.xs))
-                    Text(
-                        text = state.changelog,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
+                        .heightIn(max = 320.dp),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             },
             confirmButton = { TextButton(onClick = onOpenRelease) { Text(stringResource(R.string.about_download)) } },
             dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.about_later)) } }

@@ -215,7 +215,6 @@
     <string name="about_up_to_date">已经是最新版本</string>
     <string name="about_up_to_date_detail">当前版本 v%1$s，已是 GitHub 上最新的 Release。</string>
     <string name="about_new_version_found">发现新版本</string>
-    <string name="about_new_version_detail">当前 v%1$s，最新 v%2$s。点击「前往下载」打开 GitHub Releases 页面获取最新 APK。</string>
     <string name="about_download">前往下载</string>
     <string name="about_later">稍后</string>
     <string name="about_check_failed">检查失败</string>
@@ -229,7 +228,6 @@
     <string name="update_channel_stable_desc">仅检测正式版更新</string>
     <string name="update_channel_latest">最新版</string>
     <string name="update_channel_latest_desc">包含预览版（RC）更新</string>
-    <string name="about_update_changelog">更新日志</string>
     <string name="about_no_changelog">暂无更新说明</string>
 
     <!-- Ask User Question -->

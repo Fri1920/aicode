@@ -104,12 +104,18 @@ class UpdateCheckService @Inject constructor(
         )
     }
 
-    /** 轻量清理 markdown：去掉行首标题符与粗体标记，保留纯文本便于直接阅读。 */
+    /** 轻量清理 markdown：去掉行首标题符与粗体标记，并删除 GitHub 自动生成的标题/链接行，保留纯文本便于直接阅读。 */
     private fun cleanMarkdown(text: String): String = text
         .lines()
-        .joinToString("\n") { it.trimEnd() }
-        .replace(Regex("^#{1,6}\\s+", RegexOption.MULTILINE), "")
-        .replace("**", "")
+        .map { it.trimEnd().replace("**", "") }
+        .map { it.replace(Regex("^#{1,6}\\s+"), "") }
+        .filterNot { line ->
+            val t = line.trim()
+            t.startsWith("What's Changed") ||
+                t.startsWith("What's New") ||
+                t.startsWith("Full Changelog:")
+        }
+        .joinToString("\n")
 
     private data class ReleaseInfo(
         val version: String,

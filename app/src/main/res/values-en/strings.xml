@@ -215,7 +215,6 @@
     <string name="about_up_to_date">Already up to date</string>
     <string name="about_up_to_date_detail">Current version v%1$s, already the latest Release on GitHub.</string>
     <string name="about_new_version_found">New version available</string>
-    <string name="about_new_version_detail">Current v%1$s, latest v%2$s. Tap "Download" to open GitHub Releases for the latest APK.</string>
     <string name="about_download">Download</string>
     <string name="about_later">Later</string>
     <string name="about_check_failed">Check failed</string>
@@ -229,7 +228,6 @@
     <string name="update_channel_stable_desc">Stable releases only</string>
     <string name="update_channel_latest">Latest</string>
     <string name="update_channel_latest_desc">Includes pre-releases (RC)</string>
-    <string name="about_update_changelog">Changelog</string>
     <string name="about_no_changelog">No changelog available</string>
 
     <!-- Ask User Question -->
