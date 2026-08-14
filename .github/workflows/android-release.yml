@@ -160,7 +160,15 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/v')
         run: |
           cur_tag="${GITHUB_REF_NAME}"
-          prev_tag=$(git tag --sort=-creatordate | grep -vE "^${cur_tag}$" | head -1)
+          # 正式版（vX.Y.Z 无后缀）从上一个正式版起算，包含整个发布周期（含全部 RC）的提交，
+          # 保证应用内检测更新能看到完整日志；RC/预发布从最近创建的 tag 起算（增量）。
+          if [[ "$cur_tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            prev_tag=$(git tag --sort=-creatordate | grep -E "^v[0-9]+\.[0-9]+\.[0-9]+$" | grep -vE "^${cur_tag}$" | head -1)
+            echo "正式版：从上一个正式版 ${prev_tag:-无} 起算 changelog（含全部 RC 提交）"
+          else
+            prev_tag=$(git tag --sort=-creatordate | grep -vE "^${cur_tag}$" | head -1)
+            echo "预发布：从最近 tag ${prev_tag:-无} 起算 changelog"
+          fi
           if [[ -z "$prev_tag" ]]; then
             echo "无历史 tag，列出最近 30 条提交"
             log=$(git log --oneline --no-decorate -30)
@@ -173,12 +181,16 @@ jobs:
           echo "body<<${delimiter}" >> "$GITHUB_OUTPUT"
           echo "## What's Changed" >> "$GITHUB_OUTPUT"
           echo "" >> "$GITHUB_OUTPUT"
-          echo "$log" | while IFS= read -r line; do
-            # 提取 commit hash 和 message，格式化为列表项
-            sha=$(echo "$line" | cut -d' ' -f1)
-            msg=$(echo "$line" | cut -d' ' -f2-)
-            echo "- ${msg} (${sha})" >> "$GITHUB_OUTPUT"
-          done
+          if [[ -z "$log" ]]; then
+            echo "- 无新增提交（与上次发布同一提交）" >> "$GITHUB_OUTPUT"
+          else
+            echo "$log" | while IFS= read -r line; do
+              # 提取 commit hash 和 message，格式化为列表项
+              sha=$(echo "$line" | cut -d' ' -f1)
+              msg=$(echo "$line" | cut -d' ' -f2-)
+              echo "- ${msg} (${sha})" >> "$GITHUB_OUTPUT"
+            done
+          fi
           echo "" >> "$GITHUB_OUTPUT"
           echo "**Full Changelog**: https://github.com/${{ github.repository }}/compare/${prev_tag}...${cur_tag}" >> "$GITHUB_OUTPUT"
           echo "${delimiter}" >> "$GITHUB_OUTPUT"
