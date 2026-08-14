@@ -44,6 +44,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -121,12 +122,16 @@ internal fun ChatInputBar(
         modifier = modifier.fillMaxWidth()
     ) {
         val imeInset = rememberImeBottomInset()
+        // 渐变终点固定在蒙版可视高度内：若跟随整个 Box（含 imeInset 被键盘拉长的部分），
+        // 键盘弹起时可见区域只占渐变前段，alpha 被摊薄到几乎透明——看起来像没有蒙版。
+        val maskGradientEndY = with(LocalDensity.current) { INPUT_BAR_MASK_HEIGHT.toPx() }
         Box(
             modifier = Modifier.fillMaxWidth()
         ) {
             // 半透明渐变蒙版：盖住输入框区域 + 导航栏（手势小白条）区域，滚动内容滑入时被遮罩
-            // （能看见但看不清）；高度含 IME inset 随键盘上移。注意 IME padding 不能加在外层
-            // Box 上——align(BottomCenter) 的子项对齐在 padding 内部，会漏掉导航栏那条区域。
+            // （能看见但看不清）；高度含 IME inset 随键盘上移，渐变在 INPUT_BAR_MASK_HEIGHT 内完成，
+            // 之下为纯色。注意 IME padding 不能加在外层 Box 上——align(BottomCenter) 的子项
+            // 对齐在 padding 内部，会漏掉导航栏那条区域。
             Box(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
@@ -137,7 +142,9 @@ internal fun ChatInputBar(
                             listOf(
                                 MaterialTheme.colorScheme.surface.copy(alpha = 0f),
                                 MaterialTheme.colorScheme.surface.copy(alpha = 0.98f)
-                            )
+                            ),
+                            startY = 0f,
+                            endY = maskGradientEndY
                         )
                     )
             )
