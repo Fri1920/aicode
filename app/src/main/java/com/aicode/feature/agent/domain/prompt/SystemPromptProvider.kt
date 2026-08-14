@@ -14,9 +14,8 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * 阶段二优化：增量式提示词更新 (SystemContext 化)
- * 拆分为独立的 Source 模块，并且为每个 Source 维护缓存和快照。
- * 对于高频变化的 WorkspaceSource，提供增量 Diff 逻辑，最大化节省冗余 Token，提升大模型 KV Cache 命中率。
+ * 按模块组装系统提示词：稳定基线放最前（享受 KV Cache），仅日期为低频变化。
+ * 每个 Source 维护内容缓存，避免重复读取与格式化。
  */
 @Singleton
 class SystemPromptProvider @Inject constructor(
@@ -110,29 +109,17 @@ class SystemPromptProvider @Inject constructor(
     private inner class WorkspaceSource : PromptSource {
         override fun build(ctx: AgentContext): String {
             val hasWorkspace = ctx.projectRoot.isNotBlank()
-            return """
-                当前上下文:
-                - 项目根目录: ${if (hasWorkspace) "~/workspace" else "（未选择工作区）"}
-                - 当前文件: ${ctx.currentFile ?: "无"}
-                - 选中的代码: ${ctx.selectedCode ?: "无"}
-                - 编程语言: ${ctx.language ?: "未知"}
-            """.trimIndent()
+            return "当前上下文:\n- 项目根目录: ${if (hasWorkspace) "~/workspace" else "（未选择工作区）"}"
         }
     }
 
     private inner class CurrentTimeSource : PromptSource {
         override fun build(ctx: AgentContext): String {
-            val formatter = java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss XXX")
+            val formatter = java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd")
             val currentTime = java.time.ZonedDateTime.now().format(formatter)
             return "[System] 当前本地时间: $currentTime"
         }
     }
-
-    // 会话级别的快照缓存 (Baseline & Snapshot)
-    data class SessionSnapshot(
-        val lastWorkspaceContext: String = ""
-    )
-    private val sessionSnapshots = ConcurrentHashMap<String, SessionSnapshot>()
 
     private inner class MemoryListSource : PromptSource {
         @Volatile private var cached: String? = null
@@ -177,21 +164,8 @@ class SystemPromptProvider @Inject constructor(
         val memoriesContent = memoryListSource.build(agentContext)
         val projectRules = projectRuleSource.build(agentContext)
         
-        // 2. 增量 Diff 处理 (仅针对高频变化的 Workspace)
-        val currentWorkspaceContext = workspaceSource.build(agentContext)
-        val sessionId = agentContext.sessionId ?: "default"
-        
-        val snapshot = sessionSnapshots[sessionId] ?: SessionSnapshot()
-        
-        val effectiveWorkspaceContent = if (snapshot.lastWorkspaceContext == currentWorkspaceContext) {
-            // 没有变化，维持基线不变，仅向大模型注入极简指令，大幅降低重复 Token 处理
-            "当前上下文: [未发生变化，请参考之前的会话记忆]"
-        } else {
-            // 发生变化，输出完整内容并更新本次快照；容量超限时整体重建，避免删除会话后残留累积。
-            if (sessionSnapshots.size > MAX_SESSION_SNAPSHOTS) sessionSnapshots.clear()
-            sessionSnapshots[sessionId] = snapshot.copy(lastWorkspaceContext = currentWorkspaceContext)
-            currentWorkspaceContext
-        }
+        // 2. Workspace 上下文固定输出（内容已精简，无需快照占位）
+        val effectiveWorkspaceContent = workspaceSource.build(agentContext)
 
         // 3. 组装最终提示词：把稳定不变的重头基线放最前面（享受 KV Cache），变化部分放末尾
         return buildString {
@@ -250,8 +224,6 @@ class SystemPromptProvider @Inject constructor(
         const val AGENTS_FILE = "AGENTS.md"
         const val CLAUDE_FILE = "CLAUDE.md"
         const val MAX_AGENTS_CHARS = 32_000
-        /** 会话快照缓存上限：删除会话后不会清理该 map，超限时整体重建防累积。 */
-        const val MAX_SESSION_SNAPSHOTS = 200
         val LEADING_COMMENT = Regex("(?s)^\\s*<!--.*?-->\\s*")
     }
 }
