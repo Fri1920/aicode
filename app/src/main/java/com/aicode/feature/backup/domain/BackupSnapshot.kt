@@ -103,7 +103,10 @@ data class ProviderDto(
     val selectedModel: String = "",
     val isEnabled: Boolean = true,
     val useFullUrl: Boolean = false,
-    val useResponseApi: Boolean = false
+    val useResponseApi: Boolean = false,
+    /** 提供商级缓存开关；null 表示旧备份无此字段，导入时回退默认值。 */
+    val anthropicCacheBreakpoints: Boolean? = null,
+    val openaiChatCacheKey: Boolean? = null
 )
 
 @Serializable

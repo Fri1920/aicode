@@ -77,6 +77,10 @@
     <string name="settings_title_follow_chat">跟随当前聊天模型</string>    <string name="settings_theme_title">外观主题</string>    <string name="theme_auto">自动</string>
     <string name="theme_dark">深色</string>
     <string name="theme_light">浅色</string>
+    <string name="provider_cache_anthropic_title">Anthropic 缓存断点</string>
+    <string name="provider_cache_anthropic_subtitle">为 system/工具/消息前缀打显式缓存断点，降低重复输入成本</string>
+    <string name="provider_cache_openai_chat_title">OpenAI 兼容缓存键</string>
+    <string name="provider_cache_openai_chat_subtitle">为 Chat Completion 请求发送 prompt_cache_key（仅第三方兼容服务支持）</string>
     <string name="settings_keepalive_title">后台运行保活</string>
     <string name="settings_keepalive_subtitle">显示前台通知，防止后台被杀</string>
     <string name="settings_agent_sound_title">Agent 完成通知</string>

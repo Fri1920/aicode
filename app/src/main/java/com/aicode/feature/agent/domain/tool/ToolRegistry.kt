@@ -1,11 +1,13 @@
 package com.aicode.feature.agent.domain.tool
 
-import java.util.concurrent.ConcurrentHashMap
+import java.util.Collections
 import javax.inject.Singleton
 
 @Singleton
 class ToolRegistry {
-    private val tools = ConcurrentHashMap<String, AgentTool>()
+    // LinkedHashMap 保留注册顺序（内置工具固定顺序 + MCP 动态追加），避免工具增删后
+    // 前缀顺序漂移打断隐式前缀缓存；synchronizedMap 保证并发注册/读取安全。
+    private val tools = Collections.synchronizedMap(LinkedHashMap<String, AgentTool>())
 
     fun register(name: String, tool: AgentTool) {
         tools[name] = tool
@@ -28,7 +30,9 @@ class ToolRegistry {
      * 写操作工具由 [com.aicode.feature.agent.domain.permission.ToolPermissionPolicyEngine] 在运行时拦截并返回 PLAN_MODE_REJECTED。
      */
     fun getAvailableTools(): List<AgentTool> {
-        return tools.values.toList()
+        synchronized(tools) {
+            return tools.values.toList()
+        }
     }
 
     fun hasTool(name: String): Boolean {

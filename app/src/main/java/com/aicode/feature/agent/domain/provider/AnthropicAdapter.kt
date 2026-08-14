@@ -42,19 +42,24 @@ class AnthropicAdapter @Inject constructor(
     override var providerId = ""
     override var logSessionId: String? = null
 
+    /** 是否启用显式缓存断点（cache_control）。默认开启；第三方兼容网关严格校验未知字段时由设置项关闭。 */
+    var cacheBreakpointsEnabled: Boolean = true
+
     override suspend fun complete(
         systemPrompt: String,
         messages: List<AgentMessage>,
         tools: List<AgentTool>,
         reasoningEffort: String?
     ): AIResponse {
-        val anthropicMessages = convertToAnthropicMessages(messages)
+        val anthropicMessages = convertToAnthropicMessages(messages, cacheBreakpointsEnabled)
 
-        val toolDefs = tools.takeIf { it.isNotEmpty() }?.map { tool ->
+        val toolDefs = tools.takeIf { it.isNotEmpty() }?.mapIndexed { index, tool ->
             AnthropicToolDefinition(
                 name = tool.name,
                 description = tool.description,
-                input_schema = tool.toJsonSchema()
+                input_schema = tool.toJsonSchema(),
+                // 断点预算有限（每请求最多 4 个），tools 只打最后一个。
+                cache_control = if (cacheBreakpointsEnabled && index == tools.lastIndex) CACHE_BREAKPOINT else null
             )
         }
 
@@ -63,7 +68,7 @@ class AnthropicAdapter @Inject constructor(
         val request = AnthropicMessageRequest(
             model = model,
             messages = anthropicMessages,
-            system = systemPrompt.ifBlank { null },
+            system = buildSystemPayload(systemPrompt),
             temperature = if (thinking != null) null else 0.7f,
             thinking = thinking,
             tools = toolDefs,
@@ -118,12 +123,13 @@ class AnthropicAdapter @Inject constructor(
         tools: List<AgentTool>,
         reasoningEffort: String?
     ): Flow<AIStreamChunk> = flow {
-        val anthropicMessages = convertToAnthropicMessages(messages)
-        val toolDefs = tools.takeIf { it.isNotEmpty() }?.map { tool ->
+        val anthropicMessages = convertToAnthropicMessages(messages, cacheBreakpointsEnabled)
+        val toolDefs = tools.takeIf { it.isNotEmpty() }?.mapIndexed { index, tool ->
             AnthropicToolDefinition(
                 name = tool.name,
                 description = tool.description,
-                input_schema = tool.toJsonSchema()
+                input_schema = tool.toJsonSchema(),
+                cache_control = if (cacheBreakpointsEnabled && index == tools.lastIndex) CACHE_BREAKPOINT else null
             )
         }
 
@@ -132,7 +138,7 @@ class AnthropicAdapter @Inject constructor(
         val request = AnthropicMessageRequest(
             model = model,
             messages = anthropicMessages,
-            system = systemPrompt.ifBlank { null },
+            system = buildSystemPayload(systemPrompt),
             temperature = if (thinking != null) null else 0.7f,
             thinking = thinking,
             tools = toolDefs,
@@ -308,15 +314,18 @@ class AnthropicAdapter @Inject constructor(
         return runCatching { Json.parseToJsonElement(trimmed).jsonObject }.getOrElse { JsonObject(emptyMap()) }
     }
 
-    private fun convertToAnthropicMessages(messages: List<AgentMessage>): MutableList<AnthropicMessage> {
+    private fun convertToAnthropicMessages(messages: List<AgentMessage>, addMessageBreakpoint: Boolean): MutableList<AnthropicMessage> {
         val result = mutableListOf<AnthropicMessage>()
         // 防御性跟踪：上一个 assistant 消息是否包含 tool_use
         var lastAssistantHadToolUse = false
+        // 最后一条普通 user 消息（非 tool_result）在 result 中的索引，供 messages 断点打点。
+        var lastPlainUserIndex: Int? = null
 
         for (message in messages) {
             when (message) {
                 is AgentMessage.UserMessage -> {
                     result.add(AnthropicMessage(role = "user", content = message.toAnthropicUserContent()))
+                    lastPlainUserIndex = result.lastIndex
                     lastAssistantHadToolUse = false
                 }
                 is AgentMessage.AssistantMessage -> {
@@ -375,7 +384,47 @@ class AnthropicAdapter @Inject constructor(
             }
         }
 
+        // messages 断点：打在最后一条普通 user 消息的 text 块上（Anthropic 不允许打在 tool_result/thinking/image 块）。
+        // 工具循环中最后一条 user 是 tool_result 时不打点，保持 system+tools 两个断点即可。
+        if (addMessageBreakpoint) {
+            val idx = lastPlainUserIndex
+            if (idx != null) {
+                val msg = result[idx]
+                val newContent = when (val c = msg.content) {
+                    is String -> listOf(
+                        AnthropicContentBlock(type = "text", text = c, cache_control = CACHE_BREAKPOINT)
+                    )
+                    is List<*> -> {
+                        val blocks = c.map { it as AnthropicContentBlock }
+                        val lastText = blocks.indexOfLast { it.type == "text" }
+                        if (lastText >= 0) {
+                            blocks.mapIndexed { i, b ->
+                                if (i == lastText) b.copy(cache_control = CACHE_BREAKPOINT) else b
+                            }
+                        } else {
+                            blocks
+                        }
+                    }
+                    else -> c
+                }
+                result[idx] = msg.copy(content = newContent)
+            }
+        }
+
         return result
+    }
+
+    /** 显式缓存断点值：Anthropic ephemeral prompt caching。 */
+    private fun buildSystemPayload(systemPrompt: String): Any? {
+        if (systemPrompt.isBlank()) return null
+        if (!cacheBreakpointsEnabled) return systemPrompt
+        return listOf(
+            mapOf(
+                "type" to "text",
+                "text" to systemPrompt,
+                "cache_control" to CACHE_BREAKPOINT
+            )
+        )
     }
 
     /** Convert a Map<String, Any> (from Gson) to a JsonObject */
@@ -427,5 +476,10 @@ class AnthropicAdapter @Inject constructor(
                 "data" to base64Data
             )
         )
+    }
+
+    private companion object {
+        /** 显式缓存断点：Anthropic ephemeral prompt caching。 */
+        val CACHE_BREAKPOINT = mapOf("type" to "ephemeral")
     }
 }

@@ -41,6 +41,13 @@ class OpenAIAdapter @Inject constructor(
     override var providerId = ""
     override var logSessionId: String? = null
 
+    /**
+     * 是否在 Chat Completion 路径发送 `prompt_cache_key`（缓存 shard 路由）。
+     * 默认关闭——OpenAI 官方 Chat Completion 不接受未知字段（400）；仅第三方兼容服务（DeepInfra/Cerebras 等）支持。
+     * Responses API 路径官方原生支持，无条件发送，不受本开关影响。
+     */
+    var chatCacheKeyEnabled: Boolean = false
+
     override suspend fun complete(
         systemPrompt: String,
         messages: List<AgentMessage>,
@@ -73,6 +80,8 @@ class OpenAIAdapter @Inject constructor(
                 "tools" to toolDefs
             )
             reasoningEffort?.let { request["reasoning"] = mapOf("effort" to it) }
+            // Responses API 官方原生支持 prompt_cache_key：同会话路由到同一缓存 shard。
+            logSessionId?.let { request["prompt_cache_key"] = it }
             AILogger.logRequest(logSessionId, "OpenAI", model, "POST", url, request)
 
             val response = try {
@@ -125,7 +134,8 @@ class OpenAIAdapter @Inject constructor(
             reasoning_effort = reasoningEffort,
             tools = toolDefs,
             tool_choice = if (toolDefs != null) "auto" else null,
-            stream = false
+            stream = false,
+            prompt_cache_key = if (chatCacheKeyEnabled) logSessionId else null
         )
         AILogger.logRequest(logSessionId, "OpenAI", model, "POST", url, request)
 
@@ -185,6 +195,7 @@ class OpenAIAdapter @Inject constructor(
                 "stream" to true
             )
             reasoningEffort?.let { request["reasoning"] = mapOf("effort" to it) }
+            logSessionId?.let { request["prompt_cache_key"] = it }
             AILogger.logRequest(logSessionId, "OpenAI", model, "POST", url, request)
             val rawSse = StringBuilder()
             try {
@@ -299,7 +310,8 @@ class OpenAIAdapter @Inject constructor(
             tools = toolDefs,
             tool_choice = if (toolDefs != null) "auto" else null,
             stream = true,
-            stream_options = StreamOptions(include_usage = true)
+            stream_options = StreamOptions(include_usage = true),
+            prompt_cache_key = if (chatCacheKeyEnabled) logSessionId else null
         )
         AILogger.logRequest(logSessionId, "OpenAI", model, "POST", url, request)
         // 累积原始 SSE，整轮结束（或失败）后整体落盘，避免高频写盘。

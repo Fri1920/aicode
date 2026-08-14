@@ -3,7 +3,8 @@ package com.aicode.feature.agent.data.remote.anthropic
 data class AnthropicMessageRequest(
     val model: String,
     val messages: List<AnthropicMessage>,
-    val system: String? = null,
+    // 纯文本或内容块数组（打 cache_control 断点时用块数组）。
+    val system: Any? = null,
     val max_tokens: Int = 16384,
     // 开启 extended thinking 时不能携带 temperature（官方要求），置 null 由 Gson 跳过该字段。
     val temperature: Float? = null,
@@ -34,13 +35,15 @@ data class AnthropicContentBlock(
     val content: String? = null, // for tool_result
     val is_error: Boolean? = null, // for tool_result
     val thinking: String? = null, // for thinking block：思考摘要文本
-    val signature: String? = null // for thinking block：加密签名，多轮/工具循环须原样回传
+    val signature: String? = null, // for thinking block：加密签名，多轮/工具循环须原样回传
+    val cache_control: Map<String, String>? = null // 显式缓存断点，仅 {type: ephemeral}
 )
 
 data class AnthropicToolDefinition(
     val name: String,
     val description: String,
-    val input_schema: Map<String, Any>
+    val input_schema: Map<String, Any>,
+    val cache_control: Map<String, String>? = null // 显式缓存断点，仅最后一个工具打点
 )
 
 data class AnthropicMessageResponse(

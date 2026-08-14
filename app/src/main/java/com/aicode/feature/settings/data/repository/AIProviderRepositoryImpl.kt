@@ -68,7 +68,9 @@ class AIProviderRepositoryImpl @Inject constructor(
             selectedModel = selectedModel.ifBlank { defaultModel },
             isEnabled = isEnabled,
             useFullUrl = useFullUrl,
-            useResponseApi = useResponseApi
+            useResponseApi = useResponseApi,
+            anthropicCacheBreakpoints = anthropicCacheBreakpoints,
+            openaiChatCacheKey = openaiChatCacheKey
         )
     }
 
@@ -84,7 +86,9 @@ class AIProviderRepositoryImpl @Inject constructor(
             models = models.joinToString("\n"),
             selectedModel = selectedModel,
             isEnabled = isEnabled,
-            useResponseApi = useResponseApi
+            useResponseApi = useResponseApi,
+            anthropicCacheBreakpoints = anthropicCacheBreakpoints,
+            openaiChatCacheKey = openaiChatCacheKey
         )
     }
 }

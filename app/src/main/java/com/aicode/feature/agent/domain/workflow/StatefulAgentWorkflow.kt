@@ -224,12 +224,17 @@ class StatefulAgentWorkflow @Inject constructor(
     /**
      * 根据 [config] 创建一个全新的、独立的 [AIProvider] 实例。
      * 用于识图回退和上下文压缩等独立请求场景，完全不占用或修改主对话所用的 Provider 单例。
+     * 同时把提供商级 LLM 缓存开关（Anthropic 断点 / OpenAI cache key）应用到实例。
      */
     private fun createStandaloneProvider(config: AIProviderConfig, sessionId: String?): AIProvider {
         val provider: AIProvider = when (config.type) {
-            ProviderType.ANTHROPIC -> AnthropicAdapter(anthropicApi)
+            ProviderType.ANTHROPIC -> AnthropicAdapter(anthropicApi).also {
+                it.cacheBreakpointsEnabled = config.anthropicCacheBreakpoints
+            }
             ProviderType.GEMINI -> GeminiAdapter(geminiApi)
-            else -> OpenAIAdapter(openAIApi)
+            else -> OpenAIAdapter(openAIApi).also {
+                it.chatCacheKeyEnabled = config.openaiChatCacheKey
+            }
         }
         provider.apiKey = config.apiKey
         provider.baseUrl = config.baseUrl

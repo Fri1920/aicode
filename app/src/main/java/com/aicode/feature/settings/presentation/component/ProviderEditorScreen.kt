@@ -132,6 +132,8 @@ fun ProviderEditorScreen(
     var baseUrl by remember { mutableStateOf(initialProvider?.baseUrl ?: "") }
     var useFullUrl by remember { mutableStateOf(initialProvider?.useFullUrl ?: false) }
     var useResponseApi by remember { mutableStateOf(initialProvider?.useResponseApi ?: false) }
+    var anthropicCacheBreakpoints by remember { mutableStateOf(initialProvider?.anthropicCacheBreakpoints ?: true) }
+    var openaiChatCacheKey by remember { mutableStateOf(initialProvider?.openaiChatCacheKey ?: false) }
     var isEnabled by remember { mutableStateOf(initialProvider?.isEnabled ?: true) }
     var type by remember { mutableStateOf(initialProvider?.type ?: ProviderType.OPENAI) }
     val providerId = remember { initialProvider?.id ?: System.currentTimeMillis().toString() }
@@ -180,7 +182,9 @@ fun ProviderEditorScreen(
         defaultModel = initialProvider?.defaultModel ?: "",
         models = models.toList(),
         selectedModel = initialProvider?.selectedModel ?: "",
-        useResponseApi = useResponseApi
+        useResponseApi = useResponseApi,
+        anthropicCacheBreakpoints = anthropicCacheBreakpoints,
+        openaiChatCacheKey = openaiChatCacheKey
     )
 
     // 新建场景下判断用户是否填写了实质内容：名称、API Key、Base URL 任一非空白，或已添加模型。
@@ -351,6 +355,22 @@ fun ProviderEditorScreen(
                                 title = stringResource(R.string.provider_response_api),
                                 checked = useResponseApi,
                                 onCheckedChange = { useResponseApi = it }
+                            )
+                            SettingsDivider()
+                            ProviderSwitchRow(
+                                title = stringResource(R.string.provider_cache_openai_chat_title),
+                                subtitle = stringResource(R.string.provider_cache_openai_chat_subtitle),
+                                checked = openaiChatCacheKey,
+                                onCheckedChange = { openaiChatCacheKey = it }
+                            )
+                        }
+                        if (type == ProviderType.ANTHROPIC) {
+                            SettingsDivider()
+                            ProviderSwitchRow(
+                                title = stringResource(R.string.provider_cache_anthropic_title),
+                                subtitle = stringResource(R.string.provider_cache_anthropic_subtitle),
+                                checked = anthropicCacheBreakpoints,
+                                onCheckedChange = { anthropicCacheBreakpoints = it }
                             )
                         }
                     }

@@ -620,11 +620,13 @@ class BackupManagerImpl @Inject constructor(
     // ── Entity ↔ DTO 转换 ──────────────────────────────────────
 
     private fun AIProviderEntity.toDto() = ProviderDto(
-        id, name, type, apiKey, baseUrl, defaultModel, models, selectedModel, isEnabled, useFullUrl, useResponseApi
+        id, name, type, apiKey, baseUrl, defaultModel, models, selectedModel, isEnabled, useFullUrl, useResponseApi,
+        anthropicCacheBreakpoints, openaiChatCacheKey
     )
 
     private fun ProviderDto.toEntity() = AIProviderEntity(
-        id, name, type, apiKey, baseUrl, defaultModel, models, selectedModel, isEnabled, useFullUrl, useResponseApi
+        id, name, type, apiKey, baseUrl, defaultModel, models, selectedModel, isEnabled, useFullUrl, useResponseApi,
+        anthropicCacheBreakpoints ?: true, openaiChatCacheKey ?: false
     )
 
     private fun GitCredentialEntity.toDto() = GitCredentialDto(id, host, username, token, label, isDefault, createdAt, updatedAt)

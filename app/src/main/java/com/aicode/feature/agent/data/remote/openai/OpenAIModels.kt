@@ -8,7 +8,9 @@ data class ChatCompletionRequest(
     val tools: List<OpenAIToolDefinition>? = null,
     val tool_choice: String? = null,
     val stream: Boolean = false,
-    val stream_options: StreamOptions? = null
+    val stream_options: StreamOptions? = null,
+    /** 缓存 shard 路由键（同会话请求路由到同一缓存分片）。仅第三方兼容服务支持，OpenAI 官方不接受该字段。 */
+    val prompt_cache_key: String? = null
 )
 
 data class OpenAIChatMessage(

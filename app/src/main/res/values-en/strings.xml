@@ -77,6 +77,10 @@
     <string name="settings_title_follow_chat">Follow current chat model</string>    <string name="settings_theme_title">Appearance</string>    <string name="theme_auto">Auto</string>
     <string name="theme_dark">Dark</string>
     <string name="theme_light">Light</string>
+    <string name="provider_cache_anthropic_title">Anthropic cache breakpoints</string>
+    <string name="provider_cache_anthropic_subtitle">Mark system/tools/messages prefixes with explicit cache breakpoints to cut repeated input cost</string>
+    <string name="provider_cache_openai_chat_title">OpenAI-compatible cache key</string>
+    <string name="provider_cache_openai_chat_subtitle">Send prompt_cache_key with Chat Completion requests (third-party compatible services only)</string>
     <string name="settings_keepalive_title">Background keepalive</string>
     <string name="settings_keepalive_subtitle">Foreground notification prevents background kill</string>
     <string name="settings_agent_sound_title">Agent completion notification</string>

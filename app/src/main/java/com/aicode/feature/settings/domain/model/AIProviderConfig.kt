@@ -13,7 +13,11 @@ data class AIProviderConfig(
     val selectedModel: String = defaultModel,
     val isEnabled: Boolean = true,
     val useFullUrl: Boolean = false,
-    val useResponseApi: Boolean = false
+    val useResponseApi: Boolean = false,
+    /** Anthropic 显式缓存断点（cache_control）。仅 ANTHROPIC 类型生效，默认开启。 */
+    val anthropicCacheBreakpoints: Boolean = true,
+    /** Chat Completion 路径发送 prompt_cache_key（shard 路由）。仅 OPENAI 类型生效，默认关闭。 */
+    val openaiChatCacheKey: Boolean = false
 ) {
     /** 实际生效的模型：优先 selectedModel，其次 defaultModel。 */
     val effectiveModel: String
