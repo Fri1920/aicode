@@ -6,7 +6,6 @@ import com.aicode.feature.agent.domain.container.ContainerInstaller
 import com.aicode.feature.agent.domain.memory.MemoryRepository
 import com.aicode.feature.agent.domain.memory.MemoryScope
 import com.aicode.feature.agent.domain.model.AgentContext
-import com.aicode.feature.agent.domain.model.AgentMode
 import com.aicode.feature.agent.domain.skill.SkillRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
@@ -51,30 +50,6 @@ class SystemPromptProvider @Inject constructor(
                     .replace(LEADING_COMMENT, "")
                     .trim()
             }.also { cached = it }
-        }
-    }
-
-    private inner class PlanModeSource : PromptSource {
-        @Volatile private var cached: String? = null
-
-        override fun build(ctx: AgentContext): String? {
-            if (ctx.mode != AgentMode.PLAN) return null
-            return cached ?: resolvePrompt("80-plan-mode.md")
-                .replace(LEADING_COMMENT, "")
-                .trim()
-                .also { cached = it }
-        }
-    }
-
-    private inner class AutoModeSource : PromptSource {
-        @Volatile private var cached: String? = null
-
-        override fun build(ctx: AgentContext): String? {
-            if (ctx.mode != AgentMode.AUTO) return null
-            return cached ?: resolvePrompt("81-auto-mode.md")
-                .replace(LEADING_COMMENT, "")
-                .trim()
-                .also { cached = it }
         }
     }
 
@@ -193,15 +168,10 @@ class SystemPromptProvider @Inject constructor(
     private val activeSkillsSource = ActiveSkillsSource()
     private val projectRuleSource = ProjectRuleSource()
     private val workspaceSource = WorkspaceSource()
-    private val planModeSource = PlanModeSource()
-    private val autoModeSource = AutoModeSource()
     private val currentTimeSource = CurrentTimeSource()
 
     fun build(agentContext: AgentContext): String {
         // 1. 获取各个 Source 的基线快照。
-        // PLAN/AUTO 模式提示词放在最前面（紧随静态规则之后），确保模型优先注意到模式约束
-        val planModeContent = planModeSource.build(agentContext)
-        val autoModeContent = autoModeSource.build(agentContext)
         val staticContent = staticRuleSource.build(agentContext)
         val skillsContent = activeSkillsSource.build(agentContext)
         val memoriesContent = memoryListSource.build(agentContext)
@@ -224,19 +194,8 @@ class SystemPromptProvider @Inject constructor(
         }
 
         // 3. 组装最终提示词：把稳定不变的重头基线放最前面（享受 KV Cache），变化部分放末尾
-        // PLAN 模式约束紧随静态规则之后，确保模型优先感知模式限制
         return buildString {
             append(staticContent)
-
-            planModeContent?.let {
-                append("\n\n")
-                append(it)
-            }
-
-            autoModeContent?.let {
-                append("\n\n")
-                append(it)
-            }
 
             skillsContent?.let {
                 append("\n\n")
