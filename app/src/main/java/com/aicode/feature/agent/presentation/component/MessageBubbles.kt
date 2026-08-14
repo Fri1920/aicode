@@ -72,7 +72,7 @@ internal fun AgentMessageItem(
     markdownCache: MarkdownRenderCache? = null,
     onRewindClick: ((String) -> Unit)? = null,
     onMoreClick: ((AgentUIMessage) -> Unit)? = null,
-    onToolCollapsed: (() -> Unit)? = null
+    onToolToggle: (() -> Unit)? = null
 ) {
     if (message.isCompactionMarker) {
         // 压缩内部锚点不再渲染分隔线：摘要卡片已提供压缩反馈，避免与卡片重复。
@@ -146,7 +146,7 @@ internal fun AgentMessageItem(
                             }
                         ) {
                         if (message.role == MessageRole.TOOL) {
-                            ToolMessageBody(message, liveOutput = liveOutput, onCollapsed = onToolCollapsed)
+                            ToolMessageBody(message, liveOutput = liveOutput, onToggle = onToolToggle)
                         } else {
                             val textColor = when (message.role) {
                                 MessageRole.USER -> MaterialTheme.colorScheme.onPrimary

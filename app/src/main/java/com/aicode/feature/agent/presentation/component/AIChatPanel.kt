@@ -493,16 +493,18 @@ fun AIChatPanel(
                                 markdownCache = markdownCache,
                                 onRewindClick = { viewModel.openRewindMenu(it) },
                                 onMoreClick = { messageForMenu = it },
-                                onToolCollapsed = {
-                                    // 折叠瞬间同步读折叠前布局：卡片顶部原本可见则保持原位（原位变矮），
-                                    // 顶部在视口上方（长卡片）则滚回顶部让标题可见，避免折叠后卡片跳出视口。
-                                    val layout = listState.layoutInfo
-                                    val topOffset = layout.visibleItemsInfo.firstOrNull { it.index == index }?.offset
+                                onToolToggle = {
+                                    // 用户主动展开/收起工具卡片：先暂停自动跟随，避免校准循环把视口拉走造成跳动；
+                                    // 用户滚回底部（isAtBottom 监测）时自动恢复跟随。
+                                    followBottom = false
+                                    // 折叠后卡片可能整体缩出视口上方（长卡片双击折叠）：等一帧按折叠后的布局判断，
+                                    // 仅当卡片完全不可见时才滚回顶部让标题可见；仍可见（含贴底）时不做任何主动滚动，
+                                    // 避免用折叠前的旧 offset 定位导致「收起时跳动、位置不对」。
                                     scope.launch {
                                         withFrameNanos { }
-                                        if (topOffset != null && topOffset >= 0) {
-                                            listState.scrollToItem(index, topOffset)
-                                        } else {
+                                        val layout = listState.layoutInfo
+                                        val item = layout.visibleItemsInfo.firstOrNull { it.index == index }
+                                        if (item == null || item.offset + item.size <= 0) {
                                             listState.animateScrollToItem(index)
                                         }
                                     }

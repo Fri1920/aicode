@@ -91,7 +91,7 @@ internal const val TOOL_SECTION_LINE_LIMIT = 20
 internal fun ToolMessageBody(
     message: AgentUIMessage,
     liveOutput: String? = null,
-    onCollapsed: (() -> Unit)? = null
+    onToggle: (() -> Unit)? = null
 ) {
     val streaming = liveOutput != null
     val running = streaming || message.content.startsWith(SessionUseCase.PENDING_TOOL_MARKER) ||
@@ -133,9 +133,8 @@ internal fun ToolMessageBody(
                 .fillMaxWidth()
                 .then(
                     if (expandable) Modifier.clickable {
-                        val wasExpanded = expanded
                         expanded = !expanded
-                        if (wasExpanded) onCollapsed?.invoke()
+                        onToggle?.invoke()
                     } else Modifier
                 ),
             verticalAlignment = Alignment.CenterVertically
@@ -238,7 +237,7 @@ internal fun ToolMessageBody(
                 modifier = Modifier.pointerInput(message.id) {
                     detectDoubleTapToCollapse {
                         expanded = false
-                        onCollapsed?.invoke()
+                        onToggle?.invoke()
                     }
                 }
             ) {
