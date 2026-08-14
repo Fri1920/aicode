@@ -68,8 +68,8 @@ AiCode 的系统提示词支持用户自定义覆盖。默认提示词随 App �
 | `50-safety.md` | 安全与可信边界 |
 | `60-tools-and-paths.md` | 工具说明与路径约定 |
 | `70-skills-and-mcp.md` | 技能与 MCP 集成说明 |
-| `80-plan-mode.md` | PLAN 计划模式专属约束 |
-| `81-auto-mode.md` | AUTO 自动模式专属约束 |
+| `80-plan-mode.md` | PLAN 模式提醒：切换/处于 PLAN 模式时随用户消息注入（不再进 system，避免切换时缓存前缀变化） |
+| `81-auto-mode.md` | AUTO 模式提醒：处于 AUTO 模式时随用户消息注入 |
 
 ## 6. 编辑方式
 

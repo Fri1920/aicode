@@ -96,6 +96,9 @@ class StatefulAgentWorkflow @Inject constructor(
         const val USER_REJECTED_CODE = "USER_REJECTED"
         const val TITLE_GENERATOR_FILE = "agent/title-generator.md"
         const val TITLE_MAX_CHARS = 50
+        /** 模式提醒提示词：复用 prompts 目录文件（用户可自定义覆盖），切换时随消息注入而非进 system。 */
+        const val MODE_REMINDER_PLAN_FILE = "80-plan-mode.md"
+        const val MODE_REMINDER_AUTO_FILE = "81-auto-mode.md"
         val LEADING_COMMENT = Regex("(?s)^\\s*<!--.*?-->\\s*")
     }
 
@@ -406,16 +409,18 @@ class StatefulAgentWorkflow @Inject constructor(
         var state = AgentSessionState()
         var currentTools = tools
         val actionQueue = ArrayDeque<AgentAction>()
+        // 模式提醒随最新用户消息注入（不进 system，避免切换时 system 前缀变化打断缓存）。
+        val modeReminder = buildModeReminder(currentContext.mode)
         actionQueue.addLast(
             AgentAction.InitRequest(
                 currentContext.history + AgentMessage.UserMessage(
-                    content = userRequest,
+                    content = if (modeReminder == null) userRequest else "$userRequest\n\n$modeReminder",
                     images = currentContext.inputImages
                 )
             )
         )
 
-        var systemPrompt = promptProvider.build(currentContext)
+        val systemPrompt = promptProvider.build(currentContext)
         val aiProvider = getEffectiveProvider(currentContext.sessionId)
         // 压缩失败后本轮（本次用户请求内）不再重复尝试压缩，避免每次 LLM 调用都白试一次。
         var compactionAttemptFailed = false
@@ -613,17 +618,18 @@ class StatefulAgentWorkflow @Inject constructor(
                                     val choice = planApprovalManager.awaitApproval(reason, currentContext.sessionId)
                                     if (choice == PlanApprovalChoice.APPROVE) {
                                         currentContext = newCtx
-                                        systemPrompt = promptProvider.build(currentContext)
+                                        // system 与 mode 已解耦（SystemPromptProvider 不再注入模式提示词），
+                                        // 切换不重建 systemPrompt，避免 system 前缀变化打断缓存；模式状态通过工具结果与下轮消息提醒告知。
+                                        rawResult += buildModeSwitchNotice(AgentMode.BUILD)
                                     } else {
                                         // 用户选择继续反馈，回滚到 PLAN 模式，修正工具结果让 AI 知道切换被取消
                                         currentContext = currentContext.copy(mode = AgentMode.PLAN)
-                                        systemPrompt = promptProvider.build(currentContext)
                                         rawResult = ToolResult.Error("用户拒绝了模式切换请求，请继续在 PLAN 模式下完善方案，待用户认可后再次申请切换。", "MODE_SWITCH_REJECTED").toTransportString()
                                         isError = true
                                     }
                                 } else {
                                     currentContext = newCtx
-                                    systemPrompt = promptProvider.build(currentContext)
+                                    rawResult += buildModeSwitchNotice(newCtx.mode)
                                 }
                             }
                             batchResults.add(ToolBatchResult(toolCall.id, toolCall.name, rawResult, isError, runResult.images, runResult.attachments))
@@ -886,6 +892,32 @@ class StatefulAgentWorkflow @Inject constructor(
             }
         }
         return currentContext to false
+    }
+
+    /**
+     * 当前模式提醒：随最新用户消息注入（借鉴 opencode SessionReminders 的思路）。
+     * 模式提示词不进 system——一旦切换就要重建 system、打断前缀缓存；
+     * 改为消息级提醒：每次用户请求拼在最新用户消息末尾，位置在消息流尾部，前缀保持稳定。
+     */
+    private fun buildModeReminder(mode: AgentMode): String? = when (mode) {
+        AgentMode.PLAN -> promptProvider.resolvePrompt(MODE_REMINDER_PLAN_FILE)
+            .replace(LEADING_COMMENT, "")
+            .trim()
+            .let { "【模式提醒】$it" }
+        AgentMode.AUTO -> promptProvider.resolvePrompt(MODE_REMINDER_AUTO_FILE)
+            .replace(LEADING_COMMENT, "")
+            .trim()
+            .let { "【模式提醒】$it" }
+        AgentMode.BUILD -> null
+    }
+
+    /** 工具切换成功后拼进 switchMode 工具结果的模式状态通知（当轮即可见，无需等下一条用户消息）。 */
+    private fun buildModeSwitchNotice(mode: AgentMode): String = when (mode) {
+        AgentMode.PLAN -> "\n\n" + promptProvider.resolvePrompt(MODE_REMINDER_PLAN_FILE)
+            .replace(LEADING_COMMENT, "")
+            .trim()
+        AgentMode.BUILD -> "\n\n【模式切换】计划已获用户批准，你已切换到 BUILD（构建）模式，可以开始执行计划。"
+        AgentMode.AUTO -> "\n\n【模式切换】你已切换到 AUTO（自动）模式。"
     }
 
     private fun extractInlineImages(result: ToolResult): List<AgentImage> {
