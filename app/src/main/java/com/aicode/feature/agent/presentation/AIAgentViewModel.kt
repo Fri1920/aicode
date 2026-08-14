@@ -361,13 +361,13 @@ class AIAgentViewModel @Inject constructor(
 
             _currentWorkspace.collectLatest { path ->
                 if (path.isBlank()) return@collectLatest
-                val existing = sessionUseCase.getFirstSessionOfWorkspace(path)
-                _currentSessionId.value = if (existing != null) {
-                    existing.id // ORDER BY updatedAt DESC：最近一条
+                // 复用最近一个空会话（未发送过消息），避免反复启动/切工作区堆积空会话；
+                // 最近会话已有内容则新建空白会话（与 newSession 防堆积策略一致）。
+                val recent = sessionUseCase.getFirstSessionOfWorkspace(path)
+                _currentSessionId.value = if (recent != null && sessionUseCase.isSessionEmpty(recent.id)) {
+                    recent.id
                 } else {
-                    val s = createSession(path)
-                    sessionUseCase.upsertSession(s)
-                    s.id
+                    createAndUpsertSession(path)
                 }
             }
         }
@@ -1140,14 +1140,16 @@ class AIAgentViewModel @Inject constructor(
         _currentSessionId.value?.let { return it }
         val ws = _currentWorkspace.value
         if (ws.isBlank()) return ""
-        val existing = sessionUseCase.getFirstSessionOfWorkspace(ws)
-        val id = if (existing != null) existing.id else {
-            val s = createSession(_currentWorkspace.value)
-            sessionUseCase.upsertSession(s)
-            s.id
-        }
+        val id = sessionUseCase.getFirstSessionOfWorkspace(ws)?.id ?: createAndUpsertSession(ws)
         _currentSessionId.value = id
         return id
+    }
+
+    /** 新建会话并落库，返回 id。 */
+    private suspend fun createAndUpsertSession(workspacePath: String): String {
+        val s = createSession(workspacePath)
+        sessionUseCase.upsertSession(s)
+        return s.id
     }
 
     /**

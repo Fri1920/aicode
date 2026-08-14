@@ -98,6 +98,6 @@ class SessionUseCase @Inject constructor(
     }
 
     suspend fun isSessionEmpty(sessionId: String): Boolean {
-        return agentMessageDao.getMessagesBySessionOnce(sessionId).isEmpty()
+        return !agentMessageDao.hasMessages(sessionId)
     }
 }

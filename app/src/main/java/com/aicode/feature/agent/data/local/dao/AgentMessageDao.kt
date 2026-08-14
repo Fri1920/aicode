@@ -41,6 +41,10 @@ interface AgentMessageDao {
     @Query("SELECT * FROM agent_messages WHERE id = :id LIMIT 1")
     suspend fun getMessageById(id: String): AgentMessageEntity?
 
+    /** 会话是否已有任何消息（LIMIT 1 快速判断，避免全量读取）。 */
+    @Query("SELECT EXISTS(SELECT 1 FROM agent_messages WHERE sessionId = :sessionId LIMIT 1)")
+    suspend fun hasMessages(sessionId: String): Boolean
+
     @Query("UPDATE agent_messages SET content = :content WHERE id = :id")
     suspend fun updateMessageContent(id: String, content: String)
 
