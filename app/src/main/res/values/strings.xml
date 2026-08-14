@@ -11,6 +11,7 @@
     <string name="settings_compaction_model">压缩模型</string>
     <string name="settings_title_model">标题总结模型</string>
     <string name="settings_mcp">MCP 服务器</string>
+    <string name="settings_skills">技能</string>
     <string name="settings_container">容器镜像</string>
     <string name="settings_log_no_files">还没有日志文件</string>
     <string name="settings_log_read_failed">读取日志失败: %1$s</string>
@@ -561,6 +562,18 @@
     <string name="mcp_type_stdio">stdio</string>
     <string name="mcp_tools_count">工具: %1$s/%2$s</string>
     <string name="mcp_details">详情</string>
+
+    <!-- Skills Settings -->
+    <string name="skills_empty">还没有安装技能</string>
+    <string name="skills_empty_hint">技能放在 ~/.aicode/skills/（全局）或项目 .aicode/skills/（项目级）目录，含 SKILL.md 即自动识别</string>
+    <string name="skills_no_project_skills">当前项目暂无技能</string>
+    <string name="skills_no_global_skills">暂无全局技能</string>
+    <string name="skills_enable">是否启用</string>
+    <string name="skills_summary">摘要</string>
+    <string name="skills_delete_confirm_title">删除技能</string>
+    <string name="skills_delete_confirm_message">将删除「%1$s」的技能目录，此操作不可恢复。确定删除？</string>
+    <string name="skills_description">描述</string>
+    <string name="skills_instructions">指令正文</string>
 
     <!-- MCP stdio Fields -->
     <string name="mcp_command">启动命令</string>

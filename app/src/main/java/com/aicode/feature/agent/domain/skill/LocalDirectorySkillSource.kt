@@ -5,6 +5,9 @@ import java.io.File
 import javax.inject.Inject
 import javax.inject.Singleton
 
+/**
+ * 全局技能来源：`aicodeDir/skills`（容器内 `/root/.aicode/skills`），跨项目、跨升级保留。
+ */
 @Singleton
 class LocalDirectorySkillSource @Inject constructor(
     private val containerInstaller: ContainerInstaller
@@ -14,22 +17,8 @@ class LocalDirectorySkillSource @Inject constructor(
         File(containerInstaller.aicodeDir, "skills").also { it.mkdirs() }
     }
 
-    override fun listSkills(): List<Skill> {
-        if (!skillsRoot.exists()) return emptyList()
-        val skillFiles = skillsRoot.walkTopDown()
-            .maxDepth(4) // 允许一定的嵌套深度（比如 repo/skills/my-skill/SKILL.md）
-            .filter { it.isFile && (it.name.equals("SKILL.md", ignoreCase = true) || it.name.equals("CLAUDE.md", ignoreCase = true)) }
-            .toList()
+    override fun listSkills(): List<Skill> = SkillDirectoryScanner.scan(skillsRoot)
 
-        return skillFiles.mapNotNull { file -> file.parentFile }
-            .distinct() // 如果同一个目录下同时存在这两种文件，只解析一次
-            .mapNotNull { dir -> SkillParser.parse(dir) }
-            .sortedBy { it.name.lowercase() }
-    }
-
-    override fun loadInstructions(name: String): String? {
-        return listSkills()
-            .firstOrNull { it.name.equals(name, ignoreCase = true) }
-            ?.instructions
-    }
+    override fun loadInstructions(name: String): String? =
+        listSkills().firstOrNull { it.name.equals(name, ignoreCase = true) }?.instructions
 }

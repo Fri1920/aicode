@@ -96,6 +96,10 @@ class AIEditorApp : Application(), Configuration.Provider {
     @Inject
     lateinit var permissionRulesRepository: com.aicode.feature.agent.domain.permission.PermissionRulesRepository
 
+    /** 技能配置仓库：启动即监听技能目录与 skills.json 外部变更，改动数秒内刷新技能列表。 */
+    @Inject
+    lateinit var skillConfigRepository: com.aicode.feature.agent.domain.skill.SkillConfigRepository
+
     /** git 凭据/署名落盘同步器：启动即把 Room 凭据 + DataStore 署名写到容器持久挂载目录，
      *  供终端/AI/UI 三端 git 经 credential.helper=store 共用，兜底 rootfs 升级或文件被删。 */
     @Inject
@@ -222,6 +226,7 @@ class AIEditorApp : Application(), Configuration.Provider {
         // 启动即监听 mcp.json / permissions.json 的外部直接编辑：改动数秒内刷新设置页列表并重连。
         appScope.launch { mcpConfigRepository.startWatching() }
         appScope.launch { permissionRulesRepository.startWatching() }
+        appScope.launch { skillConfigRepository.startWatching() }
         // 语言切换由 MainActivity 的 attachBaseContext + recreate() 统一管理。
         // MainActivity 继承 ComponentActivity（非 AppCompatActivity），
         // AppCompatDelegate.setApplicationLocales 的自动 recreate 不生效，

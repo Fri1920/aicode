@@ -23,6 +23,9 @@ import com.aicode.feature.agent.domain.mcp.McpServerStatus
 import com.aicode.feature.agent.domain.mcp.McpToolDescriptor
 import com.aicode.feature.agent.domain.permission.PermissionRule
 import com.aicode.feature.agent.domain.permission.PermissionRulesRepository
+import com.aicode.feature.agent.domain.skill.SkillConfigRepository
+import com.aicode.feature.agent.domain.skill.SkillRepository
+import com.aicode.feature.agent.domain.skill.SkillScope
 import com.aicode.feature.settings.data.remote.ModelApiService
 import com.aicode.feature.settings.data.remote.ModelMetadataService
 import com.aicode.feature.settings.data.remote.ModelTestResult
@@ -129,6 +132,15 @@ data class TokenStatsUiState(
     val recentCallCosts: Map<Long, Double?> = emptyMap()
 )
 
+/** 技能列表页的 UI 状态：技能 + 来源作用域 + 启停状态。 */
+data class SkillUiEntry(
+    val name: String,
+    val description: String,
+    val scope: SkillScope,
+    val disabled: Boolean,
+    val instructions: String
+)
+
 /**
  * 把趋势聚合补全为周期内的完整时间轴：无记录的天/小时补 0，避免周期内调用集中在同一天时
  * 趋势只有单个点而无法绘制折线图。「全部」周期从最早有记录的那天起补到当天。
@@ -170,6 +182,8 @@ class SettingsViewModel @Inject constructor(
     private val mcpConfigRepository: McpConfigRepository,
     private val mcpManager: McpManager,
     private val permissionRulesRepository: PermissionRulesRepository,
+    private val skillRepository: SkillRepository,
+    private val skillConfigRepository: SkillConfigRepository,
     private val visionModelSettingsRepository: VisionModelSettingsRepository,
     private val compactionModelSettingsRepository: CompactionModelSettingsRepository,
     private val titleModelSettingsRepository: TitleModelSettingsRepository,
@@ -252,6 +266,9 @@ class SettingsViewModel @Inject constructor(
 
     private val _mcpEntries = MutableStateFlow<List<McpServerEntry>>(emptyList())
     val mcpEntries: StateFlow<List<McpServerEntry>> = _mcpEntries.asStateFlow()
+
+    private val _skills = MutableStateFlow<List<SkillUiEntry>>(emptyList())
+    val skills: StateFlow<List<SkillUiEntry>> = _skills.asStateFlow()
 
     val mcpStatuses: StateFlow<List<McpServerStatus>> = mcpManager.statuses
 
@@ -420,6 +437,16 @@ class SettingsViewModel @Inject constructor(
             }
 
             launch {
+                skillConfigRepository.changes.collectLatest {
+                    refreshSkills()
+                }
+            }
+
+            launch {
+                refreshSkills()
+            }
+
+            launch {
                 permissionRulesRepository.globalRulesFlow.collectLatest {
                     _globalRules.value = it
                 }
@@ -551,6 +578,39 @@ class SettingsViewModel @Inject constructor(
             } finally {
                 _mcpReloading.value = false
             }
+        }
+    }
+
+    /** 重新扫描技能（进入设置页 / 启停切换后调用，反映磁盘上增删改）。 */
+    fun refreshSkills() {
+        viewModelScope.launch {
+            _skills.value = withContext(Dispatchers.IO) {
+                skillRepository.listAllSkills().map { entry ->
+                    SkillUiEntry(
+                        name = entry.skill.name,
+                        description = entry.skill.description,
+                        scope = entry.scope,
+                        disabled = skillRepository.isSkillDisabled(entry.skill.name),
+                        instructions = entry.skill.instructions
+                    )
+                }
+            }
+        }
+    }
+
+    /** 切换技能的启用/禁用状态（写入对应作用域的 skills.json）。 */
+    fun setSkillEnabled(name: String, enabled: Boolean, scope: SkillScope) {
+        viewModelScope.launch {
+            skillRepository.setSkillDisabled(name, !enabled, scope)
+            refreshSkills()
+        }
+    }
+
+    /** 删除指定作用域的技能（删除其目录，不可恢复），随后立即刷新列表。 */
+    fun deleteSkill(name: String, scope: SkillScope) {
+        viewModelScope.launch {
+            skillRepository.deleteSkill(name, scope)
+            refreshSkills()
         }
     }
 

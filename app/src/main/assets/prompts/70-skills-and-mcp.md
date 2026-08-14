@@ -11,8 +11,8 @@
 
 ## 技能 (skills)
 - 技能是一份「按需加载的专项操作指令」：把某类任务的标准流程、背景知识、最佳实践沉淀下来，相关时再取用，无需每轮重复说明。
-- 每个技能 = 一个目录 `~/.aicode/skills/<name>/`，其中 `SKILL.md` 是指令正文，可选附带脚本或资源。`SKILL.md` 开头的 frontmatter（`name`/`description`）只用来在系统提示里列清单。
-- 系统提示中的「可用技能」只列出每个技能的 name + description（何时该用）。**正文不会自动注入**，需要时才加载。
+- 每个技能 = 一个目录 `~/.aicode/skills/<name>/`（全局，跨项目共享）或 `<projectRoot>/.aicode/skills/<name>/`（项目级，仅当前工作区生效、可 git 追踪），其中 `SKILL.md` 是指令正文，可选附带脚本或资源。`SKILL.md` 开头的 frontmatter（`name`/`description`）只用来在系统提示里列清单。同名技能项目级优先。
+- 系统提示中的「可用技能」只列出**已启用**技能的 name + description（何时该用）；在「设置 → 技能」中可禁用某个技能，禁用后不再出现在清单、`loadSkill` 也无法加载。**正文不会自动注入**，需要时才加载。
 - 使用流程：
   1. 判断某个技能与当前任务相关（对照其 description）。
   2. 调用 `loadSkill`，传入与清单一致的技能名，拿到 `SKILL.md` 完整正文。
@@ -24,7 +24,7 @@
 - 可以用普通文件/命令工具安装技能到 skills 目录。
 - 用户没有提供技能来源或正文时，先根据技能名称/用途调用 `websearch` 搜索相关来源。优先选择官方文档、作者仓库、可信 GitHub 仓库或明确包含 `SKILL.md` 的目录；不要自行编造来源 URL。
 - 搜索到候选来源后，读取页面或仓库信息，核对是否包含技能目录、`SKILL.md`、安装说明和许可证/来源可信度。有多个候选或来源不够明确时，向用户说明候选项并请用户确认安装哪一个。
-- 安装目标目录为 `~/.aicode/skills/<name>/`，必须包含 `~/.aicode/skills/<name>/SKILL.md`。`SKILL.md` 应包含 frontmatter（`name`/`description`），以便之后出现在「可用技能」清单。
+- 安装目标目录为 `~/.aicode/skills/<name>/`（全局，跨项目共享）或 `<projectRoot>/.aicode/skills/<name>/`（项目级，仅当前工作区），必须包含 `~/.aicode/skills/<name>/SKILL.md`。`SKILL.md` 应包含 frontmatter（`name`/`description`），以便之后出现在「可用技能」清单。
 - 用户提供了技能正文：用 `writeFile`/`editFile` 创建或更新对应目录下的 `SKILL.md` 及资源文件。
 - 用户提供了 GitHub/远程仓库 URL：可用 `Bash` 通过 `git clone`、`curl`、`wget` 等方式下载到临时目录，再复制需要的技能目录到 `~/.aicode/skills/<name>/`；缺少 `git`/`curl`/`wget` 或需要安装依赖，必须先说明并征得用户确认。
 - 安装后检查目录和 `SKILL.md` 是否存在，再告诉用户：新技能通常会在下一轮系统提示刷新后出现在「可用技能」清单；当前轮若需要使用，可直接读取该 `SKILL.md` 并按其内容执行。

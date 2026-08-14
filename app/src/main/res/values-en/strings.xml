@@ -11,6 +11,7 @@
     <string name="settings_compaction_model">Compaction Model</string>
     <string name="settings_title_model">Title Model</string>
     <string name="settings_mcp">MCP Servers</string>
+    <string name="settings_skills">Skills</string>
     <string name="settings_container">Container Image</string>
     <string name="settings_log_no_files">No log files yet</string>
     <string name="settings_log_read_failed">Failed to read log: %1$s</string>
@@ -561,6 +562,18 @@
     <string name="mcp_type_stdio">stdio</string>
     <string name="mcp_tools_count">Tools: %1$s/%2$s</string>
     <string name="mcp_details">Details</string>
+
+    <!-- Skills Settings -->
+    <string name="skills_empty">No skills installed</string>
+    <string name="skills_empty_hint">Place skills in ~/.aicode/skills/ (global) or the project\'s .aicode/skills/ (project-level); directories containing SKILL.md are recognized automatically</string>
+    <string name="skills_no_project_skills">No skills for the current project</string>
+    <string name="skills_no_global_skills">No global skills</string>
+    <string name="skills_enable">Enable</string>
+    <string name="skills_summary">Summary</string>
+    <string name="skills_delete_confirm_title">Delete Skill</string>
+    <string name="skills_delete_confirm_message">This will delete the skill directory of \"%1$s\". This action cannot be undone. Delete?</string>
+    <string name="skills_description">Description</string>
+    <string name="skills_instructions">Instructions</string>
 
     <!-- MCP stdio Fields -->
     <string name="mcp_command">Command</string>

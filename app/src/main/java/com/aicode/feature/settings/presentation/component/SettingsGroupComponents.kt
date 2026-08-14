@@ -35,6 +35,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
@@ -74,6 +75,37 @@ import kotlinx.coroutines.launch
 @Composable
 internal fun settingsLightMode(): Boolean =
     MaterialTheme.colorScheme.background.luminance() > 0.5f
+
+/** 可折叠分组标题：点击展开/收起，右侧 chevron 指示状态。与工具授权页的分组一致。 */
+@Composable
+internal fun CollapsibleGroupHeader(
+    text: String,
+    expanded: Boolean,
+    onToggle: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onToggle)
+            .padding(start = Spacing.md, end = Spacing.sm, top = Spacing.sm, bottom = Spacing.xs),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelLarge.copy(fontSize = 13.sp),
+            color = if (settingsLightMode()) Color(0xFF8E8E93) else MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.weight(1f)
+        )
+        Icon(
+            imageVector = FeatherIcons.ChevronRight,
+            contentDescription = null,
+            tint = if (settingsLightMode()) Color(0xFFC7C7CC) else MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier
+                .size(16.dp)
+                .rotate(if (expanded) 90f else 0f)
+        )
+    }
+}
 
 /** 设置页背景：浅色模式用浅灰 #F8F8F8，深色模式沿用主题背景。 */
 @Composable

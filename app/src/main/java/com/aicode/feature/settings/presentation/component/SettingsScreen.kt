@@ -32,6 +32,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -49,14 +50,17 @@ import com.aicode.R
 import com.aicode.feature.agent.domain.mcp.McpServerEntry
 import com.aicode.feature.agent.domain.mcp.McpServerConfig
 import com.aicode.feature.agent.domain.mcp.McpServerStatus
+import com.aicode.feature.agent.presentation.component.MarkdownRenderCache
 import com.aicode.feature.backup.presentation.BackupSection
 import com.aicode.feature.settings.data.repository.AppThemeMode
 import com.aicode.feature.settings.domain.model.AIProviderConfig
 import com.aicode.feature.settings.domain.model.ModelMetadata
 import com.aicode.feature.settings.presentation.SettingsViewModel
+import com.aicode.feature.settings.presentation.SkillUiEntry
 import compose.icons.FeatherIcons
 import compose.icons.feathericons.ArrowLeft
 import compose.icons.feathericons.BarChart2
+import compose.icons.feathericons.Book
 import compose.icons.feathericons.Box
 import compose.icons.feathericons.Cloud
 import compose.icons.feathericons.Cpu
@@ -80,6 +84,8 @@ internal enum class SettingsSection(@param:StringRes val titleRes: Int) {
     ProviderEditor(R.string.settings_provider_editor),
     DefaultModels(R.string.settings_default_models),
     Mcp(R.string.settings_mcp),
+    Skills(R.string.settings_skills),
+    SkillDetail(R.string.settings_skills),
     Container(R.string.settings_container),
     Log(R.string.settings_log),
     Permissions(R.string.settings_permissions),
@@ -103,6 +109,7 @@ fun SettingsScreen(
     val mcpEntries by viewModel.mcpEntries.collectAsStateWithLifecycle()
     val mcpStatuses by viewModel.mcpStatuses.collectAsStateWithLifecycle()
     val mcpReloading by viewModel.mcpReloading.collectAsStateWithLifecycle()
+    val skills by viewModel.skills.collectAsStateWithLifecycle()
     val globalRules by viewModel.globalRules.collectAsStateWithLifecycle()
     val projectRules by viewModel.projectRules.collectAsStateWithLifecycle()
     val currentProjectName by viewModel.currentProjectName.collectAsStateWithLifecycle()
@@ -139,6 +146,10 @@ fun SettingsScreen(
     var editingProvider by remember { mutableStateOf<AIProviderConfig?>(null) }
     var showMcpDialog by remember { mutableStateOf(false) }
     var editingMcp by remember { mutableStateOf<McpServerEntry?>(null) }
+    var selectedSkill by remember { mutableStateOf<SkillUiEntry?>(null) }
+    var skillToDelete by remember { mutableStateOf<SkillUiEntry?>(null) }
+    // 技能正文 Markdown 解析缓存：详情页多次进入复用，避免重复解析卡顿
+    val skillMarkdownCache = remember { MarkdownRenderCache() }
     var showContainerAddSheet by remember { mutableStateOf(false) }
     var showThemeSheet by remember { mutableStateOf(false) }
     var showLanguageSheet by remember { mutableStateOf(false) }
@@ -149,9 +160,13 @@ fun SettingsScreen(
         when (section) {
             SettingsSection.ProviderEditor -> section = SettingsSection.Providers
             SettingsSection.Log -> section = logReturnSection
+            SettingsSection.SkillDetail -> section = SettingsSection.Skills
             else -> section = SettingsSection.Menu
         }
     }
+
+    // settingsViewModel 为 Activity 级共享实例，每次进入设置页重新扫描技能，反映磁盘增删改。
+    LaunchedEffect(Unit) { viewModel.refreshSkills() }
 
     // 提供商编辑为独立全屏页，直接渲染（不嵌套 Scaffold）
     if (section == SettingsSection.ProviderEditor) {
@@ -181,7 +196,15 @@ fun SettingsScreen(
         containerColor = settingsPageBackground(),
         topBar = {
             TopAppBar(
-                title = { Text(stringResource(section.titleRes)) },
+                title = {
+                    Text(
+                        text = if (section == SettingsSection.SkillDetail) {
+                            selectedSkill?.name ?: stringResource(section.titleRes)
+                        } else {
+                            stringResource(section.titleRes)
+                        }
+                    )
+                },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = settingsPageBackground(),
                     titleContentColor = MaterialTheme.colorScheme.onBackground
@@ -192,6 +215,8 @@ fun SettingsScreen(
                             onNavigateBack()
                         } else if (section == SettingsSection.Log) {
                             section = logReturnSection
+                        } else if (section == SettingsSection.SkillDetail) {
+                            section = SettingsSection.Skills
                         } else {
                             section = SettingsSection.Menu
                         }
@@ -311,6 +336,26 @@ fun SettingsScreen(
                     },
                     onDelete = { name, scope -> viewModel.deleteMcpServer(name, scope) }
                 )
+                SettingsSection.Skills -> SkillsSection(
+                    projectName = currentProjectName,
+                    entries = skills,
+                    onDelete = { skillToDelete = it },
+                    onOpenDetail = {
+                        selectedSkill = it
+                        section = SettingsSection.SkillDetail
+                    }
+                )
+                SettingsSection.SkillDetail -> selectedSkill?.let { entry ->
+                    SkillDetailSection(
+                        entry = entry,
+                        cache = skillMarkdownCache,
+                        onToggle = { enabled ->
+                            viewModel.setSkillEnabled(entry.name, enabled, entry.scope)
+                            // 同步更新详情页快照，开关立即响应
+                            selectedSkill = selectedSkill?.copy(disabled = !enabled)
+                        }
+                    )
+                }
                 SettingsSection.Container -> ContainerSection(
                     profiles = containerProfiles,
                     activeProfileId = activeProfileId,
@@ -427,6 +472,23 @@ fun SettingsScreen(
             }
         )
     }
+
+    skillToDelete?.let { target ->
+        AlertDialog(
+            onDismissRequest = { skillToDelete = null },
+            title = { Text(stringResource(R.string.skills_delete_confirm_title)) },
+            text = { Text(stringResource(R.string.skills_delete_confirm_message, target.name)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.deleteSkill(target.name, target.scope)
+                    skillToDelete = null
+                }) { Text(stringResource(R.string.common_delete)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { skillToDelete = null }) { Text(stringResource(R.string.common_cancel)) }
+            }
+        )
+    }
 }
 
 /** 设置首页：每个分区一个可点击的二级菜单入口。 */
@@ -465,6 +527,12 @@ internal fun SettingsMenu(
                 icon = FeatherIcons.Box,
                 title = stringResource(SettingsSection.Mcp.titleRes),
                 onClick = { onOpen(SettingsSection.Mcp) }
+            )
+            SettingsDivider()
+            SettingsRow(
+                icon = FeatherIcons.Book,
+                title = stringResource(SettingsSection.Skills.titleRes),
+                onClick = { onOpen(SettingsSection.Skills) }
             )
         }
 

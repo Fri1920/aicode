@@ -24,7 +24,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -116,37 +115,6 @@ internal fun PermissionsSection(
 
         FooterNote(stringResource(R.string.perm_whitelist_short))
         FooterNote(stringResource(R.string.perm_rules_short))
-    }
-}
-
-/** 可折叠分组标题：点击展开/收起，右侧 chevron 指示状态。 */
-@Composable
-private fun CollapsibleGroupHeader(
-    text: String,
-    expanded: Boolean,
-    onToggle: () -> Unit
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onToggle)
-            .padding(start = Spacing.md, end = Spacing.sm, top = Spacing.sm, bottom = Spacing.xs),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(
-            text = text,
-            style = MaterialTheme.typography.labelLarge.copy(fontSize = 13.sp),
-            color = if (settingsLightMode()) Color(0xFF8E8E93) else MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.weight(1f)
-        )
-        Icon(
-            imageVector = FeatherIcons.ChevronRight,
-            contentDescription = null,
-            tint = if (settingsLightMode()) Color(0xFFC7C7CC) else MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier
-                .size(16.dp)
-                .rotate(if (expanded) 90f else 0f)
-        )
     }
 }
 
