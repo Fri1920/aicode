@@ -28,6 +28,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -50,7 +51,9 @@ import com.aicode.core.theme.Spacing
 import compose.icons.FeatherIcons
 import compose.icons.feathericons.ChevronDown
 import compose.icons.feathericons.ChevronUp
+import compose.icons.feathericons.Clock
 import compose.icons.feathericons.Star
+import kotlinx.coroutines.delay
 
 @Composable
 internal fun ThinkingBubble() {
@@ -129,14 +132,39 @@ internal fun RetryingBubble(attempt: Int, maxRetries: Int) {
     }
 }
 
+/** 流式渲染节流：文本变化后延迟该时长再更新渲染文本，降低 md 解析频率。 */
+private const val STREAMING_RENDER_DEBOUNCE_MS = 120L
+
+/**
+ * 对持续增长的流式文本做节流渲染：首帧立即渲染当前文本，之后每次文本变化最多
+ * [STREAMING_RENDER_DEBOUNCE_MS] 更新一次。上游每个 delta 都携带完整累积文本，
+ * 若不节流，每个 token 都会触发一次完整 md 解析（长文本下解析慢、渲染滞后）。
+ * 返回的文本只用于渲染，折叠判定等实时逻辑仍直接用原始 [text]。
+ */
+@Composable
+private fun rememberThrottledStreamingText(text: String): String {
+    var renderText by remember { mutableStateOf(text) }
+    LaunchedEffect(text) {
+        if (renderText == text) return@LaunchedEffect
+        delay(STREAMING_RENDER_DEBOUNCE_MS)
+        if (renderText != text) renderText = text
+    }
+    return renderText
+}
+
 /**
  * 模型流式吐字时的实时气泡：左对齐、与助手气泡同款。
  * 尾部带三个跳动的点表示仍在生成。本轮结束后由落库的助手气泡接管。
  *
- * 流式阶段也渲染 Markdown，但使用采样文本降低解析频率；最终落库消息再走常规缓存渲染。
+ * 流式阶段也渲染 Markdown，但渲染文本经节流（见 [rememberThrottledStreamingText]），
+ * 降低解析频率避免滞后；最终落库消息再走常规缓存渲染。
  */
 @Composable
-internal fun StreamingBubble(text: String) {
+internal fun StreamingBubble(
+    text: String,
+    cache: MarkdownRenderCache? = null
+) {
+    val renderText = rememberThrottledStreamingText(text)
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.Start
@@ -149,8 +177,9 @@ internal fun StreamingBubble(text: String) {
         ) {
             Column(modifier = Modifier.padding(horizontal = Spacing.sm, vertical = Spacing.sm)) {
                 MarkdownContent(
-                    text = text,
-                    color = MaterialTheme.colorScheme.onSurface
+                    text = renderText,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    cache = cache
                 )
                 Spacer(Modifier.height(Spacing.sm))
                 TypingDots(color = MaterialTheme.colorScheme.primary, dotSize = 5.dp)
@@ -161,6 +190,13 @@ internal fun StreamingBubble(text: String) {
 
 /** 思维链折叠阈值：超过此行数视为过长，自动折叠为前 N 行 + 「展开剩余 X 行」。 */
 internal const val REASONING_COLLAPSE_LINE_LIMIT = 8
+
+/** 思考时长格式化：<1 分钟显示 `5s`，超过显示 `1:05`。 */
+private fun formatThinkingTime(seconds: Int): String {
+    val m = seconds / 60
+    val s = seconds % 60
+    return if (m > 0) "$m:${s.toString().padStart(2, '0')}" else "${s}s"
+}
 
 /**
  * 思考过程可折叠气泡：左对齐、浅色弱化，与正式回复区分。点击标题栏折叠/展开。
@@ -174,11 +210,24 @@ internal const val REASONING_COLLAPSE_LINE_LIMIT = 8
 internal fun ReasoningBubble(
     text: String,
     initiallyExpanded: Boolean = true,
-    cache: MarkdownRenderCache? = null
+    cache: MarkdownRenderCache? = null,
+    showTimer: Boolean = false
 ) {
     var userToggled by remember { mutableStateOf(false) }
     var expanded by remember { mutableStateOf(initiallyExpanded) }
+    // 思考计时：仅流式思考场景开启，组件挂载即开始、每秒累加，思考结束组件卸载自然停止
+    var elapsedSeconds by remember { mutableStateOf(0) }
+    LaunchedEffect(showTimer) {
+        if (!showTimer) return@LaunchedEffect
+        val start = System.currentTimeMillis()
+        while (true) {
+            elapsedSeconds = ((System.currentTimeMillis() - start) / 1000).toInt()
+            delay(1000)
+        }
+    }
     val lineCount = remember(text) { text.count { it == '\n' } + 1 }
+    // 折叠判定/折叠预览用实时文本，展开渲染用节流文本（流式思考时降低 md 解析频率）
+    val renderText = rememberThrottledStreamingText(text)
     val overThreshold = lineCount > REASONING_COLLAPSE_LINE_LIMIT
     // 自动折叠：仅在用户尚未手动 toggle 过时生效；用户手动展开/折叠后以用户选择为准
     val effectiveExpanded = if (userToggled) expanded else (initiallyExpanded && !overThreshold)
@@ -214,6 +263,21 @@ internal fun ReasoningBubble(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.weight(1f)
                     )
+                    if (showTimer) {
+                        Spacer(Modifier.width(Spacing.sm))
+                        Icon(
+                            FeatherIcons.Clock,
+                            contentDescription = null,
+                            tint = Brand.IconGray,
+                            modifier = Modifier.size(13.dp)
+                        )
+                        Spacer(Modifier.width(2.dp))
+                        Text(
+                            text = formatThinkingTime(elapsedSeconds),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                     Icon(
                         if (effectiveExpanded) FeatherIcons.ChevronUp else FeatherIcons.ChevronDown,
                         contentDescription = if (effectiveExpanded) stringResource(R.string.common_collapse) else stringResource(R.string.common_expand),
@@ -224,7 +288,7 @@ internal fun ReasoningBubble(
                 if (effectiveExpanded) {
                     Spacer(Modifier.height(Spacing.sm))
                     MarkdownContent(
-                        text = text,
+                        text = renderText,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         cache = cache,
                         compact = true,

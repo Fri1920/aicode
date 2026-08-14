@@ -7,7 +7,8 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -35,8 +36,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.AwaitPointerEventScope
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.PointerId
+import androidx.compose.ui.input.pointer.PointerInputScope
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.SpanStyle
@@ -54,6 +60,7 @@ import com.aicode.feature.agent.presentation.AgentUIMessage
 import compose.icons.FeatherIcons
 import compose.icons.feathericons.ChevronDown
 import compose.icons.feathericons.ChevronUp
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -81,7 +88,11 @@ internal const val TOOL_SECTION_LINE_LIMIT = 20
  * 对 edit_file / write_file 这类带结构化差异的结果，展开后以「+新增/−删除」的彩色差异视图呈现。
  */
 @Composable
-internal fun ToolMessageBody(message: AgentUIMessage, liveOutput: String? = null) {
+internal fun ToolMessageBody(
+    message: AgentUIMessage,
+    liveOutput: String? = null,
+    onCollapsed: (() -> Unit)? = null
+) {
     val streaming = liveOutput != null
     val running = streaming || message.content.startsWith(SessionUseCase.PENDING_TOOL_MARKER) ||
         message.content.startsWith(SessionUseCase.LEGACY_PENDING_TOOL_MARKER)
@@ -108,14 +119,24 @@ internal fun ToolMessageBody(message: AgentUIMessage, liveOutput: String? = null
             || (todoData != null && todoData.items.isNotEmpty()) || webSearchData != null)
     var expanded by remember(message.id) { mutableStateOf(edit != null || todoData != null) }
 
-    val toolLabel = if (edit != null) edit.path.substringAfterLast('/') else (message.toolName ?: stringResource(R.string.common_tool))
+    val toolLabel = message.toolName ?: stringResource(R.string.common_tool)
+    // 文件相关工具：从结构化 diff 或工具参数里取路径，统一按「工具名 + 路径 + 文件名」展示
+    val filePath = if (edit != null) {
+        edit.path
+    } else {
+        remember(message.toolArgs) { extractFilePathArg(message.toolArgs) }
+    }
 
     Column(modifier = Modifier.padding(horizontal = Spacing.sm, vertical = Spacing.sm)) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .then(
-                    if (expandable) Modifier.clickable { expanded = !expanded } else Modifier
+                    if (expandable) Modifier.clickable {
+                        val wasExpanded = expanded
+                        expanded = !expanded
+                        if (wasExpanded) onCollapsed?.invoke()
+                    } else Modifier
                 ),
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -125,24 +146,54 @@ internal fun ToolMessageBody(message: AgentUIMessage, liveOutput: String? = null
                 modifier = Modifier.weight(1f),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = toolLabel,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.Medium,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                if (edit == null && !argHint.isNullOrBlank()) {
-                    Spacer(Modifier.width(Spacing.sm))
+                if (!filePath.isNullOrBlank()) {
                     Text(
-                        text = argHint,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        style = MaterialTheme.typography.bodySmall,
+                        text = toolLabel,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Medium,
                         maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f, fill = false)
+                        overflow = TextOverflow.Ellipsis
                     )
+                    Spacer(Modifier.width(Spacing.xs))
+                    // 路径段（可省略）+ 文件名段（永远完整，优先级最高）
+                    val pathDir = filePath.substringBeforeLast('/')
+                    if (pathDir.isNotEmpty()) {
+                        Text(
+                            text = pathDir + "/",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = MaterialTheme.typography.labelMedium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f, fill = false)
+                        )
+                    }
+                    Text(
+                        text = filePath.substringAfterLast('/'),
+                        color = MaterialTheme.colorScheme.onSurface,
+                        style = MaterialTheme.typography.labelMedium,
+                        maxLines = 1
+                    )
+                } else {
+                    Text(
+                        text = toolLabel,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Medium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    if (!argHint.isNullOrBlank()) {
+                        Spacer(Modifier.width(Spacing.sm))
+                        Text(
+                            text = argHint,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = MaterialTheme.typography.bodySmall,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f, fill = false)
+                        )
+                    }
                 }
             }
             if (edit != null) {
@@ -185,9 +236,10 @@ internal fun ToolMessageBody(message: AgentUIMessage, liveOutput: String? = null
         } else if (expanded) {
             Column(
                 modifier = Modifier.pointerInput(message.id) {
-                    detectTapGestures(
-                        onDoubleTap = { expanded = false }
-                    )
+                    detectDoubleTapToCollapse {
+                        expanded = false
+                        onCollapsed?.invoke()
+                    }
                 }
             ) {
                 if (todoData != null && todoData.items.isNotEmpty()) {
@@ -233,6 +285,45 @@ private fun String.takeLastLines(maxLines: Int): String {
         }
     }
     return this
+}
+
+/**
+ * 双击折叠检测：detectTapGestures 的 awaitFirstDown 默认 requireUnconsumed=true，
+ * 而展开区内容包在 SelectionContainer / clickable 里会消费 down，导致首击被忽略、
+ * 双击永远不触发。这里首击不要求未消费，只做「快速连点两次」判定。
+ */
+private suspend fun PointerInputScope.detectDoubleTapToCollapse(onDoubleTap: () -> Unit) {
+    val viewConfig = viewConfiguration
+    awaitEachGesture {
+        val firstDown = awaitFirstDown(requireUnconsumed = false)
+        // 两次点击期间若发生明显位移（用户在滑动），放弃双击判定
+        if (!awaitTapOrSwipe(firstDown.id, firstDown.position, viewConfig.touchSlop)) return@awaitEachGesture
+        val secondDown = withTimeoutOrNull(viewConfig.doubleTapTimeoutMillis) {
+            awaitFirstDown(requireUnconsumed = false)
+        } ?: return@awaitEachGesture
+        if (secondDown.uptimeMillis - firstDown.uptimeMillis < viewConfig.doubleTapMinTimeMillis) {
+            return@awaitEachGesture
+        }
+        if ((secondDown.position - firstDown.position).getDistance() > viewConfig.touchSlop) {
+            return@awaitEachGesture
+        }
+        if (!awaitTapOrSwipe(secondDown.id, secondDown.position, viewConfig.touchSlop)) return@awaitEachGesture
+        onDoubleTap()
+    }
+}
+
+/** 等待指定指针抬起；期间若位移超过 slop（发生滑动），返回 false。 */
+private suspend fun AwaitPointerEventScope.awaitTapOrSwipe(
+    pointerId: PointerId,
+    downPosition: Offset,
+    slop: Float
+): Boolean {
+    while (true) {
+        val event = awaitPointerEvent(PointerEventPass.Main)
+        val change = event.changes.firstOrNull { it.id == pointerId } ?: continue
+        if ((change.position - downPosition).getDistance() > slop) return false
+        if (!change.pressed) return true
+    }
 }
 
 /**
@@ -345,47 +436,51 @@ internal fun DiffView(diff: String, startLine: Int) {
     val gutterColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
 
     Column(modifier = Modifier.fillMaxWidth()) {
-        SelectionContainer {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(Radius.sm))
-                    .background(MaterialTheme.colorScheme.background)
-                    .horizontalScroll(rememberScrollState())
-            ) {
-                var oldLineNo = startLine
-                var newLineNo = startLine
-                visibleLines.forEach { line ->
-                    val marker = line.firstOrNull()
-                    val (bg, fg) = when (marker) {
-                        '+' -> DiffAddBg to DiffAddText
-                        '-' -> DiffRemoveBg to DiffRemoveText
-                        else -> Color.Transparent to MaterialTheme.colorScheme.onSurfaceVariant
-                    }
-                    val lineNo = when (marker) {
-                        '-' -> oldLineNo++
-                        '+' -> newLineNo++
-                        else -> { val n = newLineNo; oldLineNo++; newLineNo++; n }
-                    }
-                    val gutter = lineNo.toString().padStart(gutterChars)
-                    val styled = buildAnnotatedString {
-                        withStyle(SpanStyle(color = gutterColor)) {
-                            append(gutter)
-                            append("  ")
+        // 横向滚动容器在外层、文本选择在内层：滚动手势优先，
+        // 避免 SelectionContainer 偶发抢占左右滑动（选择模式激活后拖动被选词消费）。
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(Radius.sm))
+                .background(MaterialTheme.colorScheme.background)
+                .horizontalScroll(rememberScrollState())
+        ) {
+            SelectionContainer {
+                Column {
+                    var oldLineNo = startLine
+                    var newLineNo = startLine
+                    visibleLines.forEach { line ->
+                        val marker = line.firstOrNull()
+                        val (bg, fg) = when (marker) {
+                            '+' -> DiffAddBg to DiffAddText
+                            '-' -> DiffRemoveBg to DiffRemoveText
+                            else -> Color.Transparent to MaterialTheme.colorScheme.onSurfaceVariant
                         }
-                        withStyle(SpanStyle(color = fg)) {
-                            append(line.ifEmpty { " " })
+                        val lineNo = when (marker) {
+                            '-' -> oldLineNo++
+                            '+' -> newLineNo++
+                            else -> { val n = newLineNo; oldLineNo++; newLineNo++; n }
                         }
+                        val gutter = lineNo.toString().padStart(gutterChars)
+                        val styled = buildAnnotatedString {
+                            withStyle(SpanStyle(color = gutterColor)) {
+                                append(gutter)
+                                append("  ")
+                            }
+                            withStyle(SpanStyle(color = fg)) {
+                                append(line.ifEmpty { " " })
+                            }
+                        }
+                        Text(
+                            text = styled,
+                            style = mono,
+                            softWrap = false,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(bg)
+                                .padding(horizontal = Spacing.sm, vertical = 1.dp)
+                        )
                     }
-                    Text(
-                        text = styled,
-                        style = mono,
-                        softWrap = false,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(bg)
-                            .padding(horizontal = Spacing.sm, vertical = 1.dp)
-                    )
                 }
             }
         }
@@ -575,5 +670,16 @@ internal fun toolArgHint(argsJson: String?): String? {
         val v = preferred.firstNotNullOfOrNull { obj[it] } ?: obj.values.firstOrNull()
         val str = (v as? JsonPrimitive)?.contentOrNull ?: v?.toString()
         str?.replace("\n", " ")?.trim()?.takeIf { it.isNotEmpty() }
+    }.getOrNull()
+}
+
+/** 从工具参数 JSON 中提取文件路径（readFile/editFile/writeFile 的 path 参数）。 */
+private fun extractFilePathArg(argsJson: String?): String? {
+    if (argsJson.isNullOrBlank()) return null
+    return runCatching {
+        val obj = Json.parseToJsonElement(argsJson).jsonObject
+        listOf("path", "file_path", "file").firstNotNullOfOrNull { key ->
+            (obj[key] as? JsonPrimitive)?.contentOrNull
+        }
     }.getOrNull()
 }

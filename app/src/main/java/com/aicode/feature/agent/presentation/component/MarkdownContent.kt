@@ -119,13 +119,20 @@ internal fun MarkdownContent(
     androidx.compose.runtime.CompositionLocalProvider(
         androidx.compose.material3.LocalContentColor provides color
     ) {
+        // rememberMarkdownState 必须无条件参与组合：若缓存命中就走 if 分支跳过它，其内部
+        // remember 状态会被 dispose；下一帧文本变化（流式增长/停顿后恢复）缓存 miss 重建时
+        // 初始状态是 Loading，会闪现原始 md 文本（解析/未解析反复横跳的根因）。
+        // 缓存只作为渲染加速：解析结果与当前文本一致时直接用；不一致但缓存命中当前文本时
+        // 用缓存；否则显示 retainState 保留的旧渲染结果，等待新解析完成，绝不显示 Loading。
+        val mdState = rememberMarkdownState(content = text, retainState = true)
+        val parseState by mdState.state.collectAsState()
         val cachedState = cache?.get(text)
-        val parsedState = if (cachedState != null) {
-            cachedState
-        } else {
-            val mdState = rememberMarkdownState(content = text, retainState = true)
-            val state by mdState.state.collectAsState()
-            state
+        // 委托属性不能智能转换，先取局部快照再判断
+        val currentState = parseState
+        val parsedState: MarkdownParseState = when {
+            currentState is MarkdownParseState.Success && currentState.content == text -> currentState
+            cachedState != null -> cachedState
+            else -> currentState
         }
 
         if (parsedState is MarkdownParseState.Success) {

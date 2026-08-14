@@ -16,9 +16,10 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.DrawerState
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -32,20 +33,21 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameNanos
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.aicode.R
-import com.aicode.core.theme.Brand
 import com.aicode.core.theme.Spacing
 import com.aicode.feature.agent.domain.tool.question.UserQuestionAnswer
 import com.aicode.feature.agent.presentation.AgentUIMessage
@@ -55,10 +57,9 @@ import com.aicode.feature.agent.presentation.hasVisibleContent
 import com.aicode.feature.settings.presentation.SettingsViewModel
 import com.aicode.feature.workspace.presentation.WorkspaceViewModel
 import java.io.File
-import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-internal val brandGradient = Brush.linearGradient(listOf(Brand.Blue, Brand.Sky))
 
 /**
  * 流式尾巴的三种状态，用于 [when] 分支分发。
@@ -69,15 +70,14 @@ internal val brandGradient = Brush.linearGradient(listOf(Brand.Blue, Brand.Sky))
  */
 private enum class TailKind { THINKING, STREAMING, COMPACTING, RETRYING, NONE }
 
-private data class AutoScrollSignal(
-    val streamingTextLength: Int,
-    val streamingReasoningLength: Int,
-    val runningToolMessageId: String?,
-    val runningToolTextLength: Int,
-    val isCompacting: Boolean,
-    val messageCount: Int,
-    val thinkingTail: Boolean
-)
+/** 悬浮层（横幅/面板/输入框）与最后一条消息的间距。 */
+private val FLOATING_LAYER_GAP_DP = 8.dp
+
+/** 内容底部驱动校准的容差（px）：最后内容底部超出安全区超过该值才向下校准，避免亚像素抖动。 */
+private const val AUTO_SCROLL_TOLERANCE_PX = 2
+
+/** 流式结束后尾巴保留时长（ms）：等落库消息接管，避免高度骤减导致视口上跳。 */
+private const val STREAMING_TAIL_RETAIN_MS = 150L
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -147,6 +147,14 @@ fun AIChatPanel(
     var messageForMenu by remember { mutableStateOf<AgentUIMessage?>(null) }
     var editingMessage by remember { mutableStateOf<AgentUIMessage?>(null) }
     val listState = rememberLazyListState()
+    // 贴底滚动留白：首帧测量前用兜底值（约输入框 + 间距），实测悬浮层高度后改为动态值，
+    // 横幅/面板/输入框任何形态下最后一条消息都停在悬浮层上方不被遮挡。
+    val inputBarBottomReserveDp = 156.dp
+    var floatingLayerHeightPx by remember { mutableStateOf(0) }
+    val inputBarReservePx = with(LocalDensity.current) {
+        (if (floatingLayerHeightPx > 0) floatingLayerHeightPx + FLOATING_LAYER_GAP_DP.toPx()
+        else inputBarBottomReserveDp.toPx()).toInt()
+    }
     val markdownCache = remember { MarkdownRenderCache() }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -240,6 +248,20 @@ fun AIChatPanel(
         takePictureLauncher.launch(uri)
     }
 
+    // 流式结束过渡：streamingText 清空后保留最后文本一小段（落库消息通常在此窗口内接管），
+    // 避免尾巴 item 高度骤减导致视口被 clamp 上移、露出历史消息（结束瞬间“闪回”看到用户消息）。
+    // 保留期内 StreamingBubble 内部节流会把渲染文本追平到最终文本，与落库消息无缝接力。
+    var tailStreamingText by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(streamingText) {
+        val st = streamingText
+        if (st != null && st.hasVisibleContent()) {
+            tailStreamingText = st
+        } else {
+            delay(STREAMING_TAIL_RETAIN_MS)
+            tailStreamingText = null
+        }
+    }
+
     // 自动滚动跟随
     var positionedSession by remember { mutableStateOf<String?>(null) }
     var followBottom by remember { mutableStateOf(true) }
@@ -251,24 +273,13 @@ fun AIChatPanel(
             val lastVisible = layout.visibleItemsInfo.lastOrNull()
                 ?: return@derivedStateOf true
             val lastIndex = layout.totalItemsCount - 1
-            val viewportBottom = layout.viewportEndOffset
+            // 到底 = 最后内容底部停在安全区（悬浮层上沿）附近，而非视口底：
+            // 判定更严格，避免用户拖走一小段后仍被判「在底部」而恢复跟随、立即被拉回。
+            val safeBottom = layout.viewportEndOffset - inputBarReservePx
             lastVisible.index >= lastIndex &&
-                (lastVisible.offset + lastVisible.size) <= viewportBottom + 4
+                (lastVisible.offset + lastVisible.size) <= safeBottom + AUTO_SCROLL_TOLERANCE_PX
         }
     }
-
-    val autoScrollSignal by rememberUpdatedState(
-        AutoScrollSignal(
-            streamingTextLength = streamingText?.length ?: 0,
-            streamingReasoningLength = streamingReasoning?.length ?: 0,
-            runningToolMessageId = runningTool.firstOrNull()?.messageId,
-            runningToolTextLength = runningTool.firstOrNull()?.text?.length ?: 0,
-            isCompacting = isCompacting,
-            messageCount = messages.size,
-            // 思考阶段：__reasoning__ 气泡存在且无正文流式时，尾部 __active__ 是空 Box。
-            thinkingTail = streamingReasoning?.isNotEmpty() == true && streamingText?.hasVisibleContent() != true
-        )
-    )
 
     // 用户开始拖拽：停止跟随。松手时若已到底则恢复跟随（旧逻辑）。
     // 额外：流式输出时内容持续增长，用户可能松手后又被「顶」离底部——
@@ -278,7 +289,14 @@ fun AIChatPanel(
         listState.interactionSource.interactions.collect { interaction ->
             when (interaction) {
                 is DragInteraction.Start -> followBottom = false
-                is DragInteraction.Stop, is DragInteraction.Cancel -> followBottom = isAtBottom
+                is DragInteraction.Stop, is DragInteraction.Cancel -> {
+                    // 松手后延迟判定是否恢复跟随：等惯性滚动稳定，
+                    // 避免「松手在底部但惯性上滑」被立即拉回。
+                    scope.launch {
+                        delay(150)
+                        followBottom = isAtBottom
+                    }
+                }
             }
         }
     }
@@ -288,28 +306,15 @@ fun AIChatPanel(
         }
     }
 
-    fun lastItemBottomOffset(index: Int): Int {
-        val layout = listState.layoutInfo
-        val viewportH = layout.viewportEndOffset - layout.viewportStartOffset
-        val size = layout.visibleItemsInfo.firstOrNull { it.index == index }?.size ?: 0
-        return size - viewportH
-    }
-
-    suspend fun ensureLastItemMeasured(index: Int) {
-        if (listState.layoutInfo.visibleItemsInfo.none { it.index == index }) {
-            listState.scrollToItem(index)
-            withFrameNanos { }
-        }
-    }
-
-    // 贴底跟随：与正文流式一致，用 animateScrollToItem 平滑滚动，collectLatest 自动取消
-    // 上一个未跑完的动画、新动画从当前位置平滑接管，视觉连续。
-    // 末条流式消息可能高于一屏，必须滚到末项底部；只 animateScrollToItem(lastIndex)
-    // 会把末项顶部对齐到视口顶部。
-    val snapToBottom: suspend (Int) -> Unit = { index ->
-        if (index >= 0) {
-            ensureLastItemMeasured(index)
-            listState.animateScrollToItem(index, lastItemBottomOffset(index))
+    // 贴底定位（发送消息、切换会话）：直接滚到锚点——scrollToItem 的目标 offset 使
+    // 最后一项底部恰好停在悬浮层上方（contentPadding 预留 reserve，滚到该位置即列表
+    // 可滚的最底部，无需依赖动画与逐步对齐）。
+    val snapToBottom: suspend () -> Unit = {
+        val lastIndex = listState.layoutInfo.totalItemsCount - 1
+        if (lastIndex >= 0) {
+            // 滚到列表可滚最底部：scrollToItem 的 offset 会被 clamp 到 maxScroll，
+            // 最后一项底部恰好停在 contentPadding 底部（= 悬浮层上沿预留），无需手算项高度。
+            listState.scrollToItem(lastIndex, Int.MAX_VALUE)
         }
     }
 
@@ -337,44 +342,79 @@ fun AIChatPanel(
             followBottom = true
             scope.launch {
                 kotlinx.coroutines.delay(0)
-                snapToBottom(listState.layoutInfo.totalItemsCount - 1)
+                snapToBottom()
             }
         }
     }
 
-    // 切换会话：把列表定位到最新一条，并恢复跟随。
+    // 切换会话：定位到最新内容并恢复跟随（之后由校准循环持续跟随）。
     LaunchedEffect(currentSessionId, messagesReady) {
         if (!messagesReady) return@LaunchedEffect
-        val target = messages.size - 1
-        if (target < 0) {
-            positionedSession = currentSessionId
-            followBottom = true
-            return@LaunchedEffect
-        }
         if (positionedSession != currentSessionId) {
-            snapToBottom(listState.layoutInfo.totalItemsCount - 1)
+            // 等一帧让 LazyColumn 按新会话完成重组，再滚到锚点（maxScroll）。
+            withFrameNanos { }
+            snapToBottom()
             positionedSession = currentSessionId
             followBottom = true
         }
     }
 
-    // 流式贴底跟随（聊天标准做法）。
-    // 监听 (流式文本长度/思考长度, 消息条数) 元组：每个吐字 delta（length 变）和每次落库
-    // （size 变）都触发一次瞬时贴底（scrollToItem）。思考与正文都按字符粒度触发，
-    // 内容增长多少立即滚多少，气泡始终贴底，无动画滞后与周期感。
-    // 注意：不能用 distinctUntilChanged() 包布尔谓词，只触发一次后去重，不再跟随（旧根因）。
-    // 注意：不能删 __active__ item（让 totalItemsCount 突减），anchor clamp 上跳（旧根因）。
+    // 锚点式常驻校准循环：锚点 = 最后内容底部恰好停在悬浮层（输入框）上沿。
+    // scrollToItem(最后一项, Int.MAX_VALUE) 会被 LazyColumn clamp 到可滚的最底部
+    // （contentPadding 底部预留 reserve 保证），即最后一项底部停在悬浮层上沿，
+    // 数学上任何时刻都成立——消息足够时，最后一条消息永不落入输入框之下，
+    // 且不依赖“最后可见项 == 最后一项”的高度假设（高度跳变时也不会算错目标）。
+    // 每帧检查最后可见项：最后内容被增长推下（底部超安全区）或有内容被推出视口下方
+    // （最后可见项不是最后一项，即跟丢）时，滚回锚点；md 异步解析的高度跳变也会在
+    // 下一帧被检测到，不存在信号与渲染错位。
+    // 只向下校准：内容变矮（流式结束、折叠）时保持当前位置，避免「往回滚」与拉锯。
     LaunchedEffect(listState, messagesReady) {
         if (!messagesReady) return@LaunchedEffect
-        snapshotFlow { autoScrollSignal }.collectLatest { signal ->
-            if (!followBottom) return@collectLatest
-            // 等一帧让新文本/新落库消息完成测量，scrollToItem 读到正确布局。
-            kotlinx.coroutines.delay(0)
-            val lastIndex = listState.layoutInfo.totalItemsCount - 1
-            // 思考阶段：尾部 __active__ 是空 Box，跟随目标改为思考内容（倒数第二），
-            // 让持续增长的思考文本始终贴底可见，避免跟随被顶出视口的空 Box 反复预跳抖动。
-            val target = if (lastIndex > 0 && signal.thinkingTail) lastIndex - 1 else lastIndex
-            snapToBottom(target)
+        while (true) {
+            withFrameNanos { }
+            if (!followBottom) continue
+            // 无向下滚动空间（内容不满屏或已滚到锚点）：最后内容必然在安全区上方，无需校准。
+            if (!listState.canScrollForward) continue
+            val layout = listState.layoutInfo
+            val lastIndex = layout.totalItemsCount - 1
+            if (lastIndex < 0) continue
+            val lastVisible = layout.visibleItemsInfo.lastOrNull()
+            // 最后内容被推出视口下方（最后一项不可见）：跟丢——直接滚回锚点。
+            // 用户在别处浏览时 followBottom 已为 false，不会走到这里。
+            if (lastVisible == null || lastVisible.index < lastIndex) {
+                listState.scrollToItem(lastIndex, Int.MAX_VALUE)
+                continue
+            }
+            val safeBottom = layout.viewportEndOffset - inputBarReservePx
+            val lastBottom = lastVisible.offset + lastVisible.size
+            if (lastBottom > safeBottom + AUTO_SCROLL_TOLERANCE_PX) {
+                listState.scrollToItem(lastIndex, Int.MAX_VALUE)
+            }
+        }
+    }
+
+    // 内容变化信号旁路：文本/思考/消息条数变化时立即校准一次，不等下一帧——
+    // 与常驻校准循环互为补充，覆盖「无动画帧」的间隙，杜绝跟丢窗口。
+    LaunchedEffect(listState, messagesReady) {
+        if (!messagesReady) return@LaunchedEffect
+        snapshotFlow {
+            Triple(streamingText?.length, streamingReasoning?.length, messages.size)
+        }.collect { _ ->
+            if (!followBottom) return@collect
+            if (!listState.canScrollForward) return@collect
+            val layout = listState.layoutInfo
+            val lastIndex = layout.totalItemsCount - 1
+            if (lastIndex < 0) return@collect
+            val lastVisible = layout.visibleItemsInfo.lastOrNull()
+            if (lastVisible == null || lastVisible.index < lastIndex) {
+                listState.scrollToItem(lastIndex, Int.MAX_VALUE)
+                return@collect
+            }
+            val safeBottom = layout.viewportEndOffset - inputBarReservePx
+            val lastBottom = lastVisible.offset + lastVisible.size
+            if (lastBottom > safeBottom + AUTO_SCROLL_TOLERANCE_PX) {
+                listState.scrollToItem(lastIndex, Int.MAX_VALUE)
+            }
         }
     }
 
@@ -418,11 +458,13 @@ fun AIChatPanel(
             )
         }
     ) { padding ->
-        Column(
+        Box(
             modifier = modifier
                 .fillMaxSize()
                 .padding(padding)
         ) {
+            // 内容层：消息列表延伸到屏幕底部，输入框悬浮其上，滚动时卡片可滑入输入框后面
+            Column(modifier = Modifier.fillMaxSize()) {
             Box(modifier = Modifier.weight(1f)) {
                 if (!messagesReady) {
                     // 远程模式连接未就绪时显示连接状态占位，避免空白或旧工作区记录闪烁
@@ -436,30 +478,40 @@ fun AIChatPanel(
                         state = listState,
                         modifier = Modifier.fillMaxSize(),
                         contentPadding = PaddingValues(
-                            horizontal = Spacing.lg,
-                            vertical = Spacing.md
+                            start = Spacing.lg,
+                            end = Spacing.lg,
+                            top = Spacing.md,
+                            bottom = with(LocalDensity.current) { inputBarReservePx.toDp() }
                         ),
                         verticalArrangement = Arrangement.spacedBy(Spacing.sm)
                     ) {
-                        items(messages, key = { it.id }, contentType = { it.role.name }) { message ->
+                        itemsIndexed(messages, key = { _, it -> it.id }, contentType = { _, it -> it.role.name }) { index, message ->
                             val live = runningTool.firstOrNull { it.messageId == message.id }?.text
                             AgentMessageItem(
                                 message = message,
                                 liveOutput = live,
                                 markdownCache = markdownCache,
                                 onRewindClick = { viewModel.openRewindMenu(it) },
-                                onMoreClick = { messageForMenu = it }
+                                onMoreClick = { messageForMenu = it },
+                                onToolCollapsed = {
+                                    // 折叠瞬间同步读折叠前布局：卡片顶部原本可见则保持原位（原位变矮），
+                                    // 顶部在视口上方（长卡片）则滚回顶部让标题可见，避免折叠后卡片跳出视口。
+                                    val layout = listState.layoutInfo
+                                    val topOffset = layout.visibleItemsInfo.firstOrNull { it.index == index }?.offset
+                                    scope.launch {
+                                        withFrameNanos { }
+                                        if (topOffset != null && topOffset >= 0) {
+                                            listState.scrollToItem(index, topOffset)
+                                        } else {
+                                            listState.animateScrollToItem(index)
+                                        }
+                                    }
+                                }
                             )
                         }
                         val reasoning = streamingReasoning
                         val showReasoning = reasoning != null && reasoning.isNotEmpty()
-                        if (showReasoning) {
-                            item(key = "__reasoning__", contentType = "tail") {
-                                // 流式实时：短文本默认展开边想边看，过长（超 REASONING_COLLAPSE_LINE_LIMIT）时由气泡内部自动折叠，不刷屏
-                                ReasoningBubble(text = reasoning.orEmpty(), initiallyExpanded = true, cache = markdownCache)
-                            }
-                        }
-                        val streaming = streamingText
+                        val streaming = tailStreamingText
                         val showStreaming = streaming != null && streaming.hasVisibleContent()
                         val showThinking = !showReasoning && !showStreaming && !isCompacting && isBusy && runningTool.isEmpty() && pendingPermission == null && pendingQuestion == null
                         val showRetrying = retryState != null && isBusy && !isCompacting && !showStreaming && !showReasoning
@@ -470,27 +522,42 @@ fun AIChatPanel(
                             showThinking -> TailKind.THINKING
                             else -> TailKind.NONE
                         }
-                        // 尾巴气泡：永远挂载 item，NONE 时为空 Box（0 高度）。
-                        // 注意：不能按 tailKind 增删 item；流结束时 __active__ 移除会让 totalItemsCount
-                        // 突减，LazyColumn 把 firstVisibleItemIndex 向下 clamp → 视口上跳（旧症状2根因）。
-                        // 永远挂载则 item 数量稳定，只在 StreamingBubble 和空 Box 间切换，
-                        // anchor 不会被 clamp。流结束落库后跟随 effect 会把新消息贴底。
+                        // 尾巴 item：思考气泡与状态尾巴合并进同一个永久挂载的 item，二者都不按状态增删。
+                        // 思考开始/结束或流式开始/结束若让 totalItemsCount 突增突减，LazyColumn 会把
+                        // firstVisibleItemIndex 向下 clamp → 视口上跳（旧症状2根因）。item 数量恒为 1，
+                        // anchor 不会被 clamp：showReasoning 时渲染思考气泡（内部自带折叠），否则为空；
+                        // tailKind 为 NONE 时尾巴为空 Box（0 高度）。流结束落库后跟随 effect 会把新消息贴底。
                         item(key = "__active__", contentType = "tail") {
-                            when (tailKind) {
-                                TailKind.THINKING -> ThinkingBubble()
-                                TailKind.STREAMING -> StreamingBubble(text = streaming ?: "")
-                                TailKind.COMPACTING -> CompactionProgressBubble()
-                                TailKind.RETRYING -> {
-                                    val rs = retryState
-                                    if (rs != null) RetryingBubble(rs.attempt, rs.maxRetries) else Box(Modifier)
+                            Column {
+                                if (showReasoning) {
+                                    // 流式实时：短文本默认展开边想边看，过长（超 REASONING_COLLAPSE_LINE_LIMIT）时由气泡内部自动折叠，不刷屏
+                                    ReasoningBubble(text = reasoning.orEmpty(), initiallyExpanded = true, cache = markdownCache, showTimer = true)
                                 }
-                                TailKind.NONE -> Box(Modifier)
+                                when (tailKind) {
+                                    TailKind.THINKING -> ThinkingBubble()
+                                    TailKind.STREAMING -> StreamingBubble(text = streaming ?: "", cache = markdownCache)
+                                    TailKind.COMPACTING -> CompactionProgressBubble()
+                                    TailKind.RETRYING -> {
+                                        val rs = retryState
+                                        if (rs != null) RetryingBubble(rs.attempt, rs.maxRetries) else Box(Modifier)
+                                    }
+                                    TailKind.NONE -> Box(Modifier)
+                                }
                             }
                         }
                     }
                 }
             }
+            } // 内容层结束
 
+            // 悬浮层：错误横幅 / 面板 / 输入框（蒙版在 ChatInputBar 内部，跟随键盘上移）
+            Column(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    // 实测悬浮层实际高度作为滚动留白，横幅/面板/输入框任何形态都不遮挡最后一条
+                    .onGloballyPositioned { if (it.size.height > 0) floatingLayerHeightPx = it.size.height }
+            ) {
             StatusBanner(state = agentState)
 
             AnimatedVisibility(
@@ -573,8 +640,10 @@ fun AIChatPanel(
                     if (contextLimit > 0) {
                         sessionLastInputTokens.toFloat() / contextLimit
                     } else 0f
-                }
+                },
+                modifier = Modifier.fillMaxWidth()
             )
+            } // 悬浮层结束
 
             targetRewindMessageId?.let { targetId ->
                 val targetMsg = messages.find { it.id == targetId }

@@ -3,17 +3,18 @@ package com.aicode.feature.agent.presentation.component
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -26,7 +27,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.aicode.R
 import com.aicode.core.theme.Radius
@@ -37,7 +37,6 @@ import compose.icons.FeatherIcons
 import compose.icons.feathericons.GitBranch
 import compose.icons.feathericons.Menu
 import compose.icons.feathericons.Plus
-import compose.icons.feathericons.Star
 import compose.icons.feathericons.Terminal
 
 @Composable
@@ -217,42 +216,28 @@ internal fun RemoteConnectingPlaceholder(
 }
 
 @Composable
-internal fun BrandMark(size: Dp, iconSize: Dp) {
-    Box(
-        modifier = Modifier
-            .size(size)
-            .clip(RoundedCornerShape(Radius.lg))
-            .background(brandGradient),
+internal fun WelcomeState(modifier: Modifier = Modifier) {
+    BoxWithConstraints(
+        modifier = modifier.padding(Spacing.xl),
         contentAlignment = Alignment.Center
     ) {
-        Icon(
-            FeatherIcons.Star,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onPrimary,
-            modifier = Modifier.size(iconSize)
-        )
-    }
-}
-
-@Composable
-internal fun WelcomeState(modifier: Modifier = Modifier) {
-    Column(
-        modifier = modifier.padding(Spacing.xl),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        BrandMark(size = 64.dp, iconSize = 34.dp)
-        Spacer(Modifier.height(Spacing.xl))
-        Text(
-            text = stringResource(R.string.chat_placeholder),
-            style = MaterialTheme.typography.headlineSmall,
-            color = MaterialTheme.colorScheme.onBackground
-        )
-        Spacer(Modifier.height(Spacing.sm))
-        Text(
-            text = stringResource(R.string.chat_input_hint),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+            // 底部悬浮输入框占据大量空间，纯居中会显得偏下；整体上移 8% 屏高，视觉重心回到中部
+            modifier = Modifier.offset(y = -(maxHeight * 0.08f))
+        ) {
+            Text(
+                text = stringResource(R.string.chat_placeholder),
+                style = MaterialTheme.typography.headlineSmall,
+                color = MaterialTheme.colorScheme.onBackground
+            )
+            Spacer(Modifier.height(Spacing.sm))
+            Text(
+                text = stringResource(R.string.chat_input_hint),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
     }
 }

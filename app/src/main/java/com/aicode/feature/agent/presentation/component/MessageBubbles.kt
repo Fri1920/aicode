@@ -71,7 +71,8 @@ internal fun AgentMessageItem(
     liveOutput: String? = null,
     markdownCache: MarkdownRenderCache? = null,
     onRewindClick: ((String) -> Unit)? = null,
-    onMoreClick: ((AgentUIMessage) -> Unit)? = null
+    onMoreClick: ((AgentUIMessage) -> Unit)? = null,
+    onToolCollapsed: (() -> Unit)? = null
 ) {
     if (message.isCompactionMarker) {
         // 压缩内部锚点不再渲染分隔线：摘要卡片已提供压缩反馈，避免与卡片重复。
@@ -100,7 +101,8 @@ internal fun AgentMessageItem(
 
     val isUser = message.role == MessageRole.USER
     val screenWidthDp = LocalConfiguration.current.screenWidthDp
-    val maxUserBubbleWidth = remember(screenWidthDp) { (screenWidthDp * 0.85).dp }
+    // 用户气泡随文字撑开，最大撑到与 AI 气泡同宽（屏宽 - 列表两侧 padding）
+    val maxUserBubbleWidth = remember(screenWidthDp) { (screenWidthDp.dp - Spacing.lg * 2) }
     var copied by remember { mutableStateOf(false) }
     val clipboard = LocalClipboard.current
     val copyScope = rememberCoroutineScope()
@@ -136,7 +138,7 @@ internal fun AgentMessageItem(
                             border = if (message.role == MessageRole.ASSISTANT) {
                                 BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
                             } else null,
-                            // 用户气泡按内容自适应宽度；AI/工具气泡填满可用宽度，两侧外边距由 LazyColumn contentPadding 统一提供
+                            // 用户气泡随内容自适应宽度，最大撑到与 AI 气泡同宽；AI/工具气泡填满可用宽度
                             modifier = if (isUser) {
                                 Modifier.widthIn(max = maxUserBubbleWidth)
                             } else {
@@ -144,7 +146,7 @@ internal fun AgentMessageItem(
                             }
                         ) {
                         if (message.role == MessageRole.TOOL) {
-                            ToolMessageBody(message, liveOutput = liveOutput)
+                            ToolMessageBody(message, liveOutput = liveOutput, onCollapsed = onToolCollapsed)
                         } else {
                             val textColor = when (message.role) {
                                 MessageRole.USER -> MaterialTheme.colorScheme.onPrimary

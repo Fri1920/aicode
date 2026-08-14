@@ -26,6 +26,7 @@ keystore.properties
 
 # 临时调试文件
 /*.log
+log-*.txt
 *.apk
 /test
 

@@ -40,6 +40,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -72,6 +73,9 @@ import compose.icons.feathericons.Check
 import compose.icons.feathericons.Plus
 import compose.icons.feathericons.Square
 
+/** 输入框区域蒙版高度：盖住圆角容器，滚动内容滑入时被渐变遮罩；随键盘（IME）上移。 */
+private val INPUT_BAR_MASK_HEIGHT = 110.dp
+
 @Composable
 internal fun ChatInputBar(
     value: String,
@@ -100,7 +104,8 @@ internal fun ChatInputBar(
     slashCommands: List<SlashCommandHandler> = emptyList(),
     queuedRequests: List<QueuedRequest> = emptyList(),
     onRemoveQueued: (String) -> Unit = {},
-    tokenProgress: Float = 0f
+    tokenProgress: Float = 0f,
+    modifier: Modifier = Modifier
 ) {
     val canSend = (value.isNotBlank() || pendingAttachments.isNotEmpty()) && !isBusy
     var showAttachmentSheet by remember { mutableStateOf(false) }
@@ -113,14 +118,36 @@ internal fun ChatInputBar(
 
     Surface(
         color = Color.Transparent,
-        modifier = Modifier.fillMaxWidth()
+        modifier = modifier.fillMaxWidth()
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = rememberImeBottomInset())
-                .padding(horizontal = Spacing.lg, vertical = Spacing.md)
+        val imeInset = rememberImeBottomInset()
+        Box(
+            modifier = Modifier.fillMaxWidth()
         ) {
+            // 半透明渐变蒙版：盖住输入框区域 + 导航栏（手势小白条）区域，滚动内容滑入时被遮罩
+            // （能看见但看不清）；高度含 IME inset 随键盘上移。注意 IME padding 不能加在外层
+            // Box 上——align(BottomCenter) 的子项对齐在 padding 内部，会漏掉导航栏那条区域。
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .height(INPUT_BAR_MASK_HEIGHT + imeInset)
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(
+                                MaterialTheme.colorScheme.surface.copy(alpha = 0f),
+                                MaterialTheme.colorScheme.surface.copy(alpha = 0.98f)
+                            )
+                        )
+                    )
+            )
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = Spacing.lg)
+                    .padding(bottom = Spacing.md)
+                    .padding(bottom = imeInset)
+            ) {
             if (filteredCommands.isNotEmpty()) {
                 Surface(
                     modifier = Modifier
@@ -178,7 +205,7 @@ internal fun ChatInputBar(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(Radius.lg))
-                    .background(MaterialTheme.colorScheme.surface)
+                    .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.98f))
                     .border(
                         1.dp,
                         MaterialTheme.colorScheme.outlineVariant,
@@ -294,6 +321,7 @@ internal fun ChatInputBar(
                     SendButton(canSend = canSend, isBusy = isBusy, tokenProgress = tokenProgress, onSend = onSend, onStop = onStop)
                 }
             }
+        }
         }
     }
 

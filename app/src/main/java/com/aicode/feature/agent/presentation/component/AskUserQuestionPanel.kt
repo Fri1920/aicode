@@ -23,6 +23,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
@@ -51,6 +52,9 @@ import com.aicode.feature.agent.domain.tool.question.SingleAnswer
 import com.aicode.feature.agent.domain.tool.question.UserQuestionAnswer
 import androidx.compose.ui.res.stringResource
 import com.aicode.R
+import compose.icons.FeatherIcons
+import compose.icons.feathericons.ChevronDown
+import compose.icons.feathericons.ChevronUp
 
 
 /** 「其他」选项的固定 label，不与 AI 传入的选项重复。 */
@@ -83,6 +87,8 @@ fun AskUserQuestionPanel(
             question.questions.forEachIndexed { idx, _ -> this[idx] = "" }
         }
     }
+    // 面板折叠状态：默认展开；多问题时长面板可收起，避免挡住 AI 输出
+    var expanded by remember(question.id) { mutableStateOf(true) }
 
     Surface(
         modifier = Modifier
@@ -93,13 +99,16 @@ fun AskUserQuestionPanel(
         border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
     ) {
         Column(
-            modifier = Modifier
-                .padding(Spacing.md)
-                .heightIn(max = 480.dp)
-                .verticalScroll(rememberScrollState())
+            modifier = Modifier.padding(Spacing.md)
         ) {
-            // 面板标题
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            // 面板标题：点击折叠/展开
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(Radius.sm))
+                    .clickable { expanded = !expanded },
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 Box(
                     modifier = Modifier
                         .size(8.dp)
@@ -121,51 +130,65 @@ fun AskUserQuestionPanel(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
-            }
-
-            Spacer(Modifier.height(Spacing.md))
-
-            // 逐个渲染问题
-            question.questions.forEachIndexed { idx, q ->
-                if (idx > 0) Spacer(Modifier.height(Spacing.md))
-                QuestionCard(
-                    
-                    item = q,
-                    selected = selectedMap[idx] ?: mutableListOf(),
-                    customText = customTexts[idx] ?: "",
-                    onSelectionChanged = { newSelection ->
-                        selectedMap[idx] = newSelection.toMutableList() as MutableList<String>
-                    },
-                    onCustomTextChanged = { customTexts[idx] = it }
+                Spacer(Modifier.width(Spacing.xs))
+                Icon(
+                    if (expanded) FeatherIcons.ChevronUp else FeatherIcons.ChevronDown,
+                    contentDescription = if (expanded) stringResource(R.string.common_collapse_action) else stringResource(R.string.common_expand),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(18.dp)
                 )
             }
 
-            Spacer(Modifier.height(Spacing.md))
+            if (expanded) {
+                Column(
+                    modifier = Modifier
+                        .heightIn(max = 480.dp)
+                        .verticalScroll(rememberScrollState())
+                ) {
+                    Spacer(Modifier.height(Spacing.md))
 
-            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                AgentActionButton(
-                    text = stringResource(R.string.ask_supplement),
-                    onClick = onSkip,
-                    modifier = Modifier.weight(1f),
-                    tone = AgentActionTone.Neutral
-                )
-                AgentActionButton(
-                    text = stringResource(R.string.ask_confirm),
-                    onClick = {
-                        val answers = question.questions.mapIndexed { i, q ->
-                            val sel = selectedMap[i] ?: emptyList<String>()
-                            val custom = customTexts[i]?.takeIf { it.isNotBlank() && OTHER_LABEL in sel }
-                            SingleAnswer(
-                                question = q.question,
-                                selected = sel.filter { it != OTHER_LABEL },
-                                customText = custom
-                            )
-                        }
-                        onConfirm(UserQuestionAnswer(answers))
-                    },
-                    modifier = Modifier.weight(1f),
-                    tone = AgentActionTone.Success
-                )
+                    // 逐个渲染问题
+                    question.questions.forEachIndexed { idx, q ->
+                        if (idx > 0) Spacer(Modifier.height(Spacing.md))
+                        QuestionCard(
+                            item = q,
+                            selected = selectedMap[idx] ?: mutableListOf(),
+                            customText = customTexts[idx] ?: "",
+                            onSelectionChanged = { newSelection ->
+                                selectedMap[idx] = newSelection.toMutableList() as MutableList<String>
+                            },
+                            onCustomTextChanged = { customTexts[idx] = it }
+                        )
+                    }
+
+                    Spacer(Modifier.height(Spacing.md))
+
+                    Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                        AgentActionButton(
+                            text = stringResource(R.string.ask_supplement),
+                            onClick = onSkip,
+                            modifier = Modifier.weight(1f),
+                            tone = AgentActionTone.Neutral
+                        )
+                        AgentActionButton(
+                            text = stringResource(R.string.ask_confirm),
+                            onClick = {
+                                val answers = question.questions.mapIndexed { i, q ->
+                                    val sel = selectedMap[i] ?: emptyList<String>()
+                                    val custom = customTexts[i]?.takeIf { it.isNotBlank() && OTHER_LABEL in sel }
+                                    SingleAnswer(
+                                        question = q.question,
+                                        selected = sel.filter { it != OTHER_LABEL },
+                                        customText = custom
+                                    )
+                                }
+                                onConfirm(UserQuestionAnswer(answers))
+                            },
+                            modifier = Modifier.weight(1f),
+                            tone = AgentActionTone.Success
+                        )
+                    }
+                }
             }
         }
     }
