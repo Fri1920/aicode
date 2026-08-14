@@ -88,6 +88,14 @@ class AIEditorApp : Application(), Configuration.Provider {
     @Inject
     lateinit var mcpManager: McpManager
 
+    /** MCP 配置仓库：启动即监听 mcp.json 外部直接编辑，改动数秒内刷新列表并触发重连。 */
+    @Inject
+    lateinit var mcpConfigRepository: com.aicode.feature.agent.domain.mcp.McpConfigRepository
+
+    /** 工具授权规则仓库：启动即监听 permissions.json 外部直接编辑，改动数秒内刷新规则。 */
+    @Inject
+    lateinit var permissionRulesRepository: com.aicode.feature.agent.domain.permission.PermissionRulesRepository
+
     /** git 凭据/署名落盘同步器：启动即把 Room 凭据 + DataStore 署名写到容器持久挂载目录，
      *  供终端/AI/UI 三端 git 经 credential.helper=store 共用，兜底 rootfs 升级或文件被删。 */
     @Inject
@@ -211,6 +219,9 @@ class AIEditorApp : Application(), Configuration.Provider {
         }
         // 连接已配置的 MCP server，把其工具注册进 ToolRegistry（内部自有 scope，失败不影响启动）。
         mcpManager.start()
+        // 启动即监听 mcp.json / permissions.json 的外部直接编辑：改动数秒内刷新设置页列表并重连。
+        appScope.launch { mcpConfigRepository.startWatching() }
+        appScope.launch { permissionRulesRepository.startWatching() }
         // 语言切换由 MainActivity 的 attachBaseContext + recreate() 统一管理。
         // MainActivity 继承 ComponentActivity（非 AppCompatActivity），
         // AppCompatDelegate.setApplicationLocales 的自动 recreate 不生效，

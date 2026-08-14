@@ -66,6 +66,13 @@ class McpManager @Inject constructor(
                 reload()
             }
         }
+        // 配置文件被外部（容器内/手工）直接编辑：数秒内自动重载，使新增/删除/启停即时生效。
+        scope.launch {
+            configRepository.externalChanges.collect {
+                FileLogger.i(TAG, "检测到 MCP 配置文件外部变更，自动重载")
+                reload()
+            }
+        }
         // 容器 profile 切换：stdio server 的进程跑在旧容器的 rootfs 上，必须重建才能用新容器；
         // HTTP server 不依赖容器，不受影响。drop(1) 跳过启动首帧（reload 已处理）。
         scope.launch {

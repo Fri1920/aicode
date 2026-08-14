@@ -5,7 +5,10 @@ import com.aicode.core.util.FileLogger
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import com.aicode.feature.workspace.data.repository.WorkspaceRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.emitAll
@@ -14,6 +17,7 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -53,6 +57,8 @@ class PermissionRulesRepository @Inject constructor(
         const val TAG = "PermissionRules"
         const val PERMISSIONS_FILE = "permissions.json"
         const val AICODE_DIR = ".aicode"
+        /** 配置文件轮询间隔：外部直接编辑后约 2s 内刷新。 */
+        const val WATCH_POLL_MS = 2000L
         val JSON = Json { ignoreUnknownKeys = true; encodeDefaults = true; prettyPrint = true }
     }
 
@@ -69,6 +75,77 @@ class PermissionRulesRepository @Inject constructor(
     private val globalState = MutableStateFlow<List<PermissionRule>?>(null)
     private val projectStates = ConcurrentHashMap<String, MutableStateFlow<List<PermissionRule>?>>()
     private val mutex = Mutex()
+
+    // ── 外部修改监听：容器内/手工直接编辑 permissions.json 后刷新缓存，UI 与评估即时生效 ──
+
+    private val watchScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    /** 文件 mtime+size 快照，用于低成本检测外部修改。 */
+    private data class FileStamp(val mtime: Long, val size: Long) {
+        companion object {
+            fun of(file: File): FileStamp? = runCatching {
+                FileStamp(file.lastModified(), file.length())
+            }.getOrNull()?.takeIf { it.mtime > 0L }
+        }
+    }
+
+    @Volatile
+    private var globalStamp: FileStamp? = null
+    @Volatile
+    private var globalWatchingInitialized = false
+    private val projectStamps = ConcurrentHashMap<String, FileStamp?>()
+    private val initializedProjectPaths = ConcurrentHashMap.newKeySet<String>()
+
+    /**
+     * 启动配置文件监听：2s 轮询 mtime，外部修改后刷新缓存。App 常驻期间一直运行；
+     * 内部写入会同步 stamp，不会误触发。幂等可重复调。
+     */
+    fun startWatching() {
+        watchScope.launch {
+            while (true) {
+                delay(WATCH_POLL_MS)
+                runCatching {
+                    checkGlobalChanged()
+                    checkProjectChanged()
+                }
+            }
+        }
+    }
+
+    private suspend fun checkGlobalChanged() {
+        val stamp = FileStamp.of(globalFile)
+        if (!globalWatchingInitialized) {
+            globalStamp = stamp
+            globalWatchingInitialized = true
+            return
+        }
+        if (globalStamp == stamp) return
+        val rules = if (stamp == null) emptyList() else loadFromFile(globalFile)
+        globalStamp = stamp
+        if (rules != (globalState.value ?: emptyList<PermissionRule>())) {
+            globalState.value = rules
+            FileLogger.i(TAG, "检测到全局权限配置变化，已刷新")
+        }
+    }
+
+    private suspend fun checkProjectChanged() {
+        val path = workspaceRepository.currentPath()
+        val file = projectFileForPath(path)
+        val stamp = FileStamp.of(file)
+        if (!initializedProjectPaths.contains(path)) {
+            projectStamps[path] = stamp
+            initializedProjectPaths.add(path)
+            return
+        }
+        if (projectStamps[path] == stamp) return
+        val rules = if (stamp == null) emptyList() else loadFromFile(file)
+        projectStamps[path] = stamp
+        val state = getProjectState(path)
+        if (rules != (state.value ?: emptyList<PermissionRule>())) {
+            state.value = rules
+            FileLogger.i(TAG, "检测到项目权限配置变化，已刷新")
+        }
+    }
 
     private fun getProjectState(workspacePath: String): MutableStateFlow<List<PermissionRule>?> =
         projectStates.getOrPut(workspacePath) { MutableStateFlow(null) }
@@ -142,6 +219,7 @@ class PermissionRulesRepository @Inject constructor(
         mutex.withLock {
             withContext(Dispatchers.IO) { writeToFile(globalFile, rules) }
             globalState.value = rules
+            globalStamp = FileStamp.of(globalFile)
         }
     }
 
@@ -203,6 +281,7 @@ class PermissionRulesRepository @Inject constructor(
             mutate(list)
             withContext(Dispatchers.IO) { writeToFile(globalFile, list) }
             globalState.value = list
+            globalStamp = FileStamp.of(globalFile)
         }
     }
 
@@ -214,6 +293,7 @@ class PermissionRulesRepository @Inject constructor(
             mutate(list)
             withContext(Dispatchers.IO) { writeToFile(projectFileForPath(workspacePath), list) }
             state.value = list
+            projectStamps[workspacePath] = FileStamp.of(projectFileForPath(workspacePath))
         }
     }
 }
