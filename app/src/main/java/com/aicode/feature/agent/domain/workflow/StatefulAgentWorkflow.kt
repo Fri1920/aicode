@@ -485,7 +485,7 @@ class StatefulAgentWorkflow @Inject constructor(
                                     is AIStreamChunk.Retrying -> {
                                         acc.setLength(0)
                                         reasoningAcc.setLength(0)
-                                        send(AgentEvent.Retrying(chunk.attempt, chunk.maxRetries))
+                                        send(AgentEvent.Retrying(chunk.attempt, chunk.maxRetries, chunk.error))
                                     }
                                     is AIStreamChunk.Final -> finalResponse = chunk.response
                                 }

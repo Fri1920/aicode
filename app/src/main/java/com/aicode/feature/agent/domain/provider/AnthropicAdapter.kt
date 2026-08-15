@@ -275,7 +275,7 @@ class AnthropicAdapter @Inject constructor(
             }
             emit(AIStreamChunk.Final(AIResponse(content = textBuilder.toString(), toolCalls = toolCalls, stopReason = stopReason, signature = signature, inputTokens = streamInputTokens, outputTokens = streamOutputTokens, cachedInputTokens = streamCachedInputTokens)))
                 },
-                onRetry = { attempt, max -> emit(AIStreamChunk.Retrying(attempt, max)) }
+                onRetry = { attempt, max, error -> emit(AIStreamChunk.Retrying(attempt, max, error)) }
             )
         } catch (e: CancellationException) {
             throw e

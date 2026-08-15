@@ -40,8 +40,8 @@ sealed class AIStreamChunk {
     /** 模型新吐出的一小段思考过程（增量，非累积）。仅用于 UI 实时展示，不进入上下文回放。 */
     data class ReasoningDelta(val text: String) : AIStreamChunk()
     data class Final(val response: AIResponse) : AIStreamChunk()
-    /** 网络请求正在重试。仅用于 UI 实时展示，不进入上下文回放。 */
-    data class Retrying(val attempt: Int, val maxRetries: Int) : AIStreamChunk()
+    /** 网络请求正在重试。仅用于 UI 实时展示，不进入上下文回放。[error] 为触发重试的错误摘要，供 UI 展示具体原因。 */
+    data class Retrying(val attempt: Int, val maxRetries: Int, val error: RetryErrorInfo) : AIStreamChunk()
 }
 
 interface AIProvider {

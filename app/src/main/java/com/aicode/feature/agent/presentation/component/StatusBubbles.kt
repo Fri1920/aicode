@@ -48,7 +48,10 @@ import com.aicode.R
 import com.aicode.core.theme.Brand
 import com.aicode.core.theme.Radius
 import com.aicode.core.theme.Spacing
+import com.aicode.feature.agent.domain.provider.RetryErrorInfo
+import com.aicode.feature.agent.domain.provider.RetryErrorKind
 import compose.icons.FeatherIcons
+import compose.icons.feathericons.AlertCircle
 import compose.icons.feathericons.ChevronDown
 import compose.icons.feathericons.ChevronUp
 import compose.icons.feathericons.Clock
@@ -104,9 +107,9 @@ internal fun CompactionProgressBubble() {
     }
 }
 
-/** 网络重试期间的临时状态气泡，不落库。 */
+/** 网络重试期间的临时状态气泡，不落库。首行展示触发重试的具体错误（如 429/500/网络断开），次行展示重试进度。 */
 @Composable
-internal fun RetryingBubble(attempt: Int, maxRetries: Int) {
+internal fun RetryingBubble(attempt: Int, maxRetries: Int, error: RetryErrorInfo?) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.Start
@@ -116,20 +119,56 @@ internal fun RetryingBubble(attempt: Int, maxRetries: Int) {
             color = MaterialTheme.colorScheme.surface,
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
         ) {
-            Row(
-                modifier = Modifier.padding(horizontal = Spacing.md, vertical = Spacing.sm),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(Spacing.sm)
-            ) {
-                Text(
-                    text = stringResource(R.string.chat_retrying, attempt, maxRetries),
-                    color = MaterialTheme.colorScheme.onSurface,
-                    style = MaterialTheme.typography.bodyMedium
-                )
-                TypingDots(color = MaterialTheme.colorScheme.primary)
+            Column(modifier = Modifier.padding(horizontal = Spacing.md, vertical = Spacing.sm)) {
+                if (error != null) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(Spacing.xs)
+                    ) {
+                        Icon(
+                            FeatherIcons.AlertCircle,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Text(
+                            text = retryErrorLabel(error),
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.labelMedium
+                        )
+                    }
+                    Spacer(Modifier.height(Spacing.xs))
+                }
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.sm)
+                ) {
+                    Text(
+                        text = stringResource(R.string.chat_retrying, attempt, maxRetries),
+                        color = MaterialTheme.colorScheme.onSurface,
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    TypingDots(color = MaterialTheme.colorScheme.primary)
+                }
             }
         }
     }
+}
+
+/** 错误摘要文本：类别文案 + 状态码（如「速率限制 (429)」）；无状态码时仅类别文案。 */
+@Composable
+private fun retryErrorLabel(error: RetryErrorInfo): String {
+    val base = stringResource(
+        when (error.kind) {
+            RetryErrorKind.RATE_LIMIT -> R.string.retry_error_rate_limit
+            RetryErrorKind.SERVER_ERROR -> R.string.retry_error_server
+            RetryErrorKind.TIMEOUT -> R.string.retry_error_timeout
+            RetryErrorKind.NETWORK -> R.string.retry_error_network
+            RetryErrorKind.UNKNOWN -> R.string.retry_error_unknown
+        }
+    )
+    val code = error.statusCode
+    return if (code != null) stringResource(R.string.retry_error_with_code, base, code) else base
 }
 
 /** 流式渲染节流：文本变化后延迟该时长再更新渲染文本，降低 md 解析频率。 */

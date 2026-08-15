@@ -290,7 +290,7 @@ class OpenAIAdapter @Inject constructor(
                         .map { acc -> ToolCall(id = acc.id, name = acc.name, arguments = parseArgs(acc.args.toString())) }
                     emit(AIStreamChunk.Final(AIResponse(content = textBuilder.toString(), toolCalls = toolCalls, stopReason = finishReason, inputTokens = streamInputTokens, outputTokens = streamOutputTokens, cachedInputTokens = streamCachedInputTokens)))
                 },
-                onRetry = { attempt, max -> emit(AIStreamChunk.Retrying(attempt, max)) }
+                onRetry = { attempt, max, error -> emit(AIStreamChunk.Retrying(attempt, max, error)) }
             )
             } catch (e: CancellationException) {
                 throw e
@@ -430,7 +430,7 @@ class OpenAIAdapter @Inject constructor(
                 .map { acc -> ToolCall(id = acc.id, name = acc.name, arguments = parseArgs(acc.args.toString())) }
             emit(AIStreamChunk.Final(AIResponse(content = textBuilder.toString(), toolCalls = toolCalls, stopReason = finishReason, inputTokens = streamInputTokens, outputTokens = streamOutputTokens, cachedInputTokens = streamCachedInputTokens)))
             },
-            onRetry = { attempt, max -> emit(AIStreamChunk.Retrying(attempt, max)) }
+            onRetry = { attempt, max, error -> emit(AIStreamChunk.Retrying(attempt, max, error)) }
             )
         } catch (e: CancellationException) {
             throw e

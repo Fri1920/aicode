@@ -10,7 +10,9 @@ import kotlinx.coroutines.launch
 import retrofit2.HttpException
 import java.io.IOException
 import java.io.InterruptedIOException
+import java.net.ConnectException
 import java.net.SocketTimeoutException
+import java.net.UnknownHostException
 import java.text.SimpleDateFormat
 import java.util.Locale
 import java.util.TimeZone
@@ -129,6 +131,47 @@ fun isRetriableNetworkError(t: Throwable): Boolean {
     return TRANSIENT_MESSAGES.any { message.contains(it) }
 }
 
+/** 重试错误的用户可见类别，用于 UI 展示具体原因（而非笼统的「网络波动」）。 */
+enum class RetryErrorKind {
+    /** HTTP 429 / 服务端 rate limit 类错误。 */
+    RATE_LIMIT,
+    /** HTTP 5xx / 服务端过载类错误。 */
+    SERVER_ERROR,
+    /** 连接超时 / 读超时。 */
+    TIMEOUT,
+    /** DNS 解析失败、连接被拒、流被中断等网络层故障。 */
+    NETWORK,
+    /** 无法归类的其它错误。 */
+    UNKNOWN
+}
+
+/**
+ * 一次重试对应的错误摘要，随 Retrying 事件一路透传到 UI。
+ * [statusCode] 为 HTTP 状态码（如 429/500），非 HTTP 错误为 null。
+ */
+data class RetryErrorInfo(
+    val kind: RetryErrorKind,
+    val statusCode: Int? = null
+)
+
+/** 把触发重试的异常归类为 UI 可展示的错误摘要。 */
+fun Throwable.toRetryErrorInfo(): RetryErrorInfo = when {
+    this is HttpException -> when {
+        code() == 429 -> RetryErrorInfo(RetryErrorKind.RATE_LIMIT, code())
+        code() >= 500 -> RetryErrorInfo(RetryErrorKind.SERVER_ERROR, code())
+        else -> RetryErrorInfo(RetryErrorKind.UNKNOWN, code())
+    }
+    this is StreamApiException -> when (code) {
+        "rate_limit_exceeded", "rate_limit_error", "insufficient_quota" -> RetryErrorInfo(RetryErrorKind.RATE_LIMIT)
+        "server_error", "server_is_overloaded", "overloaded", "internal_error" -> RetryErrorInfo(RetryErrorKind.SERVER_ERROR)
+        else -> RetryErrorInfo(RetryErrorKind.UNKNOWN)
+    }
+    this is SocketTimeoutException || this is InterruptedIOException -> RetryErrorInfo(RetryErrorKind.TIMEOUT)
+    this is UnknownHostException || this is ConnectException -> RetryErrorInfo(RetryErrorKind.NETWORK)
+    this is IOException -> RetryErrorInfo(RetryErrorKind.NETWORK)
+    else -> RetryErrorInfo(RetryErrorKind.UNKNOWN)
+}
+
 /**
  * 从 [HttpException] 的响应头中解析 `Retry-After`，返回等待毫秒数。
  *
@@ -183,7 +226,7 @@ private const val MAX_RETRY_AFTER_MILLIS = 60_000L
  *                置于 [block] 之前以保证 `retryStaircase { ... }` 的 trailing lambda 仍绑定到 [block]。
  */
 suspend fun <T> retryStaircase(
-    onRetry: (suspend (attempt: Int, maxRetries: Int) -> Unit)? = null,
+    onRetry: (suspend (attempt: Int, maxRetries: Int, error: RetryErrorInfo) -> Unit)? = null,
     block: suspend () -> T
 ): T {
     var attempt = 0
@@ -197,7 +240,7 @@ suspend fun <T> retryStaircase(
             if (attempt >= MAX_NETWORK_RETRIES || !isRetriableNetworkError(e)) throw e
             val wait = retryDelayMillis(attempt, e)
             FileLogger.w(TAG, "网络请求失败，第 ${attempt + 1}/$MAX_NETWORK_RETRIES 次重试（等待 ${wait}ms）: ${e.javaClass.simpleName} ${e.message}")
-            onRetry?.invoke(attempt + 1, MAX_NETWORK_RETRIES)
+            onRetry?.invoke(attempt + 1, MAX_NETWORK_RETRIES, e.toRetryErrorInfo())
             attempt++
             if (wait > 0) delay(wait)
         }
@@ -213,7 +256,7 @@ suspend fun <T> retryStaircase(
  */
 suspend fun streamWithStaircaseRetry(
     attemptOnce: suspend () -> Unit,
-    onRetry: (suspend (attempt: Int, maxRetries: Int) -> Unit)? = null
+    onRetry: (suspend (attempt: Int, maxRetries: Int, error: RetryErrorInfo) -> Unit)? = null
 ) {
     var attempt = 0
     while (true) {
@@ -227,7 +270,7 @@ suspend fun streamWithStaircaseRetry(
             if (attempt >= MAX_NETWORK_RETRIES || !isRetriableNetworkError(e)) throw e
             val wait = retryDelayMillis(attempt, e)
             FileLogger.w(TAG, "流式请求失败，第 ${attempt + 1}/$MAX_NETWORK_RETRIES 次重试（等待 ${wait}ms）: ${e.javaClass.simpleName} ${e.message}")
-            onRetry?.invoke(attempt + 1, MAX_NETWORK_RETRIES)
+            onRetry?.invoke(attempt + 1, MAX_NETWORK_RETRIES, e.toRetryErrorInfo())
             attempt++
             if (wait > 0) delay(wait)
         }

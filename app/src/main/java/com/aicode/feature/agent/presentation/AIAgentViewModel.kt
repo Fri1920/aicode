@@ -651,7 +651,7 @@ class AIAgentViewModel @Inject constructor(
                         setStreamingReasoning(sessionId, event.accumulated)
                     }
                     is AgentEvent.Retrying -> {
-                        setRetryState(sessionId, RetryState(event.attempt, event.maxRetries))
+                        setRetryState(sessionId, RetryState(event.attempt, event.maxRetries, event.error))
                     }
                     is AgentEvent.CompactionStarted -> {
                         setRetryState(sessionId, null)

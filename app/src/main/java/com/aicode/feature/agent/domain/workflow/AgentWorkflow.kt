@@ -2,6 +2,7 @@ package com.aicode.feature.agent.domain.workflow
 
 import com.aicode.feature.agent.domain.model.AgentContext
 import com.aicode.feature.agent.domain.model.AgentMode
+import com.aicode.feature.agent.domain.provider.RetryErrorInfo
 import com.aicode.feature.agent.domain.tool.AgentTool
 import com.aicode.feature.agent.domain.tool.ToolCall
 import kotlinx.coroutines.flow.Flow
@@ -45,8 +46,8 @@ sealed class AgentEvent {
         val attachments: List<com.aicode.feature.agent.presentation.AgentAttachment> = emptyList()
     ) : AgentEvent()
 
-    /** 网络请求正在重试（首字节前失败触发自动重试）。仅用于 UI 实时展示，不落库。 */
-    data class Retrying(val attempt: Int, val maxRetries: Int) : AgentEvent()
+    /** 网络请求正在重试（首字节前失败触发自动重试）。仅用于 UI 实时展示，不落库。[error] 为触发重试的错误摘要。 */
+    data class Retrying(val attempt: Int, val maxRetries: Int, val error: RetryErrorInfo) : AgentEvent()
 
     /** 正在进行上下文压缩。仅用于 UI 实时展示，不落库。 */
     data class CompactionStarted(val estimatedTokens: Int) : AgentEvent()

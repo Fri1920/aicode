@@ -2,6 +2,7 @@ package com.aicode.feature.agent.presentation
 
 import androidx.compose.runtime.Immutable
 import com.aicode.feature.agent.domain.model.AgentImage
+import com.aicode.feature.agent.domain.provider.RetryErrorInfo
 import kotlinx.serialization.Serializable
 
 /** 单轮工作流的最终结果状态（供 [AgentUIState.Result] 使用）。 */
@@ -19,10 +20,11 @@ sealed class AgentUIState {
 
 /**
  * 网络请求重试状态（仅用于 UI 实时展示「正在重试 (N/M)...」提示）。
+ * [error] 为触发重试的错误摘要，UI 据此展示具体原因（如 429/500/网络断开）。
  * 与 [AgentUIState] 解耦：重试是 Streaming 的子状态，不改变顶层 agent 状态机。
  */
 @Immutable
-data class RetryState(val attempt: Int, val maxRetries: Int)
+data class RetryState(val attempt: Int, val maxRetries: Int, val error: RetryErrorInfo? = null)
 
 @Immutable
 data class AgentUIMessage(
