@@ -1,10 +1,13 @@
 package com.aicode.feature.git.presentation.component
 
 import androidx.annotation.StringRes
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -16,8 +19,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyListScope
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -27,7 +28,6 @@ import androidx.compose.material3.ExposedDropdownMenuAnchorType
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -46,6 +46,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
@@ -53,13 +54,16 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.aicode.R
 import com.aicode.core.theme.Radius
 import com.aicode.core.theme.Spacing
+import com.aicode.feature.settings.presentation.component.SettingsDivider
+import com.aicode.feature.settings.presentation.component.SettingsGroup
+import com.aicode.feature.settings.presentation.component.settingsLightMode
 import com.aicode.feature.git.domain.model.GitBranch
 import com.aicode.feature.git.domain.model.GitTag
 import compose.icons.FeatherIcons
-import compose.icons.feathericons.ChevronDown
 import compose.icons.feathericons.ChevronRight
 import compose.icons.feathericons.Cloud
 import compose.icons.feathericons.Edit2
@@ -361,7 +365,8 @@ internal fun BranchesTab(
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(bottom = Spacing.xl)
+        contentPadding = PaddingValues(start = Spacing.lg, end = Spacing.lg, bottom = 70.dp),
+        verticalArrangement = Arrangement.spacedBy(Spacing.md)
     ) {
         item { BranchesOverview(currentBranch, localBranches.size, remoteBranches.size, tags.size) }
         item {
@@ -372,13 +377,15 @@ internal fun BranchesTab(
             )
         }
         if (isExpanded("head")) {
-            item {
-                RefRow(
-                    name = currentBranch,
-                    subtitle = stringResource(R.string.git_checked_out),
-                    icon = FeatherIcons.GitCommit,
-                    isCurrent = true
-                )
+            item(key = "head-group") {
+                SettingsGroup {
+                    RefRow(
+                        name = currentBranch,
+                        subtitle = stringResource(R.string.git_checked_out),
+                        icon = FeatherIcons.GitCommit,
+                        isCurrent = true
+                    )
+                }
             }
         }
         if (localBranches.isNotEmpty()) {
@@ -391,17 +398,21 @@ internal fun BranchesTab(
                 )
             }
             if (isExpanded("local")) {
-                renderBranchTree(
-                    localTree,
-                    depth = 1,
-                    expanded,
-                    isRemote = false,
-                    checkoutLoading = checkoutLoading,
-                    onCheckout = { ref, remote -> pendingCheckout = ref to remote },
-                    onRenameBranch = { pendingRename = it },
-                    onDeleteBranch = { pendingDelete = it to false },
-                    onDeleteRemoteBranch = {}
-                )
+                item(key = "local-group") {
+                    SettingsGroup {
+                        renderBranchTree(
+                            localTree,
+                            depth = 1,
+                            expanded,
+                            isRemote = false,
+                            checkoutLoading = checkoutLoading,
+                            onCheckout = { ref, remote -> pendingCheckout = ref to remote },
+                            onRenameBranch = { pendingRename = it },
+                            onDeleteBranch = { pendingDelete = it to false },
+                            onDeleteRemoteBranch = {}
+                        )
+                    }
+                }
             }
         }
         if (remoteBranches.isNotEmpty()) {
@@ -413,17 +424,21 @@ internal fun BranchesTab(
                 )
             }
             if (isExpanded("remote")) {
-                renderBranchTree(
-                    remoteTree,
-                    depth = 1,
-                    expanded,
-                    isRemote = true,
-                    checkoutLoading = checkoutLoading,
-                    onCheckout = { ref, remote -> pendingCheckout = ref to remote },
-                    onRenameBranch = {},
-                    onDeleteBranch = {},
-                    onDeleteRemoteBranch = { pendingDelete = it to true }
-                )
+                item(key = "remote-group") {
+                    SettingsGroup {
+                        renderBranchTree(
+                            remoteTree,
+                            depth = 1,
+                            expanded,
+                            isRemote = true,
+                            checkoutLoading = checkoutLoading,
+                            onCheckout = { ref, remote -> pendingCheckout = ref to remote },
+                            onRenameBranch = {},
+                            onDeleteBranch = {},
+                            onDeleteRemoteBranch = { pendingDelete = it to true }
+                        )
+                    }
+                }
             }
         }
         if (tags.isNotEmpty()) {
@@ -436,19 +451,22 @@ internal fun BranchesTab(
                 )
             }
             if (isExpanded("tags")) {
-                tags.forEach { t ->
-                    item(key = "tag-${t.name}") {
-                        RefRow(
-                            name = t.name,
-                            subtitle = t.shortHash,
-                            icon = FeatherIcons.Tag,
-                            isCurrent = false,
-                            isLoading = checkoutLoading == t.name,
-                            actions = listOf(
-                                RefAction.Switch(onClick = { pendingCheckout = t.name to false }),
-                                RefAction.Delete(onClick = { pendingDeleteTag = t.name })
+                item(key = "tags-group") {
+                    SettingsGroup {
+                        tags.forEachIndexed { index, t ->
+                            if (index > 0) SettingsDivider()
+                            RefRow(
+                                name = t.name,
+                                subtitle = t.shortHash,
+                                icon = FeatherIcons.Tag,
+                                isCurrent = false,
+                                isLoading = checkoutLoading == t.name,
+                                actions = listOf(
+                                    RefAction.Switch(onClick = { pendingCheckout = t.name to false }),
+                                    RefAction.Delete(onClick = { pendingDeleteTag = t.name })
+                                )
                             )
-                        )
+                        }
                     }
                 }
             }
@@ -463,24 +481,20 @@ private fun BranchesOverview(
     remoteCount: Int,
     tagCount: Int
 ) {
-    Surface(color = MaterialTheme.colorScheme.surface, modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.md)) {
+    Surface(
+        color = if (settingsLightMode()) Color.White else MaterialTheme.colorScheme.surface,
+        shape = RoundedCornerShape(Radius.lg),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.padding(Spacing.lg)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Surface(
-                    color = MaterialTheme.colorScheme.primaryContainer,
-                    shape = RoundedCornerShape(Radius.sm),
-                    modifier = Modifier.size(40.dp)
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            FeatherIcons.GitBranch,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-                }
-                Spacer(Modifier.width(Spacing.md))
+                Icon(
+                    FeatherIcons.GitBranch,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(Modifier.width(Spacing.sm))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = stringResource(R.string.git_current_branch),
@@ -518,25 +532,30 @@ private fun RefSectionHeader(
     onToggle: () -> Unit,
     onAdd: (() -> Unit)? = null
 ) {
+    val rotation by animateFloatAsState(
+        targetValue = if (isExpanded) 90f else 0f,
+        animationSpec = tween(180),
+        label = "ref-chevron"
+    )
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onToggle)
-            .padding(start = Spacing.lg + (indent * 16).dp, end = Spacing.lg, top = Spacing.sm, bottom = Spacing.sm),
+            .padding(start = Spacing.md + (indent * 16).dp, end = Spacing.sm, top = Spacing.sm, bottom = Spacing.xs),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(
-            imageVector = if (isExpanded) FeatherIcons.ChevronDown else FeatherIcons.ChevronRight,
+            imageVector = FeatherIcons.ChevronRight,
             contentDescription = if (isExpanded) stringResource(R.string.common_collapse) else stringResource(R.string.common_expand),
-            modifier = Modifier.size(18.dp),
-            tint = MaterialTheme.colorScheme.onSurfaceVariant
+            modifier = Modifier.size(16.dp).rotate(rotation),
+            tint = if (settingsLightMode()) Color(0xFFC7C7CC) else MaterialTheme.colorScheme.onSurfaceVariant
         )
         Spacer(Modifier.width(Spacing.xs))
         Text(
             text = title,
-            style = MaterialTheme.typography.labelLarge,
-            fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MaterialTheme.typography.labelLarge.copy(fontSize = 13.sp),
+            fontWeight = FontWeight.Normal,
+            color = if (settingsLightMode()) Color(0xFF8E8E93) else MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.weight(1f)
         )
         if (onAdd != null) {
@@ -545,7 +564,7 @@ private fun RefSectionHeader(
                     FeatherIcons.Plus,
                     contentDescription = stringResource(R.string.git_new),
                     modifier = Modifier.size(16.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    tint = if (settingsLightMode()) Color(0xFF0F0F0F) else MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }
@@ -579,7 +598,7 @@ private fun RefRow(
     var menuExpanded by remember { mutableStateOf(false) }
     val contentColor = if (isCurrent) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
     Surface(
-        color = if (isCurrent) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
+        color = if (isCurrent) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
         modifier = Modifier
             .fillMaxWidth()
             .let {
@@ -629,7 +648,6 @@ private fun RefRow(
                 }
             }
         }
-        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
     }
     if (menuExpanded) {
         RefActionSheet(
@@ -746,9 +764,10 @@ private fun sortBranchTree(node: BranchNode) {
 }
 
 /**
- * 递归向 [LazyListScope] 注入分支树节点。文件夹节点可折叠。
+ * 递归向 [ColumnScope] 注入分支树节点。文件夹节点可折叠，行间用 [SettingsDivider] 分隔。
  */
-private fun LazyListScope.renderBranchTree(
+@Composable
+private fun ColumnScope.renderBranchTree(
     nodes: List<BranchNode>,
     depth: Int,
     expanded: MutableMap<String, Boolean>,
@@ -759,41 +778,41 @@ private fun LazyListScope.renderBranchTree(
     onDeleteBranch: (String) -> Unit,
     onDeleteRemoteBranch: (String) -> Unit
 ) {
-    for (node in nodes) {
+    nodes.forEachIndexed { index, node ->
         val isFolder = node.children.isNotEmpty()
         val isOpen = expanded[node.fullPath] ?: true
-        item(key = "node-${node.fullPath}") {
-            if (isFolder) {
-                RefSectionHeader(
-                    title = node.segment,
-                    isExpanded = isOpen,
-                    indent = depth,
-                    onToggle = { expanded[node.fullPath] = !isOpen }
-                )
-            } else {
-                node.branch?.let { b ->
-                    val actions = if (isRemote) {
-                        listOf(
-                            RefAction.Switch(onClick = { onCheckout(b.name, true) }),
-                            RefAction.Delete(onClick = { onDeleteRemoteBranch(b.name) })
-                        )
-                    } else {
-                        buildList {
-                            if (!b.current) add(RefAction.Switch(onClick = { onCheckout(b.name, false) }))
-                            add(RefAction.Rename(onClick = { onRenameBranch(b.name) }))
-                            if (!b.current) add(RefAction.Delete(onClick = { onDeleteBranch(b.name) }))
-                        }
-                    }
-                    RefRow(
-                        name = node.segment,
-                        subtitle = if (b.current) stringResource(R.string.git_checked_out) else null,
-                        icon = if (isRemote) FeatherIcons.Cloud else FeatherIcons.GitBranch,
-                        isCurrent = b.current,
-                        isLoading = checkoutLoading == b.name,
-                        indent = depth,
-                        actions = actions
+        if (isFolder) {
+            if (index > 0) SettingsDivider()
+            RefSectionHeader(
+                title = node.segment,
+                isExpanded = isOpen,
+                indent = depth,
+                onToggle = { expanded[node.fullPath] = !isOpen }
+            )
+        } else {
+            node.branch?.let { b ->
+                if (index > 0) SettingsDivider()
+                val actions = if (isRemote) {
+                    listOf(
+                        RefAction.Switch(onClick = { onCheckout(b.name, true) }),
+                        RefAction.Delete(onClick = { onDeleteRemoteBranch(b.name) })
                     )
+                } else {
+                    buildList {
+                        if (!b.current) add(RefAction.Switch(onClick = { onCheckout(b.name, false) }))
+                        add(RefAction.Rename(onClick = { onRenameBranch(b.name) }))
+                        if (!b.current) add(RefAction.Delete(onClick = { onDeleteBranch(b.name) }))
+                    }
                 }
+                RefRow(
+                    name = node.segment,
+                    subtitle = if (b.current) stringResource(R.string.git_checked_out) else null,
+                    icon = if (isRemote) FeatherIcons.Cloud else FeatherIcons.GitBranch,
+                    isCurrent = b.current,
+                    isLoading = checkoutLoading == b.name,
+                    indent = depth,
+                    actions = actions
+                )
             }
         }
         if (isFolder && isOpen) {

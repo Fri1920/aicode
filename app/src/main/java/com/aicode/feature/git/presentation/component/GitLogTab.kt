@@ -49,7 +49,7 @@ import androidx.compose.ui.unit.dp
 import com.aicode.R
 import com.aicode.core.theme.Radius
 import com.aicode.core.theme.Spacing
-import com.aicode.feature.git.domain.model.GitCommit
+import com.aicode.feature.settings.presentation.component.settingsLightMode
 import com.aicode.feature.git.domain.model.GitFileChange
 import com.aicode.feature.git.domain.model.GitGraph
 import com.aicode.feature.git.domain.model.GitGraphRef
@@ -59,7 +59,6 @@ import compose.icons.FeatherIcons
 import compose.icons.feathericons.ChevronDown
 import compose.icons.feathericons.ChevronRight
 import compose.icons.feathericons.Cloud
-import compose.icons.feathericons.File
 import compose.icons.feathericons.GitBranch
 import compose.icons.feathericons.Tag
 
@@ -89,25 +88,33 @@ internal fun LogTab(
     // 每行高度，用于计算连线纵向跨度（节点居中）。
     val rowHeight = 72.dp
     val listState = rememberLazyListState()
-    // 滚到底且还有更多、且不在加载中时触发加载下一页。用 derivedStateOf 避免每帧回调。
+    // 滚动接近底部（还剩 6 项）且还有更多、不在加载中时触发预拉取下一页。用 derivedStateOf 避免每帧回调。
     val reachedBottom by remember {
         derivedStateOf {
             val lastVisible = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: return@derivedStateOf false
-            lastVisible >= listState.layoutInfo.totalItemsCount - 3
+            lastVisible >= listState.layoutInfo.totalItemsCount - 6
         }
     }
     LaunchedEffect(reachedBottom) {
         if (reachedBottom && graph.hasMore && !graphLoadingMore) onLoadMore()
     }
-    val overviewCommits = remember(commits) { commits.map { GitCommit(it.hash, it.shortHash, it.author, it.date, it.message) } }
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        state = listState,
-        contentPadding = PaddingValues(bottom = Spacing.xl)
-    ) {
-        item { LogOverview(commits = overviewCommits, expandedCount = expandedCommits.size) }
-        item { SectionHeader(stringResource(R.string.git_commit_count, commits.size)) }
-        commits.forEachIndexed { index, c ->
+    Column(modifier = Modifier.fillMaxSize()) {
+        SectionHeader(stringResource(R.string.git_commit_count, commits.size))
+        Surface(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = Spacing.lg),
+            shape = RoundedCornerShape(Radius.lg),
+            color = if (settingsLightMode()) Color.White else MaterialTheme.colorScheme.surface
+        ) {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                state = listState,
+                // 底部留出悬浮 tab bar 高度：滚动时内容可滚过 tab 区域被蒙版渐隐，
+                // 滚到底时最后一项停在 tab 上方不被遮挡。
+                contentPadding = PaddingValues(bottom = 70.dp)
+            ) {
+                commits.forEachIndexed { index, c ->
             val isExpanded = c.hash in expandedCommits
             item(key = "commit-${c.hash}") {
                 GraphCommitRow(
@@ -149,100 +156,43 @@ internal fun LogTab(
                 }
             }
         }
-        // 末尾加载更多指示：hasMore 为真时显示，加载中转圈，否则静态「上拉加载」提示。
-        if (graph.hasMore) {
-            item(key = "load-more") {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = Spacing.md),
-                    contentAlignment = Alignment.Center
-                ) {
-                    if (graphLoadingMore) {
-                        CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
-                    } else {
+            // 末尾加载指示：还有更多时预拉取提示/转圈；没有更多时显示结束提示。
+            if (graph.hasMore) {
+                item(key = "load-more") {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = Spacing.md),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (graphLoadingMore) {
+                            CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+                        } else {
+                            Text(
+                                stringResource(R.string.git_load_more_commits),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+            } else {
+                item(key = "no-more") {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = Spacing.md),
+                        contentAlignment = Alignment.Center
+                    ) {
                         Text(
-                            stringResource(R.string.git_load_more_commits),
+                            stringResource(R.string.git_no_more_commits),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
             }
-        }
-    }
-}
-
-@Composable
-private fun LogOverview(commits: List<GitCommit>, expandedCount: Int) {
-    val latest = commits.first()
-    Surface(color = MaterialTheme.colorScheme.surface, modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.md)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Surface(
-                    color = MaterialTheme.colorScheme.primaryContainer,
-                    shape = RoundedCornerShape(Radius.sm),
-                    modifier = Modifier.size(40.dp)
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            FeatherIcons.File,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-                }
-                Spacer(Modifier.width(Spacing.md))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = stringResource(R.string.git_latest_commit),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Text(
-                        text = latest.message,
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
             }
-
-            Spacer(Modifier.height(Spacing.md))
-
-            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                StatusMetric(stringResource(R.string.git_recent_commit), commits.size, MaterialTheme.colorScheme.primary, Modifier.weight(1f))
-                StatusMetric(stringResource(R.string.git_expanded), expandedCount, MaterialTheme.colorScheme.secondary, Modifier.weight(1f))
-                DateMetric(latest.date, Modifier.weight(1f))
-            }
-        }
-    }
-}
-
-@Composable
-private fun DateMetric(date: String, modifier: Modifier = Modifier) {
-    Surface(
-        color = MaterialTheme.colorScheme.surfaceVariant,
-        shape = RoundedCornerShape(Radius.sm),
-        modifier = modifier
-    ) {
-        Column(modifier = Modifier.padding(horizontal = Spacing.sm, vertical = Spacing.sm)) {
-            Text(
-                text = date,
-                style = MaterialTheme.typography.titleMedium,
-                fontFamily = FontFamily.Monospace,
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            Text(
-                text = stringResource(R.string.git_latest_date),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1
-            )
         }
     }
 }
@@ -265,7 +215,7 @@ private fun GraphCommitRow(
     val isMerge = commit.isMerge
     val nodeColor = laneColors.getOrElse(lane) { Color.Gray }
     Surface(
-        color = if (isExpanded) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.surface,
+        color = if (isExpanded) MaterialTheme.colorScheme.surfaceVariant else Color.Transparent,
         modifier = Modifier.fillMaxWidth()
     ) {
         Row(
@@ -353,7 +303,11 @@ private fun GraphCommitRow(
                 }
             }
         }
-        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+        HorizontalDivider(
+            color = if (settingsLightMode()) Color(0xFFE5E5EA) else MaterialTheme.colorScheme.outlineVariant,
+            thickness = 0.5.dp,
+            modifier = Modifier.padding(start = canvasWidth + Spacing.md)
+        )
     }
 }
 
@@ -650,7 +604,8 @@ private fun CommitFileRow(file: GitFileChange, indent: Dp, onClick: () -> Unit =
             }
         }
         HorizontalDivider(
-            color = MaterialTheme.colorScheme.outlineVariant,
+            color = if (settingsLightMode()) Color(0xFFE5E5EA) else MaterialTheme.colorScheme.outlineVariant,
+            thickness = 0.5.dp,
             modifier = Modifier.padding(start = indent + 44.dp)
         )
     }
