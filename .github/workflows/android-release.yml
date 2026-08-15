@@ -291,3 +291,13 @@ jobs:
             echo "  ✓ 已上传"
           done
           echo "完成: https://gitee.com/${owner}/${repo}/releases"
+
+      # 按保留策略自动清理 Gitee 过期 Release：保留最新 3 个正式版 + 最新正式版之后的全部 RC，
+      # 防止免费版 1GB 附件配额被历史版本占满（正式版转正后其 RC 自动过期）。
+      # 脚本幂等：保留集合内缺失的附件会顺带补齐，已存在的跳过。
+      - name: Prune outdated Gitee releases
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GITEE_TOKEN: ${{ secrets.GITEE_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python3 scripts/sync-gitee-releases.py --prune
