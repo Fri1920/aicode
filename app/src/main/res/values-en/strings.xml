@@ -490,6 +490,7 @@
     <string name="git_no_commits">No commits yet</string>
     <string name="git_commit_count">Commits (%1$s)</string>
     <string name="git_load_more_commits">Pull up to load more commits</string>
+    <string name="git_no_more_commits">No more commits</string>
     <string name="git_latest_commit">Latest commit</string>
     <string name="git_recent_commit">Recent commit</string>
     <string name="git_expanded">Expanded</string>
