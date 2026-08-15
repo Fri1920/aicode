@@ -1,6 +1,7 @@
 package com.aicode.feature.settings.data.remote
 
 import android.content.Context
+import android.content.SharedPreferences
 import com.aicode.core.util.FileLogger
 import com.aicode.feature.settings.data.local.CustomModelMetadataStore
 import com.aicode.feature.settings.domain.model.ModelMetadata
@@ -37,10 +38,15 @@ class ModelMetadataService @Inject constructor(
     @Volatile
     private var refreshAttemptedThisProcess = false
 
+    /** 上次测活成功的源 id 持久化于此（SharedPreferences，键值文件，系统清理不影响）。 */
+    private val prefs: SharedPreferences by lazy {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+    }
+
     /** models.dev 仅作元数据增强：独立短超时 client，不可达时快速失败，不占用共享的 120s 流式超时。 */
     private val metadataClient: OkHttpClient = OkHttpClient.Builder()
         .connectTimeout(5, TimeUnit.SECONDS)
-        .readTimeout(10, TimeUnit.SECONDS)
+        .readTimeout(30, TimeUnit.SECONDS)
         .writeTimeout(10, TimeUnit.SECONDS)
         .build()
 
@@ -67,17 +73,15 @@ class ModelMetadataService @Inject constructor(
         return mergeModelMetadata(modelId, auto, custom)
     }
 
-    /**
-     * App 启动时统一调用的异步刷新：磁盘缓存未过期（<24h）则跳过；拉取成功写入内存与磁盘缓存，
-     * 失败静默（resolve 回退内置 assets 数据）。进程内只尝试一次，绝不阻塞模型请求。
-     */
+    /** 启动时统一调用：先轻量测活候选源并记忆可用源；缓存过期时再用可用源拉全量。 */
     suspend fun refreshFromNetworkIfStale() {
         if (refreshAttemptedThisProcess) return
         refreshAttemptedThisProcess = true
         withContext(Dispatchers.IO) {
+            val activeSource = probeSources()
             val diskCache = loadCatalogFromDisk()
             if (diskCache != null && isFresh(diskCache)) return@withContext
-            fetchCatalogFromNetwork()
+            fetchCatalogFromSources(preferred = activeSource)
         }
     }
 
@@ -85,7 +89,7 @@ class ModelMetadataService @Inject constructor(
         System.currentTimeMillis() - cache.loadedAtMs < CACHE_MAX_AGE_MS
 
     /** 纯只读链路：内存 → 磁盘缓存(24h 内) → 内置 assets → 空目录（由调用方回退默认值），绝不发网络请求。
-     *  网络刷新失败时（[fetchCatalogFromNetwork]），会把过期磁盘缓存降级塞入内存 [cached]，
+     *  网络刷新失败时（[fetchCatalogFromSources]），会把过期磁盘缓存降级塞入内存 [cached]，
      *  避免回退到更旧的内置 assets 快照。 */
     private fun loadCatalog(): Map<String, Map<String, ModelMetadata>> {
         cached?.let {
@@ -105,27 +109,84 @@ class ModelMetadataService @Inject constructor(
         return emptyMap()
     }
 
-    private fun fetchCatalogFromNetwork() {
-        runCatching {
-            val request = Request.Builder()
-                .url(MODELS_DEV_URL)
-                .header("User-Agent", "aicode")
-                .get()
-                .build()
-
-            metadataClient.newCall(request).execute().use { response ->
-                val body = response.body?.string().orEmpty()
-                if (!response.isSuccessful) error("HTTP ${response.code}: ${body.take(200)}")
-                writeCatalogCache(body)
-                parseCatalog(json.parseToJsonElement(body))
-            }
-        }.onSuccess { catalog ->
-            cached = Cache(System.currentTimeMillis(), catalog)
-        }.onFailure { e ->
-            FileLogger.w(TAG, "拉取 models.dev 模型元数据失败", e)
-            // 拉取失败：降级使用磁盘缓存（即使已过期），避免回退到更旧的内置 assets 快照
-            loadCatalogFromDisk()?.let { cached = it }
+    /**
+     * 按「测活选中源 → 候选顺序」尝试拉取全量目录，成功即停并记忆该源；
+     * 全部失败降级磁盘缓存（即使已过期），避免回退到更旧的内置 assets 快照。
+     */
+    private fun fetchCatalogFromSources(preferred: Source?) {
+        val ordered = buildList {
+            preferred?.let { add(it.id) }
+            addAll(CANDIDATE_SOURCES.map { it.id }.filter { it != preferred?.id })
         }
+        for (id in ordered) {
+            val source = CANDIDATE_SOURCES.firstOrNull { it.id == id } ?: continue
+            val result = runCatching {
+                val request = Request.Builder()
+                    .url(source.url)
+                    .header("User-Agent", "aicode")
+                    .get()
+                    .build()
+                metadataClient.newCall(request).execute().use { response ->
+                    val body = response.body?.string().orEmpty()
+                    if (!response.isSuccessful) error("HTTP ${response.code}: ${body.take(200)}")
+                    writeCatalogCache(body)
+                    parseCatalog(json.parseToJsonElement(body))
+                }
+            }
+            if (result.isSuccess) {
+                cached = Cache(System.currentTimeMillis(), result.getOrThrow())
+                rememberSource(source.id)
+                return
+            }
+            FileLogger.w(TAG, "拉取模型元数据失败 source=${source.id}", result.exceptionOrNull())
+        }
+        loadCatalogFromDisk()?.let { cached = it }
+    }
+
+    /** 按「记忆源 → 候选顺序」轻量测活，返回第一个可用源并更新/清空记忆；全部失败返回 null。 */
+    private fun probeSources(): Source? {
+        val remembered = rememberedSourceId()
+        val ordered = buildList {
+            remembered?.let { add(it) }
+            addAll(CANDIDATE_SOURCES.map { it.id }.filter { it != remembered })
+        }
+        var found: Source? = null
+        for (id in ordered) {
+            val source = CANDIDATE_SOURCES.firstOrNull { it.id == id } ?: continue
+            if (probe(source)) {
+                found = source
+                break
+            }
+        }
+        if (found != null) {
+            rememberSource(found.id)
+        } else if (remembered != null) {
+            clearRememberedSource()
+        }
+        return found
+    }
+
+    /** 轻量连通测试：Range 取前 2KB，读到 1 字节即活（随后立即关闭，不下载全量）。 */
+    private fun probe(source: Source): Boolean = runCatching {
+        val request = Request.Builder()
+            .url(source.url)
+            .header("User-Agent", "aicode")
+            .header("Range", "bytes=0-2047")
+            .get()
+            .build()
+        metadataClient.newCall(request).execute().use { response ->
+            response.isSuccessful && (response.body?.byteStream()?.read() ?: -1) >= 0
+        }
+    }.getOrDefault(false)
+
+    private fun rememberedSourceId(): String? = prefs.getString(KEY_LAST_SOURCE, null)
+
+    private fun rememberSource(id: String) {
+        prefs.edit().putString(KEY_LAST_SOURCE, id).apply()
+    }
+
+    private fun clearRememberedSource() {
+        prefs.edit().remove(KEY_LAST_SOURCE).apply()
     }
 
     private fun loadCatalogFromDisk(): Cache? {
@@ -239,11 +300,21 @@ class ModelMetadataService @Inject constructor(
 
     private companion object {
         const val TAG = "ModelMetadataService"
-        const val MODELS_DEV_URL = "https://models.dev/api.json"
+        private const val PREFS_NAME = "model_metadata_prefs"
+        private const val KEY_LAST_SOURCE = "last_success_source"
         const val CACHE_FILE_NAME = "models-dev-api.json"
         const val ASSET_FILE_NAME = "api.official.json"
         const val CACHE_MAX_AGE_MS = 24 * 60 * 60 * 1000L
         const val DEFAULT_CONTEXT_TOKENS = 128_000
         const val DEFAULT_OUTPUT_TOKENS = 64_000
+
+        private data class Source(val id: String, val url: String)
+
+        /** 候选源：官方优先（代理/海外网络可用），jsDelivr 镜像兜底（国内可达，每日同步）。 */
+        private val CANDIDATE_SOURCES = listOf(
+            Source("official", "https://models.dev/api.json"),
+            Source("jsdelivr_gcore", "https://gcore.jsdelivr.net/gh/symfony/models-dev@main/models-dev.json"),
+            Source("jsdelivr_cdn", "https://cdn.jsdelivr.net/gh/symfony/models-dev@main/models-dev.json"),
+        )
     }
 }
