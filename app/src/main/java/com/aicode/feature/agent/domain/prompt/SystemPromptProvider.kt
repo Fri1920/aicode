@@ -53,20 +53,29 @@ class SystemPromptProvider @Inject constructor(
     }
 
     private inner class ActiveSkillsSource : PromptSource {
-        @Volatile private var cached: String? = null
+        // 会话级缓存：同一 (sessionId, projectRoot) 内只扫一次磁盘，保持 system prompt 稳定以命中 KV 缓存；
+        // 新开会话 / 切换工作区 / 重启 App 时缓存自然失效重建。空内容用 "" 占位以区分"未缓存"。
+        private val cachedByKey = ConcurrentHashMap<SourceCacheKey, String>()
 
         override fun build(ctx: AgentContext): String? {
-            // 每轮实时扫描磁盘，如有新增立即生效。这里为了避免每次大体积反序列化造成开销，可以简单做内存对比。
+            val key = SourceCacheKey(ctx.sessionId, ctx.projectRoot)
+            val cached = cachedByKey[key]
+            if (cached != null) return cached.ifEmpty { null }
             val skills = try { skillRepository.listSkills() } catch (e: Exception) { return null }
-            if (skills.isEmpty()) return null
-            
-            val list = skills.joinToString("\n") { "- ${it.name}: ${it.description.ifBlank { "（无描述）" }}" }
-            val newContent = "可用技能 (skills)（格式为 名称: 何时使用；相关时用 loadSkill 传入名称取完整正文，详见上文「技能」说明）：\n当清单里有与当前任务对口的技能时，在合适的时机主动 `loadSkill` 加载并按其正文行事，让技能辅助你更规范、更高效地完成工作，而不是仅凭默认流程硬做。\n$list"
-            
-            if (cached != newContent) {
-                cached = newContent
+            if (skills.isEmpty()) {
+                cachedByKey[key] = ""
+                return null
             }
-            return cached
+
+            val list = skills.joinToString("\n") { "- ${it.name}: ${it.description.ifBlank { "（无描述）" }}" }
+            val content = "可用技能 (skills)（格式为 名称: 何时使用；相关时用 loadSkill 传入名称取完整正文，详见上文「技能」说明）：\n当清单里有与当前任务对口的技能时，在合适的时机主动 `loadSkill` 加载并按其正文行事，让技能辅助你更规范、更高效地完成工作，而不是仅凭默认流程硬做。\n$list"
+            cachedByKey[key] = content
+            trimIfNeeded()
+            return content
+        }
+
+        private fun trimIfNeeded() {
+            if (cachedByKey.size > SOURCE_CACHE_LIMIT) cachedByKey.clear()
         }
     }
 
@@ -122,16 +131,24 @@ class SystemPromptProvider @Inject constructor(
     }
 
     private inner class MemoryListSource : PromptSource {
-        @Volatile private var cached: String? = null
+        // 会话级缓存：同一 (sessionId, projectRoot) 内只读一次盘，保持 system prompt 稳定以命中 KV 缓存；
+        // 新开会话 / 切换工作区 / 重启 App 时缓存自然失效重建。空内容用 "" 占位以区分"未缓存"。
+        private val cachedByKey = ConcurrentHashMap<SourceCacheKey, String>()
 
         override fun build(ctx: AgentContext): String? {
+            val key = SourceCacheKey(ctx.sessionId, ctx.projectRoot)
+            val cached = cachedByKey[key]
+            if (cached != null) return cached.ifEmpty { null }
             val memories = try { memoryRepository.listMemories(ctx.projectRoot) } catch (e: Exception) { return null }
-            if (memories.isEmpty()) return null
-            
+            if (memories.isEmpty()) {
+                cachedByKey[key] = ""
+                return null
+            }
+
             val globalMemories = memories.filter { it.scope == MemoryScope.GLOBAL }
             val projectMemories = memories.filter { it.scope == MemoryScope.PROJECT }
-            
-            val newContent = buildString {
+
+            val content = buildString {
                 if (globalMemories.isNotEmpty()) {
                     append("全局记忆 (跨项目个人偏好，需要详情时用 memory(action=read, name=xxx, scope=global))：\n")
                     globalMemories.forEach { append("- ${it.name}: ${it.description.ifBlank { "无" }}\n") }
@@ -142,13 +159,19 @@ class SystemPromptProvider @Inject constructor(
                     projectMemories.forEach { append("- ${it.name}: ${it.description.ifBlank { "无" }}\n") }
                 }
             }.trimEnd()
-            
-            if (cached != newContent) {
-                cached = newContent
-            }
-            return cached
+
+            cachedByKey[key] = content
+            trimIfNeeded()
+            return content
+        }
+
+        private fun trimIfNeeded() {
+            if (cachedByKey.size > SOURCE_CACHE_LIMIT) cachedByKey.clear()
         }
     }
+
+    /** 会话级缓存 key：同一会话同一工作区共享一份快照，避免每轮重扫磁盘导致 system prompt 变化。 */
+    private data class SourceCacheKey(val sessionId: String?, val projectRoot: String)
 
     private val staticRuleSource = StaticRuleSource()
     private val memoryListSource = MemoryListSource()
@@ -224,6 +247,8 @@ class SystemPromptProvider @Inject constructor(
         const val AGENTS_FILE = "AGENTS.md"
         const val CLAUDE_FILE = "CLAUDE.md"
         const val MAX_AGENTS_CHARS = 32_000
+        /** 会话级缓存 key 数量上限：超过后整体清空，仅防长期累积；正常会话数远小于此。 */
+        const val SOURCE_CACHE_LIMIT = 32
         val LEADING_COMMENT = Regex("(?s)^\\s*<!--.*?-->\\s*")
     }
 }
