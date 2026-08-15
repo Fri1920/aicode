@@ -12,7 +12,7 @@ sealed interface RunState {
 }
 
 /** 后台任务完成通知携带的终端输出行数。 */
-const val TAIL_LINES = 10
+const val TAIL_LINES = 50
 
 /** 截取终端 transcript 的最后 n 行；null 输入返回 null。 */
 fun String?.takeTailLines(n: Int): String? =
