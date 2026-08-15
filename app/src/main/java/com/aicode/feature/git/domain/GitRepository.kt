@@ -471,6 +471,12 @@ class GitRepository @Inject constructor(
             }.getOrDefault("")
         }
 
+    /** 读取暂存区当前文件内容（index）。文件尚未暂存时返回空串。 */
+    suspend fun indexFileContent(path: String): String {
+        val out = git("show", ":$path")
+        return if (out.startsWith("fatal:") || out.startsWith("error:")) "" else out
+    }
+
     /**
      * porcelain v1 对含引号/反斜杠/控制字符的路径会整体加引号并做 C 风格转义
      * （如 `"a\"b.txt"`、`"a\tb.txt"`、八进制 `\NNN`），这里做反向解析还原真实路径。

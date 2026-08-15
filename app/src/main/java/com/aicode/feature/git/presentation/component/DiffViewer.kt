@@ -99,8 +99,9 @@ fun DiffViewerScreen(
                             overflow = TextOverflow.Ellipsis
                         )
                         Text(
-                            text = "${diffData.oldRef} → ${diffData.newRef}",
+                            text = diffData.filePath,
                             style = MaterialTheme.typography.labelSmall,
+                            fontFamily = FontFamily.Monospace,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis

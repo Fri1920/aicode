@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
@@ -26,6 +27,10 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -65,11 +70,13 @@ internal fun StatusTab(
     onCommit: () -> Unit,
     onPull: () -> Unit,
     onPush: () -> Unit,
-    onFileDiff: (String) -> Unit
+    onFileDiff: (String) -> Unit,
+    onStagedFileDiff: (String) -> Unit
 ) {
     val s = status
     val clean = s == null || (s.staged.isEmpty() && s.unstaged.isEmpty() && s.untracked.isEmpty())
     val hasChanges = !clean
+    var showUnstageAllConfirm by remember { mutableStateOf(false) }
 
     Column(
         modifier = Modifier
@@ -138,7 +145,7 @@ internal fun StatusTab(
                     title = stringResource(R.string.git_staged_count, ss.staged.size),
                     actionLabel = stringResource(R.string.git_action_unstage_all),
                     actionEnabled = !busy,
-                    onAction = onUnstageAll
+                    onAction = { showUnstageAllConfirm = true }
                 )
                 SettingsGroup {
                     ss.staged.forEachIndexed { index, f ->
@@ -148,7 +155,8 @@ internal fun StatusTab(
                             actionIcon = FeatherIcons.Minus,
                             actionDesc = stringResource(R.string.git_unstage),
                             onAction = { onUnstage(f.path) },
-                            enabled = !busy
+                            enabled = !busy,
+                            onClick = { onStagedFileDiff(f.path) }
                         )
                     }
                 }
@@ -186,9 +194,26 @@ internal fun StatusTab(
             }
         }
     }
-}
 
-/** 顶部概览白卡片：当前分支 + 同步状态 + 三组计数。 */
+    if (showUnstageAllConfirm) {
+        AlertDialog(
+            onDismissRequest = { showUnstageAllConfirm = false },
+            title = { Text(stringResource(R.string.git_action_unstage_all)) },
+            text = { Text(stringResource(R.string.git_unstage_all_confirm)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    showUnstageAllConfirm = false
+                    onUnstageAll()
+                }) { Text(stringResource(R.string.git_action_unstage_all)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showUnstageAllConfirm = false }) {
+                    Text(stringResource(R.string.common_cancel))
+                }
+            }
+        )
+    }
+}
 @Composable
 private fun StatusOverview(status: GitStatus?, clean: Boolean) {
     val staged = status?.staged?.size ?: 0

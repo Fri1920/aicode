@@ -88,6 +88,7 @@ fun GitScreen(
     }
 
     var showCommitDialog by remember { mutableStateOf(false) }
+    var showPullConfirm by remember { mutableStateOf(false) }
 
     // diff 视图：独立全屏页，不进入下方 GitScreen 的 Scaffold，避免双层顶栏。
     val diffData = state.diffData
@@ -103,7 +104,7 @@ fun GitScreen(
         containerColor = settingsPageBackground(),
         topBar = {
             TopAppBar(
-                title = { Text("Git") },
+                title = { Text(stringResource(R.string.git_title)) },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = settingsPageBackground(),
                     titleContentColor = MaterialTheme.colorScheme.onBackground
@@ -161,9 +162,12 @@ fun GitScreen(
                             onStageAll = viewModel::stageAll,
                             onUnstageAll = viewModel::unstageAll,
                             onCommit = { showCommitDialog = true },
-                            onPull = viewModel::pull,
+                            onPull = {
+                                if (state.status?.hasChanges == true) showPullConfirm = true else viewModel.pull()
+                            },
                             onPush = viewModel::push,
-                            onFileDiff = viewModel::loadWorktreeDiff
+                            onFileDiff = viewModel::loadWorktreeDiff,
+                            onStagedFileDiff = viewModel::loadStagedDiff
                         )
                         GitTab.BRANCHES -> BranchesTab(
                             branches = state.branches,
@@ -207,6 +211,25 @@ fun GitScreen(
             modifier = Modifier.align(Alignment.BottomCenter)
         )
     }
+    }
+
+    if (showPullConfirm) {
+        AlertDialog(
+            onDismissRequest = { showPullConfirm = false },
+            title = { Text(stringResource(R.string.git_pull)) },
+            text = { Text(stringResource(R.string.git_pull_dirty_confirm)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    showPullConfirm = false
+                    viewModel.pull()
+                }) { Text(stringResource(R.string.git_pull_continue)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showPullConfirm = false }) {
+                    Text(stringResource(R.string.common_cancel))
+                }
+            }
+        )
     }
 
     if (showCommitDialog) {
@@ -336,7 +359,7 @@ private fun CommitDialog(onDismiss: () -> Unit, onConfirm: (String) -> Unit) {
     var message by remember { mutableStateOf("") }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.git_tab_commits)) },
+        title = { Text(stringResource(R.string.git_commit_dialog_title)) },
         text = {
             OutlinedTextField(
                 value = message,
@@ -350,7 +373,7 @@ private fun CommitDialog(onDismiss: () -> Unit, onConfirm: (String) -> Unit) {
             TextButton(
                 onClick = { if (message.isNotBlank()) onConfirm(message.trim()) },
                 enabled = message.isNotBlank()
-            ) { Text(stringResource(R.string.git_tab_commits)) }
+            ) { Text(stringResource(R.string.git_action_commit)) }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_cancel)) } }
     )

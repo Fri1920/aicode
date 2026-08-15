@@ -414,16 +414,33 @@ class GitViewModel @Inject constructor(
  * path 为文件路径。用 showFileContent("HEAD", path) 取版本库快照，用 worktreeFileContent(path) 取工作区当前内容。
  */
     fun loadWorktreeDiff(path: String) {
+        loadDiff(path, "HEAD", "工作区") { ref, p ->
+            if (ref == "工作区") repository.worktreeFileContent(p)
+            else repository.showFileContent(ref, p)
+        }
+    }
+
+    /** 加载某文件的暂存区差异（HEAD vs index）。 */
+    fun loadStagedDiff(path: String) {
+        loadDiff(path, "HEAD", "暂存区") { ref, p ->
+            if (ref == "暂存区") repository.indexFileContent(p)
+            else repository.showFileContent(ref, p)
+        }
+    }
+
+    private fun loadDiff(
+        path: String,
+        oldRef: String,
+        newRef: String,
+        contentProvider: suspend (String, String) -> String
+    ) {
         if (_state.value.diffLoading) return
         _state.update { it.copy(diffLoading = true, diffData = null) }
         viewModelScope.launch {
             val data = runCatching {
-                computeDiff(path, "HEAD", "工作区") { ref, p ->
-                    if (ref == "工作区") repository.worktreeFileContent(p)
-                    else repository.showFileContent(ref, p)
-                }
+                computeDiff(path, oldRef, newRef, contentProvider)
             }.getOrElse { e ->
-                FileLogger.e(TAG, "加载工作区 diff 失败: $path", e)
+                FileLogger.e(TAG, "加载 diff 失败: $path", e)
                 null
             }
             _state.update { it.copy(diffLoading = false, diffData = data, toast = if (data == null) context.getString(R.string.git_toast_diff_failed) else null) }
