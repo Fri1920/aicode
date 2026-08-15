@@ -1,11 +1,9 @@
 package com.aicode.feature.credentials.presentation.component
 
-import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
@@ -19,12 +17,9 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -43,7 +38,6 @@ import com.aicode.core.theme.Spacing
 import com.aicode.feature.credentials.domain.model.GitCredential
 import com.aicode.feature.credentials.domain.model.newCredentialId
 import compose.icons.FeatherIcons
-import compose.icons.feathericons.ArrowLeft
 import compose.icons.feathericons.Eye
 import compose.icons.feathericons.EyeOff
 import compose.icons.feathericons.Trash2
@@ -204,22 +198,4 @@ internal fun CredentialEditorSheet(
             }
         }
     }
-}
-
-/**
- * 保留原本 CredentialEditorScreen 用于兼容调用。
- */
-@Composable
-internal fun CredentialEditorScreen(
-    initial: GitCredential?,
-    onBack: () -> Unit,
-    onSave: (GitCredential) -> Unit,
-    onDelete: (String) -> Unit
-) {
-    CredentialEditorSheet(
-        initial = initial,
-        onDismiss = onBack,
-        onSave = onSave,
-        onDelete = onDelete
-    )
 }

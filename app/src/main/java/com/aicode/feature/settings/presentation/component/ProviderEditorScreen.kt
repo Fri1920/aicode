@@ -44,8 +44,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.MultiChoiceSegmentedButtonRow
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonColors
@@ -94,6 +92,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aicode.core.theme.Radius
 import com.aicode.core.theme.Spacing
+import com.aicode.core.ui.FloatingTabBar
+import com.aicode.core.ui.FloatingTabItem
 import com.aicode.feature.settings.data.local.CustomModelMetadataStore
 import com.aicode.feature.settings.data.remote.ModelTestResult
 import com.aicode.feature.settings.domain.model.AIProviderConfig
@@ -243,31 +243,13 @@ fun ProviderEditorScreen(
                 }
             )
         },
-        bottomBar = {
-            NavigationBar(
-                containerColor = settingsPageBackground(),
-                tonalElevation = 0.dp
-            ) {
-                NavigationBarItem(
-                    icon = { Icon(FeatherIcons.Sliders, contentDescription = stringResource(R.string.provider_config)) },
-                    label = { Text(stringResource(R.string.provider_config)) },
-                    selected = selectedTab == 0,
-                    onClick = { selectedTab = 0 }
-                )
-                NavigationBarItem(
-                    icon = { Icon(FeatherIcons.Cpu, contentDescription = stringResource(R.string.common_model)) },
-                    label = { Text(stringResource(R.string.common_model)) },
-                    selected = selectedTab == 1,
-                    onClick = { selectedTab = 1 }
-                )
-            }
-        }
     ) { padding ->
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
         ) {
+            Column(modifier = Modifier.fillMaxSize()) {
             if (selectedTab == 0) {
                 Column(
                     modifier = Modifier
@@ -468,6 +450,18 @@ fun ProviderEditorScreen(
                     }
                 }
             }
+            }
+
+            FloatingTabBar(
+                selected = selectedTab,
+                onSelect = { selectedTab = it },
+                items = listOf(
+                    FloatingTabItem(FeatherIcons.Sliders, stringResource(R.string.provider_config)),
+                    FloatingTabItem(FeatherIcons.Cpu, stringResource(R.string.common_model))
+                ),
+                maskColor = settingsPageBackground(),
+                modifier = Modifier.align(Alignment.BottomCenter)
+            )
         }
     }
 

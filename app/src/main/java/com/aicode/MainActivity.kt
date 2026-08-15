@@ -46,6 +46,7 @@ import com.aicode.feature.agent.presentation.AIAgentViewModel
 import com.aicode.feature.agent.presentation.component.AIChatPanel
 import com.aicode.feature.agent.presentation.component.ChatDrawerContent
 import com.aicode.feature.git.presentation.GitViewModel
+import com.aicode.feature.credentials.presentation.component.CredentialScreen
 import com.aicode.feature.git.presentation.component.GitScreen
 import com.aicode.feature.settings.data.repository.KeepaliveSettingsRepository
 import com.aicode.feature.settings.data.repository.AppThemeMode
@@ -347,10 +348,16 @@ fun AppNavigation() {
             }
             composable("git") {
                 val gitViewModel: GitViewModel = hiltViewModel()
-                val credentialViewModel: com.aicode.feature.credentials.presentation.CredentialViewModel = hiltViewModel()
                 GitScreen(
                     viewModel = gitViewModel,
-                    credentialViewModel = credentialViewModel,
+                    onNavigateToCredentials = { navController.navigate("credentials") },
+                    onNavigateBack = { navController.popBackStack() }
+                )
+            }
+            composable("credentials") {
+                val credentialViewModel: com.aicode.feature.credentials.presentation.CredentialViewModel = hiltViewModel()
+                CredentialScreen(
+                    viewModel = credentialViewModel,
                     onNavigateBack = { navController.popBackStack() }
                 )
             }

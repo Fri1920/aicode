@@ -1,7 +1,5 @@
 package com.aicode.feature.workspace.presentation.remote
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -9,9 +7,7 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -32,15 +28,14 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.aicode.core.theme.Spacing
+import com.aicode.core.ui.FloatingTabBar
+import com.aicode.core.ui.FloatingTabItem
 import com.aicode.feature.settings.presentation.component.SettingsDivider
 import com.aicode.feature.settings.presentation.component.SettingsGroup
 import com.aicode.feature.settings.presentation.component.settingsPageBackground
@@ -49,7 +44,11 @@ import com.aicode.feature.workspace.domain.model.RemoteMount
 import com.aicode.R
 import compose.icons.FeatherIcons
 import compose.icons.feathericons.ArrowLeft
+import compose.icons.feathericons.Folder
 import compose.icons.feathericons.Plus
+import compose.icons.feathericons.RefreshCw
+import compose.icons.feathericons.Server
+import compose.icons.feathericons.UploadCloud
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -70,45 +69,33 @@ fun RemoteServerScreen(
     Scaffold(
         containerColor = settingsPageBackground(),
         topBar = {
-            Column {
-                TopAppBar(
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = settingsPageBackground(),
-                        titleContentColor = MaterialTheme.colorScheme.onBackground
-                    ),
-                    title = { Text(stringResource(R.string.remote_workspace_title)) },
-                    navigationIcon = {
-                        IconButton(onClick = onNavigateBack) {
-                            Icon(FeatherIcons.ArrowLeft, contentDescription = stringResource(R.string.common_back))
-                        }
-                    },
-                    actions = {
-                        if (selectedTab == 0 || selectedTab == 1) {
-                            IconButton(onClick = {
-                                if (selectedTab == 0) {
-                                    connectionToEdit = null
-                                    showAddConnectionDialog = true
-                                } else {
-                                    mountToEdit = null
-                                    showAddMountDialog = true
-                                }
-                            }) {
-                                Icon(FeatherIcons.Plus, contentDescription = stringResource(R.string.common_add))
+            TopAppBar(
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = settingsPageBackground(),
+                    titleContentColor = MaterialTheme.colorScheme.onBackground
+                ),
+                title = { Text(stringResource(R.string.remote_workspace_title)) },
+                navigationIcon = {
+                    IconButton(onClick = onNavigateBack) {
+                        Icon(FeatherIcons.ArrowLeft, contentDescription = stringResource(R.string.common_back))
+                    }
+                },
+                actions = {
+                    if (selectedTab == 0 || selectedTab == 1) {
+                        IconButton(onClick = {
+                            if (selectedTab == 0) {
+                                connectionToEdit = null
+                                showAddConnectionDialog = true
+                            } else {
+                                mountToEdit = null
+                                showAddMountDialog = true
                             }
+                        }) {
+                            Icon(FeatherIcons.Plus, contentDescription = stringResource(R.string.common_add))
                         }
                     }
-                )
-                SegmentTabs(
-                    selected = selectedTab,
-                    onSelect = { selectedTab = it },
-                    tabs = listOf(
-                        stringResource(R.string.remote_tab_connections),
-                        stringResource(R.string.remote_tab_mounts),
-                        stringResource(R.string.remote_tab_ftp),
-                        stringResource(R.string.remote_tab_sync)
-                    )
-                )
-            }
+                }
+            )
         }
     ) { paddingValues ->
         Box(modifier = Modifier.padding(paddingValues).fillMaxSize()) {
@@ -183,6 +170,19 @@ fun RemoteServerScreen(
                 )
             }
 
+            FloatingTabBar(
+                selected = selectedTab,
+                onSelect = { selectedTab = it },
+                items = listOf(
+                    FloatingTabItem(FeatherIcons.Server, stringResource(R.string.remote_tab_connections)),
+                    FloatingTabItem(FeatherIcons.Folder, stringResource(R.string.remote_tab_mounts)),
+                    FloatingTabItem(FeatherIcons.UploadCloud, stringResource(R.string.remote_tab_ftp)),
+                    FloatingTabItem(FeatherIcons.RefreshCw, stringResource(R.string.remote_tab_sync))
+                ),
+                maskColor = settingsPageBackground(),
+                modifier = Modifier.align(Alignment.BottomCenter)
+            )
+
             if (uiState.isLoading) {
                 CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
             }
@@ -254,48 +254,6 @@ fun RemoteServerScreen(
                     viewModel.listRemoteDirectories(connectionId, path, onResult)
                 }
             )
-        }
-    }
-}
-
-/** iOS 风格分段控件：圆角浅灰容器 + 白色选中块，样式与容器镜像弹窗的分段选择器一致。 */
-@Composable
-internal fun SegmentTabs(
-    selected: Int,
-    onSelect: (Int) -> Unit,
-    tabs: List<String>
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = Spacing.lg, vertical = Spacing.sm)
-            .background(
-                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
-                RoundedCornerShape(12.dp)
-            )
-            .padding(3.dp),
-        horizontalArrangement = Arrangement.spacedBy(3.dp)
-    ) {
-        tabs.forEachIndexed { index, title ->
-            val isSelected = index == selected
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(if (isSelected) MaterialTheme.colorScheme.surface else Color.Transparent)
-                    .clickable { onSelect(index) }
-                    .padding(vertical = 8.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.bodyMedium.copy(
-                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-                    ),
-                    color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1
-                )
-            }
         }
     }
 }
