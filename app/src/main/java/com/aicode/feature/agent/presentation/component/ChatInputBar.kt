@@ -1,6 +1,8 @@
 package com.aicode.feature.agent.presentation.component
 
+import android.content.ClipData
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -36,6 +38,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -45,6 +48,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.ClipEntry
+import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -71,8 +76,12 @@ import compose.icons.FeatherIcons
 import compose.icons.feathericons.AlertCircle
 import compose.icons.feathericons.ArrowUp
 import compose.icons.feathericons.Check
+import compose.icons.feathericons.ChevronDown
+import compose.icons.feathericons.ChevronUp
+import compose.icons.feathericons.Copy
 import compose.icons.feathericons.Plus
 import compose.icons.feathericons.Square
+import kotlinx.coroutines.launch
 
 /** 输入框区域蒙版高度：盖住圆角容器，滚动内容滑入时被渐变遮罩；随键盘（IME）上移。 */
 private val INPUT_BAR_MASK_HEIGHT = 110.dp
@@ -542,39 +551,89 @@ internal fun StatusBanner(state: AgentUIState) {
         exit = androidx.compose.animation.fadeOut()
     ) {
         when (state) {
-            is AgentUIState.Error -> InfoBanner(
-                text = state.message,
-                container = MaterialTheme.colorScheme.errorContainer,
-                content = MaterialTheme.colorScheme.onErrorContainer,
-                icon = FeatherIcons.AlertCircle
-            )
+            is AgentUIState.Error -> ErrorBubble(message = state.message)
 
             else -> {}
         }
     }
 }
 
+/**
+ * 失败错误气泡：风格对齐 ToolPermissionPanel / AskUserQuestionPanel（内联面板，与输入框同宽且两侧留距）。
+ * 默认折叠为一行标题（请求失败），点击展开完整错误详情；右上角可一键复制。
+ */
 @Composable
-internal fun InfoBanner(
-    text: String,
-    container: Color,
-    content: Color,
-    icon: androidx.compose.ui.graphics.vector.ImageVector
-) {
+private fun ErrorBubble(message: String) {
+    var expanded by remember(message) { mutableStateOf(false) }
+    var copied by remember(message) { mutableStateOf(false) }
+    val clipboard = LocalClipboard.current
+    val copyScope = rememberCoroutineScope()
     Surface(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = Spacing.lg, vertical = Spacing.xs),
-        color = container,
-        shape = RoundedCornerShape(Radius.md)
+        color = MaterialTheme.colorScheme.surface,
+        shape = RoundedCornerShape(Radius.md),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
     ) {
-        Row(
-            modifier = Modifier.padding(Spacing.md),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(icon, contentDescription = null, tint = Brand.IconGray, modifier = Modifier.size(18.dp))
-            Spacer(Modifier.width(Spacing.sm))
-            Text(text, color = content, style = MaterialTheme.typography.bodyMedium)
+        Column(modifier = Modifier.padding(Spacing.md)) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(Radius.sm))
+                    .clickable { expanded = !expanded },
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    FeatherIcons.AlertCircle,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(Modifier.width(Spacing.sm))
+                Text(
+                    text = stringResource(R.string.chat_error_title),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.error,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.weight(1f)
+                )
+                IconButton(onClick = {
+                    copyScope.launch {
+                        clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("error", message)))
+                        copied = true
+                    }
+                }) {
+                    Icon(
+                        if (copied) FeatherIcons.Check else FeatherIcons.Copy,
+                        contentDescription = if (copied) stringResource(R.string.chat_copied) else stringResource(R.string.chat_copy),
+                        tint = if (copied) MaterialTheme.colorScheme.primary else Brand.IconGray,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+                Icon(
+                    if (expanded) FeatherIcons.ChevronUp else FeatherIcons.ChevronDown,
+                    contentDescription = if (expanded) stringResource(R.string.common_collapse) else stringResource(R.string.common_expand),
+                    tint = Brand.IconGray,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+            if (expanded) {
+                Spacer(Modifier.height(Spacing.sm))
+                SelectionContainer {
+                    Column(
+                        modifier = Modifier
+                            .heightIn(max = 160.dp)
+                            .verticalScroll(rememberScrollState())
+                    ) {
+                        Text(
+                            text = message,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
         }
     }
 }

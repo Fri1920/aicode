@@ -552,7 +552,7 @@ fun AIChatPanel(
             }
             } // 内容层结束
 
-            // 悬浮层：错误横幅 / 面板 / 输入框（蒙版在 ChatInputBar 内部，跟随键盘上移）
+            // 悬浮层：错误气泡 / 面板 / 输入框（蒙版在 ChatInputBar 内部，跟随键盘上移）
             Column(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
