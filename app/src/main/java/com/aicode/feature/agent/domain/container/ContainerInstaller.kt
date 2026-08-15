@@ -213,9 +213,13 @@ class ContainerInstaller @Inject constructor(
     val prootLibDir: File
         get() = File(context.filesDir, "container/lib")
 
-    /** PRoot 在 Android 上必须的临时目录（Android 没有 /tmp） */
+    /**
+     * PRoot 在 Android 上必须的临时目录（Android 没有 /tmp）。
+     * 放在 rootfs 的 /tmp（宿主 filesDir/rootfs/tmp）：cache 目录会被系统清理（清缓存后 proot
+     * 找不到临时目录报 can't canonicalize），files 目录稳定；rootfs 重装后自带 /tmp 会重建，无需额外处理。
+     */
     val prootTmpDir: File
-        get() = File(context.cacheDir, "proot_tmp")
+        get() = File(rootfsDir, "tmp")
 
     /** 标记文件，内容是已安装的版本号 */
     private val installedMarker: File
