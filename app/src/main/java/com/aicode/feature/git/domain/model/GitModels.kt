@@ -24,7 +24,10 @@ data class GitCommit(
 data class GitBranch(
     val name: String,
     val current: Boolean,
-    val remote: Boolean
+    val remote: Boolean,
+    val upstream: String? = null,
+    val ahead: Int = 0,
+    val behind: Int = 0
 )
 
 data class GitTag(
@@ -39,7 +42,9 @@ data class GitStatus(
     val behind: Int,
     val staged: List<GitFileChange>,
     val unstaged: List<GitFileChange>,
-    val untracked: List<String>
+    val untracked: List<String>,
+    val upstream: String? = null,
+    val isDetached: Boolean = false
 ) {
     val hasChanges: Boolean
         get() = staged.isNotEmpty() || unstaged.isNotEmpty() || untracked.isNotEmpty()

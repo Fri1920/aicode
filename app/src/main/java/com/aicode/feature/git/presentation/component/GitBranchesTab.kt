@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -81,6 +82,7 @@ internal fun BranchesTab(
     branchesLoading: Boolean,
     branchesLoaded: Boolean,
     checkoutLoading: String?,
+    listState: LazyListState,
     onCheckout: (String, Boolean) -> Unit,
     onCreateBranch: (String, String?, Boolean) -> Unit,
     onDeleteBranch: (String) -> Unit,
@@ -111,6 +113,9 @@ internal fun BranchesTab(
         return
     }
     val currentBranch = branches.firstOrNull { it.current }?.name ?: stringResource(R.string.git_no_checked_out_branch)
+    // 无当前分支即 detached HEAD（HEAD 卡片只展示参考信息，此时显示提示而非分支名）。
+    val hasCurrentBranch = branches.any { it.current }
+    val isDetached = branches.none { it.current } && branches.any { it.remote } || branches.none { it.current } && tags.isNotEmpty()
     val localBranches = branches.filter { !it.remote }
     val remoteBranches = branches.filter { it.remote }
     val expanded = remember { mutableStateMapOf<String, Boolean>() }
@@ -365,10 +370,11 @@ internal fun BranchesTab(
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
+        state = listState,
         contentPadding = PaddingValues(start = Spacing.lg, end = Spacing.lg, bottom = 70.dp),
         verticalArrangement = Arrangement.spacedBy(Spacing.md)
     ) {
-        item { BranchesOverview(currentBranch, localBranches.size, remoteBranches.size, tags.size) }
+        item { BranchesOverview(currentBranch, localBranches.size, remoteBranches.size, tags.size, hasCurrentBranch) }
         item {
             RefSectionHeader(
                 title = "HEAD",
@@ -479,7 +485,8 @@ private fun BranchesOverview(
     currentBranch: String,
     localCount: Int,
     remoteCount: Int,
-    tagCount: Int
+    tagCount: Int,
+    hasCurrentBranch: Boolean
 ) {
     Surface(
         color = if (settingsLightMode()) Color.White else MaterialTheme.colorScheme.surface,
@@ -509,6 +516,13 @@ private fun BranchesOverview(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
+                    if (!hasCurrentBranch) {
+                        Text(
+                            text = stringResource(R.string.git_detached_head_label),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
                 }
             }
 
@@ -569,6 +583,38 @@ private fun RefSectionHeader(
             }
         }
     }
+}
+
+/**
+ * 分支行副标题：当前分支标记 + 跟踪关系 + 同步数量。
+ */
+@Composable
+private fun branchSubtitle(
+    branch: GitBranch,
+    checkedOutLabel: String,
+    noUpstreamLabel: String
+): String? {
+    val parts = mutableListOf<String>()
+    if (branch.current) parts.add(checkedOutLabel)
+    val upstream = branch.upstream
+    if (upstream != null) {
+        val sync = buildString {
+            if (branch.ahead > 0) {
+                append(stringResource(R.string.git_ahead_count, branch.ahead))
+            }
+            if (branch.behind > 0) {
+                if (isNotEmpty()) append(" · ")
+                append(stringResource(R.string.git_behind_count, branch.behind))
+            }
+        }
+        parts.add(
+            if (sync.isNotEmpty()) "$upstream $sync"
+            else "$upstream ${stringResource(R.string.git_branch_synced)}"
+        )
+    } else {
+        parts.add(noUpstreamLabel)
+    }
+    return parts.joinToString(" · ")
 }
 
 /**
@@ -806,7 +852,7 @@ private fun ColumnScope.renderBranchTree(
                 }
                 RefRow(
                     name = node.segment,
-                    subtitle = if (b.current) stringResource(R.string.git_checked_out) else null,
+                    subtitle = if (isRemote) null else branchSubtitle(b, stringResource(R.string.git_checked_out), stringResource(R.string.git_no_upstream)),
                     icon = if (isRemote) FeatherIcons.Cloud else FeatherIcons.GitBranch,
                     isCurrent = b.current,
                     isLoading = checkoutLoading == b.name,

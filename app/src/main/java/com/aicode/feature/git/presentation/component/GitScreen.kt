@@ -8,6 +8,8 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -38,6 +40,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -89,6 +92,18 @@ fun GitScreen(
 
     var showCommitDialog by remember { mutableStateOf(false) }
     var showPullConfirm by remember { mutableStateOf(false) }
+
+    // 三个 tab 的滚动状态统一提升到页面层，聚合出「是否正在滚动」用于底部 tab 栏滚动弱化。
+    val statusScrollState = rememberScrollState()
+    val branchesListState = rememberLazyListState()
+    val logListState = rememberLazyListState()
+    val tabsScrolling by remember {
+        derivedStateOf {
+            statusScrollState.isScrollInProgress ||
+                branchesListState.isScrollInProgress ||
+                logListState.isScrollInProgress
+        }
+    }
 
     // diff 视图：独立全屏页，不进入下方 GitScreen 的 Scaffold，避免双层顶栏。
     val diffData = state.diffData
@@ -157,6 +172,7 @@ fun GitScreen(
                             busy = state.busy,
                             hasRemote = state.hasRemote,
                             hasIdentity = state.hasIdentity,
+                            scrollState = statusScrollState,
                             onStage = viewModel::stage,
                             onUnstage = viewModel::unstage,
                             onStageAll = viewModel::stageAll,
@@ -175,6 +191,7 @@ fun GitScreen(
                             branchesLoading = state.branchesLoading,
                             branchesLoaded = state.branchesLoaded,
                             checkoutLoading = state.checkoutLoading,
+                            listState = branchesListState,
                             onCheckout = viewModel::checkoutBranch,
                             onCreateBranch = viewModel::createBranch,
                             onDeleteBranch = viewModel::deleteBranch,
@@ -185,11 +202,13 @@ fun GitScreen(
                         )
                         GitTab.LOG -> LogTab(
                             graph = state.graph,
-                            expandedCommits = state.expandedCommits,
                             commitFiles = state.commitFiles,
                             loadingCommit = state.loadingCommit,
                             graphLoadingMore = state.graphLoadingMore,
-                            onToggleCommit = viewModel::toggleCommit,
+                            listState = logListState,
+                            detailHash = state.commitDetailHash,
+                            onOpenCommit = viewModel::openCommitDetail,
+                            onCloseCommit = viewModel::closeCommitDetail,
                             onFileDiff = viewModel::loadCommitFileDiff,
                             onLoadMore = viewModel::loadMoreCommits
                         )
@@ -208,6 +227,7 @@ fun GitScreen(
                 FloatingTabItem(FeatherIcons.GitCommit, stringResource(R.string.git_tab_commits))
             ),
             maskColor = settingsPageBackground(),
+            isScrolling = tabsScrolling,
             modifier = Modifier.align(Alignment.BottomCenter)
         )
     }

@@ -94,6 +94,8 @@ class GitRepository @Inject constructor(
         val lines = raw.split('\n').map { it.removeSuffix("\r") }
 
         var branch = "(unknown)"
+        var upstream: String? = null
+        var isDetached = false
         var ahead = 0
         var behind = 0
         val staged = mutableListOf<GitFileChange>()
@@ -104,9 +106,14 @@ class GitRepository @Inject constructor(
             if (line.isBlank()) continue
             if (line.startsWith("## ")) {
                 val header = line.removePrefix("## ")
-                // 形如 "main" / "main...origin/main" / "main...origin/main [ahead 2, behind 1]"
+                isDetached = header.startsWith("HEAD (no branch)")
                 val tracking = header.substringBefore(" [")
-                branch = tracking.substringBefore("...").ifBlank { tracking }
+                if (isDetached) {
+                    branch = "HEAD"
+                } else {
+                    branch = tracking.substringBefore("...").ifBlank { tracking }
+                    upstream = tracking.substringAfter("...", "").ifBlank { null }
+                }
                 val bracket = header.substringAfter(" [", "")
                 if (bracket.isNotBlank()) {
                     bracket.removeSuffix("]").split(",").forEach { tok ->
@@ -136,7 +143,7 @@ class GitRepository @Inject constructor(
                 unstaged.add(GitFileChange(path, y.toString(), staged = false))
             }
         }
-        return GitStatus(branch, ahead, behind, staged, unstaged, untracked)
+        return GitStatus(branch, ahead, behind, staged, unstaged, untracked, upstream, isDetached)
     }
 
     /** 本地 + 远程分支列表，当前分支高亮。 */
@@ -148,14 +155,14 @@ class GitRepository @Inject constructor(
      */
     suspend fun localRefsOnly(): Map<String, List<GitGraphRef>> = withContext(Dispatchers.Default) {
         val raw = runCatching {
-            git("for-each-ref", "--format=%(refname:short)|%(objectname)|%(HEAD)|%(refname)", "refs/heads")
+            git("for-each-ref", "--format=%(refname:short)\u001f%(objectname)\u001f%(HEAD)\u001f%(refname)", "refs/heads")
         }.getOrDefault("")
         if (raw.isBlank() || raw.startsWith("fatal:")) return@withContext emptyMap()
         val result = mutableMapOf<String, MutableList<GitGraphRef>>()
         for (line in raw.split('\n')) {
             val l = line.removeSuffix("\r").trim()
             if (l.isBlank()) continue
-            val parts = l.split('|', limit = 4)
+            val parts = l.split('\u001f')
             if (parts.size < 4) continue
             val isHead = parts[2].trim() == "*"
             result.getOrPut(parts[1]) { mutableListOf() }
@@ -166,10 +173,10 @@ class GitRepository @Inject constructor(
 
     /** 最近 [limit] 条提交。 */
     suspend fun log(limit: Int = 50): List<GitCommit> {
-        val raw = git("log", "--pretty=format:%H|%h|%an|%ar|%s", "-n", limit.toString())
+        val raw = git("log", "--pretty=format:%H%x1f%h%x1f%an%x1f%ar%x1f%s", "-n", limit.toString())
         if (raw.isBlank() || raw.startsWith("fatal:")) return emptyList()
         return raw.split('\n').mapNotNull { line ->
-            val parts = line.removeSuffix("\r").split('|', limit = 5)
+            val parts = line.removeSuffix("\r").split('\u001f')
             if (parts.size < 5) null
             else GitCommit(parts[0], parts[1], parts[2], parts[3], parts[4])
         }
@@ -212,7 +219,7 @@ class GitRepository @Inject constructor(
         limit: Int = GRAPH_PAGE_SIZE
     ): GitGraph = withContext(Dispatchers.Default) {
         val skip = existingCommits.size
-        val logRaw = runCatching { git("log", "--pretty=format:%H|%h|%an|%ar|%s|%P", "--skip", skip.toString(), "-n", limit.toString()) }
+        val logRaw = runCatching { git("log", "--pretty=format:%H%x1f%h%x1f%an%x1f%ar%x1f%s%x1f%P%x1f%b", "--skip", skip.toString(), "-n", limit.toString()) }
             .getOrDefault("")
         if (logRaw.isBlank() || logRaw.startsWith("fatal:")) {
             return@withContext if (existingCommits.isEmpty()) GitGraph.EMPTY
@@ -247,7 +254,7 @@ class GitRepository @Inject constructor(
         val raw = runCatching {
             git(
                 "for-each-ref",
-                "--format=%(refname:short)|%(objectname)|%(HEAD)|%(refname)",
+                "--format=%(refname:short)\u001f%(objectname)\u001f%(HEAD)\u001f%(refname)\u001f%(upstream:short)\u001f%(upstream:track)",
                 "refs/heads", "refs/remotes", "refs/tags"
             )
         }.getOrDefault("")
@@ -258,18 +265,22 @@ class GitRepository @Inject constructor(
         for (line in raw.split('\n')) {
             val l = line.removeSuffix("\r").trim()
             if (l.isBlank()) continue
-            val parts = l.split('|', limit = 4)
+            val parts = l.split('\u001f')
             if (parts.size < 4) continue
             val name = parts[0]
             val hash = parts[1]
             val isHead = parts[2].trim() == "*"
             val refname = parts[3]
+            val upstream = parts.getOrNull(4)?.ifBlank { null }
+            val track = parts.getOrNull(5).orEmpty()
+            val ahead = Regex("ahead (\\d+)").find(track)?.groupValues?.get(1)?.toIntOrNull() ?: 0
+            val behind = Regex("behind (\\d+)").find(track)?.groupValues?.get(1)?.toIntOrNull() ?: 0
             val isRemote = refname.startsWith("refs/remotes")
             val isBranch = refname.startsWith("refs/heads") || isRemote
             refsByCommit.getOrPut(hash) { mutableListOf() }
                 .add(GitGraphRef(name, isBranch, isHead && !isRemote, isRemote))
             if (isBranch) {
-                branches.add(GitBranch(name, current = isHead && !isRemote, remote = isRemote))
+                branches.add(GitBranch(name, current = isHead && !isRemote, remote = isRemote, upstream = upstream, ahead = ahead, behind = behind))
             } else {
                 // 标签：objectname 取短哈希（前 7 位）与原 listTags 行为一致。
                 tags.add(GitTag(name, hash.take(7)))

@@ -1,6 +1,7 @@
 package com.aicode.feature.git.presentation.component
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -63,6 +64,7 @@ internal fun StatusTab(
     busy: Boolean,
     hasRemote: Boolean,
     hasIdentity: Boolean,
+    scrollState: ScrollState,
     onStage: (String) -> Unit,
     onUnstage: (String) -> Unit,
     onStageAll: () -> Unit,
@@ -81,7 +83,7 @@ internal fun StatusTab(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
+            .verticalScroll(scrollState)
             .padding(horizontal = Spacing.lg)
             // 底部留出悬浮 tab bar 高度：滚动时内容可滚过 tab 区域被蒙版渐隐，
             // 滚到底时最后一项停在 tab 上方不被遮挡。
@@ -248,6 +250,27 @@ private fun StatusOverview(status: GitStatus?, clean: Boolean) {
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
+                    if (status?.isDetached == true) {
+                        Text(
+                            text = stringResource(R.string.git_detached_head_label),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    } else if (status?.upstream != null) {
+                        Text(
+                            text = stringResource(R.string.git_tracking_branch, status.upstream),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    } else if (status != null) {
+                        Text(
+                            text = stringResource(R.string.git_no_upstream),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
                 if (status != null && (status.ahead > 0 || status.behind > 0)) {
                     Spacer(Modifier.width(Spacing.sm))
@@ -275,10 +298,10 @@ private fun SyncPill(ahead: Int, behind: Int) {
     ) {
         Text(
             text = buildString {
-                if (ahead > 0) append("↑$ahead")
+                if (ahead > 0) append(stringResource(R.string.git_ahead_count, ahead))
                 if (behind > 0) {
                     if (isNotEmpty()) append("  ")
-                    append("↓$behind")
+                    append(stringResource(R.string.git_behind_count, behind))
                 }
             },
             style = MaterialTheme.typography.labelMedium,

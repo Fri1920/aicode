@@ -16,6 +16,8 @@ data class GraphCommit(
     val author: String,
     val date: String,
     val message: String,
+    /** 提交正文（message 之后的段落，无正文时为空串）。 */
+    val body: String = "",
     /** 父提交完整哈希列表（按 git 输出顺序，第一父为主线）。 */
     val parents: List<String>
 ) {

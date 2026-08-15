@@ -38,6 +38,7 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.boundsInParent
@@ -70,8 +71,16 @@ fun FloatingTabBar(
     onSelect: (Int) -> Unit,
     items: List<FloatingTabItem>,
     maskColor: Color,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    /** 内容正在滚动时整体淡出到 40%，停止滚动恢复；用于长列表阅读时降低底栏干扰。默认关闭。 */
+    isScrolling: Boolean = false
 ) {
+    // 滚动弱化：胶囊本体透明度动画（蒙版渐变不参与，保持遮内容能力）。
+    val contentAlpha by animateFloatAsState(
+        targetValue = if (isScrolling) 0.4f else 1f,
+        animationSpec = tween(200),
+        label = "tabbar-content-alpha"
+    )
     // 浅色判断与设置页一致：背景 luminance > 0.5 视为浅色模式。
     val light = MaterialTheme.colorScheme.background.luminance() > 0.5f
     val glassBg = if (light) Color.White.copy(alpha = 0.85f)
@@ -104,6 +113,7 @@ fun FloatingTabBar(
     ) {
         Box(
             modifier = Modifier
+                .graphicsLayer { alpha = contentAlpha }
                 .shadow(
                     elevation = 3.dp,
                     shape = RoundedCornerShape(Radius.pill),

@@ -1,5 +1,6 @@
 package com.aicode.feature.git.presentation.component
 
+import android.content.ClipData
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -18,20 +19,26 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -41,6 +48,8 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.platform.ClipEntry
+import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -56,20 +65,24 @@ import com.aicode.feature.git.domain.model.GitGraphRef
 import com.aicode.feature.git.domain.model.GraphCommit
 import com.aicode.feature.git.domain.model.GraphEdge
 import compose.icons.FeatherIcons
-import compose.icons.feathericons.ChevronDown
 import compose.icons.feathericons.ChevronRight
 import compose.icons.feathericons.Cloud
+import compose.icons.feathericons.Copy
 import compose.icons.feathericons.GitBranch
 import compose.icons.feathericons.Tag
+
+import kotlinx.coroutines.launch
 
 @Composable
 internal fun LogTab(
     graph: GitGraph,
-    expandedCommits: Set<String>,
     commitFiles: Map<String, List<GitFileChange>>,
     loadingCommit: String?,
     graphLoadingMore: Boolean,
-    onToggleCommit: (String) -> Unit,
+    listState: LazyListState,
+    detailHash: String?,
+    onOpenCommit: (String) -> Unit,
+    onCloseCommit: () -> Unit,
     onFileDiff: (String, String) -> Unit,
     onLoadMore: () -> Unit
 ) {
@@ -82,12 +95,12 @@ internal fun LogTab(
     val laneColors = rememberLaneColors(graph.maxLane + 1)
     // 每个提交到其父提交的边列表（按提交索引分组），供 Canvas 绘制连线。
     val edgesByCommit = remember(graph) { groupEdgesByCommit(graph) }
-    // Canvas 宽度：每个泳道一列，加左右内边距。
-    val laneWidth = 26.dp
-    val canvasWidth = laneWidth * (graph.maxLane + 1) + Spacing.sm * 2
+    // Canvas 宽度：每个泳道一列，加左右内边距。线性历史（无分叉/合并）时收紧泳道宽度，
+    // 让出更多空间给提交信息；有分叉时每泳道 16dp。节点在泳道内自动居中，无需改绘制。
+    val laneWidth = if (graph.maxLane == 0) 10.dp else 16.dp
+    val canvasWidth = laneWidth * (graph.maxLane + 1) + Spacing.xs * 2
     // 每行高度，用于计算连线纵向跨度（节点居中）。
     val rowHeight = 72.dp
-    val listState = rememberLazyListState()
     // 滚动接近底部（还剩 6 项）且还有更多、不在加载中时触发预拉取下一页。用 derivedStateOf 避免每帧回调。
     val reachedBottom by remember {
         derivedStateOf {
@@ -115,7 +128,6 @@ internal fun LogTab(
                 contentPadding = PaddingValues(bottom = 70.dp)
             ) {
                 commits.forEachIndexed { index, c ->
-            val isExpanded = c.hash in expandedCommits
             item(key = "commit-${c.hash}") {
                 GraphCommitRow(
                     commit = c,
@@ -128,32 +140,9 @@ internal fun LogTab(
                     laneWidth = laneWidth,
                     rowHeight = rowHeight,
                     refs = graph.refs[c.hash].orEmpty(),
-                    isExpanded = isExpanded,
-                    onToggle = { onToggleCommit(c.hash) }
+                    isTopTerminal = index == 0,
+                    onOpen = { onOpenCommit(c.hash) }
                 )
-            }
-            if (isExpanded) {
-                val files = commitFiles[c.hash]
-                when {
-                    loadingCommit == c.hash && files == null -> {
-                        item(key = "loading-${c.hash}") { LoadingFilesRow(canvasWidth) }
-                    }
-                    files == null -> Unit
-                    files.isEmpty() -> {
-                        item(key = "empty-${c.hash}") { EmptyCommitFilesRow(canvasWidth) }
-                    }
-                    else -> {
-                        item(key = "summary-${c.hash}") {
-                            CommitFilesSummary(files.size, canvasWidth)
-                        }
-                        items(
-                            items = files,
-                            key = { f -> "file-${c.hash}-${f.statusCode}-${f.path}" }
-                        ) { file ->
-                            CommitFileRow(file, indent = canvasWidth + Spacing.sm, onClick = { onFileDiff(c.hash, file.path) })
-                        }
-                    }
-                }
             }
         }
             // 末尾加载指示：还有更多时预拉取提示/转圈；没有更多时显示结束提示。
@@ -195,6 +184,20 @@ internal fun LogTab(
             }
         }
     }
+
+    // 提交详情弹层：不打断列表布局，泳道保持完整。
+    detailHash?.let { hash ->
+        val commit = graph.commits.find { it.hash == hash }
+        if (commit != null) {
+            CommitDetailSheet(
+                commit = commit,
+                files = commitFiles[hash],
+                loading = loadingCommit == hash && commitFiles[hash] == null,
+                onDismiss = onCloseCommit,
+                onFileDiff = onFileDiff
+            )
+        }
+    }
 }
 
 @Composable
@@ -209,13 +212,14 @@ private fun GraphCommitRow(
     laneWidth: Dp,
     rowHeight: Dp,
     refs: List<GitGraphRef>,
-    isExpanded: Boolean,
-    onToggle: () -> Unit
+    /** 列表第一行（最新提交）：上方无更多提交，不画向上延伸的竖线。 */
+    isTopTerminal: Boolean,
+    onOpen: () -> Unit
 ) {
     val isMerge = commit.isMerge
     val nodeColor = laneColors.getOrElse(lane) { Color.Gray }
     Surface(
-        color = if (isExpanded) MaterialTheme.colorScheme.surfaceVariant else Color.Transparent,
+        color = Color.Transparent,
         modifier = Modifier.fillMaxWidth()
     ) {
         Row(
@@ -223,7 +227,7 @@ private fun GraphCommitRow(
                 .fillMaxWidth()
                 .height(IntrinsicSize.Min)
                 .heightIn(min = rowHeight)
-                .clickable(onClick = onToggle),
+                .clickable(onClick = onOpen),
             verticalAlignment = Alignment.CenterVertically
         ) {
             // 左侧拓扑图区域：Canvas 绘制节点 + 上下连线。
@@ -236,14 +240,16 @@ private fun GraphCommitRow(
                 laneColors = laneColors,
                 canvasWidth = canvasWidth,
                 laneWidth = laneWidth,
+                suppressTopLane = isTopTerminal,
                 modifier = Modifier
                     .width(canvasWidth)
                     .fillMaxHeight()
             )
-            // 右侧提交信息。
+            // 右侧提交信息。上下留白只作用于内容，Canvas 撑满整行保证泳道跨行连续。
             Column(
                 modifier = Modifier
                     .weight(1f)
+                    .padding(vertical = Spacing.sm)
                     .padding(end = Spacing.lg)
             ) {
                 // 引用标签行（分支/标签 pill）。
@@ -253,8 +259,8 @@ private fun GraphCommitRow(
                 }
                 Row(verticalAlignment = Alignment.Top) {
                     Icon(
-                        imageVector = if (isExpanded) FeatherIcons.ChevronDown else FeatherIcons.ChevronRight,
-                        contentDescription = if (isExpanded) stringResource(R.string.common_collapse) else stringResource(R.string.common_expand),
+                        imageVector = FeatherIcons.ChevronRight,
+                        contentDescription = stringResource(R.string.common_expand),
                         modifier = Modifier.size(16.dp),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -330,12 +336,14 @@ private fun GraphCanvas(
     laneColors: List<Color>,
     canvasWidth: Dp,
     laneWidth: Dp,
+    /** 第一行（最新提交）：不画上半段竖线，避免节点上方悬空延伸。 */
+    suppressTopLane: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     val nodeColor = laneColors.getOrElse(lane) { Color.Gray }
     Canvas(modifier = modifier) {
         val lanePx = laneWidth.toPx()
-        val padPx = Spacing.sm.toPx()
+        val padPx = Spacing.xs.toPx()
         val centerX = lane * lanePx + lanePx / 2f + padPx
         val centerY = size.height / 2f
         val stroke = 2.5.dp.toPx()
@@ -357,23 +365,35 @@ private fun GraphCanvas(
             val x = l * lanePx + lanePx / 2f + padPx
 
             if (inTop && inBot) {
-                // 贯穿整行
-                drawLine(
-                    color = color,
-                    start = Offset(x, 0f),
-                    end = Offset(x, size.height),
-                    strokeWidth = stroke,
-                    cap = StrokeCap.Round
-                )
+                // 贯穿整行；第一行不画上半段（上方无提交）。
+                if (suppressTopLane) {
+                    drawLine(
+                        color = color,
+                        start = Offset(x, centerY),
+                        end = Offset(x, size.height),
+                        strokeWidth = stroke,
+                        cap = StrokeCap.Round
+                    )
+                } else {
+                    drawLine(
+                        color = color,
+                        start = Offset(x, 0f),
+                        end = Offset(x, size.height),
+                        strokeWidth = stroke,
+                        cap = StrokeCap.Round
+                    )
+                }
             } else if (inTop) {
-                // 仅上半段（到达节点终止，或下半段转为斜曲线）
-                drawLine(
-                    color = color,
-                    start = Offset(x, 0f),
-                    end = Offset(x, centerY),
-                    strokeWidth = stroke,
-                    cap = StrokeCap.Round
-                )
+                // 仅上半段（到达节点终止，或下半段转为斜曲线）；第一行不画。
+                if (!suppressTopLane) {
+                    drawLine(
+                        color = color,
+                        start = Offset(x, 0f),
+                        end = Offset(x, centerY),
+                        strokeWidth = stroke,
+                        cap = StrokeCap.Round
+                    )
+                }
             } else if (inBot) {
                 // 仅下半段（从该节点新分出/延伸）
                 drawLine(
@@ -608,5 +628,107 @@ private fun CommitFileRow(file: GitFileChange, indent: Dp, onClick: () -> Unit =
             thickness = 0.5.dp,
             modifier = Modifier.padding(start = indent + 44.dp)
         )
+    }
+}
+
+/** 提交详情底部弹层：完整信息 + 复制哈希 + 改动文件清单（点击文件进 diff）。 */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun CommitDetailSheet(
+    commit: GraphCommit,
+    files: List<GitFileChange>?,
+    loading: Boolean,
+    onDismiss: () -> Unit,
+    onFileDiff: (String, String) -> Unit
+) {
+    val sheetState = rememberModalBottomSheetState()
+    val clipboard = LocalClipboard.current
+    val scope = rememberCoroutineScope()
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = MaterialTheme.colorScheme.surface
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = Spacing.lg)
+                .padding(bottom = Spacing.xl),
+            verticalArrangement = Arrangement.spacedBy(Spacing.sm)
+        ) {
+            Text(
+                text = commit.message,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            if (commit.body.isNotBlank()) {
+                Text(
+                    text = commit.body.trim(),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Text(
+                text = "${commit.author} · ${commit.date}",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = commit.hash,
+                    style = MaterialTheme.typography.labelSmall,
+                    fontFamily = FontFamily.Monospace,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f)
+                )
+                IconButton(onClick = {
+                    scope.launch {
+                        clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("commit-short", commit.shortHash)))
+                    }
+                }) {
+                    Icon(
+                        FeatherIcons.Copy,
+                        contentDescription = stringResource(R.string.git_copy_short_hash),
+                        modifier = Modifier.size(16.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                IconButton(onClick = {
+                    scope.launch {
+                        clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("commit-full", commit.hash)))
+                    }
+                }) {
+                    Icon(
+                        FeatherIcons.Copy,
+                        contentDescription = stringResource(R.string.git_copy_full_hash),
+                        modifier = Modifier.size(16.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+            if (commit.isMerge) {
+                Text(
+                    text = stringResource(R.string.git_merge_commit),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.tertiary
+                )
+            }
+            Spacer(Modifier.height(Spacing.xs))
+            when {
+                loading -> LoadingFilesRow(0.dp)
+                files == null -> Unit
+                files.isEmpty() -> EmptyCommitFilesRow(0.dp)
+                else -> {
+                    CommitFilesSummary(files.size, 0.dp)
+                    files.forEach { file ->
+                        CommitFileRow(file, indent = 0.dp, onClick = { onFileDiff(commit.hash, file.path) })
+                    }
+                }
+            }
+        }
     }
 }

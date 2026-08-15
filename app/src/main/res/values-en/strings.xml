@@ -504,6 +504,15 @@
     <string name="git_init_repo">Initialize Git Repository</string>
     <string name="git_commit_dialog_title">Commit Changes</string>
     <string name="git_commit_message">Commit message</string>
+    <string name="git_tracking_branch">Tracking %1$s</string>
+    <string name="git_no_upstream">No upstream set</string>
+    <string name="git_detached_head_label">detached HEAD: not on any branch</string>
+    <string name="git_ahead_count">%1$s to push</string>
+    <string name="git_behind_count">%1$s to pull</string>
+    <string name="git_copy_short_hash">Copy short hash</string>
+    <string name="git_copy_full_hash">Copy full hash</string>
+    <string name="git_branch_synced">Synced</string>
+    <string name="git_merge_commit">Merge commit</string>
     <string name="git_unstage_all_confirm">All files will be unstaged, but their contents will not be deleted. Continue?</string>
     <string name="git_pull_dirty_confirm">The working tree has uncommitted changes. Pulling may cause conflicts. Commit or stage them first if possible. Continue pulling?</string>
     <string name="git_pull_continue">Continue Pull</string>

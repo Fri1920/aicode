@@ -11,14 +11,16 @@ import com.aicode.feature.git.domain.model.GraphEdge
  */
 internal object GitGraphBuilder {
 
-    /** 解析 `git log --pretty=format:%H|%h|%an|%ar|%s|%P` 输出为 [GraphCommit] 列表。 */
+    /** 解析 `git log --pretty=format:%H%x1f%h%x1f%an%x1f%ar%x1f%s%x1f%P%x1f%b` 输出为 [GraphCommit] 列表。 */
     fun parseGraphCommits(raw: String): List<GraphCommit> =
         raw.split('\n').mapNotNull { line ->
-            val parts = line.removeSuffix("\r").split('|', limit = 6)
+            // 字段用 0x1f 分隔：提交信息/作者名可能含 '|'（实测 7aba60f 提交信息含 '|' 曾导致
+            // split('|') 把 parents 解析成假父，提交被误判为 merge 并产生幽灵泳道）。
+            val parts = line.removeSuffix("\r").split('\u001f')
             if (parts.size < 6) null
             else {
                 val parents = parts[5].split(' ').filter { it.isNotBlank() }
-                GraphCommit(parts[0], parts[1], parts[2], parts[3], parts[4], parents)
+                GraphCommit(parts[0], parts[1], parts[2], parts[3], parts[4], parents = parents, body = parts.getOrNull(6) ?: "")
             }
         }
 

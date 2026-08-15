@@ -504,6 +504,15 @@
     <string name="git_init_repo">初始化 Git 仓库</string>
     <string name="git_commit_dialog_title">提交更改</string>
     <string name="git_commit_message">提交信息</string>
+    <string name="git_tracking_branch">跟踪 %1$s</string>
+    <string name="git_no_upstream">未设置上游</string>
+    <string name="git_detached_head_label">detached HEAD：当前不在任何分支上</string>
+    <string name="git_ahead_count">待推送 %1$s</string>
+    <string name="git_behind_count">待拉取 %1$s</string>
+    <string name="git_copy_short_hash">复制短哈希</string>
+    <string name="git_copy_full_hash">复制完整哈希</string>
+    <string name="git_branch_synced">已同步</string>
+    <string name="git_merge_commit">合并提交</string>
     <string name="git_unstage_all_confirm">将取消所有文件的暂存，但不会删除文件内容。确定继续吗？</string>
     <string name="git_pull_dirty_confirm">当前工作区有未提交改动，拉取可能导致冲突。建议先提交或暂存。仍要继续拉取吗？</string>
     <string name="git_pull_continue">继续拉取</string>

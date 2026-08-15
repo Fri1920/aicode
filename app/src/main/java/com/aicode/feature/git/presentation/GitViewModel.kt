@@ -75,7 +75,8 @@ class GitViewModel @Inject constructor(
         val hasRemote: Boolean = false,
         /** 是否已配置全局署名 user.name（git config --global），控制提交按钮可用性；无署名提交会成为失败提交。 */
         val hasIdentity: Boolean = false,
-        val expandedCommits: Set<String> = emptySet(),
+        /** 当前在详情弹层中查看的提交 hash；null 表示未打开。 */
+        val commitDetailHash: String? = null,
         /** 已懒加载的提交文件清单，按 hash 缓存。 */
         val commitFiles: Map<String, List<GitFileChange>> = emptyMap(),
         /** 正在加载文件清单的提交 hash。 */
@@ -255,16 +256,13 @@ class GitViewModel @Inject constructor(
     }
 
     /**
-     * 切换某条提交的展开状态。展开时若尚未加载文件清单则懒加载（不置 [GitUiState.busy]，
+     * 打开某条提交的详情弹层。若文件清单尚未加载则懒加载（不置 [GitUiState.busy]，
      * 因为这是只读查看，不应阻塞 status/branches 的写操作）。
      */
-    fun toggleCommit(hash: String) {
+    fun openCommitDetail(hash: String) {
         val current = _state.value
-        if (hash in current.expandedCommits) {
-            _state.update { it.copy(expandedCommits = it.expandedCommits - hash) }
-            return
-        }
-        _state.update { it.copy(expandedCommits = it.expandedCommits + hash) }
+        if (current.commitDetailHash == hash) return
+        _state.update { it.copy(commitDetailHash = hash) }
         if (hash in current.commitFiles) return
         _state.update { it.copy(loadingCommit = hash) }
         viewModelScope.launch {
@@ -280,6 +278,8 @@ class GitViewModel @Inject constructor(
             }
         }
     }
+
+    fun closeCommitDetail() = _state.update { it.copy(commitDetailHash = null) }
 
     fun consumeToast() = _state.update { it.copy(toast = null) }
 
