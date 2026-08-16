@@ -12,7 +12,7 @@
     <string name="settings_title_model">标题总结模型</string>
     <string name="settings_mcp">MCP 服务器</string>
     <string name="settings_skills">技能</string>
-    <string name="settings_container">容器镜像</string>
+    <string name="settings_container">容器与镜像</string>
     <string name="settings_log_no_files">还没有日志文件</string>
     <string name="settings_log_read_failed">读取日志失败: %1$s</string>
     <string name="settings_models_fetch_failed">拉取失败</string>
@@ -367,14 +367,14 @@
     <string name="container_delete_confirm">确定删除「%1$s」？%2$s</string>
     <string name="container_rootfs_will_be_cleared">其 rootfs 目录会被一并清除。</string>
     <string name="container_builtin_restorable">内置镜像删除后可在空列表恢复。</string>
-    <string name="container_switch_image">切换容器镜像</string>
+    <string name="container_switch_image">切换容器与镜像</string>
     <string name="container_switch_confirm">切换到「%1$s」后，当前正在运行的 AI 会话将被停止、终端标签将被关闭。是否继续切换？</string>
     <string name="container_reset_title">重置容器</string>
     <string name="container_reset_confirm">将删除「%1$s」的 rootfs 目录（含已安装的工具与配置），下次使用时重新解压并初始化。是否继续？</string>
     <string name="container_builtin_badge">内置</string>
     <string name="container_custom_badge">自定义</string>
     <string name="container_ssh_badge">SSH</string>
-    <string name="container_empty">暂无容器镜像</string>
+    <string name="container_empty">暂无容器与镜像</string>
     <string name="container_empty_desc">添加一个自定义镜像，或恢复内置 Alpine。</string>
     <string name="container_restore_builtin">恢复内置 Alpine</string>
     <string name="container_active">当前使用中</string>
@@ -407,6 +407,24 @@
     <string name="container_select_ssh_channel">选择 SSH 通道</string>
     <string name="container_ssh_channel">SSH 连接通道</string>
     <string name="container_remote_workspace_path">远程工作区路径</string>
+    <string name="container_announcement_title">常见问题</string>
+    <string name="container_announcement_got_it">知道了</string>
+    <string name="container_download_image">下载镜像</string>
+    <string name="container_download_architecture">架构：%1$s</string>
+    <string name="container_download_current_source">下载源：%1$s</string>
+    <string name="container_download_current_source_title">选择下载源</string>
+    <string name="container_download_source_unavailable">当前源暂无此镜像</string>
+    <string name="container_download_start">下载</string>
+    <string name="container_download_redownload">重新下载</string>
+    <string name="container_download_cancel">取消下载</string>
+    <string name="container_download_import">导入</string>
+    <string name="container_download_imported_toast">已导入到容器列表，首次进入终端时自动解压初始化</string>
+    <string name="container_download_failed">下载失败：%1$s</string>
+    <string name="container_download_list_empty">暂无可用镜像</string>
+    <string name="container_download_done">已下载</string>
+    <string name="container_download_size">大小：%1$s</string>
+    <string name="container_download_delete_title">删除下载镜像</string>
+    <string name="container_download_delete_confirm">删除「%1$s」的下载文件？已导入的容器将无法再解压。</string>
 
     <!-- Credential Editor -->
     <string name="credential_edit">编辑凭据</string>

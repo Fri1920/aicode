@@ -482,6 +482,7 @@ private fun ContainerRow(
                         fontWeight = FontWeight.Normal,
                         color = if (light) Color(0xFF0F0F0F) else MaterialTheme.colorScheme.onSurface,
                         maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f, fill = false)
                     )
                     if (profile.isBuiltin) {
@@ -530,7 +531,7 @@ private fun ContainerRow(
                 )
             }
 
-            // 编辑（所有容器）
+            // 编辑入口（所有容器）：行尾铅笔，点击进入编辑弹窗（行主体点击是切换）
             IconButton(onClick = onEdit) {
                 Icon(
                     imageVector = FeatherIcons.Edit3,
@@ -1272,13 +1273,17 @@ private fun copyImageToPrivate(context: Context, uriString: String, profileId: S
     }.getOrNull()
 }
 
-/** 删除 profile 时清理其私有目录镜像副本（仅清理 rootfs_images/ 下的 file uri 副本）。 */
+/**
+ * 删除 profile 时清理其私有目录镜像副本（仅清理 rootfs_images/ 下的 file uri 副本）。
+ * 跳过 `download_` 前缀的副本——那是「下载镜像」页下载的镜像文件，删除容器不应连带清掉，
+ * 否则下载页记录还在但文件没了；手动导入的副本（import_*）照旧清理。
+ */
 private fun deleteImageCopy(profile: ContainerProfile) {
     val src = profile.rootfsSource as? RootfsSource.LocalFile ?: return
     if (!src.uri.startsWith("file://")) return
     runCatching {
         val file = File(Uri.parse(src.uri).path ?: return)
-        if (file.parentFile?.name == "rootfs_images") file.delete()
+        if (file.parentFile?.name == "rootfs_images" && !file.name.startsWith("download_")) file.delete()
     }
 }
 

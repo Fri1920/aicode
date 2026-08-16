@@ -28,7 +28,9 @@ data class ContainerProfile(
     val env: Map<String, String> = emptyMap(),
     val isBuiltin: Boolean,
     /** 该 profile 的执行模式：本地 PRoot 容器 or 远程 SSH。选中时据此切全局 [ExecutionMode]。 */
-    val mode: ExecutionMode = ExecutionMode.LOCAL_PROOT
+    val mode: ExecutionMode = ExecutionMode.LOCAL_PROOT,
+    /** 添加时间（毫秒时间戳），容器列表按此降序排列；旧数据/内置默认 0 排最后。 */
+    val createdAt: Long = 0
 ) {
     companion object {
         const val BUILTIN_ID = "builtin-alpine"

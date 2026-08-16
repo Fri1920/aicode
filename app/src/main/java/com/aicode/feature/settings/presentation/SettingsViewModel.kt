@@ -1,6 +1,7 @@
 package com.aicode.feature.settings.presentation
 
 import android.content.Context
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.aicode.core.util.FileLogger
@@ -9,6 +10,8 @@ import com.aicode.feature.agent.data.local.dao.LlmCallRecordDao
 import com.aicode.feature.agent.data.local.dao.RecentCallRecord
 import com.aicode.feature.agent.data.local.entity.LlmCallRecordEntity
 import com.aicode.feature.agent.domain.container.ConnectionState
+import com.aicode.feature.agent.domain.container.ContainerImageCatalog
+import com.aicode.feature.agent.domain.container.ContainerImageEntry
 import com.aicode.feature.agent.domain.container.ContainerInstaller
 import com.aicode.feature.agent.domain.container.ContainerOsDetector
 import com.aicode.feature.agent.domain.container.ContainerProfile
@@ -27,6 +30,7 @@ import com.aicode.feature.agent.domain.skill.SkillConfigRepository
 import com.aicode.feature.agent.domain.skill.SkillRepository
 import com.aicode.feature.agent.domain.skill.SkillScope
 import com.aicode.feature.settings.data.remote.ModelApiService
+import com.aicode.feature.settings.data.remote.ContainerImageDownloader
 import com.aicode.feature.settings.data.remote.ModelMetadataService
 import com.aicode.feature.settings.data.remote.ModelTestResult
 import com.aicode.feature.settings.data.remote.UpdateCheckResult
@@ -36,6 +40,7 @@ import com.aicode.feature.settings.data.repository.UpdateChannel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import com.aicode.feature.settings.data.repository.AppThemeMode
 import com.aicode.feature.settings.data.repository.ContainerSettingsRepository
+import com.aicode.feature.settings.data.repository.DownloadedImageRecord
 import com.aicode.feature.settings.data.repository.ExecutionMode
 import com.aicode.feature.settings.data.repository.CompactionModelSettingsRepository
 import com.aicode.feature.settings.data.repository.DefaultModelSettingsRepository
@@ -76,6 +81,26 @@ sealed class FetchState {
     object Loading : FetchState()
     data class Success(val models: List<String>) : FetchState()
     data class Error(val message: String) : FetchState()
+}
+
+/** 镜像下载页的完整 UI 状态：空闲 / 下载中（进度）/ 下载完成（可安装）/ 失败。 */
+sealed interface ContainerImageDownloadUiState {
+    data object Idle : ContainerImageDownloadUiState
+    data class Downloading(
+        val entryId: String,
+        val name: String,
+        val version: String,
+        val sourceId: String,
+        val bytesRead: Long,
+        val totalBytes: Long
+    ) : ContainerImageDownloadUiState
+    data class Done(
+        val entryId: String,
+        val name: String,
+        val version: String,
+        val fileUri: String
+    ) : ContainerImageDownloadUiState
+    data class Error(val entryId: String, val message: String) : ContainerImageDownloadUiState
 }
 
 data class LogViewerUiState(
@@ -189,6 +214,8 @@ class SettingsViewModel @Inject constructor(
     private val titleModelSettingsRepository: TitleModelSettingsRepository,
     private val defaultModelSettingsRepository: DefaultModelSettingsRepository,
     private val containerSettingsRepository: ContainerSettingsRepository,
+    private val containerImageCatalog: ContainerImageCatalog,
+    private val containerImageDownloader: ContainerImageDownloader,
     private val containerInstaller: ContainerInstaller,
     private val containerOsDetector: ContainerOsDetector,
     private val executionModeRepository: ExecutionModeRepository,
@@ -312,6 +339,39 @@ class SettingsViewModel @Inject constructor(
     /** 各容器已识别的系统类型（profile id → os id），UI 据此显示对应系统图标。 */
     val containerOsMap: StateFlow<Map<String, String>> = containerOsDetector.osMap
 
+    /** 公告内容（跟随界面语言），与 [containerAnnouncementOutdated] 配套供弹窗渲染。 */
+    private val _containerAnnouncementText = MutableStateFlow("")
+    val containerAnnouncementText: StateFlow<String> = _containerAnnouncementText.asStateFlow()
+
+    /** 公告是否需要弹出：本地未存哈希或与当前内容哈希不一致（内容更新过）时为 true。 */
+    private val _containerAnnouncementOutdated = MutableStateFlow(false)
+    val containerAnnouncementOutdated: StateFlow<Boolean> = _containerAnnouncementOutdated.asStateFlow()
+
+    private val _imageCatalog = MutableStateFlow<List<ContainerImageEntry>>(emptyList())
+    val imageCatalog: StateFlow<List<ContainerImageEntry>> = _imageCatalog.asStateFlow()
+
+    /** 全局下载源 id 列表（来自目录 JSON 的 sources 键，保持顺序），供右上角切换。 */
+    private val _imageSourceOptions = MutableStateFlow<List<String>>(emptyList())
+    val imageSourceOptions: StateFlow<List<String>> = _imageSourceOptions.asStateFlow()
+
+    /** 当前选中的下载源（默认官方）。 */
+    private val _selectedImageSource = MutableStateFlow("official")
+    val selectedImageSource: StateFlow<String> = _selectedImageSource.asStateFlow()
+
+    /** 已下载/已安装的镜像记录（entryId → 记录），跨重启保留。 */
+    private val _downloadedImages = MutableStateFlow<Map<String, DownloadedImageRecord>>(emptyMap())
+    val downloadedImages: StateFlow<Map<String, DownloadedImageRecord>> = _downloadedImages.asStateFlow()
+
+    /** 当前选中源下无下载 URL 的镜像 id（如腾讯云不提供 Ubuntu），UI 据此禁用下载按钮。 */
+    private val _sourceUnavailableIds = MutableStateFlow<Set<String>>(emptySet())
+    val sourceUnavailableIds: StateFlow<Set<String>> = _sourceUnavailableIds.asStateFlow()
+
+    private val _containerImageDownload = MutableStateFlow<ContainerImageDownloadUiState>(ContainerImageDownloadUiState.Idle)
+    val containerImageDownload: StateFlow<ContainerImageDownloadUiState> = _containerImageDownload.asStateFlow()
+
+    /** 当前下载任务句柄，取消下载时 cancel 它（底层 OkHttp call 同步中断）。 */
+    private var downloadJob: kotlinx.coroutines.Job? = null
+
     /** 当前执行模式（本地 PRoot / 远程 SSH），供 UI 判断是否显示远程连接指示器。 */
     val executionMode: StateFlow<ExecutionMode> = executionModeHolder.mode
 
@@ -334,6 +394,31 @@ class SettingsViewModel @Inject constructor(
         .stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.Eagerly, emptyList())
 
     init {
+        _imageCatalog.value = containerImageCatalog.load()
+        _imageSourceOptions.value = containerImageCatalog.sourceIds
+        _selectedImageSource.value = containerImageCatalog.sourceIds.firstOrNull { it == "official" }
+            ?: containerImageCatalog.sourceIds.firstOrNull() ?: "official"
+        // 已下载/已安装记录跨重启保留
+        viewModelScope.launch {
+            containerSettingsRepository.downloadedImagesFlow.collect { records ->
+                _downloadedImages.value = records.associateBy { it.entryId }
+            }
+        }
+        // 当前源下不可用的镜像集合（源切换后自动更新）
+        viewModelScope.launch {
+            combine(_imageCatalog, _selectedImageSource) { entries, sourceId ->
+                entries.filter { containerImageCatalog.urlFor(it, sourceId, ContainerImageCatalog.CURRENT_ABI) == null }
+                    .map { it.id }.toSet()
+            }.collect { _sourceUnavailableIds.value = it }
+        }
+        // 公告按「内容哈希比对」判断是否弹出：首次（无哈希）或内容更新（哈希不一致）即弹。
+        viewModelScope.launch {
+            combine(_languageTag, containerSettingsRepository.announcementShownHashFlow) { tag, storedHash ->
+                val text = loadContainerAnnouncement(context, tag)
+                _containerAnnouncementText.value = text
+                _containerAnnouncementOutdated.value = storedHash != sha256(text)
+            }.collect {}
+        }
         viewModelScope.launch {
             launch {
                 repository.getAllProviders().collectLatest {
@@ -426,7 +511,8 @@ class SettingsViewModel @Inject constructor(
 
             launch {
                 containerSettingsRepository.customProfilesFlow.collectLatest {
-                    _customProfiles.value = it
+                    // 按添加时间降序（新的在前）；旧数据 createdAt 同为 0 时保持存储顺序
+                    _customProfiles.value = it.sortedByDescending { profile -> profile.createdAt }
                 }
             }
 
@@ -900,6 +986,102 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
+    /** 标记公告已展示：把当前内容哈希写入存储，下次内容不变则不再弹；内容更新哈希变自然重新弹。 */
+    fun markContainerAnnouncementShown() {
+        viewModelScope.launch {
+            containerSettingsRepository.markAnnouncementShown(sha256(_containerAnnouncementText.value))
+        }
+    }
+
+    /** 切换全局下载源（官方/华为云/阿里云/腾讯云等）。 */
+    fun setImageSource(sourceId: String) {
+        _selectedImageSource.value = sourceId
+    }
+
+    /** 源显示名：按界面语言取目录 JSON 里定义的 name，跟随系统语言时按系统语言。 */
+    fun sourceDisplayName(sourceId: String, languageTag: String?): String {
+        val lang = languageTag?.takeIf { it.isNotBlank() } ?: java.util.Locale.getDefault().language
+        val key = if (lang.startsWith("zh", ignoreCase = true)) "zh" else "en"
+        return containerImageCatalog.sourceName(sourceId, key) ?: sourceId
+    }
+
+    /** 开始下载镜像：按当前架构与全局源拼 URL，进度实时写入 [_containerImageDownload]。 */
+    fun startContainerImageDownload(entry: ContainerImageEntry, sourceId: String) {
+        if (_containerImageDownload.value is ContainerImageDownloadUiState.Downloading) return
+        val url = containerImageCatalog.urlFor(entry, sourceId, ContainerImageCatalog.CURRENT_ABI) ?: return
+        val suffix = when {
+            url.endsWith(".tar.gz") -> "tar.gz"
+            url.endsWith(".tar.xz") || url.endsWith(".txz") -> "tar.xz"
+            url.endsWith(".tgz") -> "tgz"
+            else -> "tar.gz"
+        }
+        val fileName = "download_${entry.id}_${entry.version}_${System.currentTimeMillis()}.$suffix"
+        downloadJob = viewModelScope.launch {
+            _containerImageDownload.value =
+                ContainerImageDownloadUiState.Downloading(entry.id, entry.name, entry.version, sourceId, 0, 0)
+            try {
+                val uri = containerImageDownloader.download(url, fileName) { read, total ->
+                    _containerImageDownload.value = ContainerImageDownloadUiState.Downloading(
+                        entry.id, entry.name, entry.version, sourceId, read, total
+                    )
+                }
+                // 下载完成即持久化记录，安装与否都保留，跨重启可见。
+                containerSettingsRepository.upsertDownloadedImage(DownloadedImageRecord(entry.id, uri))
+                _containerImageDownload.value =
+                    ContainerImageDownloadUiState.Done(entry.id, entry.name, entry.version, uri)
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                _containerImageDownload.value = ContainerImageDownloadUiState.Idle
+                throw e
+            } catch (e: Exception) {
+                _containerImageDownload.value =
+                    ContainerImageDownloadUiState.Error(entry.id, e.message ?: context.getString(R.string.container_download_failed, ""))
+            }
+        }
+    }
+
+    /** 取消正在进行的下载（半成品文件由下载器清理）。 */
+    fun cancelContainerImageDownload() {
+        downloadJob?.cancel()
+        downloadJob = null
+    }
+
+    /**
+     * 把已下载的镜像作为自定义 profile 导入容器列表（可重复导入，每次新建 profile），后续流程与手动导入一致。
+     * 默认追加 `--link2symlink` proot 参数（硬链接模拟为符号链接，Android 上常见），与内置 Alpine 一致。
+     */
+    fun importDownloadedImage(entryId: String, fileUri: String) {
+        val entry = _imageCatalog.value.firstOrNull { it.id == entryId } ?: return
+        viewModelScope.launch {
+            val profile = ContainerProfile(
+                id = "custom-${System.currentTimeMillis()}",
+                name = "${entry.name} ${entry.version}",
+                rootfsSource = RootfsSource.LocalFile(fileUri),
+                shellPath = null,
+                extraArgs = listOf("--link2symlink"),
+                isBuiltin = false
+            )
+            containerSettingsRepository.upsertCustomProfile(profile)
+            // 保留已下载记录，仅标记已导入；UI 状态不消失。
+            containerSettingsRepository.upsertDownloadedImage(DownloadedImageRecord(entryId, fileUri, installed = true))
+            _containerImageDownload.value = ContainerImageDownloadUiState.Idle
+        }
+    }
+
+    /** 删除已下载的镜像：清记录 + 删下载文件（仅限 rootfs_images 目录，防误删）；若正在下载该条目先取消。 */
+    fun deleteDownloadedImage(entryId: String) {
+        val record = _downloadedImages.value[entryId] ?: return
+        if ((_containerImageDownload.value as? ContainerImageDownloadUiState.Downloading)?.entryId == entryId) {
+            cancelContainerImageDownload()
+        }
+        viewModelScope.launch {
+            runCatching {
+                val file = java.io.File(Uri.parse(record.fileUri).path ?: return@runCatching)
+                if (file.parentFile?.name == "rootfs_images") file.delete()
+            }
+            containerSettingsRepository.removeDownloadedImage(entryId)
+        }
+    }
+
     /** 设置识图专用模型；providerId 留空等同 [clearVisionModel]（跟随聊天模型）。 */
     fun setVisionModel(providerId: String, model: String) {
         viewModelScope.launch {
@@ -1078,3 +1260,19 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch { permissionRulesRepository.promoteToGlobal(name, rule) }
     }
 }
+
+/** 读取公告 md（zh 用中文版，其余英文版）；跟随系统语言时按系统语言判断。读取失败返回空串（空内容不弹窗）。 */
+private fun loadContainerAnnouncement(context: Context, languageTag: String?): String {
+    val lang = languageTag?.takeIf { it.isNotBlank() } ?: java.util.Locale.getDefault().language
+    val zh = lang.startsWith("zh", ignoreCase = true)
+    return runCatching {
+        context.assets.open("announcements/container-guide.${if (zh) "zh" else "en"}.md")
+            .bufferedReader().use { it.readText() }
+    }.getOrDefault("")
+}
+
+/** SHA-256 十六进制摘要，用于公告内容比对：内容更新则哈希变，自动重新弹出。 */
+private fun sha256(text: String): String =
+    java.security.MessageDigest.getInstance("SHA-256")
+        .digest(text.toByteArray())
+        .joinToString("") { "%02x".format(it) }

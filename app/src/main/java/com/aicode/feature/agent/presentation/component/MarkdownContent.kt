@@ -66,7 +66,9 @@ internal fun MarkdownContent(
     color: Color,
     modifier: Modifier = Modifier,
     cache: MarkdownRenderCache? = null,
-    compact: Boolean = false
+    compact: Boolean = false,
+    /** 解析未完成（Loading）时显示的内容；为 null 时回退显示原文纯文本（聊天流式场景）。 */
+    loading: (@Composable () -> Unit)? = null
 ) {
     val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
 
@@ -200,11 +202,15 @@ internal fun MarkdownContent(
                 ),
             )
 
-            is MarkdownParseState.Loading -> PlainMarkdownText(
-                text = text,
-                color = color,
-                modifier = modifier
-            )
+            is MarkdownParseState.Loading -> if (loading != null) {
+                loading()
+            } else {
+                PlainMarkdownText(
+                    text = text,
+                    color = color,
+                    modifier = modifier
+                )
+            }
 
             is MarkdownParseState.Error -> PlainMarkdownText(
                 text = text,

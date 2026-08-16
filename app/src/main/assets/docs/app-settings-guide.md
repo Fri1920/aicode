@@ -7,7 +7,7 @@
 1. **聊天界面与基础使用**：见本文档第 1、2、3 节。
 2. **AI 提供商与模型配置 (Providers / 默认模型)**：请读取 `~/.aicode/docs/providers-and-models.md`
 3. **MCP 服务器与扩展工具 (MCP)**：请读取 `~/.aicode/docs/mcp-and-skills.md`
-4. **容器镜像 (Container)**：请读取 `~/.aicode/docs/container-image.md`
+4. **容器与镜像 (Container)**：请读取 `~/.aicode/docs/container-image.md`
 5. **日志查看、私有目录挂载与后台保活**：请读取 `~/.aicode/docs/logs-and-private-dir.md`
 6. **工具授权 (Permissions)**：请读取 `~/.aicode/docs/tool-permissions.md`
 7. **软件权限 (App Permissions)**：请读取 `~/.aicode/docs/app-permissions.md`

@@ -9,12 +9,21 @@ import com.aicode.feature.agent.domain.container.ContainerProfile
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
 import javax.inject.Inject
 import javax.inject.Singleton
 
 private val Context.containerDataStore by preferencesDataStore(name = "container_prefs")
+
+/** 下载镜像页里已下载/已安装的镜像记录，跨重启保留。 */
+@Serializable
+data class DownloadedImageRecord(
+    val entryId: String,
+    val fileUri: String,
+    val installed: Boolean = false
+)
 
 /**
  * 持久化当前选中的容器 profile 与用户自定义 profile 列表。
@@ -33,6 +42,11 @@ class ContainerSettingsRepository @Inject constructor(
         val DEFAULT_CONTAINER_ID_KEY = stringPreferencesKey("default_container_profile_id")
         /** 首次启动是否已写入内置 Alpine 默认项；置位后用户删光列表不再自动补回。 */
         val INITIALIZED_KEY = booleanPreferencesKey("initialized")
+        /** 「容器与镜像」页使用说明公告已展示内容的哈希；无值或与当前内容哈希不一致时重新弹出。 */
+        val ANNOUNCEMENT_SHOWN_HASH_KEY = stringPreferencesKey("container_announcement_shown_hash")
+        /** 下载镜像页已下载/已安装的记录（JSON 列表）。 */
+        val DOWNLOADED_IMAGES_KEY = stringPreferencesKey("downloaded_images_json")
+        val downloadedImageSerializer = ListSerializer(DownloadedImageRecord.serializer())
         val profileSerializer = ListSerializer(ContainerProfile.serializer())
         val json = Json { ignoreUnknownKeys = true }
     }
@@ -82,13 +96,59 @@ class ContainerSettingsRepository @Inject constructor(
         }
     }
 
-    /** 新增或覆盖同名 id 的自定义 profile。 */
+    /** 已展示公告内容的哈希；无值表示从未展示过。 */
+    val announcementShownHashFlow: Flow<String?> = context.containerDataStore.data.map { prefs ->
+        prefs[ANNOUNCEMENT_SHOWN_HASH_KEY]
+    }
+
+    suspend fun markAnnouncementShown(hash: String) {
+        context.containerDataStore.edit { it[ANNOUNCEMENT_SHOWN_HASH_KEY] = hash }
+    }
+
+    /** 已下载镜像记录列表（按 entryId 去重，最新覆盖旧的）。 */
+    val downloadedImagesFlow: Flow<List<DownloadedImageRecord>> = context.containerDataStore.data.map { prefs ->
+        prefs[DOWNLOADED_IMAGES_KEY]?.let { raw ->
+            runCatching { json.decodeFromString(downloadedImageSerializer, raw) }.getOrNull()
+        } ?: emptyList()
+    }
+
+    suspend fun upsertDownloadedImage(record: DownloadedImageRecord) {
+        context.containerDataStore.edit { prefs ->
+            val current = prefs[DOWNLOADED_IMAGES_KEY]?.let { raw ->
+                runCatching { json.decodeFromString(downloadedImageSerializer, raw) }.getOrNull()
+            } ?: emptyList()
+            val merged = current.filterNot { it.entryId == record.entryId } + record
+            prefs[DOWNLOADED_IMAGES_KEY] = json.encodeToString(downloadedImageSerializer, merged)
+        }
+    }
+
+    suspend fun removeDownloadedImage(entryId: String) {
+        context.containerDataStore.edit { prefs ->
+            val current = prefs[DOWNLOADED_IMAGES_KEY]?.let { raw ->
+                runCatching { json.decodeFromString(downloadedImageSerializer, raw) }.getOrNull()
+            } ?: emptyList()
+            prefs[DOWNLOADED_IMAGES_KEY] =
+                json.encodeToString(downloadedImageSerializer, current.filterNot { it.entryId == entryId })
+        }
+    }
+
+    /**
+     * 新增或覆盖同名 id 的自定义 profile。
+     * createdAt 规则：传入非 0 则用传入值；为 0 时若原记录存在（编辑场景，表单重建丢了时间）保留原时间，
+     * 否则视为新增写入当前时间——保证编辑保存后不改变排序位置。
+     */
     suspend fun upsertCustomProfile(profile: ContainerProfile) {
         context.containerDataStore.edit { prefs ->
             val current = prefs[CUSTOM_PROFILES_KEY]?.let { raw ->
                 runCatching { json.decodeFromString(profileSerializer, raw) }.getOrNull()
             } ?: emptyList()
-            val merged = (current.filterNot { it.id == profile.id } + profile)
+            val existing = current.firstOrNull { it.id == profile.id }
+            val final = when {
+                profile.createdAt != 0L -> profile
+                existing != null && existing.createdAt != 0L -> profile.copy(createdAt = existing.createdAt)
+                else -> profile.copy(createdAt = System.currentTimeMillis())
+            }
+            val merged = (current.filterNot { it.id == final.id } + final)
             prefs[CUSTOM_PROFILES_KEY] = json.encodeToString(profileSerializer, merged)
         }
     }

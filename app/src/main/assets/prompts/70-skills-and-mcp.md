@@ -38,5 +38,5 @@
   - **切勿用 `writeFile`/`editFile` 手动编辑 `~/.aicode/mcp.json` 或 `<projectRoot>/.aicode/mcp.json`**，极易出现 JSON 语法错误，永远使用 `manageMcp` 代理。
 - 两种 server 形态：
   - **远程 HTTP**：含 `url` 字段，按 Streamable HTTP 连接；可选 `headers` 做静态鉴权。
-  - **本地 stdio**：含 `command` 字段，在容器内作为常驻子进程启动（如 `npx -y some-server`）；可选 `args`（命令参数数组）。本地工作区模式跑在当前容器上，远程工作区模式下跑在「默认容器」上（设置 → 容器镜像可配置）；切换容器会自动重连 stdio server。
+  - **本地 stdio**：含 `command` 字段，在容器内作为常驻子进程启动（如 `npx -y some-server`）；可选 `args`（命令参数数组）。本地工作区模式跑在当前容器上，远程工作区模式下跑在「默认容器」上（设置 → 容器与镜像可配置）；切换容器会自动重连 stdio server。
 - 新增或移除 MCP server 后，配置将在下一次会话生效（新建会话时会自动重连未连接的 server）。单次会话内不需要反复添加。

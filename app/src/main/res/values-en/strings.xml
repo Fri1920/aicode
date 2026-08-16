@@ -12,7 +12,7 @@
     <string name="settings_title_model">Title Model</string>
     <string name="settings_mcp">MCP Servers</string>
     <string name="settings_skills">Skills</string>
-    <string name="settings_container">Container Image</string>
+    <string name="settings_container">Container &amp; Images</string>
     <string name="settings_log_no_files">No log files yet</string>
     <string name="settings_log_read_failed">Failed to read log: %1$s</string>
     <string name="settings_models_fetch_failed">Fetch failed</string>
@@ -367,14 +367,14 @@
     <string name="container_delete_confirm">Delete "%1$s"? %2$s</string>
     <string name="container_rootfs_will_be_cleared">Its rootfs directory will also be removed.</string>
     <string name="container_builtin_restorable">Built-in images can be restored from the empty list.</string>
-    <string name="container_switch_image">Switch Container Image</string>
+    <string name="container_switch_image">Switch Container &amp; Images</string>
     <string name="container_switch_confirm">After switching to "%1$s", the currently running AI sessions will be stopped and terminal tabs will be closed. Continue?</string>
     <string name="container_reset_title">Reset Container</string>
     <string name="container_reset_confirm">This will delete the rootfs directory of "%1$s" (including installed tools and configs). It will be re-extracted and initialized on next use. Continue?</string>
     <string name="container_builtin_badge">Built-in</string>
     <string name="container_custom_badge">Custom</string>
     <string name="container_ssh_badge">SSH</string>
-    <string name="container_empty">No container images</string>
+    <string name="container_empty">No containers or images</string>
     <string name="container_empty_desc">Add a custom image, or restore the built-in Alpine.</string>
     <string name="container_restore_builtin">Restore Built-in Alpine</string>
     <string name="container_active">Currently in use</string>
@@ -407,6 +407,24 @@
     <string name="container_select_ssh_channel">Select SSH Channel</string>
     <string name="container_ssh_channel">SSH Channel</string>
     <string name="container_remote_workspace_path">Remote Workspace Path</string>
+    <string name="container_announcement_title">FAQ</string>
+    <string name="container_announcement_got_it">Got it</string>
+    <string name="container_download_image">Download Images</string>
+    <string name="container_download_architecture">Architecture: %1$s</string>
+    <string name="container_download_current_source">Source: %1$s</string>
+    <string name="container_download_current_source_title">Choose download source</string>
+    <string name="container_download_source_unavailable">Not available on this mirror</string>
+    <string name="container_download_start">Download</string>
+    <string name="container_download_redownload">Redownload</string>
+    <string name="container_download_cancel">Cancel download</string>
+    <string name="container_download_import">Import</string>
+    <string name="container_download_imported_toast">Imported to the container list; it will be extracted on first use in Terminal</string>
+    <string name="container_download_failed">Download failed: %1$s</string>
+    <string name="container_download_list_empty">No images available</string>
+    <string name="container_download_done">Downloaded</string>
+    <string name="container_download_size">Size: %1$s</string>
+    <string name="container_download_delete_title">Delete downloaded image</string>
+    <string name="container_download_delete_confirm">Delete the downloaded file for "%1$s"? Imported containers will not be able to extract again.</string>
 
     <!-- Credential Editor -->
     <string name="credential_edit">Edit Credential</string>

@@ -10,14 +10,18 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
@@ -27,6 +31,7 @@ import androidx.compose.material3.ExposedDropdownMenuAnchorType
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -41,8 +46,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.aicode.core.theme.Spacing
 import com.aicode.core.util.LogLevel
@@ -50,6 +57,7 @@ import com.aicode.R
 import com.aicode.feature.agent.domain.mcp.McpServerEntry
 import com.aicode.feature.agent.domain.mcp.McpServerConfig
 import com.aicode.feature.agent.domain.mcp.McpServerStatus
+import com.aicode.feature.agent.presentation.component.MarkdownContent
 import com.aicode.feature.agent.presentation.component.MarkdownRenderCache
 import com.aicode.feature.backup.presentation.BackupSection
 import com.aicode.feature.settings.data.repository.AppThemeMode
@@ -64,6 +72,7 @@ import compose.icons.feathericons.Book
 import compose.icons.feathericons.Box
 import compose.icons.feathericons.Cloud
 import compose.icons.feathericons.Cpu
+import compose.icons.feathericons.Download
 import compose.icons.feathericons.FileText
 import compose.icons.feathericons.Globe
 import compose.icons.feathericons.HardDrive
@@ -87,6 +96,7 @@ internal enum class SettingsSection(@param:StringRes val titleRes: Int) {
     Skills(R.string.settings_skills),
     SkillDetail(R.string.settings_skills),
     Container(R.string.settings_container),
+    ContainerDownloads(R.string.container_download_image),
     Log(R.string.settings_log),
     Permissions(R.string.settings_permissions),
     AppPermissions(R.string.settings_app_permissions),
@@ -132,6 +142,14 @@ fun SettingsScreen(
     val tokenStats by viewModel.tokenStats.collectAsStateWithLifecycle()
     val updateCheckEnabled by viewModel.updateCheckEnabled.collectAsStateWithLifecycle()
     val updateCheckChannel by viewModel.updateCheckChannel.collectAsStateWithLifecycle()
+    val containerAnnouncementText by viewModel.containerAnnouncementText.collectAsStateWithLifecycle()
+    val containerAnnouncementOutdated by viewModel.containerAnnouncementOutdated.collectAsStateWithLifecycle()
+    val imageCatalog by viewModel.imageCatalog.collectAsStateWithLifecycle()
+    val imageDownload by viewModel.containerImageDownload.collectAsStateWithLifecycle()
+    val imageSourceOptions by viewModel.imageSourceOptions.collectAsStateWithLifecycle()
+    val selectedImageSource by viewModel.selectedImageSource.collectAsStateWithLifecycle()
+    val downloadedImages by viewModel.downloadedImages.collectAsStateWithLifecycle()
+    val sourceUnavailableIds by viewModel.sourceUnavailableIds.collectAsStateWithLifecycle()
 
     val currentLanguageDisplayName = if (languageTag.isNullOrBlank()) {
         stringResource(R.string.language_follow_system)
@@ -151,6 +169,8 @@ fun SettingsScreen(
     // 技能正文 Markdown 解析缓存：详情页多次进入复用，避免重复解析卡顿
     val skillMarkdownCache = remember { MarkdownRenderCache() }
     var showContainerAddSheet by remember { mutableStateOf(false) }
+    var showContainerAnnouncement by remember { mutableStateOf(false) }
+    var showImageSourceSheet by remember { mutableStateOf(false) }
     var showThemeSheet by remember { mutableStateOf(false) }
     var showLanguageSheet by remember { mutableStateOf(false) }
     var showResetTokenStats by remember { mutableStateOf(false) }
@@ -161,12 +181,20 @@ fun SettingsScreen(
             SettingsSection.ProviderEditor -> section = SettingsSection.Providers
             SettingsSection.Log -> section = logReturnSection
             SettingsSection.SkillDetail -> section = SettingsSection.Skills
+            SettingsSection.ContainerDownloads -> section = SettingsSection.Container
             else -> section = SettingsSection.Menu
         }
     }
 
     // settingsViewModel 为 Activity 级共享实例，每次进入设置页重新扫描技能，反映磁盘增删改。
     LaunchedEffect(Unit) { viewModel.refreshSkills() }
+
+    // 首次（或公告内容更新后）进入「容器与镜像」页自动弹出使用说明；哈希比对在 ViewModel 完成。
+    LaunchedEffect(section, containerAnnouncementOutdated) {
+        if (section == SettingsSection.Container && containerAnnouncementOutdated && containerAnnouncementText.isNotBlank()) {
+            showContainerAnnouncement = true
+        }
+    }
 
     // 提供商编辑为独立全屏页，直接渲染（不嵌套 Scaffold）
     if (section == SettingsSection.ProviderEditor) {
@@ -257,8 +285,36 @@ fun SettingsScreen(
                                 )
                             }
                         }
-                        SettingsSection.Container -> IconButton(onClick = { showContainerAddSheet = true }) {
-                            Icon(FeatherIcons.Plus, contentDescription = stringResource(R.string.container_add_image))
+                        SettingsSection.Container -> {
+                            IconButton(onClick = { showContainerAnnouncement = true }) {
+                                Icon(
+                                    FeatherIcons.Info,
+                                    contentDescription = stringResource(R.string.container_announcement_title),
+                                    tint = MaterialTheme.colorScheme.onBackground,
+                                    modifier = Modifier.size(22.dp)
+                                )
+                            }
+                            IconButton(onClick = { section = SettingsSection.ContainerDownloads }) {
+                                Icon(
+                                    FeatherIcons.Download,
+                                    contentDescription = stringResource(R.string.container_download_image),
+                                    tint = MaterialTheme.colorScheme.onBackground,
+                                    modifier = Modifier.size(22.dp)
+                                )
+                            }
+                            IconButton(onClick = { showContainerAddSheet = true }) {
+                                Icon(FeatherIcons.Plus, contentDescription = stringResource(R.string.container_add_image))
+                            }
+                        }
+                        SettingsSection.ContainerDownloads -> {
+                            IconButton(onClick = { showImageSourceSheet = true }) {
+                                Icon(
+                                    FeatherIcons.Globe,
+                                    contentDescription = stringResource(R.string.container_download_current_source_title),
+                                    tint = MaterialTheme.colorScheme.onBackground,
+                                    modifier = Modifier.size(22.dp)
+                                )
+                            }
                         }
                         SettingsSection.Log -> {
                             IconButton(onClick = { viewModel.refreshLogs() }) {
@@ -373,6 +429,17 @@ fun SettingsScreen(
                     onRestoreBuiltin = { viewModel.restoreBuiltinAlpine() },
                     remoteConnections = remoteConnections
                 )
+                SettingsSection.ContainerDownloads -> ContainerImageDownloadSection(
+                    catalog = imageCatalog,
+                    state = imageDownload,
+                    downloadedImages = downloadedImages,
+                    sourceUnavailableIds = sourceUnavailableIds,
+                    selectedSourceName = viewModel.sourceDisplayName(selectedImageSource, languageTag),
+                    onDownload = { entry -> viewModel.startContainerImageDownload(entry, selectedImageSource) },
+                    onCancel = { viewModel.cancelContainerImageDownload() },
+                    onImport = { entryId, fileUri -> viewModel.importDownloadedImage(entryId, fileUri) },
+                    onDelete = { entryId -> viewModel.deleteDownloadedImage(entryId) }
+                )
                 SettingsSection.Log -> LogSection(
                     current = logLevel,
                     onSelect = { viewModel.setLogLevel(it) },
@@ -456,6 +523,15 @@ fun SettingsScreen(
         )
     }
 
+    if (showImageSourceSheet) {
+        SourceSelectionSheet(
+            options = imageSourceOptions.map { it to viewModel.sourceDisplayName(it, languageTag) },
+            selected = selectedImageSource,
+            onSelected = { viewModel.setImageSource(it) },
+            onDismiss = { showImageSourceSheet = false }
+        )
+    }
+
     if (showResetTokenStats) {
         AlertDialog(
             onDismissRequest = { showResetTokenStats = false },
@@ -488,6 +564,71 @@ fun SettingsScreen(
                 TextButton(onClick = { skillToDelete = null }) { Text(stringResource(R.string.common_cancel)) }
             }
         )
+    }
+
+    // 「容器与镜像」使用说明公告：首次进入（或内容更新后）自动弹出，右上角 Info 按钮可随时重看。
+    if (showContainerAnnouncement) {
+        val dismiss = {
+            showContainerAnnouncement = false
+            viewModel.markContainerAnnouncementShown()
+        }
+        Dialog(onDismissRequest = dismiss) {
+            Surface(
+                shape = RoundedCornerShape(16.dp),
+                color = MaterialTheme.colorScheme.surface,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = LocalConfiguration.current.screenHeightDp.dp * 0.72f)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .padding(20.dp)
+                ) {
+                    Text(
+                        text = stringResource(R.string.container_announcement_title),
+                        style = MaterialTheme.typography.titleLarge,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    if (containerAnnouncementText.isNotBlank()) {
+                        // mikepenz Markdown 内部是 Column（非 LazyColumn），本身不可滚动，
+                        // 必须由外层提供滚动容器，否则超出弹窗高度的内容被直接裁剪。
+                        Column(
+                            modifier = Modifier
+                                .weight(1f)
+                                .verticalScroll(rememberScrollState())
+                                .padding(top = 8.dp)
+                        ) {
+                            MarkdownContent(
+                                text = containerAnnouncementText,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.fillMaxWidth(),
+                                loading = {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(vertical = 24.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        CircularProgressIndicator()
+                                    }
+                                }
+                            )
+                        }
+                    }
+                    Button(
+                        onClick = dismiss,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(44.dp)
+                            .padding(top = 4.dp),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text(stringResource(R.string.container_announcement_got_it))
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -634,4 +775,5 @@ internal fun SettingsMenu(
             )
         }
     }
+
 }
