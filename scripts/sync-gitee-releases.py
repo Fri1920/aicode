@@ -222,6 +222,7 @@ def main() -> int:
             attach_names = set()
             if existing is not None:
                 release_id = str(existing["id"])
+                # Gitee 列表接口直接带 assets，无需再查详情
                 attach_names = {a.get("name") for a in existing.get("assets", [])}
                 print(f"[跳过创建] {tag}（已存在 Release #{release_id}，附件 {len(attach_names)} 个）")
             else:
@@ -235,17 +236,11 @@ def main() -> int:
                         "target_commitish": "main",
                     })
                     release_id = str(created["id"])
+                    attach_names = set()
                 except Exception as e:
                     print(f"  错误：创建 Release 失败：{e}")
                     failed += 1
                     continue
-            if not attach_names:
-                # 列表接口可能不含附件明细，查详情确认
-                try:
-                    detail = gitee_get(f"/releases/{release_id}")
-                    attach_names = {a.get("name") for a in detail.get("assets", [])}
-                except Exception:
-                    pass
 
             for asset in rel.get("assets", []):
                 name = asset["name"]
