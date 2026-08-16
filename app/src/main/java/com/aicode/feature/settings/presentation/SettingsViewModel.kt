@@ -567,10 +567,10 @@ class SettingsViewModel @Inject constructor(
                         val trend = padTrend(period, rawTrend, tz)
                         val costs = withContext(Dispatchers.IO) {
                             val perCall = calls.associate {
-                                it.record.id to callCostUsd(it.record.model, it.record.inputTokens.toLong(), it.record.cachedInputTokens.toLong(), it.record.outputTokens.toLong())
+                                it.record.id to callCostUsd(it.record.providerId, it.record.model, it.record.inputTokens.toLong(), it.record.cachedInputTokens.toLong(), it.record.outputTokens.toLong())
                             }
                             val periodTotal = models.sumOf { m ->
-                                callCostUsd(m.model, m.inputTokens, m.cachedInputTokens, m.outputTokens) ?: 0.0
+                                callCostUsd(null, m.model, m.inputTokens, m.cachedInputTokens, m.outputTokens) ?: 0.0
                             }
                             perCall to periodTotal
                         }
@@ -1131,12 +1131,14 @@ class SettingsViewModel @Inject constructor(
     }
 
     /** 单次调用的预估费用（USD）；模型无单价返回 null。缓存读价缺失时按输入价 10% 估算。 */
-    private fun callCostUsd(model: String?, inputTokens: Long, cachedInputTokens: Long, outputTokens: Long): Double? {
+    private suspend fun callCostUsd(providerId: String?, model: String?, inputTokens: Long, cachedInputTokens: Long, outputTokens: Long): Double? {
         val modelId = model ?: return null
-        val price = modelMetadataService.findModelCostUsdPerM(modelId) ?: return null
-        val inputPrice = price.first ?: return null
-        val outputPrice = price.second ?: 0.0
-        val cachePrice = price.third ?: inputPrice * CACHE_READ_DISCOUNT
+        // 统一走元数据解析入口（自动拉取/内置 → 自定义 三级回退），与编辑页回显价格一致。
+        val provider = _providers.value.firstOrNull { it.id == providerId }
+        val meta = modelMetadataService.resolve(providerId.orEmpty(), provider?.type ?: ProviderType.OPENAI, modelId)
+        val inputPrice = meta.inputCostUsdPerM ?: return null
+        val outputPrice = meta.outputCostUsdPerM ?: 0.0
+        val cachePrice = meta.cacheReadCostUsdPerM ?: inputPrice * CACHE_READ_DISCOUNT
         val uncached = (inputTokens - cachedInputTokens).coerceAtLeast(0)
         return (uncached * inputPrice + cachedInputTokens * cachePrice + outputTokens * outputPrice) / 1_000_000.0
     }

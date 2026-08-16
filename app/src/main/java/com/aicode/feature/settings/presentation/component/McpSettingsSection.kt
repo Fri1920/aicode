@@ -394,7 +394,7 @@ internal fun McpServerRow(
 
 /** 紧凑 pill 标签：胶囊背景 + 小字，用于状态/类型/摘要。 */
 @Composable
-private fun McpPill(
+internal fun McpPill(
     text: String,
     textColor: Color,
     backgroundColor: Color,

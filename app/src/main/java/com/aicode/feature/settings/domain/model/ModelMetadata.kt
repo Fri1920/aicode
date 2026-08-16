@@ -56,7 +56,10 @@ fun mergeModelMetadata(
         supportsReasoning = c.supportsReasoning,
         contextTokens = c.contextTokens.takeIf { it > 0 } ?: a.contextTokens,
         inputTokens = c.inputTokens ?: a.inputTokens,
-        outputTokens = c.outputTokens ?: a.outputTokens
+        outputTokens = c.outputTokens ?: a.outputTokens,
+        inputCostUsdPerM = c.inputCostUsdPerM ?: a.inputCostUsdPerM,
+        outputCostUsdPerM = c.outputCostUsdPerM ?: a.outputCostUsdPerM,
+        cacheReadCostUsdPerM = c.cacheReadCostUsdPerM ?: a.cacheReadCostUsdPerM
     )
 }
 

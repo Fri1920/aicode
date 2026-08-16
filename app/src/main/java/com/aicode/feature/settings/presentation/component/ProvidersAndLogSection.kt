@@ -1,12 +1,15 @@
 package com.aicode.feature.settings.presentation.component
 
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -15,14 +18,13 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.aicode.core.theme.Radius
 import com.aicode.core.theme.Spacing
@@ -32,11 +34,12 @@ import compose.icons.feathericons.ChevronRight
 import androidx.compose.ui.res.stringResource
 import com.aicode.R
 
-/** 提供商二级页：列表 + 空态提示。新增/编辑由顶栏「+」与点击触发 [ProviderEditorScreen]。 */
+/** 提供商二级页：列表 + 空态提示。新增/编辑由顶栏「+」与点击触发 [ProviderEditorScreen]，左滑删除。 */
 @Composable
 internal fun ProvidersSection(
     providers: List<AIProviderConfig>,
-    onEdit: (AIProviderConfig) -> Unit
+    onEdit: (AIProviderConfig) -> Unit,
+    onDelete: (AIProviderConfig) -> Unit
 ) {
     if (providers.isEmpty()) {
         EmptyHint(stringResource(R.string.providers_empty))
@@ -56,7 +59,8 @@ internal fun ProvidersSection(
                 }
                 ProviderItem(
                     provider = provider,
-                    onEdit = { onEdit(provider) }
+                    onEdit = { onEdit(provider) },
+                    onDelete = { onDelete(provider) }
                 )
             }
         }
@@ -80,58 +84,105 @@ internal fun EmptyHint(text: String) {
     }
 }
 
-/** 提供商行：品牌 logo + 名称 + 状态徽章 + 右箭头，整行点击进入编辑。 */
+/**
+ * 提供商行：布局与 MCP 列表行一致——左侧品牌 logo + 状态圆点，
+ * 中部两行（名称 / 类型 + 模型数量 pills），右侧状态 pill + 箭头。
+ * 整行点击进入编辑，左滑露出删除按钮。
+ */
 @Composable
 fun ProviderItem(
     provider: AIProviderConfig,
-    onEdit: () -> Unit
+    onEdit: () -> Unit,
+    onDelete: () -> Unit
 ) {
-    val statusColor = if (provider.isEnabled) Color(0xFF22C55E) else Color(0xFFF59E0B)
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onEdit() }
-            .padding(horizontal = Spacing.lg, vertical = 11.dp),
-        verticalAlignment = Alignment.CenterVertically
+    // 状态色与 MCP 行一致：启用用主题 tertiary（绿调），停用用 outline（灰）。
+    val statusColor = if (provider.isEnabled) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.outline
+    val light = settingsLightMode()
+    val rowBackground = if (light) Color.White else MaterialTheme.colorScheme.surface
+
+    SwipeToDeleteRow(
+        onDelete = onDelete,
+        onClick = onEdit
     ) {
-        ProviderLogoIcon(
-            provider = provider,
-            size = 24.dp,
-            modifier = Modifier.padding(end = Spacing.md)
-        )
-        Text(
-            text = provider.name,
-            style = MaterialTheme.typography.bodyLarge,
-            fontWeight = FontWeight.Normal,
-            color = if (MaterialTheme.colorScheme.background.luminance() > 0.5f) {
-                Color(0xFF0F0F0F)
-            } else {
-                MaterialTheme.colorScheme.onSurface
-            },
-            modifier = Modifier.weight(1f)
-        )
-        Surface(
-            shape = RoundedCornerShape(Radius.pill),
-            color = statusColor.copy(alpha = 0.15f)
+        // 行内容自带与 MCP 行一致的内边距（SwipeToDeleteRow 本身无 padding）。
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = Spacing.lg, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
+            // 左侧品牌 logo 容器 + 状态圆点
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .background(
+                        color = MaterialTheme.colorScheme.surfaceVariant,
+                        shape = RoundedCornerShape(8.dp)
+                    )
+            ) {
+                ProviderLogoIcon(
+                    provider = provider,
+                    size = 22.dp,
+                    modifier = Modifier.size(22.dp).align(Alignment.Center)
+                )
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(1.dp)
+                        .size(8.dp)
+                        .background(color = statusColor, shape = RoundedCornerShape(Radius.pill))
+                        .border(1.5.dp, rowBackground, RoundedCornerShape(Radius.pill))
+                )
+            }
+
+            Spacer(modifier = Modifier.width(Spacing.md))
+
+            // 中间：名称 / 类型 + 模型数量
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = provider.name,
+                    style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold),
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Spacer(modifier = Modifier.height(6.dp))
+
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    McpPill(
+                        text = providerTypeLabel(provider.type),
+                        textColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        backgroundColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
+                    )
+                    McpPill(
+                        text = stringResource(R.string.provider_models_count_tag, provider.models.size),
+                        textColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        backgroundColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                        modifier = Modifier.weight(1f, fill = false)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.width(Spacing.sm))
+
+            // 启用/停用状态 pill + 右箭头
+            McpPill(
                 text = stringResource(if (provider.isEnabled) R.string.common_enabled else R.string.common_disabled),
-                style = MaterialTheme.typography.labelSmall,
-                fontWeight = FontWeight.Medium,
-                color = statusColor,
-                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                textColor = statusColor,
+                backgroundColor = statusColor.copy(alpha = 0.12f)
+            )
+            Spacer(Modifier.width(Spacing.xs))
+            Icon(
+                imageVector = FeatherIcons.ChevronRight,
+                contentDescription = null,
+                tint = if (light) Color(0xFFC7C7CC) else MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(18.dp)
             )
         }
-        Spacer(Modifier.width(Spacing.xs))
-        Icon(
-            imageVector = FeatherIcons.ChevronRight,
-            contentDescription = null,
-            tint = if (MaterialTheme.colorScheme.background.luminance() > 0.5f) {
-                Color(0xFFC7C7CC)
-            } else {
-                MaterialTheme.colorScheme.onSurfaceVariant
-            },
-            modifier = Modifier.size(18.dp)
-        )
     }
 }

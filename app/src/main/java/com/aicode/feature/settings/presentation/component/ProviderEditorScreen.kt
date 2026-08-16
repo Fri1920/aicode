@@ -1,13 +1,10 @@
 package com.aicode.feature.settings.presentation.component
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -17,10 +14,13 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Apps
@@ -42,16 +42,18 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.MultiChoiceSegmentedButtonRow
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonColors
-import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalClipboard
 import android.content.ClipData
 import androidx.compose.ui.platform.ClipEntry
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -59,6 +61,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.DisposableEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.LaunchedEffect
@@ -75,13 +78,14 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.foundation.background
@@ -111,19 +115,17 @@ import compose.icons.feathericons.Eye
 import compose.icons.feathericons.EyeOff
 import compose.icons.feathericons.Plus
 import compose.icons.feathericons.Sliders
-import compose.icons.feathericons.Trash2
 import androidx.compose.ui.res.stringResource
 import com.aicode.R
 
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProviderEditorScreen(
     viewModel: SettingsViewModel,
     initialProvider: AIProviderConfig?,
     onNavigateBack: () -> Unit,
-    onSave: (AIProviderConfig) -> Unit,
-    onDelete: (String) -> Unit
+    onSave: (AIProviderConfig) -> Unit
 ) {
     val context = LocalContext.current
     var name by remember { mutableStateOf(initialProvider?.name ?: "") }
@@ -147,6 +149,15 @@ fun ProviderEditorScreen(
     var showAddModelSheet by remember { mutableStateOf(false) }
     var showFetchDialog by remember { mutableStateOf(false) }
     var fetchDialogKey by remember { mutableIntStateOf(0) }
+
+    // 两个 tab 的滚动状态提升到页面层，聚合出「是否正在滚动」供底部 tab 栏滚动弱化（同 Git 页面）。
+    val configScrollState = rememberScrollState()
+    val modelsScrollState = rememberScrollState()
+    val tabsScrolling by remember {
+        derivedStateOf {
+            configScrollState.isScrollInProgress || modelsScrollState.isScrollInProgress
+        }
+    }
 
     val fetchState by viewModel.fetchState.collectAsStateWithLifecycle()
     val testResults by viewModel.testResults.collectAsStateWithLifecycle()
@@ -225,15 +236,6 @@ fun ProviderEditorScreen(
                     }
                 },
                 actions = {
-                    if (initialProvider != null) {
-                        IconButton(onClick = { onDelete(initialProvider.id) }) {
-                            Icon(
-                                FeatherIcons.Trash2,
-                                contentDescription = stringResource(R.string.provider_delete),
-                                tint = MaterialTheme.colorScheme.error
-                            )
-                        }
-                    }
                     IconButton(onClick = {
                         selectedTab = 1
                         showAddModelSheet = true
@@ -254,9 +256,9 @@ fun ProviderEditorScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .verticalScroll(rememberScrollState())
+                        .verticalScroll(configScrollState)
                         .padding(horizontal = Spacing.lg)
-                        .padding(bottom = Spacing.xl),
+                        .padding(bottom = 70.dp),
                     verticalArrangement = Arrangement.spacedBy(Spacing.sm)
                 ) {
                     // ── 基本信息 ──
@@ -361,9 +363,9 @@ fun ProviderEditorScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .verticalScroll(rememberScrollState())
+                        .verticalScroll(modelsScrollState)
                         .padding(horizontal = Spacing.lg)
-                        .padding(bottom = Spacing.xl),
+                        .padding(bottom = 70.dp),
                     verticalArrangement = Arrangement.spacedBy(Spacing.sm)
                 ) {
                     // ── 模型管理 ──
@@ -460,6 +462,7 @@ fun ProviderEditorScreen(
                     FloatingTabItem(FeatherIcons.Cpu, stringResource(R.string.common_model))
                 ),
                 maskColor = settingsPageBackground(),
+                isScrolling = tabsScrolling,
                 modifier = Modifier.align(Alignment.BottomCenter)
             )
         }
@@ -548,7 +551,10 @@ private fun AddModelSheet(
     onSave: (String, ModelMetadata) -> Unit,
     onDismiss: () -> Unit
 ) {
-    val sheetState = rememberModalBottomSheetState()
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val configuration = LocalConfiguration.current
+    val screenHeight = configuration.screenHeightDp.dp
+    val flingFix = rememberSheetFlingFix(sheetState)
     var modelName by remember { mutableStateOf(initial?.id ?: "") }
     var supportsVision by remember { mutableStateOf(initial?.supportsVision ?: false) }
     var supportsImageOutput by remember { mutableStateOf(initial?.supportsImageOutput ?: false) }
@@ -556,6 +562,9 @@ private fun AddModelSheet(
     var supportsReasoning by remember { mutableStateOf(initial?.supportsReasoning ?: false) }
     var inputTokens by remember { mutableStateOf((initial?.inputTokens ?: initial?.contextTokens?.takeIf { it > 0 })?.toString() ?: "") }
     var outputTokens by remember { mutableStateOf(initial?.outputTokens?.toString() ?: "") }
+    var inputPrice by remember { mutableStateOf(initial?.inputCostUsdPerM?.toString() ?: "") }
+    var outputPrice by remember { mutableStateOf(initial?.outputCostUsdPerM?.toString() ?: "") }
+    var cacheReadPrice by remember { mutableStateOf(initial?.cacheReadCostUsdPerM?.toString() ?: "") }
     val trimmedModel = modelName.trim()
     val duplicate = existingModels.any { it == trimmedModel && it != initial?.id }
     val canSave = trimmedModel.isNotEmpty() && !duplicate
@@ -563,25 +572,47 @@ private fun AddModelSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = settingsPageBackground()
+        containerColor = MaterialTheme.colorScheme.surface,
+        contentWindowInsets = { WindowInsets(0.dp) }
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = Spacing.lg)
-                .padding(bottom = Spacing.lg),
-            verticalArrangement = Arrangement.spacedBy(2.dp)
+                .heightIn(max = screenHeight * 0.88f)
         ) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleMedium,
-                color = if (MaterialTheme.colorScheme.background.luminance() > 0.5f) Color(0xFF0F0F0F) else MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.md)
-            )
+            // ── 顶部标题栏：居中标题（仿 MCP 编辑对话框）──
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Spacer(modifier = Modifier.size(36.dp))
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 16.sp
+                    ),
+                    modifier = Modifier.weight(1f),
+                    textAlign = TextAlign.Center,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(modifier = Modifier.size(36.dp))
+            }
 
-            // 模型名称 + 上下文窗口（上下结构，同一卡片）
-            SettingsGroup {
-                ProviderTextFieldRow(
+            // ── 表单区：输入框直接铺背景，卡片承载能力开关 ──
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 20.dp, vertical = 8.dp)
+                    .navigationBarsPadding()
+                    .nestedScroll(flingFix),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                ModelSheetTextField(
                     label = stringResource(R.string.provider_model_name),
                     value = modelName,
                     onValueChange = { modelName = it }
@@ -591,133 +622,119 @@ private fun AddModelSheet(
                         text = stringResource(R.string.provider_model_already_added),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.error,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = Spacing.lg)
-                            .padding(bottom = Spacing.sm)
+                        modifier = Modifier.fillMaxWidth()
                     )
                 }
-                SettingsDivider()
-                ProviderTextFieldRow(
+                ModelSheetTextField(
                     label = stringResource(R.string.provider_model_context_input),
                     value = inputTokens,
                     onValueChange = { inputTokens = it }
                 )
-                SettingsDivider()
-                ProviderTextFieldRow(
+                ModelSheetTextField(
                     label = stringResource(R.string.provider_model_context_output),
                     value = outputTokens,
                     onValueChange = { outputTokens = it }
                 )
+
+                SectionLabel(stringResource(R.string.provider_model_section_price))
+                ModelSheetTextField(
+                    label = stringResource(R.string.provider_model_price_input),
+                    value = inputPrice,
+                    onValueChange = { inputPrice = it },
+                    keyboardType = KeyboardType.Decimal
+                )
+                ModelSheetTextField(
+                    label = stringResource(R.string.provider_model_price_output),
+                    value = outputPrice,
+                    onValueChange = { outputPrice = it },
+                    keyboardType = KeyboardType.Decimal
+                )
+                ModelSheetTextField(
+                    label = stringResource(R.string.provider_model_price_cache_read),
+                    value = cacheReadPrice,
+                    onValueChange = { cacheReadPrice = it },
+                    keyboardType = KeyboardType.Decimal
+                )
+
+                SectionLabel(stringResource(R.string.provider_model_capabilities))
+                Card(
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(
+                        // 中性浅灰，避免 surfaceVariant 在蓝调主题下偏蓝。
+                        containerColor = if (settingsLightMode()) Color(0xFFF2F2F7) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column {
+                        CapabilitySwitchRow(
+                            title = stringResource(R.string.provider_model_cap_vision),
+                            checked = supportsVision,
+                            onCheckedChange = { supportsVision = it }
+                        )
+                        SettingsDivider()
+                        CapabilitySwitchRow(
+                            title = stringResource(R.string.provider_model_cap_image_output),
+                            checked = supportsImageOutput,
+                            onCheckedChange = { supportsImageOutput = it }
+                        )
+                        SettingsDivider()
+                        CapabilitySwitchRow(
+                            title = stringResource(R.string.provider_model_capability_tools),
+                            checked = supportsTools,
+                            onCheckedChange = { supportsTools = it }
+                        )
+                        SettingsDivider()
+                        CapabilitySwitchRow(
+                            title = stringResource(R.string.provider_model_capability_reasoning),
+                            checked = supportsReasoning,
+                            onCheckedChange = { supportsReasoning = it }
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
             }
 
-            SectionLabel(stringResource(R.string.provider_model_input_mode))
-            MultiSegmentRow(
-                firstLabel = stringResource(R.string.provider_model_mode_text),
-                secondLabel = stringResource(R.string.provider_model_mode_image),
-                firstChecked = true,
-                secondChecked = supportsVision,
-                onFirstChange = {},
-                onSecondChange = { supportsVision = it }
-            )
-
-            SectionLabel(stringResource(R.string.provider_model_output_mode))
-            MultiSegmentRow(
-                firstLabel = stringResource(R.string.provider_model_mode_text),
-                secondLabel = stringResource(R.string.provider_model_mode_image),
-                firstChecked = true,
-                secondChecked = supportsImageOutput,
-                onFirstChange = {},
-                onSecondChange = { supportsImageOutput = it }
-            )
-
-            SectionLabel(stringResource(R.string.provider_model_capabilities))
-            MultiSegmentRow(
-                firstLabel = stringResource(R.string.provider_model_capability_tools),
-                secondLabel = stringResource(R.string.provider_model_capability_reasoning),
-                firstChecked = supportsTools,
-                secondChecked = supportsReasoning,
-                onFirstChange = { supportsTools = it },
-                onSecondChange = { supportsReasoning = it }
-            )
-
-            Button(
-                onClick = {
-                    val input = inputTokens.trim().toIntOrNull()
-                    val output = outputTokens.trim().toIntOrNull()
-                    val meta = ModelMetadata(
-                        id = trimmedModel,
-                        displayName = trimmedModel,
-                        contextTokens = input ?: 0,
-                        inputTokens = input,
-                        outputTokens = output,
-                        supportsVision = supportsVision,
-                        supportsImageOutput = supportsImageOutput,
-                        supportsTools = supportsTools,
-                        supportsReasoning = supportsReasoning
-                    )
-                    onSave(trimmedModel, meta)
-                },
-                enabled = canSave,
+            // ── 底部保存按钮（仿 MCP 编辑对话框）──
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = Spacing.lg, vertical = Spacing.md),
-                shape = RoundedCornerShape(12.dp),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                    .padding(horizontal = 20.dp, vertical = 12.dp)
             ) {
-                Icon(FeatherIcons.Plus, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(Spacing.xs))
-                Text(confirmLabel)
+                Button(
+                    enabled = canSave,
+                    onClick = {
+                        val input = inputTokens.trim().toIntOrNull()
+                        val output = outputTokens.trim().toIntOrNull()
+                        val meta = ModelMetadata(
+                            id = trimmedModel,
+                            displayName = trimmedModel,
+                            contextTokens = input ?: 0,
+                            inputTokens = input,
+                            outputTokens = output,
+                            inputCostUsdPerM = inputPrice.trim().toDoubleOrNull(),
+                            outputCostUsdPerM = outputPrice.trim().toDoubleOrNull(),
+                            cacheReadCostUsdPerM = cacheReadPrice.trim().toDoubleOrNull(),
+                            supportsVision = supportsVision,
+                            supportsImageOutput = supportsImageOutput,
+                            supportsTools = supportsTools,
+                            supportsReasoning = supportsReasoning
+                        )
+                        onSave(trimmedModel, meta)
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(44.dp),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Icon(FeatherIcons.Check, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(confirmLabel, style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold))
+                }
             }
         }
     }
 }
-
-/** 双栏多选分段选择器（可独立选中），选中项以主题色高亮并带勾选。 */
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun MultiSegmentRow(
-    firstLabel: String,
-    secondLabel: String,
-    firstChecked: Boolean,
-    secondChecked: Boolean,
-    onFirstChange: (Boolean) -> Unit,
-    onSecondChange: (Boolean) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    MultiChoiceSegmentedButtonRow(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = Spacing.lg, vertical = Spacing.xs)
-    ) {
-        SegmentedButton(
-            checked = firstChecked,
-            onCheckedChange = onFirstChange,
-            shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
-            colors = segmentedSelectedColors(),
-            icon = { if (firstChecked) SelectedCheck() }
-        ) {
-            Text(firstLabel)
-        }
-        SegmentedButton(
-            checked = secondChecked,
-            onCheckedChange = onSecondChange,
-            shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
-            colors = segmentedSelectedColors(),
-            icon = { if (secondChecked) SelectedCheck() }
-        ) {
-            Text(secondLabel)
-        }
-    }
-}
-
-/** 分段选中态配色：容器用主题色（蓝），文字与勾选用其上的 onPrimary 白色。 */
-@Composable
-private fun segmentedSelectedColors(): SegmentedButtonColors =
-    SegmentedButtonDefaults.colors(
-        activeContainerColor = MaterialTheme.colorScheme.primaryContainer,
-        activeContentColor = MaterialTheme.colorScheme.onPrimaryContainer
-    )
 
 /** 分段组小标题：灰色小字、紧凑间距，直接铺在弹窗背景上（无卡片）。 */
 @Composable
@@ -731,17 +748,58 @@ private fun SectionLabel(text: String) {
     )
 }
 
+/** 添加/编辑模型弹窗内的全宽输入框：样式与 MCP 编辑对话框一致。 */
 @Composable
-private fun SelectedCheck() {
-    Icon(
-        imageVector = FeatherIcons.Check,
-        contentDescription = null,
-        modifier = Modifier.size(16.dp),
-        tint = MaterialTheme.colorScheme.onPrimaryContainer
+private fun ModelSheetTextField(
+    label: String,
+    value: String,
+    onValueChange: (String) -> Unit,
+    keyboardType: KeyboardType = KeyboardType.Text
+) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        label = { Text(label) },
+        singleLine = true,
+        keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
+        shape = RoundedCornerShape(12.dp),
+        colors = OutlinedTextFieldDefaults.colors(
+            unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
+            focusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
+            unfocusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f),
+            focusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f)
+        ),
+        modifier = Modifier.fillMaxWidth()
     )
 }
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+/** 能力开关行：标题 + 右侧 Switch，卡片内一行。 */
+@Composable
+private fun CapabilitySwitchRow(
+    title: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium),
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.weight(1f)
+        )
+        Switch(
+            checked = checked,
+            onCheckedChange = onCheckedChange
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun FetchModelsDialog(
     fetchState: FetchState,
@@ -941,7 +999,7 @@ internal fun defaultProviderBaseUrl(type: ProviderType): String = when (type) {
     else -> "https://api.openai.com/"
 }
 
-/** 分组内输入行：上方小标题 + 全宽输入框，可选密文转换与尾随操作。 */
+/** 分组内输入行：全宽 OutlinedTextField，可选密文转换与尾随操作。样式与 MCP 编辑页输入框一致。 */
 @Composable
 private fun ProviderTextFieldRow(
     label: String,
@@ -950,43 +1008,24 @@ private fun ProviderTextFieldRow(
     visualTransformation: VisualTransformation = VisualTransformation.None,
     trailing: (@Composable () -> Unit)? = null
 ) {
-    Column(
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        label = { Text(label) },
+        singleLine = true,
+        visualTransformation = visualTransformation,
+        trailingIcon = { trailing?.invoke() },
+        shape = RoundedCornerShape(12.dp),
+        colors = OutlinedTextFieldDefaults.colors(
+            unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
+            focusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
+            unfocusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f),
+            focusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f)
+        ),
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = Spacing.lg, vertical = Spacing.sm)
-    ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelLarge.copy(fontSize = 13.sp),
-            color = if (MaterialTheme.colorScheme.background.luminance() > 0.5f) {
-                Color(0xFF8E8E93)
-            } else {
-                MaterialTheme.colorScheme.onSurfaceVariant
-            },
-            modifier = Modifier.padding(bottom = Spacing.xs)
-        )
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            BasicTextField(
-                value = value,
-                onValueChange = onValueChange,
-                textStyle = MaterialTheme.typography.bodyLarge.copy(
-                    color = if (MaterialTheme.colorScheme.background.luminance() > 0.5f) {
-                        Color(0xFF0F0F0F)
-                    } else {
-                        MaterialTheme.colorScheme.onSurface
-                    }
-                ),
-                singleLine = true,
-                visualTransformation = visualTransformation,
-                cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-                modifier = Modifier.weight(1f)
-            )
-            trailing?.invoke()
-        }
-    }
+            .padding(horizontal = Spacing.lg, vertical = Spacing.xs)
+    )
 }
 
 /** 分组内开关行：标题 + 可选副标题 + 右侧 Switch。 */
@@ -1092,7 +1131,7 @@ private fun ProviderTypeSelectionSheet(
     }
 }
 
-private fun providerTypeLabel(type: ProviderType): String = when (type) {
+internal fun providerTypeLabel(type: ProviderType): String = when (type) {
     ProviderType.OPENAI -> "OpenAI"
     ProviderType.ANTHROPIC -> "Anthropic"
     ProviderType.GEMINI -> "Gemini"

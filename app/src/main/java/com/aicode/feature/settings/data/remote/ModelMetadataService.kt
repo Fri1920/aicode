@@ -226,22 +226,6 @@ class ModelMetadataService @Inject constructor(
         source = ModelMetadata.Source.INFERRED
     )
 
-    /**
-     * 按模型 id 查单价（USD/1M tokens），返回 (input, output, cacheRead)。
-     * 仅当输入价存在时视为可计价；查不到返回 null。
-     */
-    fun findModelCostUsdPerM(modelId: String): Triple<Double?, Double?, Double?>? {
-        val normalized = modelId.removePrefix("models/")
-        for (provider in loadCatalog().values) {
-            provider[normalized]?.let { m ->
-                if (m.inputCostUsdPerM != null || m.outputCostUsdPerM != null) {
-                    return Triple(m.inputCostUsdPerM, m.outputCostUsdPerM, m.cacheReadCostUsdPerM)
-                }
-            }
-        }
-        return null
-    }
-
     private fun findMetadata(
         catalog: Map<String, Map<String, ModelMetadata>>,
         type: ProviderType,

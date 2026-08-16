@@ -204,10 +204,6 @@ fun SettingsScreen(
             onNavigateBack = { section = SettingsSection.Providers },
             onSave = { provider ->
                 viewModel.saveProvider(provider)
-            },
-            onDelete = { id ->
-                viewModel.deleteProvider(id)
-                section = SettingsSection.Providers
             }
         )
         return
@@ -361,7 +357,8 @@ fun SettingsScreen(
                     onEdit = {
                         editingProvider = it
                         section = SettingsSection.ProviderEditor
-                    }
+                    },
+                    onDelete = { viewModel.deleteProvider(it.id) }
                 )
                 SettingsSection.DefaultModels -> DefaultModelsSection(
                     providers = providers,
