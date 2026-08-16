@@ -140,6 +140,7 @@
     <string name="common_model">Model</string>
     <string name="common_add">Add</string>
     <string name="credential_add">Add Credential</string>
+    <string name="credential_new">New credential</string>
     <string name="common_username">Username</string>
     <string name="common_got_it">Got it</string>
     <string name="common_edit">Edit</string>
@@ -428,8 +429,6 @@
 
     <!-- Credential Editor -->
     <string name="credential_edit">Edit Credential</string>
-    <string name="credential_delete">Delete Credential</string>
-    <string name="credential_usage_desc">Credentials are used for authentication when pushing/pulling https remote repos. For multiple accounts on the same host, the one with "Default" enabled takes priority; if none is default, the first one for that host is used.</string>
     <string name="credential_host">Remote Host</string>
     <string name="credential_alias">Alias (optional)</string>
     <string name="credential_set_default">Set as default credential for this host</string>
@@ -508,6 +507,7 @@
     <string name="git_new">New</string>
     <string name="git_no_commits">No commits yet</string>
     <string name="git_commit_count">Commits (%1$s)</string>
+    <string name="git_credentials_count">Credentials (%1$d)</string>
     <string name="git_load_more_commits">Pull up to load more commits</string>
     <string name="git_no_more_commits">No more commits</string>
     <string name="git_latest_commit">Latest commit</string>
@@ -563,6 +563,7 @@
     <string name="git_tab_credentials">Credentials</string>
     <string name="git_identity_title">Commit Identity</string>
     <string name="git_identity_desc">Used as author for every commit. Applies globally in the container, shared across all workspaces.</string>
+    <string name="git_repo_url_title">Repository URL</string>
     <string name="git_remote_url">remote.origin.url</string>
     <!-- Main Activity -->
 

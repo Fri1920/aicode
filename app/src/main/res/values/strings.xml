@@ -140,6 +140,7 @@
     <string name="common_model">模型</string>
     <string name="common_add">添加</string>
     <string name="credential_add">添加凭据</string>
+    <string name="credential_new">新的凭证</string>
     <string name="common_username">用户名</string>
     <string name="common_got_it">知道了</string>
     <string name="common_edit">编辑</string>
@@ -428,8 +429,6 @@
 
     <!-- Credential Editor -->
     <string name="credential_edit">编辑凭据</string>
-    <string name="credential_delete">删除凭据</string>
-    <string name="credential_usage_desc">凭据用于推送/拉取 https 远程仓库时认证。同 host 多账号时，开启「默认」的优先注入；均未开启默认则取该 host 首条。</string>
     <string name="credential_host">远程主机 host</string>
     <string name="credential_alias">别名（可选）</string>
     <string name="credential_set_default">设为该 host 的默认凭据</string>
@@ -508,6 +507,7 @@
     <string name="git_new">新增</string>
     <string name="git_no_commits">暂无提交记录</string>
     <string name="git_commit_count">提交记录 (%1$s)</string>
+    <string name="git_credentials_count">凭据 (%1$d)</string>
     <string name="git_load_more_commits">上拉加载更早提交</string>
     <string name="git_no_more_commits">没有更多了</string>
     <string name="git_latest_commit">最新提交</string>
@@ -563,6 +563,7 @@
     <string name="git_tab_credentials">凭据</string>
     <string name="git_identity_title">提交署名</string>
     <string name="git_identity_desc">用于每次提交的 author。容器全局生效，所有工作区共用。</string>
+    <string name="git_repo_url_title">仓库地址</string>
     <string name="git_remote_url">remote.origin.url</string>
     <!-- Main Activity -->
 

@@ -2,6 +2,7 @@ package com.aicode.feature.git.presentation.component
 
 import android.content.ClipData
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -101,86 +102,84 @@ internal fun LogTab(
     val canvasWidth = laneWidth * (graph.maxLane + 1) + Spacing.xs * 2
     // 每行高度，用于计算连线纵向跨度（节点居中）。
     val rowHeight = 72.dp
-    // 滚动接近底部（还剩 6 项）且还有更多、不在加载中时触发预拉取下一页。用 derivedStateOf 避免每帧回调。
+    // 滚动到底（或内容不满一屏）且还有更多、不在加载中时触发预拉取下一页。
+    // 白色卡片整体作为单个 item，无索引可判，用 canScrollForward 判断是否已到底。
     val reachedBottom by remember {
-        derivedStateOf {
-            val lastVisible = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: return@derivedStateOf false
-            lastVisible >= listState.layoutInfo.totalItemsCount - 6
-        }
+        derivedStateOf { !listState.canScrollForward }
     }
     LaunchedEffect(reachedBottom) {
         if (reachedBottom && graph.hasMore && !graphLoadingMore) onLoadMore()
     }
     Column(modifier = Modifier.fillMaxSize()) {
         SectionHeader(stringResource(R.string.git_commit_count, commits.size))
-        Surface(
+        // 滚动容器占满整屏（与状态/分支页一致）：白色卡片是滚动内容的一部分——
+        // 内容少时卡片收缩在顶部；滚动时整卡可滚过 tab 被渐变蒙版渐隐，
+        // 滚到底卡片底部停在 tab 上方（底部 70dp 留白）。
+        LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(horizontal = Spacing.lg),
-            shape = RoundedCornerShape(Radius.lg),
-            color = if (settingsLightMode()) Color.White else MaterialTheme.colorScheme.surface
+            state = listState,
+            contentPadding = PaddingValues(bottom = 70.dp)
         ) {
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                state = listState,
-                // 底部留出悬浮 tab bar 高度：滚动时内容可滚过 tab 区域被蒙版渐隐，
-                // 滚到底时最后一项停在 tab 上方不被遮挡。
-                contentPadding = PaddingValues(bottom = 70.dp)
-            ) {
-                commits.forEachIndexed { index, c ->
-            item(key = "commit-${c.hash}") {
-                GraphCommitRow(
-                    commit = c,
-                    lane = graph.lanes[c.hash] ?: 0,
-                    edges = edgesByCommit[index].orEmpty(),
-                    activeTopLanes = graph.activeTopLanes[c.hash].orEmpty(),
-                    activeBottomLanes = graph.activeBottomLanes[c.hash].orEmpty(),
-                    laneColors = laneColors,
-                    canvasWidth = canvasWidth,
-                    laneWidth = laneWidth,
-                    rowHeight = rowHeight,
-                    refs = graph.refs[c.hash].orEmpty(),
-                    isTopTerminal = index == 0,
-                    onOpen = { onOpenCommit(c.hash) }
-                )
-            }
-        }
-            // 末尾加载指示：还有更多时预拉取提示/转圈；没有更多时显示结束提示。
-            if (graph.hasMore) {
-                item(key = "load-more") {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = Spacing.md),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        if (graphLoadingMore) {
-                            CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
-                        } else {
+            item(key = "commit-card") {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(
+                            color = if (settingsLightMode()) Color.White else MaterialTheme.colorScheme.surface,
+                            shape = RoundedCornerShape(Radius.lg)
+                        )
+                ) {
+                    commits.forEachIndexed { index, c ->
+                        GraphCommitRow(
+                            commit = c,
+                            lane = graph.lanes[c.hash] ?: 0,
+                            edges = edgesByCommit[index].orEmpty(),
+                            activeTopLanes = graph.activeTopLanes[c.hash].orEmpty(),
+                            activeBottomLanes = graph.activeBottomLanes[c.hash].orEmpty(),
+                            laneColors = laneColors,
+                            canvasWidth = canvasWidth,
+                            laneWidth = laneWidth,
+                            rowHeight = rowHeight,
+                            refs = graph.refs[c.hash].orEmpty(),
+                            isTopTerminal = index == 0,
+                            onOpen = { onOpenCommit(c.hash) }
+                        )
+                    }
+                    // 末尾加载指示：还有更多时预拉取提示/转圈；没有更多时显示结束提示。
+                    if (graph.hasMore) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = Spacing.md),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            if (graphLoadingMore) {
+                                CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+                            } else {
+                                Text(
+                                    stringResource(R.string.git_load_more_commits),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    } else {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = Spacing.md),
+                            contentAlignment = Alignment.Center
+                        ) {
                             Text(
-                                stringResource(R.string.git_load_more_commits),
+                                stringResource(R.string.git_no_more_commits),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }
                 }
-            } else {
-                item(key = "no-more") {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = Spacing.md),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            stringResource(R.string.git_no_more_commits),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-            }
             }
         }
     }

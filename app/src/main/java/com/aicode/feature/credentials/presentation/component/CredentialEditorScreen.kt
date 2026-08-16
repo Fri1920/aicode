@@ -5,9 +5,12 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
@@ -17,9 +20,9 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -29,6 +32,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
@@ -38,9 +42,9 @@ import com.aicode.core.theme.Spacing
 import com.aicode.feature.credentials.domain.model.GitCredential
 import com.aicode.feature.credentials.domain.model.newCredentialId
 import compose.icons.FeatherIcons
+import compose.icons.feathericons.Check
 import compose.icons.feathericons.Eye
 import compose.icons.feathericons.EyeOff
-import compose.icons.feathericons.Trash2
 
 /**
  * 凭据编辑 BottomSheet 弹窗：从底部弹出编辑/新增 host、用户名、Token。
@@ -50,8 +54,7 @@ import compose.icons.feathericons.Trash2
 internal fun CredentialEditorSheet(
     initial: GitCredential?,
     onDismiss: () -> Unit,
-    onSave: (GitCredential) -> Unit,
-    onDelete: ((String) -> Unit)? = null
+    onSave: (GitCredential) -> Unit
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var host by remember(initial) { mutableStateOf(initial?.host ?: "") }
@@ -90,72 +93,42 @@ internal fun CredentialEditorSheet(
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(Spacing.sm)
         ) {
-            Row(
+            Text(
+                text = if (initial == null) stringResource(R.string.credential_add) else stringResource(R.string.credential_edit),
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(bottom = Spacing.xs),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = if (initial == null) stringResource(R.string.credential_add) else stringResource(R.string.credential_edit),
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                if (initial != null && onDelete != null) {
-                    IconButton(onClick = {
-                        onDelete(initial.id)
-                        onDismiss()
-                    }) {
-                        Icon(
-                            FeatherIcons.Trash2,
-                            contentDescription = stringResource(R.string.credential_delete),
-                            tint = MaterialTheme.colorScheme.error
-                        )
-                    }
-                }
-            }
-
-            Text(
-                text = stringResource(R.string.credential_usage_desc),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                    .padding(bottom = Spacing.xs)
             )
-            OutlinedTextField(
+
+            CredentialField(
                 value = host,
                 onValueChange = { host = it },
-                label = { Text(stringResource(R.string.credential_host)) },
-                placeholder = { Text("github.com") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth()
+                label = stringResource(R.string.credential_host),
+                placeholder = "github.com"
             )
-            OutlinedTextField(
+            CredentialField(
                 value = username,
                 onValueChange = { username = it },
-                label = { Text(stringResource(R.string.common_username)) },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth()
+                label = stringResource(R.string.common_username)
             )
-            OutlinedTextField(
+            CredentialField(
                 value = token,
                 onValueChange = { token = it },
-                label = { Text(stringResource(R.string.credential_token)) },
-                singleLine = true,
+                label = stringResource(R.string.credential_token),
                 visualTransformation = if (tokenVisible) VisualTransformation.None else PasswordVisualTransformation(),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                 trailingIcon = {
                     IconButton(onClick = { tokenVisible = !tokenVisible }) {
                         Icon(if (tokenVisible) FeatherIcons.EyeOff else FeatherIcons.Eye, contentDescription = if (tokenVisible) stringResource(R.string.common_hide) else stringResource(R.string.common_show))
                     }
-                },
-                modifier = Modifier.fillMaxWidth()
+                }
             )
-            OutlinedTextField(
+            CredentialField(
                 value = label,
                 onValueChange = { label = it },
-                label = { Text(stringResource(R.string.credential_alias)) },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth()
+                label = stringResource(R.string.credential_alias)
             )
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -173,29 +146,58 @@ internal fun CredentialEditorSheet(
                 Switch(checked = isDefault, onCheckedChange = { isDefault = it })
             }
 
-            Row(
+            Button(
+                onClick = {
+                    current()?.let {
+                        onSave(it)
+                        onDismiss()
+                    }
+                },
+                enabled = canSave,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = Spacing.md),
-                horizontalArrangement = Arrangement.End,
-                verticalAlignment = Alignment.CenterVertically
+                    .height(44.dp),
+                shape = RoundedCornerShape(12.dp)
             ) {
-                TextButton(onClick = onDismiss) {
-                    Text(stringResource(R.string.common_cancel), color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                Spacer(modifier = Modifier.width(Spacing.sm))
-                Button(
-                    onClick = {
-                        current()?.let {
-                            onSave(it)
-                            onDismiss()
-                        }
-                    },
-                    enabled = canSave
-                ) {
-                    Text(if (initial != null) stringResource(R.string.common_save) else stringResource(R.string.common_add))
-                }
+                Icon(FeatherIcons.Check, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    if (initial != null) stringResource(R.string.common_save) else stringResource(R.string.common_add),
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
+                )
             }
         }
     }
+}
+
+/** 与容器/镜像编辑弹窗一致的输入框：圆角 12dp + 定制边框与底色。 */
+@Composable
+private fun CredentialField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    label: String,
+    modifier: Modifier = Modifier,
+    placeholder: String? = null,
+    visualTransformation: VisualTransformation = VisualTransformation.None,
+    keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
+    trailingIcon: (@Composable () -> Unit)? = null
+) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        label = { Text(label) },
+        placeholder = placeholder?.let { { Text(it) } },
+        singleLine = true,
+        visualTransformation = visualTransformation,
+        keyboardOptions = keyboardOptions,
+        trailingIcon = trailingIcon,
+        shape = RoundedCornerShape(12.dp),
+        colors = OutlinedTextFieldDefaults.colors(
+            unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
+            focusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
+            unfocusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f),
+            focusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f)
+        ),
+        modifier = modifier.fillMaxWidth()
+    )
 }

@@ -1,22 +1,22 @@
 package com.aicode.feature.credentials.presentation.component
 
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -29,6 +29,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -36,6 +37,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -49,10 +52,16 @@ import com.aicode.core.ui.FloatingTabBar
 import com.aicode.core.ui.FloatingTabItem
 import com.aicode.feature.credentials.domain.model.GitCredential
 import com.aicode.feature.credentials.presentation.CredentialViewModel
+import com.aicode.feature.git.presentation.component.SectionHeader
+import com.aicode.feature.settings.presentation.component.SettingsDivider
+import com.aicode.feature.settings.presentation.component.SettingsGroup
+import com.aicode.feature.settings.presentation.component.SwipeToDeleteRow
+import com.aicode.feature.settings.presentation.component.settingsLightMode
 import com.aicode.feature.settings.presentation.component.settingsPageBackground
 import compose.icons.FeatherIcons
 import compose.icons.feathericons.ArrowLeft
-import compose.icons.feathericons.Edit2
+import compose.icons.feathericons.ChevronRight
+import compose.icons.feathericons.Github
 import compose.icons.feathericons.Key
 import compose.icons.feathericons.Plus
 import compose.icons.feathericons.User
@@ -78,6 +87,15 @@ fun CredentialScreen(
         state.toast?.let {
             snackbarHostState.showSnackbar(it)
             viewModel.consumeToast()
+        }
+    }
+
+    // 两个标签页的滚动状态提升到页面层，聚合出「是否正在滚动」用于底部 tab 栏滚动弱化。
+    val identityScrollState = rememberScrollState()
+    val credentialListState = rememberLazyListState()
+    val tabsScrolling by remember {
+        derivedStateOf {
+            identityScrollState.isScrollInProgress || credentialListState.isScrollInProgress
         }
     }
 
@@ -115,8 +133,11 @@ fun CredentialScreen(
                     0 -> Column(
                         modifier = Modifier
                             .fillMaxSize()
-                            .verticalScroll(rememberScrollState())
-                            .padding(Spacing.lg)
+                            .verticalScroll(identityScrollState)
+                            .padding(horizontal = Spacing.lg)
+                            // 底部留出悬浮 tab 栏高度：滚动时内容可滚过 tab 区域被蒙版渐隐，
+                            // 滚到底时最后一项停在 tab 上方不被遮挡。
+                            .padding(bottom = 70.dp)
                     ) {
                         GitUserIdentityCard(
                             initialName = state.userName,
@@ -143,14 +164,24 @@ fun CredentialScreen(
                     } else {
                         LazyColumn(
                             modifier = Modifier.fillMaxSize(),
-                            contentPadding = PaddingValues(Spacing.lg),
+                            state = credentialListState,
+                            contentPadding = PaddingValues(start = Spacing.lg, end = Spacing.lg, bottom = 70.dp),
                             verticalArrangement = Arrangement.spacedBy(Spacing.md)
                         ) {
-                            items(state.credentials, key = { it.id }) { cred ->
-                                CredentialItem(
-                                    credential = cred,
-                                    onEdit = { editingCredential = cred }
-                                )
+                            item(key = "header") {
+                                SectionHeader(stringResource(R.string.git_credentials_count, state.credentials.size))
+                            }
+                            item(key = "credential-group") {
+                                SettingsGroup {
+                                    state.credentials.forEachIndexed { index, cred ->
+                                        if (index > 0) SettingsDivider()
+                                        CredentialItem(
+                                            credential = cred,
+                                            onEdit = { editingCredential = cred },
+                                            onDelete = { viewModel.deleteCredential(cred.id) }
+                                        )
+                                    }
+                                }
                             }
                         }
                     }
@@ -165,6 +196,7 @@ fun CredentialScreen(
                     FloatingTabItem(FeatherIcons.Key, stringResource(R.string.git_tab_credentials))
                 ),
                 maskColor = settingsPageBackground(),
+                isScrolling = tabsScrolling,
                 modifier = Modifier.align(Alignment.BottomCenter)
             )
         }
@@ -175,8 +207,7 @@ fun CredentialScreen(
         CredentialEditorSheet(
             initial = editing,
             onDismiss = { editingCredential = null },
-            onSave = { viewModel.saveCredential(it); editingCredential = null },
-            onDelete = { viewModel.deleteCredential(it); editingCredential = null }
+            onSave = { viewModel.saveCredential(it); editingCredential = null }
         )
     }
 
@@ -192,40 +223,115 @@ fun CredentialScreen(
 @Composable
 private fun CredentialItem(
     credential: GitCredential,
-    onEdit: () -> Unit
+    onEdit: () -> Unit,
+    onDelete: () -> Unit
 ) {
-    Card(
-        modifier = Modifier.fillMaxWidth().clickable { onEdit() },
-        shape = RoundedCornerShape(Radius.md),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+    SwipeToDeleteRow(
+        onDelete = onDelete,
+        onClick = onEdit
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(Spacing.lg),
+            modifier = Modifier.padding(horizontal = Spacing.lg, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            // 左侧图标方块：与容器/远程连接行一致，图标按 host 显示平台 logo（github/gitee），其余回退 Key。
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .background(
+                        color = MaterialTheme.colorScheme.surfaceVariant,
+                        shape = RoundedCornerShape(8.dp)
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                PlatformIcon(
+                    host = credential.host,
+                    modifier = Modifier.size(22.dp)
+                )
+            }
+            Spacer(Modifier.width(Spacing.md))
             Column(modifier = Modifier.weight(1f)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = credential.label.ifBlank { stringResource(R.string.credential_new) },
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.Normal,
+                        color = if (settingsLightMode()) Color(0xFF0F0F0F) else MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false)
+                    )
+                    Spacer(Modifier.width(Spacing.xs))
+                    HostBadge(host = credential.host)
+                }
                 Text(
-                    text = credential.label.ifBlank { "${credential.host} · ${credential.username}" },
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Normal,
-                    color = MaterialTheme.colorScheme.onSurface,
+                    text = credential.username,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = if (settingsLightMode()) Color(0xFF8E8E93) else MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
-                Text(
-                    text = "${credential.host} · ${credential.username}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
             }
-            IconButton(onClick = onEdit) {
-                Icon(
-                    FeatherIcons.Edit2,
-                    contentDescription = stringResource(R.string.common_edit),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
+            // 右侧大于号：与远程连接/MCP 行一致，整行点击编辑。
+            Icon(
+                imageVector = FeatherIcons.ChevronRight,
+                contentDescription = stringResource(R.string.common_edit),
+                tint = if (settingsLightMode()) Color(0xFFC7C7CC) else MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(18.dp)
+            )
         }
+    }
+}
+
+/**
+ * 平台图标：按 host 显示对应 Git 托管服务 logo（目前支持 GitHub / Gitee），
+ * 其余回退通用钥匙图标。单色 tint，与容器/镜像页系统 logo 一致。
+ */
+@Composable
+private fun PlatformIcon(host: String, modifier: Modifier = Modifier) {
+    val tint = MaterialTheme.colorScheme.onSurfaceVariant
+    when {
+        host.contains("github", ignoreCase = true) ->
+            Icon(FeatherIcons.Github, contentDescription = null, tint = tint, modifier = modifier)
+        host.contains("gitee", ignoreCase = true) ->
+            Icon(painterResource(R.drawable.logo_gitee), contentDescription = null, tint = tint, modifier = modifier)
+        else ->
+            Icon(FeatherIcons.Key, contentDescription = null, tint = tint, modifier = modifier)
+    }
+}
+
+/** 远程主机品牌徽章：按 host 识别常见 Git 托管服务并显示品牌名，未知取 host 首段域名。 */
+@Composable
+private fun HostBadge(host: String) {
+    val label = remember(host) { hostBadgeLabel(host) }
+    val color = MaterialTheme.colorScheme.primary
+    Box(
+        modifier = Modifier
+            .background(color.copy(alpha = 0.12f), RoundedCornerShape(Radius.pill))
+            .padding(horizontal = 8.dp, vertical = 2.dp)
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = color,
+            maxLines = 1
+        )
+    }
+}
+
+private fun hostBadgeLabel(host: String): String {
+    val clean = host
+        .removePrefix("https://")
+        .removePrefix("http://")
+        .substringBefore('/')
+        .substringBefore(':')
+    return when {
+        clean.contains("github", ignoreCase = true) -> "GitHub"
+        clean.contains("gitlab", ignoreCase = true) -> "GitLab"
+        clean.contains("gitee", ignoreCase = true) -> "Gitee"
+        clean.contains("bitbucket", ignoreCase = true) -> "Bitbucket"
+        clean.contains("codeberg", ignoreCase = true) -> "Codeberg"
+        clean.contains("azure", ignoreCase = true) || clean.contains("visualstudio", ignoreCase = true) -> "Azure DevOps"
+        else -> clean.substringBefore('.').ifBlank { clean }.replaceFirstChar { it.uppercase() }
     }
 }
