@@ -140,14 +140,16 @@ class RemoteTerminalSessionManager @Inject constructor(
         val tab = tab(id) ?: return false
         if (tab.runState !is RunState.Running) return false
         val text = if (appendNewline && !input.endsWith("\n")) input + "\n" else input
-        tab.session.write(text.toByteArray(Charsets.UTF_8), 0, text.length)
+        val bytes = text.toByteArray(Charsets.UTF_8)
+        tab.session.write(bytes, 0, bytes.size)
         return true
     }
 
     override fun writeToTab(id: String, text: String): Boolean {
         val tab = tab(id) ?: return false
         if (tab.runState !is RunState.Running) return false
-        tab.session.write(text.toByteArray(Charsets.UTF_8), 0, text.length)
+        val bytes = text.toByteArray(Charsets.UTF_8)
+        tab.session.write(bytes, 0, bytes.size)
         return true
     }
 
@@ -227,7 +229,8 @@ class RemoteTerminalSessionManager @Inject constructor(
     fun writeToActive(text: String) {
         activeTab?.let { tab ->
             if (tab.runState !is RunState.Running) return
-            tab.session.write(text.toByteArray(Charsets.UTF_8), 0, text.length)
+            val bytes = text.toByteArray(Charsets.UTF_8)
+            tab.session.write(bytes, 0, bytes.size)
         }
     }
 
