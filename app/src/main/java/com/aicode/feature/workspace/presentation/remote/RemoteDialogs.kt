@@ -204,6 +204,9 @@ private fun SheetSaveButton(
 @Composable
 fun AddRemoteConnectionDialog(
     initialConnection: RemoteConnection? = null,
+    pendingHostKey: PendingHostKeyConfirmation? = null,
+    onConfirmHostKey: () -> Unit = {},
+    onRejectHostKey: () -> Unit = {},
     onDismiss: () -> Unit,
     onAdd: (String, String, String, String, String, RemoteProtocol) -> Unit,
     onTestConnection: (String, String, String, String, RemoteProtocol, (Boolean, String) -> Unit) -> Unit
@@ -314,7 +317,7 @@ fun AddRemoteConnectionDialog(
                         } else null
                     )
                     if (!isLocal) {
-                        SheetOutlinedTextField(value = port, onValueChange = { port = it }, label = { Text(stringResource(R.string.remote_port)) }, modifier = Modifier.fillMaxWidth())
+                        SheetOutlinedTextField(value = port, onValueChange = { port = it.filter { char -> char.isDigit() }.take(5) }, label = { Text(stringResource(R.string.remote_port)) }, modifier = Modifier.fillMaxWidth())
                         SheetOutlinedTextField(value = username, onValueChange = { username = it }, label = { Text(stringResource(R.string.common_username)) }, modifier = Modifier.fillMaxWidth())
                         SheetOutlinedTextField(
                             value = password,
@@ -348,16 +351,59 @@ fun AddRemoteConnectionDialog(
                             Text(if (isLocal) stringResource(R.string.remote_test_dir) else stringResource(R.string.remote_test_connection))
                         }
                     }
+
                 }
             }
 
             SheetSaveButton(
                 text = stringResource(if (initialConnection != null) R.string.common_save else R.string.common_add),
-                enabled = host.isNotBlank() && (isLocal || username.isNotBlank()),
+                enabled = name.isNotBlank() && host.isNotBlank() && (isLocal || username.isNotBlank()),
                 onClick = {
                     onAdd(name, host, port, username, password, protocol)
                 }
             )
+
+            // 主机密钥确认：独立弹窗，覆盖在编辑弹窗之上（首次连接/指纹变化时由测试连通性触发）
+            pendingHostKey?.let { pending ->
+                AlertDialog(
+                    onDismissRequest = onRejectHostKey,
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    title = {
+                        Text(
+                            stringResource(
+                                if (pending.changed) R.string.ssh_host_key_changed_title
+                                else R.string.ssh_host_key_confirm_title
+                            )
+                        )
+                    },
+                    text = {
+                        Text(
+                            "${pending.host}:${pending.port}\n${pending.keyType}\n" +
+                                stringResource(R.string.ssh_host_key_fingerprint_value, pending.fingerprint)
+                        )
+                    },
+                    confirmButton = {
+                        TextButton(
+                            onClick = {
+                                onConfirmHostKey()
+                                // 确认后立即重测：指纹已保存，此次应直接连通
+                                isTesting = true
+                                onTestConnection(host, port, username, password, protocol) { success, msg ->
+                                    isTesting = false
+                                    android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_LONG).show()
+                                }
+                            }
+                        ) {
+                            Text(stringResource(R.string.ssh_host_key_trust))
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = onRejectHostKey) {
+                            Text(stringResource(R.string.ssh_host_key_reject))
+                        }
+                    }
+                )
+            }
         }
     }
 }

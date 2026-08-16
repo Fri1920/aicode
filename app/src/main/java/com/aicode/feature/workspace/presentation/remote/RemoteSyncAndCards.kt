@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredWidth
@@ -26,15 +27,18 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -63,101 +67,115 @@ import com.aicode.feature.workspace.domain.model.RemoteMount
 import com.aicode.feature.workspace.domain.model.RemoteProtocol
 import com.aicode.R
 import compose.icons.FeatherIcons
-import compose.icons.feathericons.Cloud
-import compose.icons.feathericons.Edit3
+import compose.icons.feathericons.ChevronRight
 import compose.icons.feathericons.Folder
-import compose.icons.feathericons.HardDrive
+import compose.icons.feathericons.Play
+import compose.icons.feathericons.Server
 import compose.icons.feathericons.Trash2
 import kotlin.math.roundToInt
 import kotlinx.coroutines.launch
 
+/** 同步设置底部弹窗（右上角齿轮打开）。 */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SyncSettingsSection(
+fun SyncSettingsSheet(
     useGitIgnore: Boolean,
     maxSyncBatchSize: Int,
     onUseGitIgnoreChange: (Boolean) -> Unit,
-    onMaxSyncBatchSizeChange: (Int) -> Unit
+    onMaxSyncBatchSizeChange: (Int) -> Unit,
+    onDismiss: () -> Unit
 ) {
     var maxBatchSizeText by remember(maxSyncBatchSize) { mutableStateOf(maxSyncBatchSize.toString()) }
     var editUseGitIgnore by remember(useGitIgnore) { mutableStateOf(useGitIgnore) }
     val context = androidx.compose.ui.platform.LocalContext.current
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = Spacing.lg)
-            .padding(bottom = Spacing.xl)
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor = MaterialTheme.colorScheme.surface
     ) {
-        SettingsGroup {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = Spacing.lg, vertical = 11.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp)
+                .navigationBarsPadding()
+                .padding(bottom = 24.dp)
+        ) {
+            Text(
+                text = stringResource(R.string.sync_settings_title),
+                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            SettingsGroup {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = Spacing.lg, vertical = 11.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = stringResource(R.string.sync_follow_gitignore),
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = if (settingsLightMode()) Color(0xFF0F0F0F) else MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = stringResource(R.string.sync_gitignore_desc),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = if (settingsLightMode()) Color(0xFF8E8E93) else MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(top = 2.dp)
+                        )
+                    }
+                    Switch(
+                        checked = editUseGitIgnore,
+                        onCheckedChange = { editUseGitIgnore = it }
+                    )
+                }
+                SettingsDivider()
+                Column(modifier = Modifier.padding(horizontal = Spacing.lg, vertical = 12.dp)) {
                     Text(
-                        text = stringResource(R.string.sync_follow_gitignore),
+                        text = stringResource(R.string.sync_max_batch_size),
                         style = MaterialTheme.typography.bodyLarge,
                         color = if (settingsLightMode()) Color(0xFF0F0F0F) else MaterialTheme.colorScheme.onSurface
                     )
                     Text(
-                        text = stringResource(R.string.sync_gitignore_desc),
+                        text = stringResource(R.string.sync_batch_size_desc),
                         style = MaterialTheme.typography.bodySmall,
                         color = if (settingsLightMode()) Color(0xFF8E8E93) else MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(top = 2.dp)
                     )
-                }
-                Switch(
-                    checked = editUseGitIgnore,
-                    onCheckedChange = { editUseGitIgnore = it }
-                )
-            }
-            SettingsDivider()
-            Column(modifier = Modifier.padding(horizontal = Spacing.lg, vertical = 12.dp)) {
-                Text(
-                    text = stringResource(R.string.sync_max_batch_size),
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = if (settingsLightMode()) Color(0xFF0F0F0F) else MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    text = stringResource(R.string.sync_batch_size_desc),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = if (settingsLightMode()) Color(0xFF8E8E93) else MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 2.dp)
-                )
-                Spacer(modifier = Modifier.height(10.dp))
-                OutlinedTextField(
-                    value = maxBatchSizeText,
-                    onValueChange = { maxBatchSizeText = it.filter { char -> char.isDigit() } },
-                    modifier = Modifier.fillMaxWidth(),
-                    label = { Text(stringResource(R.string.sync_max_batch_count)) },
-                    singleLine = true,
-                    shape = RoundedCornerShape(12.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
-                        focusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
-                        unfocusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f),
-                        focusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f)
+                    Spacer(modifier = Modifier.height(10.dp))
+                    OutlinedTextField(
+                        value = maxBatchSizeText,
+                        onValueChange = { maxBatchSizeText = it.filter { char -> char.isDigit() } },
+                        modifier = Modifier.fillMaxWidth(),
+                        label = { Text(stringResource(R.string.sync_max_batch_count)) },
+                        singleLine = true,
+                        shape = RoundedCornerShape(12.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
+                            focusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
+                            unfocusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f),
+                            focusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f)
+                        )
                     )
-                )
+                }
             }
-        }
-        Spacer(modifier = Modifier.height(Spacing.md))
-        Button(
-            onClick = {
-                onUseGitIgnoreChange(editUseGitIgnore)
-                onMaxSyncBatchSizeChange(maxBatchSizeText.toIntOrNull() ?: 50)
-                android.widget.Toast.makeText(context, context.getString(R.string.sync_saved), android.widget.Toast.LENGTH_SHORT).show()
-            },
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(44.dp),
-            shape = RoundedCornerShape(12.dp)
-        ) {
-            Text(stringResource(R.string.sync_save_settings))
+            Spacer(modifier = Modifier.height(Spacing.md))
+            Button(
+                onClick = {
+                    onUseGitIgnoreChange(editUseGitIgnore)
+                    onMaxSyncBatchSizeChange(maxBatchSizeText.toIntOrNull() ?: 50)
+                    android.widget.Toast.makeText(context, context.getString(R.string.sync_saved), android.widget.Toast.LENGTH_SHORT).show()
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(44.dp),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Text(stringResource(R.string.sync_save_settings))
+            }
         }
     }
 }
@@ -167,7 +185,7 @@ fun SyncSettingsSection(
  * 手势回弹与点击协调方式与容器镜像列表一致。
  */
 @Composable
-private fun SwipeToDeleteRow(
+internal fun SwipeToDeleteRow(
     onDelete: () -> Unit,
     modifier: Modifier = Modifier,
     onClick: (() -> Unit)? = null,
@@ -310,14 +328,14 @@ private fun SwipeToDeleteRow(
     }
 }
 
-/** 行内通用编辑按钮：与容器镜像列表一致的小尺寸线条图标。 */
+/** 行内通用编辑箭头：与 MCP/设置列表一致的大于号，整行点击进入编辑。 */
 @Composable
 private fun EditRowButton(onEdit: () -> Unit) {
     IconButton(onClick = onEdit) {
         Icon(
-            imageVector = FeatherIcons.Edit3,
+            imageVector = FeatherIcons.ChevronRight,
             contentDescription = stringResource(R.string.common_edit),
-            tint = if (settingsLightMode()) Color(0xFF8E8E93) else MaterialTheme.colorScheme.onSurfaceVariant,
+            tint = if (settingsLightMode()) Color(0xFFC7C7CC) else MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.size(18.dp)
         )
     }
@@ -345,7 +363,28 @@ private fun RowIconBox(icon: androidx.compose.ui.graphics.vector.ImageVector) {
     }
 }
 
-/** 连接通道行：图标方块 + 名称 + 协议地址副标题 + 右侧编辑，整行点击编辑，左滑删除。 */
+/** 协议徽章：SFTP/FTP/LOCAL 用不同颜色区分（样式同容器镜像来源徽章）。 */
+@Composable
+private fun ProtocolBadge(protocol: RemoteProtocol) {
+    val color = when (protocol) {
+        RemoteProtocol.SFTP -> MaterialTheme.colorScheme.primary
+        RemoteProtocol.FTP -> MaterialTheme.colorScheme.tertiary
+        RemoteProtocol.LOCAL -> Color(0xFFF59E0B)
+    }
+    Box(
+        modifier = Modifier
+            .background(color.copy(alpha = 0.12f), RoundedCornerShape(Radius.pill))
+            .padding(horizontal = 8.dp, vertical = 2.dp)
+    ) {
+        Text(
+            text = protocol.name,
+            style = MaterialTheme.typography.labelSmall,
+            color = color
+        )
+    }
+}
+
+/** 连接通道行：服务器图标 + 名称（协议徽章）+ 地址副标题 + 右侧箭头，整行点击编辑，左滑删除。 */
 @Composable
 fun RemoteConnectionCard(
     conn: RemoteConnection,
@@ -358,18 +397,23 @@ fun RemoteConnectionCard(
         onClick = { onEdit(conn) }
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            RowIconBox(if (isLocal) FeatherIcons.HardDrive else FeatherIcons.Cloud)
+            RowIconBox(FeatherIcons.Server)
             Spacer(modifier = Modifier.width(Spacing.md))
             Column(modifier = Modifier.weight(1f)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = conn.name,
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.Normal,
+                        color = if (settingsLightMode()) Color(0xFF0F0F0F) else MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        modifier = Modifier.weight(1f, fill = false)
+                    )
+                    Spacer(modifier = Modifier.width(Spacing.xs))
+                    ProtocolBadge(conn.protocol)
+                }
                 Text(
-                    text = conn.name,
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.Normal,
-                    color = if (settingsLightMode()) Color(0xFF0F0F0F) else MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1
-                )
-                Text(
-                    text = if (isLocal) "LOCAL://${conn.host}" else "${conn.protocol}://${conn.username}@${conn.host}:${conn.port}",
+                    text = if (isLocal) conn.host else "${conn.username}@${conn.host}:${conn.port}",
                     style = MaterialTheme.typography.bodySmall,
                     color = if (settingsLightMode()) Color(0xFF8E8E93) else MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1
@@ -436,27 +480,62 @@ fun RemoteMountCard(
             EditRowButton(onEdit = { onEdit(mount) })
         }
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.End
-        ) {
-            if (mount.isActive) {
-                TextButton(onClick = { onDisconnect(mount) }) {
-                    Text(stringResource(R.string.sync_disconnect))
-                }
-                TextButton(onClick = { onUpload(mount) }) {
-                    Text(if (isLocal) stringResource(R.string.sync_all) else stringResource(R.string.sync_upload_all))
-                }
-                if (!isLocal) {
-                    TextButton(onClick = { onDownload(mount) }) {
-                        Text(stringResource(R.string.sync_download_all))
+            SettingsDivider()
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = Spacing.lg, end = Spacing.lg, bottom = Spacing.sm),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                if (mount.isActive) {
+                    OutlinedButton(
+                        onClick = { onDisconnect(mount) },
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(32.dp),
+                        shape = RoundedCornerShape(8.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = MaterialTheme.colorScheme.error
+                        )
+                    ) {
+                        Text(stringResource(R.string.sync_disconnect), style = MaterialTheme.typography.labelLarge)
                     }
-                }
-            } else {
-                Button(onClick = { onConnect(mount) }) {
-                    Text(stringResource(R.string.sync_connect_and_sync))
+                    OutlinedButton(
+                        onClick = { onUpload(mount) },
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(32.dp),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Text(
+                            if (isLocal) stringResource(R.string.sync_all) else stringResource(R.string.sync_upload_all),
+                            style = MaterialTheme.typography.labelLarge
+                        )
+                    }
+                    if (!isLocal) {
+                        OutlinedButton(
+                            onClick = { onDownload(mount) },
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(32.dp),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Text(stringResource(R.string.sync_download_all), style = MaterialTheme.typography.labelLarge)
+                        }
+                    }
+                } else {
+                    Button(
+                        onClick = { onConnect(mount) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(40.dp),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Icon(FeatherIcons.Play, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(stringResource(R.string.sync_connect_and_sync))
+                    }
                 }
             }
         }
-    }
 }

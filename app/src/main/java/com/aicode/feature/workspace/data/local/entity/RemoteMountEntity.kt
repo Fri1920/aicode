@@ -1,5 +1,6 @@
 package com.aicode.feature.workspace.data.local.entity
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
@@ -24,5 +25,6 @@ data class RemoteMountEntity(
     val remotePath: String,
     val localMountPath: String,
     val isActive: Boolean = false,
-    val autoConnect: Boolean = true
+    val autoConnect: Boolean = true,
+    @ColumnInfo(name = "created_at") val createdAt: Long = 0
 )

@@ -21,6 +21,8 @@ import com.aicode.feature.agent.domain.container.DelegatingCommandEngine
 import com.aicode.feature.agent.domain.container.LinuxContainerEngine
 import com.aicode.feature.agent.domain.container.RemoteSshConnection
 import com.aicode.feature.agent.domain.container.RemoteSshEngine
+import com.aicode.feature.agent.domain.container.SharedPrefsSshHostKeyStore
+import com.aicode.feature.agent.domain.container.SshHostKeyStore
 import com.aicode.feature.settings.data.repository.ExecutionMode
 import com.aicode.feature.settings.data.repository.ExecutionModeHolder
 import com.aicode.feature.agent.domain.tool.file.ReadFileTool
@@ -234,6 +236,10 @@ object AgentModule {
         connection: RemoteSshConnection,
         workspaceRepository: WorkspaceRepository
     ): RemoteSftpFileAccess = RemoteSftpFileAccess(connection, workspaceRepository)
+
+    @Provides
+    @Singleton
+    fun provideSshHostKeyStore(impl: SharedPrefsSshHostKeyStore): SshHostKeyStore = impl
 
     @Provides
     @Singleton

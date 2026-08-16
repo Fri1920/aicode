@@ -1,5 +1,6 @@
 package com.aicode.feature.workspace.domain.remote.sftp
 
+import com.aicode.feature.agent.domain.container.SshHostKeyVerifier
 import com.aicode.feature.workspace.domain.remote.RemoteAuth
 import com.aicode.feature.workspace.domain.remote.RemoteFileInfo
 import com.aicode.feature.workspace.domain.remote.RemoteSyncClient
@@ -10,7 +11,9 @@ import net.schmizz.sshj.sftp.SFTPClient
 import net.schmizz.sshj.transport.verification.PromiscuousVerifier
 import java.io.File
 
-class SftpSyncClient : RemoteSyncClient {
+class SftpSyncClient(
+    private val hostKeyVerifier: SshHostKeyVerifier
+) : RemoteSyncClient {
 
     companion object {
         private const val CONNECT_TIMEOUT_MS = 15_000L
@@ -22,7 +25,7 @@ class SftpSyncClient : RemoteSyncClient {
     override suspend fun connect(host: String, port: Int, username: String, auth: RemoteAuth) = withContext(Dispatchers.IO) {
         sshClient = SSHClient().apply {
             setConnectTimeout(CONNECT_TIMEOUT_MS.toInt())
-            addHostKeyVerifier(PromiscuousVerifier()) // 简化：暂时信任所有主机密钥
+            addHostKeyVerifier(hostKeyVerifier)
             connect(host, port)
             
             when (auth) {

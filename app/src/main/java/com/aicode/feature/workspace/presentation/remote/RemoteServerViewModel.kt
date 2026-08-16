@@ -7,7 +7,9 @@ import com.aicode.feature.workspace.domain.model.RemoteConnection
 import com.aicode.feature.workspace.domain.model.RemoteMount
 import com.aicode.feature.workspace.domain.model.RemoteProtocol
 import com.aicode.feature.workspace.domain.remote.RemoteAuth
+import com.aicode.feature.agent.domain.container.RemoteSshConnection
 import com.aicode.feature.workspace.domain.repository.RemoteRepository
+import com.aicode.feature.workspace.domain.repository.HostKeyConfirmationRequiredException
 import dagger.hilt.android.lifecycle.HiltViewModel
 import com.aicode.R
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -30,10 +32,13 @@ class RemoteServerViewModel @Inject constructor(
     private val repository: RemoteRepository,
     private val workspaceRepository: WorkspaceRepository,
     private val syncSettingsRepository: SyncSettingsRepository,
+    private val remoteSshConnection: RemoteSshConnection,
     val ftpServerManager: FtpServerManager
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow(RemoteServerUiState())
+    private val _uiState = MutableStateFlow(
+        RemoteServerUiState(hostKeys = remoteSshConnection.savedHostKeys())
+    )
     val uiState: StateFlow<RemoteServerUiState> = _uiState.asStateFlow()
 
     val syncUseGitIgnore = syncSettingsRepository.useGitIgnore
@@ -128,6 +133,12 @@ class RemoteServerViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(error = null)
     }
 
+    fun removeHostKey(host: String, port: Int) {
+        remoteSshConnection.removeHostKey(host, port)
+        _uiState.value = _uiState.value.copy(hostKeys = remoteSshConnection.savedHostKeys())
+    }
+
+
     fun addConnection(
         name: String,
         host: String,
@@ -217,13 +228,35 @@ class RemoteServerViewModel @Inject constructor(
     ) {
         viewModelScope.launch {
             val p = port.toIntOrNull() ?: defaultPort(protocol)
-            val result = repository.testConnection(host, p, username, RemoteAuth.Password(password), protocol)
-            if (result.isSuccess) {
-                onResult(true, context.getString(R.string.remote_connect_success))
-            } else {
-                onResult(false, context.getString(R.string.remote_connect_failed, result.exceptionOrNull()?.message))
+            try {
+                val result = repository.testConnection(host, p, username, RemoteAuth.Password(password), protocol)
+                if (result.isSuccess) {
+                    onResult(true, context.getString(R.string.remote_connect_success))
+                } else {
+                    onResult(false, context.getString(R.string.remote_connect_failed, result.exceptionOrNull()?.message))
+                }
+            } catch (e: HostKeyConfirmationRequiredException) {
+                // 首次连接/指纹变化：进入确认状态，由连接配置弹窗展示指纹确认区
+                _uiState.value = _uiState.value.copy(
+                    pendingHostKey = PendingHostKeyConfirmation(
+                        host = e.host, port = e.port, keyType = e.keyType,
+                        fingerprint = e.fingerprint, changed = e.changed
+                    )
+                )
             }
         }
+    }
+
+    /** 确认主机密钥：保存指纹并清除确认状态；调用方随后重测即可直接连通。 */
+    fun confirmHostKey() {
+        val pending = _uiState.value.pendingHostKey ?: return
+        repository.confirmHostKey(pending.host, pending.port, pending.fingerprint)
+        _uiState.value = _uiState.value.copy(pendingHostKey = null)
+    }
+
+    /** 拒绝主机密钥：清除确认状态，不保存指纹。 */
+    fun rejectHostKey() {
+        _uiState.value = _uiState.value.copy(pendingHostKey = null)
     }
 
     fun listRemoteDirectories(
@@ -274,5 +307,16 @@ data class RemoteServerUiState(
     val workspaces: List<Workspace> = emptyList(),
     val failedMountIds: Set<String> = emptySet(),
     val isLoading: Boolean = false,
-    val error: String? = null
+    val error: String? = null,
+    val hostKeys: Map<String, String> = emptyMap(),
+    val pendingHostKey: PendingHostKeyConfirmation? = null
+)
+
+/** 待确认的主机密钥（首次连接或指纹变化），由连接配置弹窗展示。 */
+data class PendingHostKeyConfirmation(
+    val host: String,
+    val port: Int,
+    val keyType: String,
+    val fingerprint: String,
+    val changed: Boolean
 )

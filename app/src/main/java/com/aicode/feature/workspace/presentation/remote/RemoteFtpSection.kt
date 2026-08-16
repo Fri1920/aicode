@@ -4,6 +4,7 @@ import android.content.ClipData
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -49,7 +50,10 @@ import compose.icons.feathericons.Share2
 import kotlinx.coroutines.launch
 
 @Composable
-fun WiFiFtpServerSection(viewModel: RemoteServerViewModel) {
+fun WiFiFtpServerSection(
+    viewModel: RemoteServerViewModel,
+    scrollState: ScrollState
+) {
     val isRunning by viewModel.ftpServerManager.isRunning.collectAsStateWithLifecycle()
     val serverUrl by viewModel.ftpServerManager.serverUrl.collectAsStateWithLifecycle()
     val port by viewModel.ftpServerManager.port.collectAsStateWithLifecycle()
@@ -71,9 +75,9 @@ fun WiFiFtpServerSection(viewModel: RemoteServerViewModel) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
+            .verticalScroll(scrollState)
             .padding(horizontal = Spacing.lg)
-            .padding(bottom = Spacing.xl),
+            .padding(bottom = 70.dp),
         verticalArrangement = Arrangement.spacedBy(Spacing.md)
     ) {
         SettingsGroupHeader(text = stringResource(R.string.ftp_usage_title))

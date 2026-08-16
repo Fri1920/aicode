@@ -677,22 +677,22 @@
     <!-- Remote Dialogs -->
     <string name="remote_edit_connection">Edit Connection Channel</string>
     <string name="remote_add_connection">Add Connection Channel</string>
-    <string name="remote_channel_name_hint">Channel name (e.g. Internal storage image)</string>
-    <string name="remote_connection_name_hint">Connection name (e.g. Tencent Cloud Server)</string>
+    <string name="remote_channel_name_hint">Channel name</string>
+    <string name="remote_connection_name_hint">Connection name</string>
     <string name="remote_internal_dir">Internal Storage Target Directory</string>
-    <string name="remote_host_address">Host (IP or domain)</string>
+    <string name="remote_host_address">Host</string>
     <string name="remote_select_dir">Select Directory</string>
     <string name="remote_port">Port</string>
     <string name="remote_password">Password</string>
     <string name="remote_toggle_password">Toggle password visibility</string>
     <string name="remote_test_dir">Test Directory</string>
     <string name="remote_test_connection">Test Connection</string>
-    <string name="remote_edit_workspace">Edit Workspace</string>
-    <string name="remote_add_workspace">Add Workspace</string>
+    <string name="remote_edit_workspace">Edit Mount</string>
+    <string name="remote_add_workspace">Add Mount</string>
     <string name="remote_select_channel">Select Remote Channel</string>
     <string name="remote_link_channel">Link Remote Connection Channel</string>
     <string name="remote_mount_subdir">Mount Target Subdirectory</string>
-    <string name="remote_target_dir">Remote Target Directory (absolute path)</string>
+    <string name="remote_target_dir">Remote Target Directory</string>
     <string name="remote_browse_dir">Browse Directory</string>
     <string name="remote_local_channel_subdir_desc">The local channel\'s image root comes from the connection config; fill in a subdirectory under the root, usually just /.</string>
     <string name="remote_select_local_workspace">Select Local Workspace</string>
@@ -749,9 +749,20 @@
     <string name="remote_connect_success">Connection successful!</string>
     <string name="remote_connect_failed">Connection failed: %1$s</string>
     <string name="remote_unknown_error">Unknown error</string>
+    <string name="ssh_host_key_settings_title">SSH Host Keys</string>
+    <string name="ssh_host_key_confirm_title">Confirm SSH Host Key</string>
+    <string name="ssh_host_key_changed_title">SSH Host Key Changed</string>
+    <string name="ssh_host_key_trust">Trust and connect</string>
+    <string name="ssh_host_key_reject">Reject</string>
+    <string name="ssh_host_key_settings_desc">Confirmed host fingerprints help prevent man-in-the-middle attacks. Verify a server after reinstalling it or rotating its key before confirming again.</string>
+    <string name="ssh_host_key_empty">No saved host fingerprints</string>
+    <string name="ssh_host_key_fingerprint_value">Fingerprint: %1$s</string>
+    <string name="ssh_host_key_remove">Remove fingerprint</string>
+    <string name="ssh_host_key_detail">Saved server host fingerprint:\n%1$s</string>
 
     <!-- Remote Sync -->
     <string name="sync_save_settings">Save Settings</string>
+    <string name="sync_settings_title">Sync Settings</string>
     <string name="sync_saved">Sync settings saved</string>
     <string name="sync_follow_gitignore">Follow .gitignore rules</string>
     <string name="sync_gitignore_desc">Automatically reads the project root .gitignore and ignores its contents.</string>

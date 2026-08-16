@@ -18,7 +18,6 @@ import kotlinx.coroutines.withContext
 import net.schmizz.sshj.SSHClient
 import net.schmizz.sshj.connection.channel.direct.Session
 import net.schmizz.sshj.sftp.SFTPClient
-import net.schmizz.sshj.transport.verification.PromiscuousVerifier
 import net.schmizz.sshj.transport.DisconnectListener
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -33,7 +32,10 @@ private const val TAG = "RemoteSshConnection"
  * 重新建立。所有操作串行化（[mutex]），避免并发导致 sshj 状态错乱。
  */
 @Singleton
-class RemoteSshConnection @Inject constructor() {
+class RemoteSshConnection @Inject constructor(
+    private val hostKeyStore: SshHostKeyStore,
+    private val hostKeyVerifier: SshHostKeyVerifier
+) {
 
     @Volatile
     private var sshClient: SSHClient? = null
@@ -69,7 +71,7 @@ class RemoteSshConnection @Inject constructor() {
         try {
             withContext(Dispatchers.IO) {
                 val client = SSHClient().apply {
-                    addHostKeyVerifier(PromiscuousVerifier())
+                    addHostKeyVerifier(hostKeyVerifier)
                     connect(config.host, config.port)
                     when (val auth = config.auth) {
                         is RemoteAuth.Password -> authPassword(config.username, auth.password)
@@ -113,6 +115,11 @@ class RemoteSshConnection @Inject constructor() {
         }
     }
 
+    fun removeHostKey(host: String, port: Int) {
+        hostKeyStore.remove(host, port)
+    }
+
+    fun savedHostKeys(): Map<String, String> = hostKeyStore.entries()
     /** 无参 connect：用上次保存的 config 重连。 */
     suspend fun connect() {
         val cfg = config ?: throw IllegalStateException("未配置 SSH 连接")

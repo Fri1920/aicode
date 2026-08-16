@@ -1,5 +1,13 @@
 package com.aicode.feature.workspace.presentation.remote
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -23,6 +31,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -45,9 +54,10 @@ import com.aicode.R
 import compose.icons.FeatherIcons
 import compose.icons.feathericons.ArrowLeft
 import compose.icons.feathericons.Folder
+import compose.icons.feathericons.Key
 import compose.icons.feathericons.Plus
-import compose.icons.feathericons.RefreshCw
 import compose.icons.feathericons.Server
+import compose.icons.feathericons.Settings
 import compose.icons.feathericons.UploadCloud
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -60,6 +70,20 @@ fun RemoteServerScreen(
     var selectedTab by remember { mutableStateOf(0) }
     var showAddConnectionDialog by remember { mutableStateOf(false) }
     var showAddMountDialog by remember { mutableStateOf(false) }
+    var showHostKeysScreen by remember { mutableStateOf(false) }
+    var showSyncSettingsSheet by remember { mutableStateOf(false) }
+
+    // 列表滚动状态提升到页面层：滚动时底部 tab 栏淡出（同 Git 页面）。
+    val connScrollState = rememberScrollState()
+    val mountScrollState = rememberScrollState()
+    val ftpScrollState = rememberScrollState()
+    val tabsScrolling by remember {
+        derivedStateOf {
+            connScrollState.isScrollInProgress ||
+                mountScrollState.isScrollInProgress ||
+                ftpScrollState.isScrollInProgress
+        }
+    }
     var connectionToEdit by remember { mutableStateOf<RemoteConnection?>(null) }
     var mountToEdit by remember { mutableStateOf<RemoteMount?>(null) }
 
@@ -81,6 +105,14 @@ fun RemoteServerScreen(
                     }
                 },
                 actions = {
+                    if (selectedTab == 0) {
+                        IconButton(onClick = { showHostKeysScreen = true }) {
+                            Icon(FeatherIcons.Key, contentDescription = stringResource(R.string.ssh_host_key_settings_title))
+                        }
+                        IconButton(onClick = { showSyncSettingsSheet = true }) {
+                            Icon(FeatherIcons.Settings, contentDescription = stringResource(R.string.sync_settings_title))
+                        }
+                    }
                     if (selectedTab == 0 || selectedTab == 1) {
                         IconButton(onClick = {
                             if (selectedTab == 0) {
@@ -99,7 +131,18 @@ fun RemoteServerScreen(
         }
     ) { paddingValues ->
         Box(modifier = Modifier.padding(paddingValues).fillMaxSize()) {
-            when (selectedTab) {
+            AnimatedContent(
+                targetState = selectedTab,
+                transitionSpec = {
+                    val direction = if (targetState > initialState) 1 else -1
+                    (slideInHorizontally(animationSpec = tween(240)) { direction * it } +
+                        fadeIn(animationSpec = tween(240))) togetherWith
+                        (slideOutHorizontally(animationSpec = tween(240)) { -direction * it } +
+                            fadeOut(animationSpec = tween(160)))
+                },
+                label = "remote-tab-content"
+            ) { tab ->
+                when (tab) {
                 0 -> {
                     if (uiState.connections.isEmpty()) {
                         EmptyState(
@@ -111,7 +154,7 @@ fun RemoteServerScreen(
                             }
                         )
                     } else {
-                        SettingsList {
+                        SettingsList(scrollState = connScrollState) {
                             uiState.connections.forEachIndexed { index, conn ->
                                 if (index > 0) {
                                     SettingsDivider()
@@ -139,7 +182,7 @@ fun RemoteServerScreen(
                             }
                         )
                     } else {
-                        SettingsList {
+                        SettingsList(scrollState = mountScrollState) {
                             uiState.mounts.forEachIndexed { index, mount ->
                                 if (index > 0) {
                                     SettingsDivider()
@@ -161,13 +204,8 @@ fun RemoteServerScreen(
                         }
                     }
                 }
-                2 -> WiFiFtpServerSection(viewModel)
-                3 -> SyncSettingsSection(
-                    useGitIgnore = syncUseGitIgnore,
-                    maxSyncBatchSize = maxSyncBatchSize,
-                    onUseGitIgnoreChange = { viewModel.setSyncUseGitIgnore(it) },
-                    onMaxSyncBatchSizeChange = { viewModel.setMaxSyncBatchSize(it) }
-                )
+                2 -> WiFiFtpServerSection(viewModel, ftpScrollState)
+                }
             }
 
             FloatingTabBar(
@@ -176,10 +214,10 @@ fun RemoteServerScreen(
                 items = listOf(
                     FloatingTabItem(FeatherIcons.Server, stringResource(R.string.remote_tab_connections)),
                     FloatingTabItem(FeatherIcons.Folder, stringResource(R.string.remote_tab_mounts)),
-                    FloatingTabItem(FeatherIcons.UploadCloud, stringResource(R.string.remote_tab_ftp)),
-                    FloatingTabItem(FeatherIcons.RefreshCw, stringResource(R.string.remote_tab_sync))
+                    FloatingTabItem(FeatherIcons.UploadCloud, stringResource(R.string.remote_tab_ftp))
                 ),
                 maskColor = settingsPageBackground(),
+                isScrolling = tabsScrolling,
                 modifier = Modifier.align(Alignment.BottomCenter)
             )
 
@@ -202,9 +240,31 @@ fun RemoteServerScreen(
         }
     }
 
+    if (showHostKeysScreen) {
+        HostKeysScreen(
+            hostKeys = uiState.hostKeys,
+            onRemove = { host, port -> viewModel.removeHostKey(host, port) },
+            onNavigateBack = { showHostKeysScreen = false }
+        )
+        return
+    }
+
+    if (showSyncSettingsSheet) {
+        SyncSettingsSheet(
+            useGitIgnore = syncUseGitIgnore,
+            maxSyncBatchSize = maxSyncBatchSize,
+            onUseGitIgnoreChange = { viewModel.setSyncUseGitIgnore(it) },
+            onMaxSyncBatchSizeChange = { viewModel.setMaxSyncBatchSize(it) },
+            onDismiss = { showSyncSettingsSheet = false }
+        )
+    }
+
     if (showAddConnectionDialog) {
         AddRemoteConnectionDialog(
             initialConnection = connectionToEdit,
+            pendingHostKey = uiState.pendingHostKey,
+            onConfirmHostKey = { viewModel.confirmHostKey() },
+            onRejectHostKey = { viewModel.rejectHostKey() },
             onDismiss = { showAddConnectionDialog = false },
             onAdd = { name, host, port, username, password, protocol ->
                 val editing = connectionToEdit
@@ -289,15 +349,19 @@ private fun EmptyState(
     }
 }
 
-/** 分组列表容器：垂直滚动 + 白色圆角分组，与容器镜像页列表一致。 */
+/** 分组列表容器：垂直滚动 + 白色圆角分组，与容器镜像页列表一致。底部预留 70dp（tab 栏高度），
+ *  列表最后一项可完全滚到悬浮 tab 栏之上不被遮挡（同 Git 页面）。 */
 @Composable
-private fun SettingsList(content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit) {
+private fun SettingsList(
+    scrollState: ScrollState,
+    content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit
+) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
+            .verticalScroll(scrollState)
             .padding(horizontal = Spacing.lg)
-            .padding(bottom = Spacing.xl)
+            .padding(bottom = 70.dp)
     ) {
         SettingsGroup(content = content)
     }

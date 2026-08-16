@@ -14,10 +14,10 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface RemoteConnectionDao {
     // Connection operations
-    @Query("SELECT * FROM remote_connections")
+    @Query("SELECT * FROM remote_connections ORDER BY created_at ASC, rowid ASC")
     fun getAllConnections(): Flow<List<RemoteConnectionEntity>>
 
-    @Query("SELECT * FROM remote_connections")
+    @Query("SELECT * FROM remote_connections ORDER BY created_at ASC, rowid ASC")
     suspend fun getAllConnectionsOnce(): List<RemoteConnectionEntity>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
@@ -36,7 +36,7 @@ interface RemoteConnectionDao {
     suspend fun deleteConnection(connection: RemoteConnectionEntity)
 
     // Mount operations
-    @Query("SELECT * FROM remote_mounts")
+    @Query("SELECT * FROM remote_mounts ORDER BY created_at ASC, rowid ASC")
     fun getAllMounts(): Flow<List<RemoteMountEntity>>
 
     @Query("SELECT * FROM remote_mounts WHERE id = :id")
@@ -48,7 +48,7 @@ interface RemoteConnectionDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertMount(mount: RemoteMountEntity)
 
-    @Query("SELECT * FROM remote_mounts")
+    @Query("SELECT * FROM remote_mounts ORDER BY created_at ASC, rowid ASC")
     suspend fun getAllMountsOnce(): List<RemoteMountEntity>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)

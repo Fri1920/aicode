@@ -677,22 +677,22 @@
     <!-- Remote Dialogs -->
     <string name="remote_edit_connection">编辑连接通道</string>
     <string name="remote_add_connection">添加连接通道</string>
-    <string name="remote_channel_name_hint">通道名称 (如: 内部存储镜像)</string>
-    <string name="remote_connection_name_hint">连接名称 (如: 腾讯云云服务器)</string>
+    <string name="remote_channel_name_hint">通道名称</string>
+    <string name="remote_connection_name_hint">连接名称</string>
     <string name="remote_internal_dir">内部存储目标目录</string>
-    <string name="remote_host_address">主机地址 (IP 或域名)</string>
+    <string name="remote_host_address">主机地址</string>
     <string name="remote_select_dir">选择目录</string>
     <string name="remote_port">端口</string>
     <string name="remote_password">密码</string>
     <string name="remote_toggle_password">切换密码可见性</string>
     <string name="remote_test_dir">测试目录</string>
     <string name="remote_test_connection">测试连通性</string>
-    <string name="remote_edit_workspace">编辑工作区</string>
-    <string name="remote_add_workspace">添加工作区</string>
+    <string name="remote_edit_workspace">编辑挂载目录</string>
+    <string name="remote_add_workspace">添加挂载目录</string>
     <string name="remote_select_channel">选择远程通道</string>
     <string name="remote_link_channel">关联远程连接通道</string>
     <string name="remote_mount_subdir">镜像目标子目录</string>
-    <string name="remote_target_dir">远程目标目录 (绝对路径)</string>
+    <string name="remote_target_dir">远程目标目录</string>
     <string name="remote_browse_dir">浏览目录</string>
     <string name="remote_local_channel_subdir_desc">本地通道的镜像根目录来自连接配置；这里填写根目录下的子目录，通常保持 / 即可。</string>
     <string name="remote_select_local_workspace">选择本地工作区</string>
@@ -749,9 +749,20 @@
     <string name="remote_connect_success">连接成功！</string>
     <string name="remote_connect_failed">连接失败: %1$s</string>
     <string name="remote_unknown_error">未知错误</string>
+    <string name="ssh_host_key_settings_title">SSH 主机密钥</string>
+    <string name="ssh_host_key_confirm_title">确认 SSH 主机密钥</string>
+    <string name="ssh_host_key_changed_title">SSH 主机密钥已变化</string>
+    <string name="ssh_host_key_trust">信任并连接</string>
+    <string name="ssh_host_key_reject">拒绝</string>
+    <string name="ssh_host_key_settings_desc">已确认的主机指纹会用于阻止中间人攻击。服务器重装或密钥变化后，请先核实再重新确认。</string>
+    <string name="ssh_host_key_empty">暂无已保存的主机指纹</string>
+    <string name="ssh_host_key_fingerprint_value">指纹：%1$s</string>
+    <string name="ssh_host_key_remove">删除指纹</string>
+    <string name="ssh_host_key_detail">已保存的服务器主机指纹：\n%1$s</string>
 
     <!-- Remote Sync -->
     <string name="sync_save_settings">保存设置</string>
+    <string name="sync_settings_title">同步设置</string>
     <string name="sync_saved">同步设置已保存</string>
     <string name="sync_follow_gitignore">遵循 .gitignore 规则</string>
     <string name="sync_gitignore_desc">自动读取项目根目录的 .gitignore 并忽略其中内容。</string>

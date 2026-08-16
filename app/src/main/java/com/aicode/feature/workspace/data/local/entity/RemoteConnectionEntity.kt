@@ -1,5 +1,6 @@
 package com.aicode.feature.workspace.data.local.entity
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 import com.aicode.feature.workspace.domain.model.RemoteProtocol
@@ -15,5 +16,6 @@ data class RemoteConnectionEntity(
     val username: String,
     val authType: String = "password", // 'password' or 'key'
     val authData: String, // password or private key path
-    val passphrase: String? = null
+    val passphrase: String? = null,
+    @ColumnInfo(name = "created_at") val createdAt: Long = 0
 )

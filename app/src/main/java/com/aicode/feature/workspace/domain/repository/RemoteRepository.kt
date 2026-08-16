@@ -1,6 +1,8 @@
 package com.aicode.feature.workspace.domain.repository
 
 import com.aicode.core.util.FileLogger
+import com.aicode.feature.agent.domain.container.SshHostKeyStore
+import com.aicode.feature.agent.domain.container.SshHostKeyVerifier
 import com.aicode.feature.workspace.data.local.dao.RemoteConnectionDao
 import com.aicode.feature.workspace.data.local.entity.RemoteConnectionEntity
 import com.aicode.feature.workspace.data.local.entity.RemoteMountEntity
@@ -34,7 +36,9 @@ import javax.inject.Singleton
 class RemoteRepository @Inject constructor(
     private val dao: RemoteConnectionDao,
     private val syncSettings: com.aicode.feature.settings.data.repository.SyncSettingsRepository,
-    private val workspaceRepository: WorkspaceRepository
+    private val workspaceRepository: WorkspaceRepository,
+    private val hostKeyStore: SshHostKeyStore,
+    private val hostKeyVerifier: SshHostKeyVerifier
 ) {
     private val activeEngines = ConcurrentHashMap<String, SyncEngine>()
     private val activeEngineIds = MutableStateFlow<Set<String>>(emptySet())
@@ -114,7 +118,8 @@ class RemoteRepository @Inject constructor(
         val authType = if (auth is RemoteAuth.Password) "PASSWORD" else "PRIVATE_KEY"
         val authData = if (auth is RemoteAuth.Password) auth.password else (auth as RemoteAuth.PrivateKey).privateKeyPath
         val passphrase = if (auth is RemoteAuth.PrivateKey) auth.passphrase else null
-        
+        // 编辑（updateConnection 复用本方法）时保留原创建时间，避免刷新排序位置
+        val existing = dao.getConnectionById(conn.id)
         val entity = RemoteConnectionEntity(
             id = conn.id,
             name = conn.name,
@@ -124,7 +129,8 @@ class RemoteRepository @Inject constructor(
             username = conn.username,
             authType = authType,
             authData = authData,
-            passphrase = passphrase
+            passphrase = passphrase,
+            createdAt = existing?.createdAt ?: System.currentTimeMillis()
         )
         dao.insertConnection(entity)
     }
@@ -151,7 +157,8 @@ class RemoteRepository @Inject constructor(
             connectionId = mount.connectionId,
             remotePath = mount.remotePath,
             localMountPath = mount.localMountPath,
-            autoConnect = mount.autoConnect
+            autoConnect = mount.autoConnect,
+            createdAt = System.currentTimeMillis()
         ))
     }
     
@@ -187,7 +194,7 @@ class RemoteRepository @Inject constructor(
             val mount = mountEntity.toDomainModel(conn)
 
             val client = when (conn.protocol) {
-                RemoteProtocol.SFTP -> SftpSyncClient()
+                RemoteProtocol.SFTP -> SftpSyncClient(hostKeyVerifier)
                 RemoteProtocol.FTP -> FtpSyncClient()
                 RemoteProtocol.LOCAL -> LocalSyncClient()
             }
@@ -219,7 +226,13 @@ class RemoteRepository @Inject constructor(
             activeEngineIds.update { it + mountId }
             Result.success(Unit)
         } catch (e: Exception) {
-            Result.failure(e)
+            // 挂载连接不弹确认：提示用户先去连接配置页测试连通性完成确认
+            val pending = hostKeyVerifier.consumePending()
+            if (pending != null) {
+                Result.failure(Exception("主机密钥未确认，请先在「连接配置」页测试连通性完成确认"))
+            } else {
+                Result.failure(e)
+            }
         }
     }
 
@@ -251,6 +264,12 @@ class RemoteRepository @Inject constructor(
         }
     }
 
+    /** 保存用户确认过的主机指纹，之后同主机连接直接放行。 */
+    fun confirmHostKey(host: String, port: Int, fingerprint: String) {
+        hostKeyStore.save(host, port, fingerprint)
+    }
+
+    /** 测试连通性：待确认（首次/指纹变化）时抛 [HostKeyConfirmationRequiredException]，供 UI 弹出确认。 */
     suspend fun testConnection(
         host: String,
         port: Int,
@@ -260,7 +279,7 @@ class RemoteRepository @Inject constructor(
     ): Result<Unit> = withContext(Dispatchers.IO) {
         try {
             val client = when (protocol) {
-                RemoteProtocol.SFTP -> SftpSyncClient()
+                RemoteProtocol.SFTP -> SftpSyncClient(hostKeyVerifier)
                 RemoteProtocol.FTP -> FtpSyncClient()
                 RemoteProtocol.LOCAL -> LocalSyncClient()
             }
@@ -268,6 +287,12 @@ class RemoteRepository @Inject constructor(
             client.disconnect()
             Result.success(Unit)
         } catch (e: Exception) {
+            val pending = hostKeyVerifier.consumePending()
+            if (pending != null) {
+                throw HostKeyConfirmationRequiredException(
+                    pending.host, pending.port, pending.keyType, pending.fingerprint, pending.changed
+                )
+            }
             Result.failure(e)
         }
     }
@@ -278,7 +303,7 @@ class RemoteRepository @Inject constructor(
             val conn = connEntity.toDomainModel()
             
             val client = when (conn.protocol) {
-                RemoteProtocol.SFTP -> SftpSyncClient()
+                RemoteProtocol.SFTP -> SftpSyncClient(hostKeyVerifier)
                 RemoteProtocol.FTP -> FtpSyncClient()
                 RemoteProtocol.LOCAL -> LocalSyncClient()
             }
@@ -317,3 +342,12 @@ class RemoteRepository @Inject constructor(
         connection = conn
     )
 }
+
+/** 主机密钥待确认（首次连接或指纹变化），由测试连通性抛出供 UI 确认。 */
+class HostKeyConfirmationRequiredException(
+    val host: String,
+    val port: Int,
+    val keyType: String,
+    val fingerprint: String,
+    val changed: Boolean
+) : Exception("SSH 主机密钥需要确认: $host:$port")
