@@ -27,8 +27,10 @@ import com.aicode.feature.settings.data.repository.ThemeSettingsRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -89,10 +91,12 @@ class GitViewModel @Inject constructor(
         val branchesLoading: Boolean = false,
         /** 正在切换分支。 */
         val checkoutLoading: String? = null,
-        /** diff 视图数据；非 null 时 UI 全屏渲染 diff 页。 */
-        val diffData: DiffData? = null,
-        /** 正在加载 diff。 */
-        val diffLoading: Boolean = false
+        /** 是否显示 diff 全屏页；进入即置 true，diffData 为 null 时页内显示加载中。 */
+        val diffVisible: Boolean = false,
+        /** 正在查看 diff 的文件路径；加载中（diffData 为 null）时供顶栏显示文件名。 */
+        val diffPath: String? = null,
+        /** diff 视图数据；非 null 时 diff 页渲染内容。 */
+        val diffData: DiffData? = null
     )
 
     private val _state = MutableStateFlow(GitUiState())
@@ -390,22 +394,21 @@ class GitViewModel @Inject constructor(
     /**
      * 退出 diff 视图，清空 diff 状态。
      */
-    fun clearDiff() = _state.update { it.copy(diffData = null) }
+    fun clearDiff() = _state.update { it.copy(diffVisible = false, diffPath = null, diffData = null) }
 
     /**
      * 加载某次提交中某文件的差异（改动前 vs 改动后）。
  * hash 为提交 hash，path 为文件路径。后台线程算 diff + 高亮，完成后填 diffData。
  */
     fun loadCommitFileDiff(hash: String, path: String) {
-        if (_state.value.diffLoading) return
-        _state.update { it.copy(diffLoading = true, diffData = null) }
+        openDiff(path)
         viewModelScope.launch {
             val data = runCatching { computeDiff(path, "${hash}^", hash, repository::showFileContent) }
                 .getOrElse { e ->
                     FileLogger.e(TAG, "加载提交文件 diff 失败: $path", e)
                     null
                 }
-            _state.update { it.copy(diffLoading = false, diffData = data, toast = if (data == null) context.getString(R.string.git_toast_diff_failed) else null) }
+            finishDiff(data)
         }
     }
 
@@ -434,8 +437,7 @@ class GitViewModel @Inject constructor(
         newRef: String,
         contentProvider: suspend (String, String) -> String
     ) {
-        if (_state.value.diffLoading) return
-        _state.update { it.copy(diffLoading = true, diffData = null) }
+        openDiff(path)
         viewModelScope.launch {
             val data = runCatching {
                 computeDiff(path, oldRef, newRef, contentProvider)
@@ -443,7 +445,22 @@ class GitViewModel @Inject constructor(
                 FileLogger.e(TAG, "加载 diff 失败: $path", e)
                 null
             }
-            _state.update { it.copy(diffLoading = false, diffData = data, toast = if (data == null) context.getString(R.string.git_toast_diff_failed) else null) }
+            finishDiff(data)
+        }
+    }
+
+    /** 进入 diff 全屏页（页内加载中），已有 diff 页打开时忽略。 */
+    private fun openDiff(path: String) {
+        if (_state.value.diffVisible) return
+        _state.update { it.copy(diffVisible = true, diffPath = path, diffData = null) }
+    }
+
+    /** diff 计算完成：成功填数据，失败关闭 diff 页并 toast。 */
+    private fun finishDiff(data: DiffData?) {
+        if (data == null) {
+            _state.update { it.copy(diffVisible = false, diffData = null, toast = context.getString(R.string.git_toast_diff_failed)) }
+        } else {
+            _state.update { it.copy(diffData = data) }
         }
     }
 
@@ -457,13 +474,13 @@ class GitViewModel @Inject constructor(
         oldRef: String,
         newRef: String,
         contentProvider: suspend (String, String) -> String
-    ): DiffData {
+    ): DiffData = withContext(Dispatchers.Default) {
         val oldContent = contentProvider(oldRef, path)
         val newContent = contentProvider(newRef, path)
 
         // 二进制检测：git show 对二进制文件返回乱码，直接看是否含 NUL。
         if (oldContent.contains('\u0000') || newContent.contains('\u0000')) {
-            return DiffData(path, oldRef, newRef, emptyList(), 0, 0, isBinary = true)
+            return@withContext DiffData(path, oldRef, newRef, emptyList(), 0, 0, isBinary = true)
         }
 
         val oldLines = oldContent.split('\n')
@@ -472,7 +489,7 @@ class GitViewModel @Inject constructor(
             oldLines.any { it.length > MAX_DIFF_LINE_LENGTH } ||
             newLines.any { it.length > MAX_DIFF_LINE_LENGTH }
         ) {
-            return DiffData(path, oldRef, newRef, emptyList(), 0, 0, isLarge = true)
+            return@withContext DiffData(path, oldRef, newRef, emptyList(), 0, 0, isLarge = true)
         }
 
         val diffLines = LineDiff.diff(oldContent, newContent)
@@ -480,9 +497,13 @@ class GitViewModel @Inject constructor(
 
         // 对旧/新文件整体各跑一次高亮，拿到全文的 token 区间；渲染时按行偏移截取对应 SpanStyle。
         // 语法主题跟随当前 UI 主题，避免深色模式下 light 主题的 token 色（如 = 和 {}）看不清。
+        // 两侧并行算（高亮是 diff 耗时主体），整体已在 Default 线程池，不碰主线程。
         val darkMode = currentDarkMode()
-        val oldHighlighted = highlightCode(oldContent, language, darkMode)
-        val newHighlighted = highlightCode(newContent, language, darkMode)
+        val (oldHighlighted, newHighlighted) = coroutineScope {
+            val old = async { highlightCode(oldContent, language, darkMode) }
+            val new = async { highlightCode(newContent, language, darkMode) }
+            old.await() to new.await()
+        }
 
         // 构建行号 + 高亮截取。oldLineOffsets/newLineOffsets 为每行在全文中的起始偏移。
         val oldOffsets = lineOffsets(oldContent)
@@ -507,7 +528,7 @@ class GitViewModel @Inject constructor(
 
         val added = rows.count { it.type == LineDiff.LineType.ADD }
         val removed = rows.count { it.type == LineDiff.LineType.REMOVE }
-        return DiffData(path, oldRef, newRef, rows, added, removed)
+        return@withContext DiffData(path, oldRef, newRef, rows, added, removed)
     }
 
     /**

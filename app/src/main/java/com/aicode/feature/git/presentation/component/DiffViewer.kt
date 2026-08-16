@@ -4,6 +4,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
@@ -15,9 +16,11 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -32,11 +35,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.aicode.core.theme.Spacing
@@ -82,30 +87,41 @@ data class DiffRow(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DiffViewerScreen(
-    diffData: DiffData,
+    diffData: DiffData?,
+    filePath: String?,
     onBack: () -> Unit
 ) {
     BackHandler { onBack() }
+    val path = diffData?.filePath ?: filePath
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             TopAppBar(
                 title = {
-                    Column {
+                    if (path == null) {
                         Text(
-                            text = diffData.filePath.substringAfterLast('/'),
+                            text = stringResource(R.string.git_computing_diff),
                             style = MaterialTheme.typography.titleSmall,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
-                        Text(
-                            text = diffData.filePath,
-                            style = MaterialTheme.typography.labelSmall,
-                            fontFamily = FontFamily.Monospace,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
+                    } else {
+                        Column {
+                            Text(
+                                text = path.substringAfterLast('/'),
+                                style = MaterialTheme.typography.titleSmall,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Text(
+                                text = path,
+                                style = MaterialTheme.typography.labelSmall,
+                                fontFamily = FontFamily.Monospace,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -121,10 +137,22 @@ fun DiffViewerScreen(
         }
     ) { padding ->
         when {
+            diffData == null -> DiffLoading(padding)
             diffData.isBinary -> BinaryHint(padding)
             diffData.isLarge -> LargeFileHint(diffData, padding)
             diffData.lines.isEmpty() -> EmptyDiff(padding)
             else -> DiffContent(diffData, padding)
+        }
+    }
+}
+
+@Composable
+private fun DiffLoading(padding: androidx.compose.foundation.layout.PaddingValues) {
+    Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            CircularProgressIndicator()
+            Spacer(Modifier.height(Spacing.sm))
+            Text(stringResource(R.string.git_computing_diff), color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
@@ -138,22 +166,38 @@ private fun DiffContent(diffData: DiffData, padding: androidx.compose.foundation
         val chars = maxOf(3, maxLineNum.toString().length)
         (chars * 8 + 8).dp
     }
+    // 横向滚动只有一个实例（外层 Box），LazyColumn 宽度取最宽行的实测宽度，整列同步滚动。
+    val hScroll = rememberScrollState()
+    val textMeasurer = rememberTextMeasurer()
+    val contentStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace)
+    val density = LocalDensity.current
+    val contentWidth = remember(diffData, textMeasurer) {
+        val maxTextPx = diffData.lines.maxOfOrNull { textMeasurer.measure(it.text, contentStyle).size.width } ?: 0
+        with(density) { (maxTextPx + 24).toDp() } + gutterWidth * 2 + 1.dp + 14.dp + Spacing.lg
+    }
 
     SelectionContainer {
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .verticalScroll(rememberScrollState())
         ) {
             DiffStatsBar(diffData.addedCount, diffData.removedCount)
-            Column(
+            BoxWithConstraints(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState())
+                    .weight(1f)
+                    .horizontalScroll(hScroll)
             ) {
-                diffData.lines.forEach { row ->
-                    DiffLineRow(row, gutterWidth)
+                LazyColumn(
+                    modifier = Modifier
+                        .width(maxOf(contentWidth, maxWidth))
+                        .fillMaxHeight(),
+                    state = rememberLazyListState()
+                ) {
+                    items(count = diffData.lines.size, key = { "row-$it" }) { index ->
+                        DiffLineRow(diffData.lines[index], gutterWidth)
+                    }
                 }
             }
         }

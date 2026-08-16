@@ -106,10 +106,10 @@ fun GitScreen(
     }
 
     // diff 视图：独立全屏页，不进入下方 GitScreen 的 Scaffold，避免双层顶栏。
-    val diffData = state.diffData
-    if (diffData != null) {
+    if (state.diffVisible) {
         DiffViewerScreen(
-            diffData = diffData,
+            diffData = state.diffData,
+            filePath = state.diffPath,
             onBack = { viewModel.clearDiff() }
         )
         return
@@ -144,13 +144,6 @@ fun GitScreen(
         Box(modifier = Modifier.fillMaxSize().padding(padding)) {
             Column(modifier = Modifier.fillMaxSize()) {
             when {
-                state.diffLoading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        CircularProgressIndicator()
-                        Spacer(Modifier.height(Spacing.sm))
-                        Text(stringResource(R.string.git_computing_diff), color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                }
                 state.loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator()
                 }
