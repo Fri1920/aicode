@@ -6,7 +6,7 @@ import androidx.room.PrimaryKey
 
 /**
  * 单次 LLM 调用记录：Token 统计页的数据源。
- * 由 workflow 主循环（chat/vision）与上下文压缩链路（compaction）埋点写入，
+ * 由 workflow 主循环（chat）与上下文压缩链路（compaction）埋点写入，
  * 覆盖渠道、模型、输入/输出/缓存 tokens、首字延迟、耗时与成败。
  */
 @Entity(
@@ -21,9 +21,9 @@ data class LlmCallRecordEntity(
     val sessionId: String? = null,
     /** 渠道（ai_providers.id），展示时 LEFT JOIN 取渠道名。 */
     val providerId: String? = null,
-    /** 实际调用模型（含识图/压缩 fallback 模型）。 */
+    /** 实际调用模型（含压缩 fallback 模型）。 */
     val model: String? = null,
-    /** 调用类型：chat（普通对话）/ vision（识图轮）/ compaction（上下文压缩）。 */
+    /** 调用类型：chat（普通对话）/ compaction（上下文压缩）。历史数据含已废弃的 vision（识图轮）。 */
     val kind: String = "chat",
     val inputTokens: Int = 0,
     val outputTokens: Int = 0,

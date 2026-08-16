@@ -2,7 +2,6 @@ package com.aicode.feature.agent.domain.workflow
 
 import com.aicode.core.util.FileLogger
 import com.aicode.feature.agent.domain.model.AgentContext
-import com.aicode.feature.agent.domain.model.AgentImage
 import com.aicode.feature.agent.domain.model.AgentMessage
 import com.aicode.feature.agent.domain.model.AgentMode
 import com.aicode.feature.agent.domain.session.SessionUseCase
@@ -32,7 +31,6 @@ import com.aicode.feature.settings.data.remote.ModelMetadataService
 import com.aicode.feature.settings.data.repository.CompactionModelSettingsRepository
 import com.aicode.feature.settings.data.repository.DefaultModelSettingsRepository
 import com.aicode.feature.settings.data.repository.TitleModelSettingsRepository
-import com.aicode.feature.settings.data.repository.VisionModelSettingsRepository
 import com.aicode.feature.settings.domain.model.AIProviderConfig
 import com.aicode.feature.agent.data.remote.anthropic.AnthropicApi
 import com.aicode.feature.agent.data.remote.gemini.GeminiApi
@@ -79,7 +77,6 @@ class StatefulAgentWorkflow @Inject constructor(
     private val planApprovalManager: PlanApprovalManager,
     private val toolOutputStore: ToolOutputStore,
     private val modelMetadataService: ModelMetadataService,
-    private val visionModelSettingsRepository: VisionModelSettingsRepository,
     private val compactionModelSettingsRepository: CompactionModelSettingsRepository,
     private val titleModelSettingsRepository: TitleModelSettingsRepository,
     private val defaultModelSettingsRepository: DefaultModelSettingsRepository,
@@ -115,9 +112,7 @@ class StatefulAgentWorkflow @Inject constructor(
         /** 已批准、待并行执行的 toolCall */
         val approvedToolCalls: List<ToolCall> = emptyList(),
         /** 被策略/系统拒绝（非用户拒绝）的 tool 结果，key = toolCall.id */
-        val rejectedToolResults: Map<String, ToolBatchResult> = emptyMap(),
-        /** 标记下一轮 CallLlm 用于识图——若当前聊天模型不支持 vision 则临时切到识图专用模型发送。 */
-        val pendingVisionRound: Boolean = false
+        val rejectedToolResults: Map<String, ToolBatchResult> = emptyMap()
     )
 
     /** 改变状态的动作 (Action) */
@@ -146,7 +141,6 @@ class StatefulAgentWorkflow @Inject constructor(
     private data class ToolRunResult(
         val raw: String,
         val isError: Boolean,
-        val images: List<AgentImage> = emptyList(),
         /** 仅 sendFile 等展示型工具：随结果附带的文件卡片元数据，供 UI 渲染，不回放进模型上下文。 */
         val attachments: List<com.aicode.feature.agent.presentation.AgentAttachment> = emptyList()
     )
@@ -157,7 +151,6 @@ class StatefulAgentWorkflow @Inject constructor(
         val toolName: String,
         val result: String,
         val isError: Boolean,
-        val images: List<AgentImage> = emptyList(),
         /** 仅 sendFile 等展示型工具：随结果附带的文件卡片元数据，供 UI 渲染，不回放进模型上下文。 */
         val attachments: List<com.aicode.feature.agent.presentation.AgentAttachment> = emptyList()
     )
@@ -223,7 +216,7 @@ class StatefulAgentWorkflow @Inject constructor(
 
     /**
      * 根据 [config] 创建一个全新的、独立的 [AIProvider] 实例。
-     * 用于识图回退和上下文压缩等独立请求场景，完全不占用或修改主对话所用的 Provider 单例。
+     * 用于上下文压缩等独立请求场景，完全不占用或修改主对话所用的 Provider 单例。
      * 同时把提供商级 LLM 缓存开关（Anthropic 断点 / OpenAI cache key）应用到实例。
      */
     private fun createStandaloneProvider(config: AIProviderConfig, sessionId: String?): AIProvider {
@@ -366,26 +359,15 @@ class StatefulAgentWorkflow @Inject constructor(
                 // 优先取策略拒绝结果，其次取并行执行结果，保证与 assistant(toolCalls) 顺序一致。
                 val resultsById = action.results.associateBy { it.id }
                 val appendedMessages = mutableListOf<AgentMessage>()
-                var hasImages = false
                 newState.batchToolCalls.forEach { call ->
                     val batchResult = newState.rejectedToolResults[call.id] ?: resultsById[call.id] ?: return@forEach
                     appendedMessages.add(
                         AgentMessage.ToolResultMessage(
                             id = batchResult.id,
                             toolName = batchResult.toolName,
-                            result = batchResult.result,
-                            images = batchResult.images
+                            result = batchResult.result
                         )
                     )
-                    if (batchResult.images.isNotEmpty()) {
-                        hasImages = true
-                        appendedMessages.add(
-                            AgentMessage.UserMessage(
-                                content = "已附加 ${batchResult.toolName} 读取的图片，供下一轮视觉分析使用。",
-                                images = batchResult.images
-                            )
-                        )
-                    }
                 }
                 newState = state.copy(
                     messages = state.messages + appendedMessages,
@@ -394,10 +376,6 @@ class StatefulAgentWorkflow @Inject constructor(
                     approvedToolCalls = emptyList(),
                     rejectedToolResults = emptyMap()
                 )
-                // 本批 viewImage 产出了图片，标记下一轮为识图轮。
-                if (hasImages) {
-                    newState = newState.copy(pendingVisionRound = true)
-                }
                 effects.add(AgentSideEffect.CallLlm)
             }
         }
@@ -438,9 +416,7 @@ class StatefulAgentWorkflow @Inject constructor(
             for (effect in effects) {
                 when (effect) {
                     is AgentSideEffect.CallLlm -> {
-                        // 识图轮：若当前聊天模型无 vision，使用独立识图模型发送
-                        val visionProvider = if (state.pendingVisionRound) resolveVisionFallbackProvider(currentContext.sessionId) else null
-                        val providerInUse = visionProvider ?: aiProvider
+                        val providerInUse = aiProvider
                         // 压缩轮：若配置了压缩专用模型，使用独立压缩模型压缩
                         val compactionProvider = resolveCompactionFallbackProvider(currentContext.sessionId) ?: providerInUse
                         var compactedMessages = state.messages
@@ -462,14 +438,14 @@ class StatefulAgentWorkflow @Inject constructor(
                         // 调用统计埋点：记录请求发出/首字/结束时刻与 usage，失败与取消同样留痕。
                         val callStartElapsed = SystemClock.elapsedRealtime()
                         val callStartWall = System.currentTimeMillis()
-                        val callKind = if (state.pendingVisionRound) "vision" else "chat"
+                        val callKind = "chat"
                         var ttfbElapsed: Long? = null
                         var callError: String? = null
                         var callCompleted = false
 
                         try {
                             // 发送前按实际模型的视觉能力处理图片（同 execute 路径）。
-                            val supportsVision = state.pendingVisionRound || activeModelSupportsVision(currentContext.sessionId)
+                            val supportsVision = activeModelSupportsVision(currentContext.sessionId)
                             val messagesToSend = sanitizeImagesForModel(compactedMessages, supportsVision)
                             providerInUse.completeStream(systemPrompt, messagesToSend, currentTools, currentContext.reasoningEffort).collect { chunk ->
                                 when (chunk) {
@@ -540,7 +516,6 @@ class StatefulAgentWorkflow @Inject constructor(
                                     )
                                 )
                             }
-                            if (state.pendingVisionRound) state = state.copy(pendingVisionRound = false)
                         }
                     }
                     is AgentSideEffect.RequestPermission -> {
@@ -637,7 +612,7 @@ class StatefulAgentWorkflow @Inject constructor(
                                     rawResult += buildModeSwitchNotice(newCtx.mode)
                                 }
                             }
-                            batchResults.add(ToolBatchResult(toolCall.id, toolCall.name, rawResult, isError, runResult.images, runResult.attachments))
+                            batchResults.add(ToolBatchResult(toolCall.id, toolCall.name, rawResult, isError, runResult.attachments))
                         }
 
                         // 逐个推送完成事件（保持与 batchToolCalls 一致顺序），并进入收尾。
@@ -660,82 +635,15 @@ class StatefulAgentWorkflow @Inject constructor(
             return ToolRunResult(ToolResult.Error("工具 $name 不存在", "TOOL_NOT_FOUND").toTransportString(), true)
         }
         return try {
-            if (name == "viewImage" && !activeModelSupportsVision(context.sessionId)) {
-                if (!visionFallbackReady()) {
-                    return ToolRunResult(
-                        ToolResult.Error(
-                            "当前聊天模型不支持图片输入，且未配置支持 Vision 的识图专用模型。请在「设置 → 默认模型 → 识图模型」中指定一个支持 Vision 的模型后再查看图片。",
-                            "MODEL_VISION_UNSUPPORTED"
-                        ).toTransportString(),
-                        true
-                    )
-                }
-                // 非多模态模型：同步用识图模型理解图片，文本结果直接作为工具返回
-                val result = tool.executeWithContext(toolCall.arguments, context)
-                val userPrompt = (toolCall.arguments["prompt"] as? JsonPrimitive)?.contentOrNull?.trim()
-                val textResult = runVisionFallback(result, context.sessionId, userPrompt)
-                val processed = toolOutputStore.process(name, toolCall.id, ToolResult.Success(JsonObject(mapOf(
-                    "content" to JsonPrimitive(textResult),
-                    "model" to JsonPrimitive("vision-fallback")
-                ))))
-                return ToolRunResult(processed.toTransportString(), processed is ToolResult.Error, emptyList())
-            }
             val result = tool.executeWithContext(toolCall.arguments, context)
-            val images = if (name == "viewImage") extractInlineImages(result) else emptyList()
             val attachments = if (name == "sendFile") extractAttachments(result) else emptyList()
-            val transportResult = when {
-                images.isNotEmpty() -> stripInlineImages(result)
-                attachments.isNotEmpty() -> stripAttachments(result)
-                else -> result
-            }
+            val transportResult = if (attachments.isNotEmpty()) stripAttachments(result) else result
             val processed = toolOutputStore.process(name, toolCall.id, transportResult)
-            ToolRunResult(processed.toTransportString(), processed is ToolResult.Error, images, attachments)
+            ToolRunResult(processed.toTransportString(), processed is ToolResult.Error, attachments)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
             ToolRunResult(ToolResult.Error("工具执行失败: ${e.message}", "TOOL_EXECUTION_FAILED").toTransportString(), true)
-        }
-    }
-
-    /**
-     * 非多模态模型的 viewImage 回退：从工具结果中提取 base64 图片，
-     * 同步发给识图专用模型理解内容，返回文本结果。
-     */
-    private suspend fun runVisionFallback(result: ToolResult, sessionId: String?, customPrompt: String? = null): String {
-        val data = (result as? ToolResult.Success)?.data as? JsonObject
-            ?: return "无法解析图片数据"
-        val image = data["image"] as? JsonObject
-            ?: return "无法提取图片数据"
-        val mimeType = image["mime_type"]?.jsonPrimitive?.contentOrNull
-            ?: return "无法识别图片格式"
-        val base64Data = image["base64_data"]?.jsonPrimitive?.contentOrNull
-            ?: return "无法读取图片数据"
-        val path = image["path"]?.jsonPrimitive?.contentOrNull.orEmpty()
-
-        val agentImage = AgentImage(mimeType = mimeType, base64Data = base64Data, path = path)
-        val visionProvider = resolveVisionFallbackProvider(sessionId)
-            ?: return "识图模型不可用"
-
-        val promptText = if (!customPrompt.isNullOrBlank()) {
-            "请针对用户/模型的如下关注重点，详细分析并描述这张图片：\n$customPrompt"
-        } else {
-            "请详细描述这张图片的内容，包括其中出现的文字、元素、布局、颜色等关键信息。"
-        }
-
-        try {
-            val messages = listOf(
-                AgentMessage.UserMessage(
-                    content = promptText,
-                    images = listOf(agentImage)
-                )
-            )
-            val response = visionProvider.complete("", messages, emptyList())
-            return response.content.ifBlank { "（识图模型未返回内容）" }
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            FileLogger.e(TAG, "识图回退失败", e)
-            return "识图失败: ${e.message}"
         }
     }
 
@@ -766,39 +674,6 @@ class StatefulAgentWorkflow @Inject constructor(
                 is AgentMessage.AssistantMessage -> msg
             }
         }
-    }
-
-    /**
-     * 识图专用兜底模型是否可用：已配置 providerId 且指向的 provider/model 存在、有 apiKey、且其
-     * ModelMetadata.supportsVision 为真。识图轮仅当 [activeModelSupportsVision] 为 false 时才回退到它。
-     * 未配置（providerId 空）即视为「跟随聊天模型」，不构成兜底 → 返回 false。
-     */
-    private suspend fun visionFallbackReady(): Boolean {
-        val providerId = visionModelSettingsRepository.getVisionProviderId().trim()
-        if (providerId.isEmpty()) return false
-        val model = visionModelSettingsRepository.getVisionModel().trim()
-        if (model.isEmpty()) return false
-        val config = aiProviderRepository.getProviderById(providerId) ?: return false
-        if (!config.isEnabled) return false
-        if (config.apiKey.isBlank()) return false
-        val metadata = modelMetadataService.resolve(config.id, config.type, model)
-        return metadata.supportsVision
-    }
-
-    /**
-     * 识图轮专用 provider 解析。仅当当前聊天模型不支持 vision、且专用模型已配置且可用时返回
-     * 全新的独立 AIProvider 实例；否则返回 null（表示无需切换、沿用 aiProvider）。
-     */
-    private suspend fun resolveVisionFallbackProvider(sessionId: String?): AIProvider? {
-        if (activeModelSupportsVision(sessionId)) return null // 当前聊天模型就有原生能力，直接用之
-        if (!visionFallbackReady()) return null       // 无可用兜底，仍沿用 aiProvider（守卫已先行拦截并报错）
-        val providerId = visionModelSettingsRepository.getVisionProviderId().trim()
-        val model = visionModelSettingsRepository.getVisionModel().trim()
-        val config = aiProviderRepository.getProviderById(providerId)
-            ?: error("识图专用模型配置丢失")
-        if (config.apiKey.isBlank()) error("识图专用模型「${config.name}」未填写 API Key")
-        if (model.isBlank()) error("识图专用模型未指定模型")
-        return createStandaloneProvider(config.copy(selectedModel = model), sessionId)
     }
 
     /**
@@ -925,16 +800,6 @@ class StatefulAgentWorkflow @Inject constructor(
         AgentMode.AUTO -> "\n\n【模式切换】你已切换到 AUTO（自动）模式。"
     }
 
-    private fun extractInlineImages(result: ToolResult): List<AgentImage> {
-        val data = (result as? ToolResult.Success)?.data as? JsonObject ?: return emptyList()
-        val image = data["image"] as? JsonObject ?: return emptyList()
-        val mimeType = image["mime_type"]?.jsonPrimitive?.contentOrNull ?: return emptyList()
-        val base64Data = image["base64_data"]?.jsonPrimitive?.contentOrNull ?: return emptyList()
-        val path = image["path"]?.jsonPrimitive?.contentOrNull.orEmpty()
-        if (!mimeType.startsWith("image/") || base64Data.isBlank()) return emptyList()
-        return listOf(AgentImage(mimeType = mimeType, base64Data = base64Data, path = path))
-    }
-
     /**
      * 从 sendFile 工具结果的 `files` 数组提取文件卡片元数据（含宿主本地路径，供 UI 打开文件用）。
      * 任一文件缺关键字段则整体返回空（与 sendFile 的原子语义一致）。
@@ -971,22 +836,6 @@ class StatefulAgentWorkflow @Inject constructor(
         val strippedData = data.toMutableMap().apply {
             this["files"] = JsonArray(strippedFiles)
             this["files_attached"] = JsonPrimitive(true)
-        }
-        return ToolResult.Success(JsonObject(strippedData))
-    }
-
-    private fun stripInlineImages(result: ToolResult): ToolResult {
-        val success = result as? ToolResult.Success ?: return result
-        val data = success.data as? JsonObject ?: return result
-        val image = data["image"] as? JsonObject ?: return result
-        val strippedImage = image.toMutableMap().apply {
-            remove("base64_data")
-            this["base64_omitted"] = JsonPrimitive(true)
-            this["note"] = JsonPrimitive("图片数据已作为视觉输入附加，未写入文本工具结果。")
-        }
-        val strippedData = data.toMutableMap().apply {
-            this["image"] = JsonObject(strippedImage)
-            this["image_attached"] = JsonPrimitive(true)
         }
         return ToolResult.Success(JsonObject(strippedData))
     }

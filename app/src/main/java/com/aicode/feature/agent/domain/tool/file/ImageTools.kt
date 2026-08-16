@@ -4,12 +4,31 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.util.Base64
 import com.aicode.core.util.FileLogger
-import com.aicode.feature.agent.domain.tool.AgentTool
+import com.aicode.feature.agent.data.remote.anthropic.AnthropicApi
+import com.aicode.feature.agent.data.remote.gemini.GeminiApi
+import com.aicode.feature.agent.data.remote.openai.OpenAIApi
+import com.aicode.feature.agent.domain.model.AgentContext
+import com.aicode.feature.agent.domain.model.AgentImage
+import com.aicode.feature.agent.domain.model.AgentMessage
+import com.aicode.feature.agent.domain.provider.AIProvider
+import com.aicode.feature.agent.domain.provider.AnthropicAdapter
+import com.aicode.feature.agent.domain.provider.GeminiAdapter
+import com.aicode.feature.agent.domain.provider.OpenAIAdapter
+import com.aicode.feature.agent.domain.session.SessionUseCase
+import com.aicode.feature.agent.domain.tool.AbstractContextualTool
 import com.aicode.feature.agent.domain.tool.ParameterType
 import com.aicode.feature.agent.domain.tool.ToolCapability
 import com.aicode.feature.agent.domain.tool.ToolParameter
 import com.aicode.feature.agent.domain.tool.ToolResult
+import com.aicode.feature.settings.data.repository.DefaultModelSettingsRepository
+import com.aicode.feature.settings.data.repository.VisionModelSettingsRepository
+import com.aicode.feature.settings.domain.model.AIProviderConfig
+import com.aicode.feature.settings.domain.model.ProviderType
+import com.aicode.feature.settings.domain.repository.AIProviderRepository
 import com.aicode.feature.workspace.domain.FileAccessProvider
+import kotlinx.coroutines.CancellationException
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
@@ -17,110 +36,268 @@ import kotlinx.serialization.json.jsonPrimitive
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.net.URLConnection
+import java.util.UUID
 import javax.inject.Inject
 
+/**
+ * 多轮会话式识图工具：第一次传 images（1~5 张）由识图模型一次性分析/对比，返回 vision_id 与文本结果；
+ * 之后传 vision_id + prompt 在同一识图会话内继续追问（识图模型记得图片与之前的问答）。
+ * 会话请求体落盘在 ~/.aicode/vision-sessions/（见 [VisionSessionStore]）。
+ * 识图模型不校验视觉能力，调用失败时把错误信息原样作为工具结果返回。
+ */
 class ViewImageTool @Inject constructor(
-    private val fileAccess: FileAccessProvider
-) : AgentTool() {
+    private val fileAccess: FileAccessProvider,
+    private val visionSessionStore: VisionSessionStore,
+    private val aiProviderRepository: AIProviderRepository,
+    private val defaultModelSettingsRepository: DefaultModelSettingsRepository,
+    private val visionModelSettingsRepository: VisionModelSettingsRepository,
+    private val sessionUseCase: SessionUseCase,
+    private val openAIApi: OpenAIApi,
+    private val anthropicApi: AnthropicApi,
+    private val geminiApi: GeminiApi
+) : AbstractContextualTool() {
     override val name = "viewImage"
-    override val description = "查看本地图片文件。读取图片尺寸并把图片作为下一轮视觉输入提供给模型，适合检查截图、设计稿、图标和生成图。"
+    override val description = "查看本地图片并让识图模型分析。传 images（1~5 张图片路径）可让识图模型一次性对比/分析多张图片，返回分析结果与 vision_id；之后可传 vision_id + prompt 在同一识图会话内继续追问（识图模型记得图片与之前的问答）。prompt 为可选的提问或关注点，为空时识图模型默认描述图片内容。detail 控制图片清晰度：high（默认）小图原样直传、大图压缩到最长边 1536；original 全部原样直传；low 全部压缩到最长边 512 省 token。用户上传的图片会以路径形式附在请求文本中——当前模型不支持图片输入时，应主动调用 viewImage 查看，而非忽略。"
     override val capabilities = setOf(ToolCapability.READ_WORKSPACE)
     override val parameters = mapOf(
-        "path" to ToolParameter(
-            name = "path",
-            type = ParameterType.STRING,
-            description = "图片路径：~/workspace/... 为项目文件；其它绝对路径为容器系统文件；相对路径基于 ~/workspace。",
-            required = true
-        ),
-        "detail" to ToolParameter(
-            name = "detail",
-            type = ParameterType.STRING,
-            description = "图片细节级别。low 会缩小到较小预览；high 适合一般视觉检查；original 尽量传原图，过大时自动降级为 high。",
+        "images" to ToolParameter(
+            name = "images",
+            type = ParameterType.ARRAY,
+            description = "图片路径列表，1~5 张（可多张对比分析）；与 id 二选一，首次识图必传。路径规则：~/workspace/... 为项目文件；其它绝对路径为容器系统文件。",
             required = false,
-            enum = listOf("low", "high", "original")
+            itemsSchema = mapOf("type" to "string")
+        ),
+        "id" to ToolParameter(
+            name = "id",
+            type = ParameterType.STRING,
+            description = "识图会话 id，继续之前识图会话的追问（识图模型记得图片与之前的问答）；与 images 二选一。",
+            required = false
         ),
         "prompt" to ToolParameter(
             name = "prompt",
             type = ParameterType.STRING,
-            description = "可选的提问或说明（如「提取报错信息」「分析 UI 布局」）。非多模态模型使用识图服务时，识图模型会优先围绕该问题或说明进行针对性描述。",
+            description = "可选的提问或关注点（如「对比这两张图的差异」）；为空时识图模型默认描述图片内容。",
             required = false
+        ),
+        "detail" to ToolParameter(
+            name = "detail",
+            type = ParameterType.STRING,
+            description = "图片细节级别：high（默认）小图原样直传、大图压缩到最长边 1536；original 全部原样直传（多张大图可能超出模型限制导致失败）；low 全部压缩到最长边 512 省 token。",
+            required = false,
+            enum = listOf("low", "high", "original")
         )
     )
 
-    override suspend fun execute(args: Map<String, kotlinx.serialization.json.JsonElement>): ToolResult {
-        return try {
-            val path = args["path"]?.jsonPrimitive?.contentOrNull?.trim().orEmpty()
-            if (path.isBlank()) {
-                return ToolResult.Error("路径参数缺失", "MISSING_PATH")
+    override suspend fun executeWithContext(
+        args: Map<String, JsonElement>,
+        context: AgentContext
+    ): ToolResult {
+        val images = parseImages(args)
+        val id = args["id"]?.jsonPrimitive?.contentOrNull?.trim().orEmpty()
+        val prompt = args["prompt"]?.jsonPrimitive?.contentOrNull?.trim().orEmpty()
+        val detail = args["detail"]?.jsonPrimitive?.contentOrNull?.trim()?.lowercase()
+            ?.takeIf { it in SUPPORTED_DETAILS } ?: "high"
+
+        if (images.isNotEmpty() && id.isNotEmpty()) {
+            return ToolResult.Error("images 与 id 二选一：传 images 开启新的识图会话，传 id 继续之前的会话。", "INVALID_ARGS")
+        }
+        if (images.isEmpty() && id.isEmpty()) {
+            return ToolResult.Error("缺少参数：首次识图需传 images（1~5 张图片路径），继续追问需传 id 与 prompt。", "MISSING_ARGS")
+        }
+        if (images.size > MAX_IMAGES) {
+            return ToolResult.Error("一次最多传 $MAX_IMAGES 张图片，当前 ${images.size} 张。", "TOO_MANY_IMAGES")
+        }
+        return if (images.isNotEmpty()) {
+            createSession(images, prompt, detail, context.sessionId)
+        } else {
+            continueSession(id, prompt, context.sessionId)
+        }
+    }
+
+    private suspend fun createSession(images: List<String>, prompt: String, detail: String, sessionId: String?): ToolResult {
+        // 按 detail 档位逐张编码：original 全部原样；high 小图原样、大图压缩；low 全部压缩。
+        val encoded = mutableListOf<AgentImage>()
+        for (path in images) {
+            when (val r = encodeImage(path, detail)) {
+                is EncodeOutcome.Ok -> encoded.add(r.image)
+                is EncodeOutcome.Fail -> return ToolResult.Error(r.message, r.code)
             }
+        }
+        val id = UUID.randomUUID().toString().replace("-", "").take(8)
+        val effectivePrompt = prompt.ifBlank { defaultPrompt(images.size) }
+        val messages = listOf(
+            AgentMessage.UserMessage(content = effectivePrompt, images = encoded)
+        )
+        return try {
+            visionSessionStore.save(id, messages)
+            val response = resolveVisionProvider(sessionId).complete("", messages, emptyList())
+            val content = response.content.ifBlank { "（识图模型未返回内容）" }
+            visionSessionStore.save(id, messages + AgentMessage.AssistantMessage(content = content))
+            successResult(id, content)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            visionSessionStore.delete(id)
+            FileLogger.e(TAG, "识图失败", e)
+            ToolResult.Error(e.message ?: "识图调用失败", "VISION_CALL_FAILED")
+        }
+    }
 
-            val detail = args["detail"]?.jsonPrimitive?.contentOrNull
-                ?.trim()
-                ?.lowercase()
-                ?.takeIf { it in SUPPORTED_DETAILS }
-                ?: "high"
+    private suspend fun continueSession(id: String, prompt: String, sessionId: String?): ToolResult {
+        if (prompt.isBlank()) {
+            return ToolResult.Error("继续识图会话需要 prompt 提问内容。", "MISSING_PROMPT")
+        }
+        val history = visionSessionStore.load(id)
+            ?: return ToolResult.Error("识图会话不存在或已过期: $id", "SESSION_NOT_FOUND")
+        val messages = history + AgentMessage.UserMessage(content = prompt)
+        return try {
+            val response = resolveVisionProvider(sessionId).complete("", messages, emptyList())
+            val content = response.content.ifBlank { "（识图模型未返回内容）" }
+            visionSessionStore.save(id, messages + AgentMessage.AssistantMessage(content = content))
+            successResult(id, content)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            FileLogger.e(TAG, "识图失败", e)
+            ToolResult.Error(e.message ?: "识图调用失败", "VISION_CALL_FAILED")
+        }
+    }
 
+    private fun successResult(id: String, content: String): ToolResult = ToolResult.Success(
+        JsonObject(
+            mapOf(
+                "vision_id" to JsonPrimitive(id),
+                "content" to JsonPrimitive(content)
+            )
+        )
+    )
+
+    private fun parseImages(args: Map<String, JsonElement>): List<String> {
+        val array = args["images"] as? JsonArray ?: return emptyList()
+        return array.mapNotNull { it.jsonPrimitive.contentOrNull?.trim() }.filter { it.isNotEmpty() }
+    }
+
+    private fun defaultPrompt(count: Int): String = if (count == 1) {
+        "请详细描述这张图片的内容，包括其中出现的文字、元素、布局、颜色等关键信息。"
+    } else {
+        "请依次分析并对比这 $count 张图片：先分别描述每张图片的内容（包括文字、元素、布局、颜色等关键信息），再指出它们之间的相同点与差异。"
+    }
+
+    /**
+     * 识图模型解析：配置了「识图模型」用专用模型，否则用当前聊天模型
+     * （session 绑定 provider 优先，回退全局默认）。不校验模型的视觉能力。
+     */
+    private suspend fun resolveVisionProvider(sessionId: String?): AIProvider {
+        val visionProviderId = visionModelSettingsRepository.getVisionProviderId().trim()
+        val visionModel = visionModelSettingsRepository.getVisionModel().trim()
+        if (visionProviderId.isNotEmpty() && visionModel.isNotEmpty()) {
+            val config = aiProviderRepository.getProviderById(visionProviderId)
+            if (config != null && config.isEnabled && config.apiKey.isNotBlank()) {
+                return createStandaloneProvider(config.copy(selectedModel = visionModel), sessionId)
+            }
+        }
+        val config = resolveCurrentChatConfig(sessionId)
+            ?: throw IllegalStateException("尚未配置 AI 提供商，请到设置中添加并选择一个")
+        if (config.apiKey.isBlank()) throw IllegalStateException("「${config.name}」未填写 API Key")
+        if (config.effectiveModel.isBlank()) throw IllegalStateException("「${config.name}」未选择模型")
+        return createStandaloneProvider(config, sessionId)
+    }
+
+    private suspend fun resolveCurrentChatConfig(sessionId: String?): AIProviderConfig? {
+        if (sessionId != null) {
+            val session = sessionUseCase.getSessionById(sessionId)
+            val boundProviderId = session?.providerId
+            val boundModel = session?.model
+            if (!boundProviderId.isNullOrBlank()) {
+                val config = aiProviderRepository.getProviderById(boundProviderId)
+                if (config != null && config.isEnabled && config.apiKey.isNotBlank()) {
+                    return if (!boundModel.isNullOrBlank()) config.copy(selectedModel = boundModel) else config
+                }
+            }
+        }
+        val defaultProviderId = defaultModelSettingsRepository.getDefaultProviderId()
+        val defaultModel = defaultModelSettingsRepository.getDefaultModel()
+        if (defaultProviderId.isNotBlank() && defaultModel.isNotBlank()) {
+            val config = aiProviderRepository.getProviderById(defaultProviderId)
+            if (config != null && config.isEnabled && config.apiKey.isNotBlank()) {
+                return config.copy(selectedModel = defaultModel)
+            }
+        }
+        return null
+    }
+
+    private fun createStandaloneProvider(config: AIProviderConfig, sessionId: String?): AIProvider {
+        val provider: AIProvider = when (config.type) {
+            ProviderType.ANTHROPIC -> AnthropicAdapter(anthropicApi).also {
+                it.cacheBreakpointsEnabled = config.anthropicCacheBreakpoints
+            }
+            ProviderType.GEMINI -> GeminiAdapter(geminiApi)
+            else -> OpenAIAdapter(openAIApi).also {
+                it.chatCacheKeyEnabled = config.openaiChatCacheKey
+            }
+        }
+        provider.apiKey = config.apiKey
+        provider.baseUrl = config.baseUrl
+        provider.model = config.effectiveModel
+        provider.useFullUrl = config.useFullUrl
+        provider.useResponseApi = config.useResponseApi
+        provider.providerId = config.id
+        provider.logSessionId = sessionId
+        return provider
+    }
+
+    private fun encodeImage(path: String, detail: String): EncodeOutcome {
+        return try {
             val file = fileAccess.copyToLocal(path)
             FileLogger.d(TAG, "viewImage path=$path -> ${file.absolutePath}, detail=$detail")
-
-            if (!fileAccess.exists(path)) return ToolResult.Error("文件不存在: $path", "FILE_NOT_FOUND")
-            if (!fileAccess.isFile(path)) return ToolResult.Error("路径不是文件: $path", "NOT_A_FILE")
+            if (!fileAccess.exists(path)) return EncodeOutcome.Fail("文件不存在: $path", "FILE_NOT_FOUND")
+            if (!fileAccess.isFile(path)) return EncodeOutcome.Fail("路径不是文件: $path", "NOT_A_FILE")
             val fileSize = fileAccess.fileSize(path)
-            if (fileSize <= 0L) return ToolResult.Error("图片文件为空: $path", "EMPTY_FILE")
+            if (fileSize <= 0L) return EncodeOutcome.Fail("图片文件为空: $path", "EMPTY_FILE")
 
             val bounds = decodeBounds(file)
-                ?: return ToolResult.Error("无法识别图片格式: $path", "UNSUPPORTED_IMAGE")
+                ?: return EncodeOutcome.Fail("无法识别图片格式: $path", "UNSUPPORTED_IMAGE")
             val sourceMime = guessMimeType(file)
             if (!sourceMime.startsWith("image/")) {
-                return ToolResult.Error("不是支持的图片文件: $path", "UNSUPPORTED_IMAGE")
+                return EncodeOutcome.Fail("不是支持的图片文件: $path", "UNSUPPORTED_IMAGE")
             }
 
-            val encoded = if (detail == "original" && fileSize <= MAX_ORIGINAL_BYTES && sourceMime in ORIGINAL_MIME_TYPES) {
-                EncodedImage(
-                    mimeType = sourceMime,
-                    base64Data = Base64.encodeToString(fileAccess.readBytes(path), Base64.NO_WRAP),
-                    width = bounds.width,
-                    height = bounds.height,
-                    detail = "original",
-                    encodedBytes = fileSize
-                )
-            } else {
-                encodePreview(file, bounds, detail)
+            val originalOk = sourceMime in ORIGINAL_MIME_TYPES
+            val encoded = when (detail) {
+                "original" -> if (originalOk) {
+                    originalImage(path, bounds, sourceMime, fileSize)
+                } else {
+                    encodePreview(file, bounds, HIGH_MAX_EDGE, HIGH_TARGET_BYTES, detail)
+                }
+                "low" -> encodePreview(file, bounds, LOW_MAX_EDGE, LOW_TARGET_BYTES, detail)
+                else -> if (originalOk && fileSize <= MAX_ORIGINAL_BYTES) {
+                    originalImage(path, bounds, sourceMime, fileSize)
+                } else {
+                    encodePreview(file, bounds, HIGH_MAX_EDGE, HIGH_TARGET_BYTES, detail)
+                }
             }
-
-            ToolResult.Success(
-                JsonObject(
-                    mapOf(
-                        "content" to JsonPrimitive(
-                            "已加载图片 ${fileAccess.toDisplayPath(path)} " +
-                                "(${bounds.width}x${bounds.height}, ${sourceMime}, ${fileSize} bytes)，" +
-                                "并作为视觉输入附加到下一轮模型上下文。"
-                        ),
-                        "path" to JsonPrimitive(fileAccess.toDisplayPath(path)),
-                        "mime_type" to JsonPrimitive(sourceMime),
-                        "width" to JsonPrimitive(bounds.width),
-                        "height" to JsonPrimitive(bounds.height),
-                        "byte_size" to JsonPrimitive(fileSize),
-                        "detail" to JsonPrimitive(encoded.detail),
-                        "encoded_mime_type" to JsonPrimitive(encoded.mimeType),
-                        "encoded_width" to JsonPrimitive(encoded.width),
-                        "encoded_height" to JsonPrimitive(encoded.height),
-                        "encoded_byte_size" to JsonPrimitive(encoded.encodedBytes),
-                        "image" to JsonObject(
-                            mapOf(
-                                "mime_type" to JsonPrimitive(encoded.mimeType),
-                                "base64_data" to JsonPrimitive(encoded.base64Data),
-                                "path" to JsonPrimitive(fileAccess.toDisplayPath(path))
-                            )
-                        )
-                    )
+            EncodeOutcome.Ok(
+                AgentImage(
+                    mimeType = encoded.mimeType,
+                    base64Data = encoded.base64Data,
+                    path = fileAccess.toDisplayPath(path)
                 )
             )
         } catch (e: Exception) {
-            FileLogger.e(TAG, "viewImage 异常", e)
-            ToolResult.Error(e.message ?: "读取图片失败", "READ_IMAGE_ERROR")
+            FileLogger.e(TAG, "viewImage 编码异常: $path", e)
+            EncodeOutcome.Fail(e.message ?: "读取图片失败", "READ_IMAGE_ERROR")
         }
     }
+
+    private fun originalImage(path: String, bounds: ImageBounds, mime: String, size: Long): EncodedImage =
+        EncodedImage(
+            mimeType = mime,
+            base64Data = Base64.encodeToString(fileAccess.readBytes(path), Base64.NO_WRAP),
+            width = bounds.width,
+            height = bounds.height,
+            detail = "original",
+            encodedBytes = size
+        )
 
     private fun decodeBounds(file: File): ImageBounds? {
         val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
@@ -130,9 +307,7 @@ class ViewImageTool @Inject constructor(
         return if (width > 0 && height > 0) ImageBounds(width, height) else null
     }
 
-    private fun encodePreview(file: File, bounds: ImageBounds, detail: String): EncodedImage {
-        val maxEdge = if (detail == "low") LOW_MAX_EDGE else HIGH_MAX_EDGE
-        val targetBytes = if (detail == "low") LOW_TARGET_BYTES else HIGH_TARGET_BYTES
+    private fun encodePreview(file: File, bounds: ImageBounds, maxEdge: Int, targetBytes: Int, detail: String): EncodedImage {
         val options = BitmapFactory.Options().apply {
             inSampleSize = calculateInSampleSize(bounds.width, bounds.height, maxEdge)
         }
@@ -202,6 +377,11 @@ class ViewImageTool @Inject constructor(
         return extMime ?: URLConnection.guessContentTypeFromName(file.name) ?: "application/octet-stream"
     }
 
+    private sealed interface EncodeOutcome {
+        data class Ok(val image: AgentImage) : EncodeOutcome
+        data class Fail(val message: String, val code: String) : EncodeOutcome
+    }
+
     private data class ImageBounds(val width: Int, val height: Int)
 
     private data class EncodedImage(
@@ -215,12 +395,13 @@ class ViewImageTool @Inject constructor(
 
     private companion object {
         const val TAG = "ImageTools"
+        const val MAX_IMAGES = 5
         const val LOW_MAX_EDGE = 512
-        const val HIGH_MAX_EDGE = 1024
+        const val HIGH_MAX_EDGE = 1536
         const val LOW_TARGET_BYTES = 96 * 1024
         const val HIGH_TARGET_BYTES = 512 * 1024
         const val MAX_ORIGINAL_BYTES = 4 * 1024 * 1024
-        val JPEG_QUALITIES = listOf(86, 78, 70, 62, 54)
+        val JPEG_QUALITIES = listOf(90, 86, 78, 70, 62)
         val SUPPORTED_DETAILS = setOf("low", "high", "original")
         val ORIGINAL_MIME_TYPES = setOf("image/jpeg", "image/png", "image/webp", "image/gif")
     }

@@ -242,7 +242,7 @@ class SettingsViewModel @Inject constructor(
     val defaultModel: StateFlow<String> = defaultModelSettingsRepository.modelFlow
         .stateIn(viewModelScope, SharingStarted.Eagerly, "")
 
-    /** 识图专用模型选择：providerId 为空即「跟随当前聊天模型」。 */
+    /** 识图模型选择：providerId 为空即「跟随当前聊天模型」。 */
     private val _visionProviderId = MutableStateFlow("")
     val visionProviderId: StateFlow<String> = _visionProviderId.asStateFlow()
 
@@ -1082,14 +1082,14 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
-    /** 设置识图专用模型；providerId 留空等同 [clearVisionModel]（跟随聊天模型）。 */
+    /** 设置识图模型；providerId 留空等同 [clearVisionModel]（跟随聊天模型）。 */
     fun setVisionModel(providerId: String, model: String) {
         viewModelScope.launch {
             visionModelSettingsRepository.setVisionModel(providerId, model)
         }
     }
 
-    /** 清空识图专用模型——回退到跟随当前聊天模型。 */
+    /** 清空识图模型——回退到跟随当前聊天模型。 */
     fun clearVisionModel() {
         viewModelScope.launch {
             visionModelSettingsRepository.clear()

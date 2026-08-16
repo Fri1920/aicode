@@ -79,7 +79,6 @@ import com.aicode.feature.credentials.data.local.dao.GitCredentialDao
 import com.aicode.feature.settings.data.repository.CompactionModelSettingsRepository
 import com.aicode.feature.settings.data.repository.DefaultModelSettingsRepository
 import com.aicode.feature.settings.data.repository.TitleModelSettingsRepository
-import com.aicode.feature.settings.data.repository.VisionModelSettingsRepository
 import com.aicode.feature.workspace.data.local.dao.RemoteConnectionDao
 import com.aicode.feature.workspace.data.repository.WorkspaceRepository
 
@@ -298,7 +297,6 @@ object AgentModule {
         planApprovalManager: PlanApprovalManager,
         toolOutputStore: ToolOutputStore,
         modelMetadataService: ModelMetadataService,
-        visionModelSettingsRepository: VisionModelSettingsRepository,
         compactionModelSettingsRepository: CompactionModelSettingsRepository,
         titleModelSettingsRepository: TitleModelSettingsRepository,
         defaultModelSettingsRepository: DefaultModelSettingsRepository,
@@ -320,7 +318,6 @@ object AgentModule {
             planApprovalManager,
             toolOutputStore,
             modelMetadataService,
-            visionModelSettingsRepository,
             compactionModelSettingsRepository,
             titleModelSettingsRepository,
             defaultModelSettingsRepository,

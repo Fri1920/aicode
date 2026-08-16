@@ -9,10 +9,10 @@ import javax.inject.Singleton
 private val Context.visionModelDataStore by preferencesDataStore(name = "vision_model_prefs")
 
 /**
- * 持久化「识图专用模型」选择（providerId + model 两字符串）。
+ * 持久化「识图模型」选择（providerId + model 两字符串）。
  *
- * 识图（viewImage）默认跟随当前聊天模型；当用户在此指定一个支持 vision 的模型后，
- * 若当前聊天模型不支持图片输入，识图那一轮会临时切换到该专用模型发送，发完恢复聊天模型。
+ * 识图（viewImage）默认跟随当前聊天模型；用户在此指定专用模型后，识图会话使用该模型。
+ * 不校验模型的视觉能力，调用失败时错误信息原样作为工具结果返回。
  * DataStore 用法与 [KeepaliveSettingsRepository] / [LogSettingsRepository] 一致。
  */
 @Singleton

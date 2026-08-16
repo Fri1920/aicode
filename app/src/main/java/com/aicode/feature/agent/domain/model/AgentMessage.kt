@@ -3,6 +3,7 @@ package com.aicode.feature.agent.domain.model
 import kotlinx.serialization.Serializable
 import com.aicode.feature.agent.domain.tool.ToolCall
 
+@Serializable
 sealed class AgentMessage {
     @Serializable
     data class UserMessage(
