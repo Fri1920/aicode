@@ -803,6 +803,13 @@ class AIAgentViewModel @Inject constructor(
                 processNextInQueue(sessionId)
             }
         }
+    }.also { job ->
+        // 同步注册 job：launch 内的 sessionJobs 赋值是异步的，finally 中 flushMergedNotifications
+        // 与 processNextInQueue 会在赋值前都看到 isActive=false 而双消费启动两个 job，
+        // 先结束的 job 把状态置 Idle/Result 覆盖仍在跑的 job 的 Streaming。
+        if (targetSessionId != null && slashCommandRegistry.findExact(request) == null) {
+            sessionJobs[targetSessionId] = job
+        }
     }
 
     fun resolveToolPermission(id: String, choice: PermissionChoice) {
