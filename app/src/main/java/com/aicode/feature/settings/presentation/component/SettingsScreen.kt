@@ -61,6 +61,7 @@ import com.aicode.feature.agent.presentation.component.MarkdownContent
 import com.aicode.feature.agent.presentation.component.MarkdownRenderCache
 import com.aicode.feature.backup.presentation.BackupSection
 import com.aicode.feature.settings.data.repository.AppThemeMode
+import com.aicode.feature.settings.data.repository.BackgroundSettingsRepository
 import com.aicode.feature.settings.domain.model.AIProviderConfig
 import com.aicode.feature.settings.domain.model.ModelMetadata
 import com.aicode.feature.settings.presentation.SettingsViewModel
@@ -76,6 +77,7 @@ import compose.icons.feathericons.Download
 import compose.icons.feathericons.FileText
 import compose.icons.feathericons.Globe
 import compose.icons.feathericons.HardDrive
+import compose.icons.feathericons.Image
 import compose.icons.feathericons.Info
 import compose.icons.feathericons.Lock
 import compose.icons.feathericons.Moon
@@ -126,6 +128,8 @@ fun SettingsScreen(
     val keepaliveEnabled by viewModel.keepaliveEnabled.collectAsStateWithLifecycle()
     val agentSoundEnabled by viewModel.agentSoundEnabled.collectAsStateWithLifecycle()
     val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
+    val backgroundImagePath by viewModel.backgroundImagePath.collectAsStateWithLifecycle()
+    val backgroundAlpha by viewModel.backgroundAlpha.collectAsStateWithLifecycle()
     val languageTag by viewModel.languageTag.collectAsStateWithLifecycle()
     val visionProviderId by viewModel.visionProviderId.collectAsStateWithLifecycle()
     val visionModel by viewModel.visionModel.collectAsStateWithLifecycle()
@@ -172,6 +176,7 @@ fun SettingsScreen(
     var showContainerAnnouncement by remember { mutableStateOf(false) }
     var showImageSourceSheet by remember { mutableStateOf(false) }
     var showThemeSheet by remember { mutableStateOf(false) }
+    var showBackgroundSheet by remember { mutableStateOf(false) }
     var showLanguageSheet by remember { mutableStateOf(false) }
     var showResetTokenStats by remember { mutableStateOf(false) }
 
@@ -342,7 +347,10 @@ fun SettingsScreen(
                 SettingsSection.Menu -> SettingsMenu(
                     themeMode = themeMode,
                     currentLanguageDisplayName = currentLanguageDisplayName,
+                    backgroundImagePath = backgroundImagePath,
+                    backgroundAlpha = backgroundAlpha,
                     onOpenThemeSheet = { showThemeSheet = true },
+                    onOpenBackgroundSheet = { showBackgroundSheet = true },
                     onOpenLanguageSheet = { showLanguageSheet = true },
                     onOpen = {
                         if (it == SettingsSection.Log) {
@@ -512,6 +520,17 @@ fun SettingsScreen(
         )
     }
 
+    if (showBackgroundSheet) {
+        BackgroundImageSheet(
+            imagePath = backgroundImagePath,
+            alpha = backgroundAlpha,
+            onPickImage = { viewModel.setBackgroundImage(it) },
+            onAlphaChange = { viewModel.setBackgroundAlpha(it) },
+            onRemove = { viewModel.clearBackgroundImage() },
+            onDismiss = { showBackgroundSheet = false }
+        )
+    }
+
     if (showLanguageSheet) {
         LanguageSelectionSheet(
             currentTag = languageTag,
@@ -634,7 +653,10 @@ fun SettingsScreen(
 internal fun SettingsMenu(
     themeMode: AppThemeMode,
     currentLanguageDisplayName: String,
+    backgroundImagePath: String?,
+    backgroundAlpha: Float,
     onOpenThemeSheet: () -> Unit,
+    onOpenBackgroundSheet: () -> Unit,
     onOpenLanguageSheet: () -> Unit,
     onOpen: (SettingsSection) -> Unit
 ) {
@@ -722,6 +744,24 @@ internal fun SettingsMenu(
                 trailing = {
                     Text(
                         text = stringResource(themeMode.labelRes),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = if (MaterialTheme.colorScheme.background.luminance() > 0.5f) {
+                            Color(0xFF8E9094)
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        }
+                    )
+                }
+            )
+            SettingsDivider()
+            SettingsRow(
+                icon = FeatherIcons.Image,
+                title = stringResource(R.string.settings_background_image),
+                onClick = onOpenBackgroundSheet,
+                trailing = {
+                    Text(
+                        text = if (backgroundImagePath != null) "${BackgroundSettingsRepository.alphaToSlider(backgroundAlpha).toInt()}%"
+                        else stringResource(R.string.settings_background_image_none),
                         style = MaterialTheme.typography.bodyMedium,
                         color = if (MaterialTheme.colorScheme.background.luminance() > 0.5f) {
                             Color(0xFF8E9094)

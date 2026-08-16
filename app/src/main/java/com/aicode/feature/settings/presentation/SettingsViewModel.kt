@@ -52,6 +52,7 @@ import com.aicode.feature.settings.data.repository.KeepaliveSettingsRepository
 import com.aicode.feature.settings.data.repository.LanguageSettingsRepository
 import com.aicode.feature.settings.data.repository.LogSettingsRepository
 import com.aicode.feature.settings.data.repository.ThemeSettingsRepository
+import com.aicode.feature.settings.data.repository.BackgroundSettingsRepository
 import com.aicode.feature.settings.data.repository.VisionModelSettingsRepository
 import com.aicode.feature.workspace.domain.model.RemoteConnection
 import com.aicode.feature.workspace.domain.repository.RemoteRepository
@@ -201,6 +202,7 @@ class SettingsViewModel @Inject constructor(
     private val modelMetadataService: ModelMetadataService,
     private val logSettingsRepository: LogSettingsRepository,
     private val themeSettingsRepository: ThemeSettingsRepository,
+    private val backgroundSettingsRepository: BackgroundSettingsRepository,
     private val keepaliveSettingsRepository: KeepaliveSettingsRepository,
     private val agentSoundSettingsRepository: AgentSoundSettingsRepository,
     private val languageSettingsRepository: LanguageSettingsRepository,
@@ -286,6 +288,14 @@ class SettingsViewModel @Inject constructor(
 
     private val _themeMode = MutableStateFlow(AppThemeMode.AUTO)
     val themeMode: StateFlow<AppThemeMode> = _themeMode.asStateFlow()
+
+    /** 全局自定义背景图文件路径（null=未设置），供设置弹窗展示与预览。 */
+    private val _backgroundImagePath = MutableStateFlow<String?>(null)
+    val backgroundImagePath: StateFlow<String?> = _backgroundImagePath.asStateFlow()
+
+    /** 背景图不透明度（0.05~1.0），实时写 DataStore，全局背景同步变化。 */
+    private val _backgroundAlpha = MutableStateFlow(BackgroundSettingsRepository.DEFAULT_ALPHA)
+    val backgroundAlpha: StateFlow<Float> = _backgroundAlpha.asStateFlow()
 
     /** 用户选择的应用语言 tag（null 表示跟随系统）。 */
     private val _languageTag = MutableStateFlow<String?>(null)
@@ -483,6 +493,18 @@ class SettingsViewModel @Inject constructor(
             launch {
                 themeSettingsRepository.themeModeFlow.collectLatest {
                     _themeMode.value = it
+                }
+            }
+
+            launch {
+                backgroundSettingsRepository.imagePathFlow.collectLatest {
+                    _backgroundImagePath.value = it
+                }
+            }
+
+            launch {
+                backgroundSettingsRepository.alphaFlow.collectLatest {
+                    _backgroundAlpha.value = it
                 }
             }
 
@@ -863,6 +885,27 @@ class SettingsViewModel @Inject constructor(
     fun setThemeMode(mode: AppThemeMode) {
         viewModelScope.launch {
             themeSettingsRepository.setThemeMode(mode)
+        }
+    }
+
+    /** 选择新背景图（拷贝到私有目录后替换）。 */
+    fun setBackgroundImage(uri: Uri) {
+        viewModelScope.launch {
+            backgroundSettingsRepository.setBackgroundImage(uri)
+        }
+    }
+
+    /** 移除背景图。 */
+    fun clearBackgroundImage() {
+        viewModelScope.launch {
+            backgroundSettingsRepository.clearBackground()
+        }
+    }
+
+    /** 调节背景图透明度（0.05~1.0），实时持久化。 */
+    fun setBackgroundAlpha(alpha: Float) {
+        viewModelScope.launch {
+            backgroundSettingsRepository.setBackgroundAlpha(alpha)
         }
     }
 

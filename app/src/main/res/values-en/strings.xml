@@ -77,6 +77,11 @@
     <string name="settings_title_follow_chat">Follow current chat model</string>    <string name="settings_theme_title">Appearance</string>    <string name="theme_auto">Auto</string>
     <string name="theme_dark">Dark</string>
     <string name="theme_light">Light</string>
+    <string name="settings_background_image">Background image</string>
+    <string name="settings_background_image_none">None</string>
+    <string name="settings_background_image_alpha">Opacity</string>
+    <string name="settings_background_image_pick">Pick image</string>
+    <string name="settings_background_image_remove">Remove background</string>
     <string name="provider_cache_anthropic_title">Anthropic cache breakpoints</string>
     <string name="provider_cache_anthropic_subtitle">Mark system/tools/messages prefixes with explicit cache breakpoints to cut repeated input cost</string>
     <string name="provider_cache_openai_chat_title">OpenAI-compatible cache key</string>
