@@ -11,6 +11,16 @@ PROVISION_SKIPPED="provision-script-skipped"
 MARKER="/.provisioned"
 MIRROR="mirrors.aliyun.com"
 
+# ── 宿主 supplementary gid 修复：proot 会把宿主进程的补充组（Android AID 3003 inet、
+# 9997 everybody、App 自身 uid 派生 gid 等）透传进容器，/etc/group 查不到名字会让
+# groups 等命令报警（cannot find name for group ID xxx）。幂等补行：gid_ 命名空间先清再补
+# 防历史残留；位于 MARKER 检查之前，每次进终端都执行（已配置设备同样生效），gid 变化自动跟上。
+# 全部静默失败，不阻塞进入 shell。
+sed -i '/^gid_/d' /etc/group 2>/dev/null
+for g in $(id -G 2>/dev/null); do
+    grep -q ":x:$g:" /etc/group 2>/dev/null || echo "gid_$g:x:$g:" >> /etc/group 2>/dev/null
+done
+
 # 已按当前版本完成或用户选择手动安装（跳过）则直接退出
 if [ -f "$MARKER" ]; then
     state=$(cat "$MARKER" 2>/dev/null)
@@ -192,6 +202,8 @@ EOF
 }
 
 git_config() {
+    # git 未安装（手动安装/退出路径）时跳过凭据配置
+    command -v git >/dev/null 2>&1 || return 0
     # git credential helper：store（命中已有凭据秒过）+ aicode 自定义 helper（未命中时经文件 IPC 弹窗回填）。
     # credential.helper 是 multi-valued，先 --replace-all 清旧值再 --add，保证顺序幂等（store 在前、aicode 在后）。
     git config --global --replace-all credential.helper 'store --file=/root/.aicode/git-credentials'

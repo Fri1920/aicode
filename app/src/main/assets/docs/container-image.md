@@ -35,6 +35,7 @@ App 自带 Alpine 镜像（来自内置资源），首次启动默认添加并�
 容器初始化由 `provision.sh` 完成，所有容器（内置 Alpine / 自定义镜像）统一走交互菜单：
 
 *   **脚本位置**：`~/.aicode/provision.sh`（App 私有目录 `filesDir/aicode/provision.sh`，经绑定即容器内 `/root/.aicode/provision.sh`，随 App 内置、启动时自动提取，跨容器重装保留）。
+*   **宿主组 ID 修复**：每次进入终端（含已配置的存量容器）会先把宿主透传的补充组（Android AID：3003 inet、9997 everybody、App 自身 uid 派生 gid 等）幂等补进 `/etc/group`（`gid_` 前缀命名，先清再补防残留），避免 `groups` 等命令因查不到组名报警；静默执行，不阻塞进入 shell。
 *   **交互菜单（所有容器一致）**：rootfs 解压完成后进入终端，自动弹出菜单：
     1. **自动安装依赖（推荐）**——先询问「是否自动换源」：选是则按发行版换国内镜像源（Debian/Ubuntu 写阿里云源并兼容两种源文件格式、Fedora 写阿里云 repo、Arch 写阿里云 mirrorlist、Alpine 写 apk 源；RHEL/CentOS 暂不支持换源用默认源；换源会先备份原配置、更新失败自动恢复），再按包管理器（`apk`/`apt-get`/`dnf`/`yum`/`pacman`）安装同一套基础工具（python3、git、pip、nodejs、npm、bash、curl、ripgrep）。安装成功写入完成标记；失败可重新进入终端重试，不阻塞进入 shell。
     2. **手动安装（不再提示）**——写入跳过标记，之后进入终端不再弹菜单，由用户自行在容器内装工具。想恢复菜单请重置容器。
