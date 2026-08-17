@@ -396,10 +396,11 @@ class AIAgentViewModel @Inject constructor(
      * UserMessage 即是它，避免重复落库或出现空占位消息。
      */
     private fun handleBackgroundCommandFinished(event: TabFinishedEvent) {
-        // 按事件携带的来源会话路由，而非用户当前所在会话：后台命令可能在用户已切到别的会话后才结束。
         val sessionId = event.sourceSessionId ?: return
-        // 该会话正忙（AI 正在工作）：缓存事件，等本轮结束后合并成一条发送，只触发一轮 AI 回复。
-        if (sessionJobs[sessionId]?.isActive == true) {
+        val jobActive = sessionJobs[sessionId]?.isActive == true
+        val currentSid = _currentSessionId.value
+        FileLogger.d(TAG, "handleBgFinished: eventSid=$sessionId currentSid=$currentSid jobActive=$jobActive state=${_agentStates.value[sessionId]}")
+        if (jobActive) {
             pendingMergedNotifications.getOrPut(sessionId) { mutableListOf() }.add(event)
             return
         }
@@ -418,6 +419,7 @@ class AIAgentViewModel @Inject constructor(
     private fun flushMergedNotifications(sessionId: String) {
         val events = pendingMergedNotifications.remove(sessionId) ?: return
         if (events.isEmpty()) return
+        FileLogger.d(TAG, "flushMergedNotifications: sid=$sessionId events=${events.size} state=${_agentStates.value[sessionId]}")
         val notification = buildBackgroundNotification(events)
         viewModelScope.launch {
             enqueueAgentRequest(
@@ -598,6 +600,7 @@ class AIAgentViewModel @Inject constructor(
             return@launch
         }
         coroutineContext[Job]?.let { sessionJobs[sessionId] = it }
+        FileLogger.d(TAG, "stream start: sid=$sessionId prevState=${_agentStates.value[sessionId]} isAutoTrigger=$isAutoTrigger")
         setAgentState(sessionId, AgentUIState.Streaming)
 
         try {
@@ -772,9 +775,12 @@ class AIAgentViewModel @Inject constructor(
             setStreamingText(sessionId, null)
 
         } catch (e: CancellationException) {
-            // 取消收尾同样带保护：若已有新的 job 把状态改为 Streaming，不能覆盖成 Idle。
             val cancelledState = _agentStates.value[sessionId]
-            if (cancelledState is AgentUIState.Loading || cancelledState is AgentUIState.Streaming) {
+            val isOwnJob = sessionJobs[sessionId] == coroutineContext[Job]
+            FileLogger.d(TAG, "stream cancelled: sid=$sessionId isOwnJob=$isOwnJob state=$cancelledState")
+            if (isOwnJob &&
+                (cancelledState is AgentUIState.Loading || cancelledState is AgentUIState.Streaming)
+            ) {
                 setAgentState(sessionId, AgentUIState.Idle)
             }
             throw e
@@ -782,7 +788,9 @@ class AIAgentViewModel @Inject constructor(
              FileLogger.e(TAG, "executeAgentRequestStream 失败: request=$request", e)
              setAgentState(sessionId, AgentUIState.Error(e.toUserMessage()))
         } finally {
-            if (sessionJobs[sessionId] == coroutineContext[Job]) {
+            val isOwnJob = sessionJobs[sessionId] == coroutineContext[Job]
+            FileLogger.d(TAG, "stream finally: sid=$sessionId isOwnJob=$isOwnJob state=${_agentStates.value[sessionId]}")
+            if (isOwnJob) {
                 sessionJobs.remove(sessionId)
             }
             _runningTools.value = _runningTools.value - sessionId
@@ -852,10 +860,21 @@ class AIAgentViewModel @Inject constructor(
         val runningTools = _runningTools.value[sessionId]?.values?.toList() ?: emptyList()
         val streamingText = _streamingTexts.value[sessionId]
         val streamingReasoning = _streamingReasonings.value[sessionId]
+        val pendingPermission = toolPermissionManager.pendingRequest.value
         val stoppedText = context.getString(R.string.agent_stopped_by_user)
+        val pendingNotifs = pendingMergedNotifications[sessionId]?.size ?: 0
+        FileLogger.d(TAG, "stopAgent: sid=$sessionId runningTools=${runningTools.size} pendingPerm=${pendingPermission?.id} pendingNotifs=$pendingNotifs state=${_agentStates.value[sessionId]}")
+        // cancel() 在 Dispatchers.Main.immediate 上可能立即恢复挂起协程
+        // （如 awaitApproval 的 CompletableDeferred.await），旧 job 的 finally →
+        // flushMergedNotifications 在 cancel() 调用栈内同步执行并可能启动新 job。
+        // 不预先清除缓存通知——它们应由 finally 正常 flush 给新 job 处理。
         job.cancel()
-        pendingMergedNotifications.remove(sessionId)
-        setAgentState(sessionId, AgentUIState.Idle)
+        // cancel 可能已同步执行完 finally（flush 启动了新 job 并注册到 sessionJobs），
+        // 此时不能再覆盖新 job 的状态；仅当无新 job 接管时才做清理。
+        if (sessionJobs[sessionId]?.isActive != true) {
+            pendingMergedNotifications.remove(sessionId)
+            setAgentState(sessionId, AgentUIState.Idle)
+        }
         _runningTools.value = _runningTools.value - sessionId
         setStreamingText(sessionId, null)
         setStreamingReasoning(sessionId, null)
@@ -888,6 +907,22 @@ class AIAgentViewModel @Inject constructor(
                     role = MessageRole.ASSISTANT,
                     content = content,
                     reasoning = reasoning
+                )
+            }
+            // 授权弹窗挂起中的工具调用：awaitApproval 挂起期间 _runningTools 为空
+            // （ToolCallStarted 在授权通过后才发出），但 AssistantText 已落库了带
+            // tool_call 声明的 assistant 消息。不补结果会导致该 tool_call 成为
+            // 孤立记录，被 buildHistory 的 validIds 交集过滤掉，AI 不知道自己曾调用过。
+            if (pendingPermission != null) {
+                val msgId = "tool_${pendingPermission.id}"
+                messagePersistenceUseCase.persist(
+                    sessionId = sessionId,
+                    role = MessageRole.TOOL,
+                    content = stoppedText,
+                    id = msgId,
+                    toolCallId = pendingPermission.id,
+                    toolName = pendingPermission.toolName,
+                    isError = true
                 )
             }
             setStreamingText(sessionId, null)
