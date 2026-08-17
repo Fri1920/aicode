@@ -7,7 +7,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
@@ -125,7 +127,11 @@ internal fun MarkdownContent(
         // remember 状态会被 dispose；下一帧文本变化（流式增长/停顿后恢复）缓存 miss 重建时
         // 初始状态是 Loading，会闪现原始 md 文本（解析/未解析反复横跳的根因）。
         // 缓存只作为渲染加速：解析结果与当前文本一致时直接用；不一致但缓存命中当前文本时
-        // 用缓存；否则显示 retainState 保留的旧渲染结果，等待新解析完成，绝不显示 Loading。
+        // 用缓存；否则进入 Loading。注意：本库 rememberMarkdownState 在文本变化时会把
+        // state 无条件置为 Loading（retainState 参数在此版本不生效），Loading 分支若回退
+        // 显示原文纯文本，流式场景下每次文本变化都会闪现「最新文本的裸文本」（底部字在闪）。
+        // 因此 Loading 期间优先渲染最近一次成功解析的结果（旧文本的完整 md 排版），解析
+        // 完成后再平滑切到新文本，内容只增不跳。
         val mdState = rememberMarkdownState(content = text, retainState = true)
         val parseState by mdState.state.collectAsState()
         val cachedState = cache?.get(text)
@@ -137,15 +143,25 @@ internal fun MarkdownContent(
             else -> currentState
         }
 
+        // 最近一次成功解析的结果：Loading 期间的渲染兜底
+        var lastSuccessState by remember { mutableStateOf<MarkdownParseState.Success?>(null) }
         if (parsedState is MarkdownParseState.Success) {
+            lastSuccessState = parsedState
             LaunchedEffect(cache, parsedState) {
                 cache?.put(parsedState)
             }
         }
 
-        when (parsedState) {
-            is MarkdownParseState.Success -> Markdown(
-                state = parsedState,
+        // Success 渲染当前结果；Loading 渲染上次成功结果（避免纯文本闪现）；Error 回退原文
+        val renderState: MarkdownParseState.Success? = when (parsedState) {
+            is MarkdownParseState.Success -> parsedState
+            is MarkdownParseState.Loading -> lastSuccessState
+            is MarkdownParseState.Error -> null
+        }
+
+        if (renderState != null) {
+            Markdown(
+                state = renderState,
                 modifier = modifier,
                 colors = mdColors,
                 typography = mdTypography,
@@ -201,18 +217,10 @@ internal fun MarkdownContent(
                     },
                 ),
             )
-
-            is MarkdownParseState.Loading -> if (loading != null) {
-                loading()
-            } else {
-                PlainMarkdownText(
-                    text = text,
-                    color = color,
-                    modifier = modifier
-                )
-            }
-
-            is MarkdownParseState.Error -> PlainMarkdownText(
+        } else if (loading != null) {
+            loading()
+        } else {
+            PlainMarkdownText(
                 text = text,
                 color = color,
                 modifier = modifier

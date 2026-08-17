@@ -67,6 +67,7 @@
 
     <!-- SettingsScreen 通用 -->
     <string name="common_back">返回</string>
+    <string name="common_scroll_to_bottom">回到底部</string>
     <string name="common_prev">上一页</string>
     <string name="common_next">下一页</string>
     <string name="settings_add_provider">添加提供商</string>

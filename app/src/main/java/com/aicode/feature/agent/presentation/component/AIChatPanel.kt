@@ -9,6 +9,10 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.DragInteraction
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -17,14 +21,20 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.DrawerState
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -38,6 +48,7 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.LocalClipboard
@@ -53,9 +64,12 @@ import com.aicode.feature.agent.domain.tool.question.UserQuestionAnswer
 import com.aicode.feature.agent.presentation.AgentUIMessage
 import com.aicode.feature.agent.presentation.AgentUIState
 import com.aicode.feature.agent.presentation.AIAgentViewModel
+import com.aicode.feature.agent.presentation.MessageRole
 import com.aicode.feature.agent.presentation.hasVisibleContent
 import com.aicode.feature.settings.presentation.SettingsViewModel
 import com.aicode.feature.workspace.presentation.WorkspaceViewModel
+import compose.icons.FeatherIcons
+import compose.icons.feathericons.ArrowDown
 import java.io.File
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -79,6 +93,15 @@ private const val AUTO_SCROLL_TOLERANCE_PX = 2
 /** 流式结束后尾巴保留时长（ms）：等落库消息接管，避免高度骤减导致视口上跳。 */
 private const val STREAMING_TAIL_RETAIN_MS = 150L
 
+/** 滚动到底部按钮直径（dp）。 */
+private const val SCROLL_TO_BOTTOM_BTN_SIZE = 34
+
+/** 新消息入场动画判定窗口（ms）：timestamp 距今小于该值视为刚插入的新消息。 */
+private const val MESSAGE_ENTRY_WINDOW_MS = 10_000L
+
+/** 连续新消息的入场动画间隔（ms）：多条消息同时插入时逐个出现。 */
+private const val MESSAGE_ENTRY_STAGGER_MS = 100L
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AIChatPanel(
@@ -95,6 +118,23 @@ fun AIChatPanel(
     val agentState by viewModel.agentState.collectAsStateWithLifecycle()
     val messagesState by viewModel.messagesState.collectAsStateWithLifecycle()
     val messages = messagesState.messages
+
+    // 工具调用卡片入场动画：仅流式期间新插入的 TOOL 消息按顺序分配递增延迟，逐个淡入展开；
+    // 落库后的历史（timestamp 旧）直接显示不重播。
+    val messageEntryDelays = remember(messages) {
+        val now = System.currentTimeMillis()
+        val map = mutableMapOf<String, Long>()
+        var consecutive = 0
+        for (m in messages) {
+            if (m.role == MessageRole.TOOL && now - m.timestamp < MESSAGE_ENTRY_WINDOW_MS) {
+                map[m.id] = consecutive * MESSAGE_ENTRY_STAGGER_MS.toLong()
+                consecutive++
+            } else {
+                consecutive = 0
+            }
+        }
+        map
+    }
 
     val currentSessionId by viewModel.currentSessionId.collectAsStateWithLifecycle()
     val sessions by viewModel.sessions.collectAsStateWithLifecycle()
@@ -147,6 +187,21 @@ fun AIChatPanel(
     var messageForMenu by remember { mutableStateOf<AgentUIMessage?>(null) }
     var editingMessage by remember { mutableStateOf<AgentUIMessage?>(null) }
     val listState = rememberLazyListState()
+    // 滚动方向追踪：仅向下滚动（回底部方向）时显示回底按钮；向上滚/停着不显示。
+    var scrollingDown by remember { mutableStateOf(false) }
+    var lastScrollPos by remember { mutableStateOf(0 to 0) }
+    LaunchedEffect(listState) {
+        snapshotFlow {
+            listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset
+        }.collect { pos ->
+            val (lastIndex, lastOffset) = lastScrollPos
+            val (index, offset) = pos
+            if (index != lastIndex || offset != lastOffset) {
+                scrollingDown = index > lastIndex || (index == lastIndex && offset > lastOffset)
+                lastScrollPos = pos
+            }
+        }
+    }
     // 贴底滚动留白：首帧测量前用兜底值（约输入框 + 间距），实测悬浮层高度后改为动态值，
     // 横幅/面板/输入框任何形态下最后一条消息都停在悬浮层上方不被遮挡。
     val inputBarBottomReserveDp = 156.dp
@@ -250,7 +305,6 @@ fun AIChatPanel(
 
     // 流式结束过渡：streamingText 清空后保留最后文本一小段（落库消息通常在此窗口内接管），
     // 避免尾巴 item 高度骤减导致视口被 clamp 上移、露出历史消息（结束瞬间“闪回”看到用户消息）。
-    // 保留期内 StreamingBubble 内部节流会把渲染文本追平到最终文本，与落库消息无缝接力。
     var tailStreamingText by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(streamingText) {
         val st = streamingText
@@ -261,6 +315,21 @@ fun AIChatPanel(
             tailStreamingText = null
         }
     }
+
+    // 打字机渲染进度：持有在 LazyColumn 之外，尾巴 item 滚出视口被 dispose 后进度不丢。
+    // active = 上游仍在吐字；streamingText 清空后（active=false）打字机立即补全为完整
+    // 文本，与上面保留期内尾巴无缝交接给落库消息。
+    val typewriterRenderText = rememberTypewriterStreamingText(
+        text = tailStreamingText ?: "",
+        active = streamingText != null
+    )
+    // 思考过程同样走打字机：与回复文本共用同一速率自适应逻辑。
+    // 正文开始输出（streamingText 非空）即视为思考结束：思考打字机立即补全，
+    // 避免思考还没打完、正文已开始导致两者叠着慢慢打。
+    val typewriterReasoningText = rememberTypewriterStreamingText(
+        text = streamingReasoning ?: "",
+        active = streamingReasoning != null && streamingText == null
+    )
 
     // 自动滚动跟随
     var positionedSession by remember { mutableStateOf<String?>(null) }
@@ -500,15 +569,23 @@ fun AIChatPanel(
                                     // 折叠后卡片可能整体缩出视口上方（长卡片双击折叠）：等一帧按折叠后的布局判断，
                                     // 仅当卡片完全不可见时才滚回顶部让标题可见；仍可见（含贴底）时不做任何主动滚动，
                                     // 避免用折叠前的旧 offset 定位导致「收起时跳动、位置不对」。
+                                    // 展开后卡片底部可能被悬浮层（输入框）遮挡：滚动让卡片底部停在悬浮层上沿，
+                                    // 与消息气泡的贴底跟随统一。
                                     scope.launch {
                                         withFrameNanos { }
                                         val layout = listState.layoutInfo
                                         val item = layout.visibleItemsInfo.firstOrNull { it.index == index }
                                         if (item == null || item.offset + item.size <= 0) {
                                             listState.animateScrollToItem(index)
+                                        } else {
+                                            val safeBottom = layout.viewportEndOffset - inputBarReservePx
+                                            if (item.offset + item.size > safeBottom + AUTO_SCROLL_TOLERANCE_PX) {
+                                                listState.animateScrollToItem(index, (safeBottom - item.size).coerceAtLeast(0))
+                                            }
                                         }
                                     }
-                                }
+                                },
+                                entryDelayMs = messageEntryDelays[message.id]
                             )
                         }
                         val reasoning = streamingReasoning
@@ -533,11 +610,11 @@ fun AIChatPanel(
                             Column {
                                 if (showReasoning) {
                                     // 流式实时：短文本默认展开边想边看，过长（超 REASONING_COLLAPSE_LINE_LIMIT）时由气泡内部自动折叠，不刷屏
-                                    ReasoningBubble(text = reasoning.orEmpty(), initiallyExpanded = true, cache = markdownCache, showTimer = true)
+                                    ReasoningBubble(text = typewriterReasoningText, initiallyExpanded = true, cache = markdownCache, showTimer = true, preRendered = true)
                                 }
                                 when (tailKind) {
                                     TailKind.THINKING -> ThinkingBubble()
-                                    TailKind.STREAMING -> StreamingBubble(text = streaming ?: "", cache = markdownCache)
+                                    TailKind.STREAMING -> StreamingBubble(text = typewriterRenderText, cache = markdownCache)
                                     TailKind.COMPACTING -> CompactionProgressBubble()
                                     TailKind.RETRYING -> {
                                         val rs = retryState
@@ -648,6 +725,26 @@ fun AIChatPanel(
             )
             } // 悬浮层结束
 
+            // 滚动到底部按钮：悬浮在输入框右上角上方（悬浮层高度 + 间距定位），向下滚动后
+            // 保持显示（停着也显示），向上滚/已到底不显示；滚动时跟随输入框淡出。
+            androidx.compose.animation.AnimatedVisibility(
+                visible = scrollingDown && !isAtBottom,
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(end = Spacing.lg)
+                    .padding(bottom = with(LocalDensity.current) { (floatingLayerHeightPx + FLOATING_LAYER_GAP_DP.toPx()).toDp() })
+                    .graphicsLayer { alpha = if (listState.isScrollInProgress) 0.4f else 1f },
+                enter = fadeIn() + scaleIn(),
+                exit = fadeOut() + scaleOut()
+            ) {
+                ScrollToBottomButton(
+                    onClick = {
+                        followBottom = true
+                        scope.launch { snapToBottom() }
+                    }
+                )
+            }
+
             targetRewindMessageId?.let { targetId ->
                 val targetMsg = messages.find { it.id == targetId }
                 RewindOptionsBottomSheet(
@@ -689,6 +786,32 @@ fun AIChatPanel(
             }
         }
     }
+    }
+}
+
+/** 滚动到底部按钮：圆形，悬浮在输入框右上角，不在底部时显示。 */
+@Composable
+private fun ScrollToBottomButton(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        shape = CircleShape,
+        color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        shadowElevation = 6.dp,
+        modifier = modifier
+            .size(SCROLL_TO_BOTTOM_BTN_SIZE.dp)
+            .clickable(onClick = onClick)
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Icon(
+                imageVector = FeatherIcons.ArrowDown,
+                contentDescription = stringResource(R.string.common_scroll_to_bottom),
+                tint = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.size(20.dp)
+            )
+        }
     }
 }
 

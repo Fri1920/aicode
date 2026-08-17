@@ -1,6 +1,10 @@
 package com.aicode.feature.agent.presentation.component
 
 import android.content.ClipData
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -65,6 +69,9 @@ import compose.icons.feathericons.RotateCcw
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
+/** 落库思考气泡保持展开的窗口（ms）：刚结束的思考不立即折叠回缩，防止高度骤变抽搐。 */
+private const val REASONING_FRESH_WINDOW_MS = 5_000L
+
 @Composable
 internal fun AgentMessageItem(
     message: AgentUIMessage,
@@ -72,7 +79,9 @@ internal fun AgentMessageItem(
     markdownCache: MarkdownRenderCache? = null,
     onRewindClick: ((String) -> Unit)? = null,
     onMoreClick: ((AgentUIMessage) -> Unit)? = null,
-    onToolToggle: (() -> Unit)? = null
+    onToolToggle: (() -> Unit)? = null,
+    /** 新消息入场动画延迟（ms）：null 表示历史消息直接显示；非 null 时首次组合延迟后淡入展开。 */
+    entryDelayMs: Long? = null
 ) {
     if (message.isCompactionMarker) {
         // 压缩内部锚点不再渲染分隔线：摘要卡片已提供压缩反馈，避免与卡片重复。
@@ -107,12 +116,25 @@ internal fun AgentMessageItem(
     val clipboard = LocalClipboard.current
     val copyScope = rememberCoroutineScope()
 
+    // 工具调用卡片入场动画：仅流式期间新插入时淡入展开；历史/落库后直接显示不重播。
+    // item 滚出视口重新组合时若消息已过新消息窗口，entryDelayMs 为 null，同样直接显示。
+    var entered by remember(message.id) { mutableStateOf(entryDelayMs == null) }
+    LaunchedEffect(entryDelayMs) {
+        val delayMs = entryDelayMs
+        if (delayMs != null) {
+            delay(delayMs)
+            entered = true
+        }
+    }
+
     Column(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(Spacing.xs)
     ) {
         if (hasReasoning) {
-            ReasoningBubble(text = message.reasoning.orEmpty(), initiallyExpanded = false, cache = markdownCache)
+            // 刚结束思考落库的消息保持展开（流式思考展开→落库折叠会高度骤变抽搐）；稍后/历史默认折叠
+            val reasoningJustFinished = System.currentTimeMillis() - message.timestamp < REASONING_FRESH_WINDOW_MS
+            ReasoningBubble(text = message.reasoning.orEmpty(), initiallyExpanded = reasoningJustFinished, cache = markdownCache)
         }
         if (hasContent || hasAttachments || message.role != MessageRole.ASSISTANT) {
             Column(
@@ -124,67 +146,80 @@ internal fun AgentMessageItem(
                     Row(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Surface(
-                            shape = if (isUser) {
-                                RoundedCornerShape(Radius.md, Radius.md, Radius.xs, Radius.md)
-                            } else {
-                                RoundedCornerShape(Radius.md, Radius.md, Radius.md, Radius.xs)
-                            },
-                            color = when (message.role) {
-                                MessageRole.USER -> MaterialTheme.colorScheme.primary
-                                MessageRole.ASSISTANT -> MaterialTheme.colorScheme.surface
-                                MessageRole.TOOL -> MaterialTheme.colorScheme.surfaceVariant
-                            },
-                            border = if (message.role == MessageRole.ASSISTANT) {
-                                BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
-                            } else null,
-                            // 用户气泡随内容自适应宽度，最大撑到与 AI 气泡同宽；AI/工具气泡填满可用宽度
-                            modifier = if (isUser) {
-                                Modifier.widthIn(max = maxUserBubbleWidth)
-                            } else {
-                                Modifier.fillMaxWidth()
-                            }
-                        ) {
                         if (message.role == MessageRole.TOOL) {
-                            ToolMessageBody(message, liveOutput = liveOutput, onToggle = onToolToggle)
-                        } else {
-                            val textColor = when (message.role) {
-                                MessageRole.USER -> MaterialTheme.colorScheme.onPrimary
-                                else -> MaterialTheme.colorScheme.onSurface
-                            }
-                            SelectionContainer {
-                                val selectionColors = if (isUser) {
-                                    TextSelectionColors(
-                                        handleColor = MaterialTheme.colorScheme.onPrimary,
-                                        backgroundColor = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.28f),
-                                    )
-                                } else {
-                                    TextSelectionColors(
-                                        handleColor = MaterialTheme.colorScheme.primary,
-                                        backgroundColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.32f),
-                                    )
+                            // 工具调用卡片：仅流式期间新插入时淡入展开；落库后的历史直接显示不重播
+                            AnimatedVisibility(
+                                visible = entered,
+                                enter = fadeIn(tween(180)) + slideInVertically(tween(180)) { it / 3 }
+                            ) {
+                                Surface(
+                                    shape = RoundedCornerShape(Radius.md, Radius.md, Radius.md, Radius.xs),
+                                    color = MaterialTheme.colorScheme.surfaceVariant,
+                                    border = null,
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    ToolMessageBody(message, liveOutput = liveOutput, onToggle = onToolToggle)
                                 }
-                                CompositionLocalProvider(LocalTextSelectionColors provides selectionColors) {
-                                    if (isUser) {
-                                        Text(
-                                            text = message.content,
-                                            color = textColor,
-                                            style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 20.sp),
-                                            modifier = Modifier.padding(horizontal = Spacing.sm, vertical = Spacing.sm)
+                            }
+                        } else {
+                            Surface(
+                                shape = if (isUser) {
+                                    RoundedCornerShape(Radius.md, Radius.md, Radius.xs, Radius.md)
+                                } else {
+                                    RoundedCornerShape(Radius.md, Radius.md, Radius.md, Radius.xs)
+                                },
+                                color = when (message.role) {
+                                    MessageRole.USER -> MaterialTheme.colorScheme.primary
+                                    MessageRole.ASSISTANT -> MaterialTheme.colorScheme.surface
+                                    MessageRole.TOOL -> MaterialTheme.colorScheme.surfaceVariant
+                                },
+                                border = if (message.role == MessageRole.ASSISTANT) {
+                                    BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                                } else null,
+                                // 用户气泡随内容自适应宽度，最大撑到与 AI 气泡同宽；AI/工具气泡填满可用宽度
+                                modifier = if (isUser) {
+                                    Modifier.widthIn(max = maxUserBubbleWidth)
+                                } else {
+                                    Modifier.fillMaxWidth()
+                                }
+                            ) {
+                                val textColor = when (message.role) {
+                                    MessageRole.USER -> MaterialTheme.colorScheme.onPrimary
+                                    else -> MaterialTheme.colorScheme.onSurface
+                                }
+                                SelectionContainer {
+                                    val selectionColors = if (isUser) {
+                                        TextSelectionColors(
+                                            handleColor = MaterialTheme.colorScheme.onPrimary,
+                                            backgroundColor = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.28f),
                                         )
                                     } else {
-                                        MarkdownContent(
-                                            text = message.content,
-                                            color = textColor,
-                                            modifier = Modifier.padding(horizontal = Spacing.sm, vertical = Spacing.sm),
-                                            cache = markdownCache
+                                        TextSelectionColors(
+                                            handleColor = MaterialTheme.colorScheme.primary,
+                                            backgroundColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.32f),
                                         )
+                                    }
+                                    CompositionLocalProvider(LocalTextSelectionColors provides selectionColors) {
+                                        if (isUser) {
+                                            Text(
+                                                text = message.content,
+                                                color = textColor,
+                                                style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 20.sp),
+                                                modifier = Modifier.padding(horizontal = Spacing.sm, vertical = Spacing.sm)
+                                            )
+                                        } else {
+                                            MarkdownContent(
+                                                text = message.content,
+                                                color = textColor,
+                                                modifier = Modifier.padding(horizontal = Spacing.sm, vertical = Spacing.sm),
+                                                cache = markdownCache
+                                            )
+                                        }
                                     }
                                 }
                             }
                         }
                     }
-                }
                 }
                 if (isUser && hasAttachments) {
                     MessageAttachmentPreviewRow(attachments = message.attachments)

@@ -123,6 +123,7 @@ internal fun ChatInputBar(
     modifier: Modifier = Modifier
 ) {
     val canSend = (value.isNotBlank() || pendingAttachments.isNotEmpty()) && !isBusy
+    val hasContent = value.isNotBlank() || pendingAttachments.isNotEmpty()
     var showAttachmentSheet by remember { mutableStateOf(false) }
     val showSlashMenu = !isBusy && slashCommands.isNotEmpty() &&
         value.startsWith("/") && !value.contains("\n")
@@ -259,8 +260,7 @@ internal fun ChatInputBar(
                         )
                     },
                     enabled = true,
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
-                    keyboardActions = KeyboardActions(onSend = { onSend() }),
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Default),
                     colors = TextFieldDefaults.colors(
                         focusedContainerColor = Color.Transparent,
                         unfocusedContainerColor = Color.Transparent,
@@ -346,7 +346,7 @@ internal fun ChatInputBar(
                         contentDescription = stringResource(R.string.chat_add_attachment),
                         onClick = { showAttachmentSheet = true }
                     )
-                    SendButton(canSend = canSend, isBusy = isBusy, tokenProgress = tokenProgress, onSend = onSend, onStop = onStop)
+                    SendButton(canSend = canSend, hasContent = hasContent, isBusy = isBusy, tokenProgress = tokenProgress, onSend = onSend, onStop = onStop)
                 }
             }
         }
@@ -396,12 +396,22 @@ internal fun UploadIconButton(
 }
 
 @Composable
-internal fun SendButton(canSend: Boolean, isBusy: Boolean, tokenProgress: Float, onSend: () -> Unit, onStop: () -> Unit) {
-    val clickable = isBusy || canSend
-    val buttonColor = if (clickable) {
-        if (isBusy) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.tertiary
-    } else {
-        MaterialTheme.colorScheme.surfaceVariant
+internal fun SendButton(
+    canSend: Boolean,
+    hasContent: Boolean,
+    isBusy: Boolean,
+    tokenProgress: Float,
+    onSend: () -> Unit,
+    onStop: () -> Unit
+) {
+    // AI 工作中：输入框为空显示停止按钮；有内容显示橙色发送（消息排队发送）；空闲时按常规发送按钮
+    val showStop = isBusy && !hasContent
+    val clickable = showStop || canSend
+    val buttonColor = when {
+        showStop -> MaterialTheme.colorScheme.error
+        isBusy -> Brand.Orange
+        canSend -> MaterialTheme.colorScheme.tertiary
+        else -> MaterialTheme.colorScheme.surfaceVariant
     }
     val iconTint = if (clickable) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
     val arcColor = buttonColor.copy(alpha = 0.85f)
@@ -433,10 +443,10 @@ internal fun SendButton(canSend: Boolean, isBusy: Boolean, tokenProgress: Float,
                 .size(36.dp)
                 .clip(CircleShape)
                 .background(buttonColor)
-                .clickable(enabled = clickable, onClick = if (isBusy) onStop else onSend),
+                .clickable(enabled = clickable, onClick = if (showStop) onStop else onSend),
             contentAlignment = Alignment.Center
         ) {
-            if (isBusy) {
+            if (showStop) {
                 Icon(
                     FeatherIcons.Square,
                     contentDescription = stringResource(R.string.chat_stop),

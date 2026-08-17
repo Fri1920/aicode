@@ -33,6 +33,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -191,19 +192,147 @@ private fun rememberThrottledStreamingText(text: String): String {
     return renderText
 }
 
+/** 打字机最低显示速率（字符/秒）：上游停顿时仍匀速追赶，保证能看到结尾。 */
+private const val TYPEWRITER_MIN_RATE = 30f
+
+/** 打字机显示速率上限（字符/秒）：防止模型爆发式吐字时显示被拉爆。 */
+private const val TYPEWRITER_MAX_RATE = 200f
+
+/** 显示速率 = 上游速率 × 该系数：略小于 1，保持「始终慢半拍」的滞后感。 */
+private const val TYPEWRITER_FOLLOW_RATIO = 0.9f
+
+/** 追赶系数（/秒）：显示进度落后越多追得越快，时间常数约 1/该值 秒。 */
+private const val TYPEWRITER_CATCHUP_PER_SEC = 0.5f
+
+/** 上游吐字速率估算的滑动窗口时长（ms）。 */
+private const val TYPEWRITER_RATE_WINDOW_MS = 500L
+
+/** 打字机渲染节流间隔（ms）：Markdown 解析频率上限约 1/间隔。 */
+private const val TYPEWRITER_RENDER_INTERVAL_MS = 100L
+
+/** 按码点数量截断字符串，避免把 emoji 等代理对截成孤立的半个字符。 */
+private fun truncateToCodePoints(text: String, codePoints: Int): String {
+    if (codePoints <= 0) return ""
+    if (codePoints >= text.codePointCount(0, text.length)) return text
+    var index = 0
+    var count = 0
+    while (index < text.length && count < codePoints) {
+        index += Character.charCount(text.codePointAt(index))
+        count++
+    }
+    return text.substring(0, index)
+}
+
+/**
+ * 速率自适应打字机：显示文本滞后于上游累积文本，打字速度跟随模型吐字速度。
+ *
+ * 上游每个 delta 都携带完整累积文本，到达节奏即模型吐字节奏。此处维护两个进度：
+ * 到达进度（[text] 的码点数）与显示进度（已展示的码点数）。显示进度由动画帧驱动，
+ * 每帧取「上游速率 × 跟随系数」与「按滞后量追赶」两者较大值（封顶 [TYPEWRITER_MAX_RATE]），
+ * 上游停顿时以 [TYPEWRITER_MIN_RATE] 兜底匀速追赶直至追平，避免停在半截。
+ *
+ * 渲染文本每 [TYPEWRITER_RENDER_INTERVAL_MS] 快照一次（throttle 而非 debounce，
+ * 保证打字期间渲染持续可见增长），把 md 解析频率压在 ~10fps；text 突变（新一轮 /
+ * 重试 / 切换会话）时显示进度归零重新打字。上游结束（[active] 变 false）时立即
+ * 显示完整文本，与落库消息无缝交接。
+ *
+ * 调用方应在 LazyColumn 之外持有本状态，避免尾巴 item 滚出视口被 dispose 后
+ * 重新组合导致打字进度丢失。
+ */
+@Composable
+internal fun rememberTypewriterStreamingText(text: String, active: Boolean): String {
+    var shownCodePoints by remember { mutableStateOf(0f) }
+    var renderText by remember { mutableStateOf("") }
+    // 上游到达事件窗口：(帧时间戳, 累计码点数)，用于估算吐字速率
+    val arrivals = remember { ArrayDeque<Pair<Long, Int>>() }
+    var lastArrivalNanos by remember { mutableStateOf(0L) }
+    var lastText by remember { mutableStateOf("") }
+
+    LaunchedEffect(text, active) {
+        // 文本不是简单前缀增长（新一轮/重试/切换会话）：显示进度归零重新打字
+        if (lastText.isNotEmpty() && !text.startsWith(lastText)) {
+            shownCodePoints = 0f
+            renderText = ""
+            arrivals.clear()
+            lastArrivalNanos = 0L
+        }
+        lastText = text
+
+        if (!active) {
+            // 上游已结束：直接显示完整文本，交给落库消息无缝接管
+            shownCodePoints = text.codePointCount(0, text.length).toFloat()
+            renderText = text
+            return@LaunchedEffect
+        }
+
+        // 记录本次到达事件，裁剪速率窗口（保留最近 WINDOW 内至少 2 条）
+        val now = System.nanoTime()
+        val codePoints = text.codePointCount(0, text.length)
+        if (lastArrivalNanos != 0L) {
+            arrivals.addLast(now to codePoints)
+            val windowNanos = TYPEWRITER_RATE_WINDOW_MS * 1_000_000L
+            while (arrivals.size > 2 && now - arrivals.first().first > windowNanos) {
+                arrivals.removeFirst()
+            }
+        }
+        lastArrivalNanos = now
+
+        // 帧驱动推进显示进度，追平本次文本即退出（text 再变化时本协程被取消重启）
+        var lastRenderNanos = 0L
+        var lastFrameNanos = 0L
+        while (shownCodePoints < codePoints) {
+            withFrameNanos { frameNanos ->
+                if (lastFrameNanos != 0L) {
+                    val dtSec = (frameNanos - lastFrameNanos) / 1_000_000_000f
+                    // 跟随项：上游速率 × 系数（滑动窗口估算）；追赶项：滞后越多追得越快
+                    var arrivalRate = 0f
+                    val oldest = arrivals.firstOrNull()
+                    if (arrivals.size >= 2 && oldest != null) {
+                        val spanSec = (frameNanos - oldest.first) / 1_000_000_000f
+                        if (spanSec > 0f) {
+                            arrivalRate = (arrivals.last().second - oldest.second) / spanSec
+                        }
+                    }
+                    val followRate = arrivalRate * TYPEWRITER_FOLLOW_RATIO
+                    val catchUpRate = (codePoints - shownCodePoints) * TYPEWRITER_CATCHUP_PER_SEC
+                    val rate = maxOf(followRate, catchUpRate)
+                        .coerceIn(TYPEWRITER_MIN_RATE, TYPEWRITER_MAX_RATE)
+                    shownCodePoints = (shownCodePoints + rate * dtSec)
+                        .coerceAtMost(codePoints.toFloat())
+                }
+                lastFrameNanos = frameNanos
+
+                // 渲染节流：到间隔就快照当前显示进度；追平瞬间强制渲染完整文本
+                val intervalNanos = TYPEWRITER_RENDER_INTERVAL_MS * 1_000_000L
+                if (frameNanos - lastRenderNanos >= intervalNanos || shownCodePoints >= codePoints) {
+                    val snapshot = truncateToCodePoints(text, shownCodePoints.toInt())
+                    if (snapshot != renderText) {
+                        lastRenderNanos = frameNanos
+                        renderText = snapshot
+                    }
+                }
+            }
+        }
+        // 追平后确保渲染完整文本（while 退出时 shownCodePoints 已到 available）
+        if (renderText != text) renderText = text
+    }
+    return renderText
+}
+
 /**
  * 模型流式吐字时的实时气泡：左对齐、与助手气泡同款。
  * 尾部带三个跳动的点表示仍在生成。本轮结束后由落库的助手气泡接管。
  *
- * 流式阶段也渲染 Markdown，但渲染文本经节流（见 [rememberThrottledStreamingText]），
- * 降低解析频率避免滞后；最终落库消息再走常规缓存渲染。
+ * 流式阶段以打字机效果渲染（打字进度由调用方经
+ * [rememberTypewriterStreamingText] 驱动，见 [AIChatPanel]），打字速度随模型吐字
+ * 速度自适应，上游结束时自动补全为完整文本，与落库消息无缝接力。
  */
 @Composable
 internal fun StreamingBubble(
     text: String,
     cache: MarkdownRenderCache? = null
 ) {
-    val renderText = rememberThrottledStreamingText(text)
+    val renderText = text
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.Start
@@ -250,7 +379,9 @@ internal fun ReasoningBubble(
     text: String,
     initiallyExpanded: Boolean = true,
     cache: MarkdownRenderCache? = null,
-    showTimer: Boolean = false
+    showTimer: Boolean = false,
+    /** 文本已由外部打字机驱动（流式尾巴场景），跳过内部防抖直接渲染。 */
+    preRendered: Boolean = false
 ) {
     var userToggled by remember { mutableStateOf(false) }
     var expanded by remember { mutableStateOf(initiallyExpanded) }
@@ -265,8 +396,9 @@ internal fun ReasoningBubble(
         }
     }
     val lineCount = remember(text) { text.count { it == '\n' } + 1 }
-    // 折叠判定/折叠预览用实时文本，展开渲染用节流文本（流式思考时降低 md 解析频率）
-    val renderText = rememberThrottledStreamingText(text)
+    // 折叠判定/折叠预览用实时文本，展开渲染用节流文本（流式思考时降低 md 解析频率）；
+    // preRendered 时外部已按打字机节奏给出渲染文本，直接使用。
+    val renderText = if (preRendered) text else rememberThrottledStreamingText(text)
     val overThreshold = lineCount > REASONING_COLLAPSE_LINE_LIMIT
     // 自动折叠：仅在用户尚未手动 toggle 过时生效；用户手动展开/折叠后以用户选择为准
     val effectiveExpanded = if (userToggled) expanded else (initiallyExpanded && !overThreshold)
