@@ -16,7 +16,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.Icon
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -33,7 +33,8 @@ import com.aicode.feature.agent.domain.model.ChatSession
 import compose.icons.FeatherIcons
 
 /**
- * 单条会话行：短按选中，长按弹出功能菜单（重命名/删除）。供侧边栏历史记录列表复用。
+ * 单条会话行：短按选中，长按弹出功能菜单（置顶/重命名/删除）。供侧边栏历史记录列表复用。
+ * 置顶会话显示浅蓝背景（primaryContainer）。
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -41,12 +42,15 @@ fun ChatSessionRow(
     session: ChatSession,
     selected: Boolean,
     isExecuting: Boolean = false,
+    pinned: Boolean = false,
     onClick: () -> Unit,
     onLongClick: () -> Unit
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .clip(RoundedCornerShape(10.dp))
+            .background(if (pinned) MaterialTheme.colorScheme.primaryContainer else Color.Transparent)
             .combinedClickable(
                 onClick = onClick,
                 onLongClick = onLongClick

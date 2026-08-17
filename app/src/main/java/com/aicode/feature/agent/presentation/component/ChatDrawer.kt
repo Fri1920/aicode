@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -19,6 +20,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -78,6 +80,7 @@ fun ChatDrawerContent(
     onSelect: (ChatSession) -> Unit,
     onDelete: (ChatSession) -> Unit,
     onRename: (ChatSession, String) -> Unit,
+    onTogglePin: (ChatSession) -> Unit,
     onExport: (ChatSession) -> Unit,
     onNavigateToSettings: () -> Unit,
     modifier: Modifier = Modifier
@@ -118,7 +121,13 @@ fun ChatDrawerContent(
                 )
             } else {
                 val groups = remember(sessions) {
-                    buildSessionGroups(sessions, System.currentTimeMillis())
+                    val now = System.currentTimeMillis()
+                    val pinned = sessions.filter { it.isPinned }
+                    val unpinned = sessions.filterNot { it.isPinned }
+                    buildList {
+                        if (pinned.isNotEmpty()) add(SessionGroup("pinned", pinned))
+                        addAll(buildSessionGroups(unpinned, now))
+                    }
                 }
                 LazyColumn(
                     state = listState,
@@ -130,13 +139,16 @@ fun ChatDrawerContent(
                         )
                         Column {
                             group.sessions.forEachIndexed { index, session ->
-                                if (index > 0) SettingsDivider()
+                                if (index > 0) {
+                                    if (group.groupKey == "pinned") Spacer(Modifier.height(Spacing.sm)) else SettingsDivider()
+                                }
                                 val state = agentStates[session.id]
                                 val isExecuting = state is AgentUIState.Loading || state is AgentUIState.Streaming
                                 ChatSessionRow(
                                     session = session,
                                     selected = session.id == currentSessionId,
                                     isExecuting = isExecuting,
+                                    pinned = session.isPinned,
                                     onClick = { onSelect(session) },
                                     onLongClick = { menuSession = session }
                                 )
@@ -176,6 +188,10 @@ fun ChatDrawerContent(
     menuSession?.let { session ->
         SessionActionSheet(
             session = session,
+            onTogglePin = {
+                menuSession = null
+                onTogglePin(session)
+            },
             onRename = {
                 menuSession = null
                 pendingRename = session
@@ -223,12 +239,13 @@ fun ChatDrawerContent(
 }
 
 /**
- * 会话行长按弹出的功能菜单：重命名 / 删除。底部 sheet 样式参照 git 分支的 RefActionSheet。
+ * 会话行长按弹出的功能菜单：置顶 / 重命名 / 导出 / 删除。底部 sheet 样式参照 git 分支的 RefActionSheet。
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun SessionActionSheet(
     session: ChatSession,
+    onTogglePin: () -> Unit,
     onRename: () -> Unit,
     onExport: () -> Unit,
     onDelete: () -> Unit,
@@ -254,6 +271,15 @@ private fun SessionActionSheet(
                 modifier = Modifier
                     .padding(horizontal = Spacing.lg)
                     .padding(bottom = Spacing.md)
+            )
+            SheetActionRow(
+                icon = Icons.Outlined.PushPin,
+                label = stringResource(if (session.isPinned) R.string.chat_unpin_session else R.string.chat_pin_session),
+                tint = MaterialTheme.colorScheme.onSurface,
+                onClick = {
+                    onDismiss()
+                    onTogglePin()
+                }
             )
             SheetActionRow(
                 icon = FeatherIcons.Edit2,
@@ -356,6 +382,7 @@ internal fun sessionGroupKey(updatedAt: Long, now: Long): String {
 
 @Composable
 private fun sessionGroupLabel(groupKey: String, anchorSession: ChatSession): String = when (groupKey) {
+    "pinned" -> stringResource(R.string.session_group_pinned)
     "today" -> stringResource(R.string.session_group_today)
     "yesterday" -> stringResource(R.string.session_group_yesterday)
     "7d" -> stringResource(R.string.session_group_last_7_days)

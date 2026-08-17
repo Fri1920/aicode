@@ -334,6 +334,7 @@ fun AppNavigation() {
                     },
                     onDelete = { agentViewModel.deleteSession(it.id) },
                     onRename = { session, title -> agentViewModel.renameSession(session.id, title) },
+                    onTogglePin = { agentViewModel.togglePinSession(it.id) },
                     onExport = { session ->
                         pendingExportSessionId = session.id
                         val safeTitle = session.title.replace(Regex("[^\\w\\u4e00-\\u9fa5\\-]"), "_")

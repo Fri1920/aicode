@@ -24,5 +24,6 @@ data class ChatSession(
     val model: String? = null,
     val totalInputTokens: Int = 0,
     val totalOutputTokens: Int = 0,
-    val lastInputTokens: Int = 0
+    val lastInputTokens: Int = 0,
+    val isPinned: Boolean = false
 )

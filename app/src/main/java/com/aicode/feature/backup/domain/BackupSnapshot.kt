@@ -139,7 +139,8 @@ data class ChatSessionDto(
     val mode: String = "BUILD",
     val reasoningEffort: String = "MEDIUM",
     val providerId: String? = null,
-    val model: String? = null
+    val model: String? = null,
+    val isPinned: Boolean = false
 )
 
 @Serializable

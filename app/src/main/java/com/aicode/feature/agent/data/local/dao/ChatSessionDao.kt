@@ -12,10 +12,10 @@ interface ChatSessionDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(session: ChatSessionEntity)
 
-    @Query("SELECT * FROM chat_sessions WHERE workspacePath = :workspacePath ORDER BY updatedAt DESC")
+    @Query("SELECT * FROM chat_sessions WHERE workspacePath = :workspacePath ORDER BY isPinned DESC, updatedAt DESC")
     fun getAllSessionsByWorkspace(workspacePath: String): Flow<List<ChatSessionEntity>>
 
-    @Query("SELECT * FROM chat_sessions WHERE workspacePath = :workspacePath ORDER BY updatedAt DESC")
+    @Query("SELECT * FROM chat_sessions WHERE workspacePath = :workspacePath ORDER BY isPinned DESC, updatedAt DESC")
     suspend fun getAllSessionsByWorkspaceOnce(workspacePath: String): List<ChatSessionEntity>
 
     @Query("SELECT * FROM chat_sessions")
@@ -36,6 +36,9 @@ interface ChatSessionDao {
 
     @Query("UPDATE chat_sessions SET updatedAt = :updatedAt WHERE id = :id")
     suspend fun touch(id: String, updatedAt: Long)
+
+    @Query("UPDATE chat_sessions SET isPinned = :pinned WHERE id = :id")
+    suspend fun updatePinned(id: String, pinned: Boolean)
 
     @Query("DELETE FROM chat_sessions WHERE id = :id")
     suspend fun delete(id: String)

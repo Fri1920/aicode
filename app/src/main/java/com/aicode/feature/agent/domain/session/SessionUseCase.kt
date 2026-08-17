@@ -76,6 +76,10 @@ class SessionUseCase @Inject constructor(
         chatSessionDao.updateTitle(sessionId, title)
     }
 
+    suspend fun updatePinned(sessionId: String, pinned: Boolean) {
+        chatSessionDao.updatePinned(sessionId, pinned)
+    }
+
     suspend fun touch(sessionId: String, timestamp: Long) {
         chatSessionDao.touch(sessionId, timestamp)
     }

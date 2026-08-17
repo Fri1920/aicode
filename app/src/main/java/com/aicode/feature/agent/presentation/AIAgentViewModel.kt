@@ -1165,6 +1165,12 @@ class AIAgentViewModel @Inject constructor(
         sessionUseCase.updateTitle(id, trimmed)
     }
 
+    /** 置顶/取消置顶会话。置顶后排在列表最前（置顶分组），不改 updatedAt。 */
+    fun togglePinSession(id: String) = viewModelScope.launch {
+        val pinned = sessions.value.find { it.id == id }?.isPinned ?: return@launch
+        sessionUseCase.updatePinned(id, !pinned)
+    }
+
     /** 导出单个会话为无密码备份格式（tar.gz），流式写入 [output]（调用方打开，本方法负责关闭）。成功回调 true，失败回调 false。 */
     fun exportSession(sessionId: String, output: OutputStream, onResult: (Boolean) -> Unit) = viewModelScope.launch {
         try {

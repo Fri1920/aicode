@@ -19,7 +19,8 @@ data class ChatSessionEntity(
     val model: String? = null,
     val totalInputTokens: Int = 0,
     val totalOutputTokens: Int = 0,
-    val lastInputTokens: Int = 0
+    val lastInputTokens: Int = 0,
+    val isPinned: Boolean = false
 ) {
     fun toDomain(): ChatSession = ChatSession(
         id = id,
@@ -33,7 +34,8 @@ data class ChatSessionEntity(
         model = model,
         totalInputTokens = totalInputTokens,
         totalOutputTokens = totalOutputTokens,
-        lastInputTokens = lastInputTokens
+        lastInputTokens = lastInputTokens,
+        isPinned = isPinned
     )
 
     companion object {
@@ -49,7 +51,8 @@ data class ChatSessionEntity(
             model = session.model,
             totalInputTokens = session.totalInputTokens,
             totalOutputTokens = session.totalOutputTokens,
-            lastInputTokens = session.lastInputTokens
+            lastInputTokens = session.lastInputTokens,
+            isPinned = session.isPinned
         )
     }
 }
