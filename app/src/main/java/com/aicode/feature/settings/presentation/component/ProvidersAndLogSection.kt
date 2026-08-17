@@ -1,7 +1,6 @@
 package com.aicode.feature.settings.presentation.component
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -26,7 +25,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.aicode.core.theme.Radius
 import com.aicode.core.theme.Spacing
 import com.aicode.feature.settings.domain.model.AIProviderConfig
 import compose.icons.FeatherIcons
@@ -85,7 +83,7 @@ internal fun EmptyHint(text: String) {
 }
 
 /**
- * 提供商行：布局与 MCP 列表行一致——左侧品牌 logo + 状态圆点，
+ * 提供商行：布局与 MCP 列表行一致——左侧品牌 logo，
  * 中部两行（名称 / 类型 + 模型数量 pills），右侧状态 pill + 箭头。
  * 整行点击进入编辑，左滑露出删除按钮。
  */
@@ -98,7 +96,6 @@ fun ProviderItem(
     // 状态色与 MCP 行一致：启用用主题 tertiary（绿调），停用用 outline（灰）。
     val statusColor = if (provider.isEnabled) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.outline
     val light = settingsLightMode()
-    val rowBackground = if (light) Color.White else MaterialTheme.colorScheme.surface
 
     SwipeToDeleteRow(
         onDelete = onDelete,
@@ -111,7 +108,7 @@ fun ProviderItem(
                 .padding(horizontal = Spacing.lg, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // 左侧品牌 logo 容器 + 状态圆点
+            // 左侧品牌 logo 容器
             Box(
                 modifier = Modifier
                     .size(40.dp)
@@ -124,14 +121,6 @@ fun ProviderItem(
                     provider = provider,
                     size = 22.dp,
                     modifier = Modifier.size(22.dp).align(Alignment.Center)
-                )
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.BottomEnd)
-                        .padding(1.dp)
-                        .size(8.dp)
-                        .background(color = statusColor, shape = RoundedCornerShape(Radius.pill))
-                        .border(1.5.dp, rowBackground, RoundedCornerShape(Radius.pill))
                 )
             }
 

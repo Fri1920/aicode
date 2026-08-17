@@ -2,7 +2,6 @@ package com.aicode.feature.settings.presentation.component
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -187,30 +186,29 @@ private fun SkillRow(
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(20.dp)
                 )
-                // 启停状态点：启用为主色调，禁用为灰色（与 MCP 行图标右下角一致）
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.BottomEnd)
-                        .padding(1.dp)
-                        .size(8.dp)
-                        .background(
-                            color = if (entry.disabled) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.tertiary,
-                            shape = RoundedCornerShape(Radius.pill)
-                        )
-                        .border(1.5.dp, rowBackground, RoundedCornerShape(Radius.pill))
-                )
             }
 
             Spacer(modifier = Modifier.width(Spacing.md))
 
             Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = entry.name,
-                    style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium),
-                    color = if (light) Color(0xFF0F0F0F) else MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Text(
+                        text = entry.name,
+                        style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium),
+                        color = if (light) Color(0xFF0F0F0F) else MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false)
+                    )
+                    McpPill(
+                        text = stringResource(if (entry.disabled) R.string.common_disabled else R.string.common_enabled),
+                        textColor = if (entry.disabled) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.tertiary,
+                        backgroundColor = (if (entry.disabled) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.tertiary).copy(alpha = 0.12f)
+                    )
+                }
                 Text(
                     text = entry.description.ifBlank { stringResource(R.string.mcp_no_description) },
                     style = MaterialTheme.typography.bodyMedium,

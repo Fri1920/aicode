@@ -308,7 +308,7 @@ internal fun McpServerRow(
                 .padding(horizontal = Spacing.lg, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // 左侧容器图标 + 状态圆点
+            // 左侧容器图标
             Box(
                 modifier = Modifier
                     .size(40.dp)
@@ -324,14 +324,6 @@ internal fun McpServerRow(
                     modifier = Modifier
                         .size(22.dp)
                         .align(Alignment.Center)
-                )
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.BottomEnd)
-                        .padding(1.dp)
-                        .size(8.dp)
-                        .background(color = statusColor, shape = RoundedCornerShape(Radius.pill))
-                        .border(1.5.dp, rowBackground, RoundedCornerShape(Radius.pill))
                 )
             }
 

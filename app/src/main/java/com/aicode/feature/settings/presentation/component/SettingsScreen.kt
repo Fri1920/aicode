@@ -613,7 +613,7 @@ fun SettingsScreen(
                             modifier = Modifier
                                 .weight(1f)
                                 .verticalScroll(rememberScrollState())
-                                .padding(top = 8.dp)
+                                .padding(top = 8.dp, bottom = Spacing.lg)
                         ) {
                             MarkdownContent(
                                 text = containerAnnouncementText,
