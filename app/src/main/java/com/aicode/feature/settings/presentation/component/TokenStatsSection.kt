@@ -458,6 +458,7 @@ private val COL_TIME_W = 120.dp
 private val COL_STATUS_W = 70.dp
 private val COL_TOKENS_W = 60.dp
 private val COL_DURATION_W = 62.dp
+private val COL_EFFORT_W = 72.dp
 private val COL_COST_W = 80.dp
 
 @Composable
@@ -479,6 +480,7 @@ private fun CallRecordsTable(
                     TableCell(stringResource(R.string.settings_token_stats_col_time), mutedColor, COL_TIME_W, FontWeight.Medium)
                     TableCell(stringResource(R.string.settings_token_stats_col_provider), mutedColor, COL_PROVIDER_W, FontWeight.Medium)
                     TableCell(stringResource(R.string.settings_token_stats_col_model), mutedColor, COL_MODEL_W, FontWeight.Medium)
+                    TableCell(stringResource(R.string.settings_token_stats_col_reasoning_effort), mutedColor, COL_EFFORT_W, FontWeight.Medium)
                     TableCell(stringResource(R.string.settings_token_stats_col_status), mutedColor, COL_STATUS_W, FontWeight.Medium)
                     TableCell(stringResource(R.string.settings_token_stats_col_input), mutedColor, COL_TOKENS_W, FontWeight.Medium)
                     TableCell(stringResource(R.string.settings_token_stats_col_output), mutedColor, COL_TOKENS_W, FontWeight.Medium)
@@ -526,6 +528,7 @@ private fun CallRecordRow(call: RecentCallRecord, cost: Double?, textColor: Colo
         TableCell(formatCallTime(call.record.createdAt), mutedColor, COL_TIME_W)
         TableCell(call.providerName ?: call.record.providerId ?: stringResource(R.string.settings_token_stats_unknown), textColor, COL_PROVIDER_W)
         TableCell(call.record.model ?: stringResource(R.string.settings_token_stats_unknown), textColor, COL_MODEL_W)
+        TableCell(call.record.reasoningEffort ?: "-", mutedColor, COL_EFFORT_W)
         TableCell(call.record.status, statusColor, COL_STATUS_W, FontWeight.Medium)
         TableCell(call.record.inputTokens.toString(), textColor, COL_TOKENS_W)
         TableCell(call.record.outputTokens.toString(), textColor, COL_TOKENS_W)

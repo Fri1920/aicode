@@ -455,6 +455,8 @@ class StatefulAgentWorkflow @Inject constructor(
                                         send(AgentEvent.AssistantDelta(acc.toString()))
                                     }
                                     is AIStreamChunk.ReasoningDelta -> {
+                                        // 思考内容也算首字（推理模型先吐思考再吐正文）
+                                        if (ttfbElapsed == null) ttfbElapsed = SystemClock.elapsedRealtime() - callStartElapsed
                                         reasoningAcc.append(chunk.text)
                                         send(AgentEvent.ReasoningDelta(reasoningAcc.toString()))
                                     }
@@ -463,7 +465,11 @@ class StatefulAgentWorkflow @Inject constructor(
                                         reasoningAcc.setLength(0)
                                         send(AgentEvent.Retrying(chunk.attempt, chunk.maxRetries, chunk.error))
                                     }
-                                    is AIStreamChunk.Final -> finalResponse = chunk.response
+                                    is AIStreamChunk.Final -> {
+                                        // 纯工具调用轮没有文本/思考增量，Final 是首个内容事件，兜底记为 TTFB
+                                        if (ttfbElapsed == null) ttfbElapsed = SystemClock.elapsedRealtime() - callStartElapsed
+                                        finalResponse = chunk.response
+                                    }
                                 }
                             }
                             val aiResponse = finalResponse ?: AIResponse(content = acc.toString())
@@ -499,6 +505,7 @@ class StatefulAgentWorkflow @Inject constructor(
                                         sessionId = currentContext.sessionId,
                                         providerId = providerInUse.providerId.ifBlank { null },
                                         model = providerInUse.model,
+                                        reasoningEffort = currentContext.reasoningEffort,
                                         kind = callKind,
                                         inputTokens = usage?.inputTokens ?: 0,
                                         outputTokens = usage?.outputTokens ?: 0,

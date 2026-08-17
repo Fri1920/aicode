@@ -23,6 +23,8 @@ data class LlmCallRecordEntity(
     val providerId: String? = null,
     /** 实际调用模型（含压缩 fallback 模型）。 */
     val model: String? = null,
+    /** 本次调用的思考强度（ReasoningEffort.apiValue，如 "medium"）；未设置/无档位模型为 null。 */
+    val reasoningEffort: String? = null,
     /** 调用类型：chat（普通对话）/ compaction（上下文压缩）。历史数据含已废弃的 vision（识图轮）。 */
     val kind: String = "chat",
     val inputTokens: Int = 0,
