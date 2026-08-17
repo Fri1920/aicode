@@ -1,12 +1,22 @@
 package com.aicode.feature.agent.domain.memory
 
+import com.aicode.feature.agent.domain.container.ContainerInstaller
+import com.aicode.feature.agent.domain.container.RemoteSshConnection
+import com.aicode.feature.settings.data.repository.ExecutionModeHolder
 import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
 class MemoryRepository @Inject constructor(
-    private val globalMemorySource: GlobalMemorySource
+    private val globalMemorySource: GlobalMemorySource,
+    private val executionModeHolder: ExecutionModeHolder,
+    private val containerInstaller: ContainerInstaller,
+    private val remoteSshConnection: RemoteSshConnection
 ) {
+    /** 按当前会话 projectRoot 创建项目级数据源（内部按执行模式决定存储位置）。 */
+    private fun projectSource(projectRoot: String) =
+        ProjectMemorySource(projectRoot, executionModeHolder, containerInstaller, remoteSshConnection)
+
     /** 扫描并聚合全局和项目级的 memory。同名 memory 项目级优先。 */
     fun listMemories(projectRoot: String?): List<Memory> {
         val allMemories = mutableListOf<Memory>()
@@ -16,8 +26,7 @@ class MemoryRepository @Inject constructor(
         
         // 2. 加载项目记忆（如果有）
         if (!projectRoot.isNullOrBlank()) {
-            val projectSource = ProjectMemorySource(projectRoot)
-            allMemories.addAll(projectSource.listMemories())
+            allMemories.addAll(projectSource(projectRoot).listMemories())
         }
         
         // 去重：按 name 小写分组，保留最后加入的（即项目级优先覆盖全局级）
@@ -30,8 +39,7 @@ class MemoryRepository @Inject constructor(
     fun loadContent(name: String, projectRoot: String?): String? {
         // 优先从项目级读取
         if (!projectRoot.isNullOrBlank()) {
-            val projectSource = ProjectMemorySource(projectRoot)
-            val content = projectSource.loadContent(name)
+            val content = projectSource(projectRoot).loadContent(name)
             if (content != null) return content
         }
         // 回退到全局读取
@@ -43,7 +51,7 @@ class MemoryRepository @Inject constructor(
             MemoryScope.GLOBAL -> globalMemorySource.saveMemory(name, description, content)
             MemoryScope.PROJECT -> {
                 if (projectRoot.isNullOrBlank()) false
-                else ProjectMemorySource(projectRoot).saveMemory(name, description, content)
+                else projectSource(projectRoot).saveMemory(name, description, content)
             }
         }
     }
@@ -53,7 +61,7 @@ class MemoryRepository @Inject constructor(
             MemoryScope.GLOBAL -> globalMemorySource.editMemory(name, edits)
             MemoryScope.PROJECT -> {
                 if (projectRoot.isNullOrBlank()) MemoryEditResult.Error("NO_WORKSPACE", "当前未选择工作区，无法编辑项目级记忆")
-                else ProjectMemorySource(projectRoot).editMemory(name, edits)
+                else projectSource(projectRoot).editMemory(name, edits)
             }
         }
     }
@@ -63,7 +71,7 @@ class MemoryRepository @Inject constructor(
             MemoryScope.GLOBAL -> globalMemorySource.deleteMemory(name)
             MemoryScope.PROJECT -> {
                 if (projectRoot.isNullOrBlank()) false
-                else ProjectMemorySource(projectRoot).deleteMemory(name)
+                else projectSource(projectRoot).deleteMemory(name)
             }
         }
     }
