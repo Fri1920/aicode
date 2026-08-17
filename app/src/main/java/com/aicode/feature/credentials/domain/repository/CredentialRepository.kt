@@ -16,7 +16,4 @@ interface CredentialRepository {
     suspend fun save(credential: GitCredential)
 
     suspend fun delete(id: String)
-
-    /** 切换某条是否为该 host 的默认凭据(host 内唯一)。 */
-    suspend fun setDefault(id: String, isDefault: Boolean)
 }

@@ -5,16 +5,19 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.aicode.R
 import com.aicode.core.util.FileLogger
-import com.aicode.feature.credentials.data.GitCredentialsFileSync
+import com.aicode.feature.agent.domain.container.RemoteSshConnection
+import com.aicode.feature.credentials.data.CredentialInjectSettingsRepository
 import com.aicode.feature.credentials.domain.model.GitCredential
 import com.aicode.feature.credentials.domain.repository.CredentialRepository
 import com.aicode.feature.git.domain.GitRepository
+import com.aicode.feature.workspace.data.repository.WorkspaceRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -31,7 +34,9 @@ import javax.inject.Inject
 class CredentialViewModel @Inject constructor(
     private val credentialRepository: CredentialRepository,
     private val gitRepository: GitRepository,
-    private val fileSync: GitCredentialsFileSync,
+    private val injectSettings: CredentialInjectSettingsRepository,
+    private val remoteSshConnection: RemoteSshConnection,
+    private val workspaceRepository: WorkspaceRepository,
     @param:ApplicationContext private val context: Context
 ) : ViewModel() {
 
@@ -47,16 +52,25 @@ class CredentialViewModel @Inject constructor(
         val globalUserName: String = "",
         /** 容器 git config 当前 remote.origin.url，作仓库地址编辑框初值。 */
         val repoUrl: String = "",
+        /** 远程模式下「自动注入凭证到远程服务器」开关状态（按服务器独立记忆）。 */
+        val autoInjectEnabled: Boolean = false,
+        /** 远程模式下该服务器是否首次进入（未询问过），UI 据此弹确认框。 */
+        val showAutoInjectPrompt: Boolean = false,
+        /** 当前是否远程模式（决定开关是否显示）。 */
+        val isRemote: Boolean = false,
         val toast: String? = null
     )
 
-    // 非反应式来源的状态：git config 读出的署名、仓库地址、toast。credentials 走 Room Flow。
+    // 非反应式来源的状态：git config 读出的署名、仓库地址、注入开关、toast。credentials 走文件仓储 Flow。
     private val _extra = MutableStateFlow(Extra())
     private data class Extra(
         val userName: String = "",
         val userEmail: String = "",
         val globalUserName: String = "",
         val repoUrl: String = "",
+        val autoInjectEnabled: Boolean = false,
+        val showAutoInjectPrompt: Boolean = false,
+        val isRemote: Boolean = false,
         val toast: String? = null
     )
 
@@ -67,14 +81,16 @@ class CredentialViewModel @Inject constructor(
             userEmail = extra.userEmail,
             globalUserName = extra.globalUserName,
             repoUrl = extra.repoUrl,
+            autoInjectEnabled = extra.autoInjectEnabled,
+            showAutoInjectPrompt = extra.showAutoInjectPrompt,
+            isRemote = extra.isRemote,
             toast = extra.toast
         )
     }.stateIn(viewModelScope, SharingStarted.Eagerly, UiState())
 
     init {
         refreshIdentity()
-        // 兜底：把 Room 凭据落盘到容器持久挂载，保证升级后或文件被删时仍就位（详见 GitCredentialsFileSync）。
-        viewModelScope.launch { fileSync.syncAll() }
+        refreshAutoInjectState()
     }
 
     /** 从容器 git config 读取当前署名与仓库地址刷新 UI（编辑框初值 + 实际值回显）。可重入，进凭据页时调一次兜住终端改动。 */
@@ -97,7 +113,7 @@ class CredentialViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 credentialRepository.save(credential)
-                fileSync.syncAll() // 落盘到容器持久挂载，UI/终端/AI 三端共用
+                syncInjectionIfEnabled() // 凭据变更后重新同步到已开启注入的远程服务器
                 toast(context.getString(R.string.credential_toast_saved))
             } catch (e: Exception) {
                 FileLogger.e(TAG, "保存凭据失败", e)
@@ -109,16 +125,69 @@ class CredentialViewModel @Inject constructor(
     fun deleteCredential(id: String) {
         viewModelScope.launch {
             credentialRepository.delete(id)
-            fileSync.syncAll() // 删凭据后从落盘文件移除，否则终端/AI 仍能用旧凭据
+            syncInjectionIfEnabled() // 删凭据后从远程注入文件移除，否则远程仍能用旧凭据
             toast(context.getString(R.string.credential_toast_deleted))
         }
     }
 
-    fun setDefault(id: String, isDefault: Boolean) {
-        viewModelScope.launch {
-            credentialRepository.setDefault(id, isDefault)
-            fileSync.syncAll() // 切默认后落盘文件随之更新，三端按新默认条带凭据
+    // ---------- 远程自动注入开关 ----------
+
+    /** 当前远程服务器标识（host:port 哈希）；本地模式/未连接时为 null。 */
+    private fun currentServerKey(): String? {
+        val cfg = remoteSshConnection.config ?: return null
+        return injectSettings.serverKey(cfg.host, cfg.port)
+    }
+
+    /** 按当前服务器刷新开关状态与「是否首次询问」。进入凭据页/连接变化时调用。 */
+    fun refreshAutoInjectState() {
+        val key = currentServerKey()
+        _extra.update {
+            it.copy(
+                isRemote = key != null,
+                autoInjectEnabled = key?.let { k -> injectSettings.isAutoInjectEnabled(k) } ?: false,
+                showAutoInjectPrompt = key?.let { k -> !injectSettings.hasAsked(k) } ?: false
+            )
         }
+    }
+
+    /** 用户切换开关：持久化 + 立即注入/撤销。 */
+    fun setAutoInject(enabled: Boolean) {
+        viewModelScope.launch {
+            val key = currentServerKey() ?: return@launch
+            injectSettings.setAutoInject(key, enabled)
+            applyInjection(key, enabled)
+            refreshAutoInjectState()
+        }
+    }
+
+    /** 首次询问弹窗选择后调用：标记已询问 + 应用选择。 */
+    fun dismissAutoInjectPrompt(enabled: Boolean) {
+        viewModelScope.launch {
+            val key = currentServerKey() ?: return@launch
+            injectSettings.markAsked(key)
+            injectSettings.setAutoInject(key, enabled)
+            applyInjection(key, enabled)
+            refreshAutoInjectState()
+        }
+    }
+
+    /** 开启时上传远程注入配置（凭据 + includeIf 限定的 gitconfig），关闭时撤销。 */
+    private suspend fun applyInjection(key: String, enabled: Boolean) {
+        if (!enabled) {
+            remoteSshConnection.removeGitCredentialConfig()
+            return
+        }
+        val creds = credentialRepository.getAll().first()
+        val workspaceRoot = workspaceRepository.currentPath()
+            .takeIf { it.isNotBlank() && it != "/" }
+            ?: remoteSshConnection.config?.remoteWorkspacePath.orEmpty()
+        remoteSshConnection.uploadGitCredentialConfig(creds, workspaceRoot)
+    }
+
+    /** 凭据增删后若当前服务器已开启注入，重新同步到远程。 */
+    private suspend fun syncInjectionIfEnabled() {
+        val key = currentServerKey() ?: return
+        if (injectSettings.isAutoInjectEnabled(key)) applyInjection(key, true)
     }
 
     /** 保存提交署名与仓库地址：跑 `git config` 写入对应 key 真源 + 刷新回显。UI 与命令行同一文件。 */

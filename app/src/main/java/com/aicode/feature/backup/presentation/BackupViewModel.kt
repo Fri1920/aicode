@@ -54,7 +54,6 @@ class BackupViewModel @Inject constructor(
         _exportOptions.value = options
         prefs.edit()
             .putBoolean(KEY_PROVIDERS, options.providers)
-            .putBoolean(KEY_GIT_CREDENTIALS, options.gitCredentials)
             .putBoolean(KEY_REMOTE_CONNECTIONS, options.remoteConnections)
             .putBoolean(KEY_CHAT_HISTORY, options.chatHistory)
             .putBoolean(KEY_MCP_SERVERS, options.mcpServers)
@@ -66,7 +65,6 @@ class BackupViewModel @Inject constructor(
 
     private fun loadExportOptions(): BackupOptions = BackupOptions(
         providers = prefs.getBoolean(KEY_PROVIDERS, true),
-        gitCredentials = prefs.getBoolean(KEY_GIT_CREDENTIALS, true),
         remoteConnections = prefs.getBoolean(KEY_REMOTE_CONNECTIONS, true),
         chatHistory = prefs.getBoolean(KEY_CHAT_HISTORY, true),
         mcpServers = prefs.getBoolean(KEY_MCP_SERVERS, true),
@@ -158,7 +156,6 @@ class BackupViewModel @Inject constructor(
 
     companion object {
         private const val KEY_PROVIDERS = "providers"
-        private const val KEY_GIT_CREDENTIALS = "git_credentials"
         private const val KEY_REMOTE_CONNECTIONS = "remote_connections"
         private const val KEY_CHAT_HISTORY = "chat_history"
         private const val KEY_MCP_SERVERS = "mcp_servers"

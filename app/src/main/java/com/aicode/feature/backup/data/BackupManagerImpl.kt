@@ -20,7 +20,6 @@ import com.aicode.feature.backup.domain.BackupMetadata
 import com.aicode.feature.backup.domain.BackupOptions
 import com.aicode.feature.backup.domain.BackupSnapshot
 import com.aicode.feature.backup.domain.ChatSessionDto
-import com.aicode.feature.backup.domain.GitCredentialDto
 import com.aicode.feature.backup.domain.ImportPreview
 import com.aicode.feature.backup.domain.ProviderDto
 import com.aicode.feature.backup.domain.RemoteConnectionDto
@@ -29,8 +28,6 @@ import com.aicode.feature.backup.domain.RestoreStats
 import com.aicode.feature.backup.domain.TodoItemDto
 import com.aicode.feature.backup.domain.WorkspaceBackupMeta
 import com.aicode.feature.backup.domain.toMetadata
-import com.aicode.feature.credentials.data.local.dao.GitCredentialDao
-import com.aicode.feature.credentials.data.local.entity.GitCredentialEntity
 import com.aicode.feature.settings.data.local.dao.AIProviderDao
 import com.aicode.feature.settings.data.local.entity.AIProviderEntity
 import com.aicode.feature.settings.data.repository.CompactionModelSettingsRepository
@@ -48,6 +45,7 @@ import com.aicode.feature.workspace.domain.model.RemoteProtocol
 import com.aicode.feature.workspace.domain.model.Workspace
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.json.Json
@@ -70,7 +68,6 @@ import javax.inject.Singleton
 class BackupManagerImpl @Inject constructor(
     @param:ApplicationContext private val context: Context,
     private val aiProviderDao: AIProviderDao,
-    private val gitCredentialDao: GitCredentialDao,
     private val remoteConnectionDao: RemoteConnectionDao,
     private val chatSessionDao: ChatSessionDao,
     private val agentMessageDao: AgentMessageDao,
@@ -311,7 +308,6 @@ class BackupManagerImpl @Inject constructor(
         appVersion = appVersionName(),
         createdAt = System.currentTimeMillis(),
         providers = if (options.providers) aiProviderDao.getAllProvidersOnce().map { it.toDto() } else emptyList(),
-        gitCredentials = if (options.gitCredentials) gitCredentialDao.getAllOnce().map { it.toDto() } else emptyList(),
         remoteConnections = if (options.remoteConnections) remoteConnectionDao.getAllConnectionsOnce().map { it.toDto() } else emptyList(),
         remoteMounts = if (options.remoteConnections) remoteConnectionDao.getAllMountsOnce().map { it.toDto() } else emptyList(),
         mcpServers = if (options.mcpServers) mcpConfigRepository.getGlobalServers() else emptyList(),
@@ -543,9 +539,6 @@ class BackupManagerImpl @Inject constructor(
         if (meta.providers.isNotEmpty()) {
             aiProviderDao.insertAllProviders(meta.providers.map { it.toEntity() })
         }
-        if (meta.gitCredentials.isNotEmpty()) {
-            gitCredentialDao.upsertAll(meta.gitCredentials.map { it.toEntity() })
-        }
         if (meta.remoteConnections.isNotEmpty()) {
             remoteConnectionDao.insertAllConnections(meta.remoteConnections.map { it.toEntity() })
         }
@@ -573,7 +566,6 @@ class BackupManagerImpl @Inject constructor(
 
         return RestoreStats(
             providers = meta.providers.size,
-            gitCredentials = meta.gitCredentials.size,
             remoteConnections = meta.remoteConnections.size,
             remoteMounts = meta.remoteMounts.size,
             mcpServers = meta.mcpServers.size,
@@ -628,9 +620,6 @@ class BackupManagerImpl @Inject constructor(
         id, name, type, apiKey, baseUrl, defaultModel, models, selectedModel, isEnabled, useFullUrl, useResponseApi,
         anthropicCacheBreakpoints ?: true, openaiChatCacheKey ?: false
     )
-
-    private fun GitCredentialEntity.toDto() = GitCredentialDto(id, host, username, token, label, isDefault, createdAt, updatedAt)
-    private fun GitCredentialDto.toEntity() = GitCredentialEntity(id, host, username, token, label, isDefault, createdAt, updatedAt)
 
     private fun RemoteConnectionEntity.toDto() = RemoteConnectionDto(
         id, name, protocol.name, host, port, username, authType, authData, passphrase

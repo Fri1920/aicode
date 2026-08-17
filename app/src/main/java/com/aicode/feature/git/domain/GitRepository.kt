@@ -39,7 +39,8 @@ class GitRepository @Inject constructor(
     /**
      * 执行一条 `git` 子命令，返回合并后的 stdout+stderr 文本。仅用于只读命令（status/branches/log/remote 等）：
      * 这些靠输出解析、容错，git 非零退出码不会让 UI 误判（解析得空罢了）。凭据由 `credential.helper=store`
-     * 经落盘文件自动注入（见 [GitCredentialsFileSync]），不在此按命令塞 `http.extraHeader`。
+     * 经凭据文件自动注入（见 [com.aicode.feature.credentials.data.repository.FileCredentialRepository]），
+     * 不在此按命令塞 `http.extraHeader`。
      * 每条参数经 [shellQuote] 单引号转义，含空格/特殊字符的值（提交消息、含空格路径等）安全传递。
      */
     private suspend fun git(

@@ -77,7 +77,6 @@ import com.aicode.feature.agent.domain.tool.search.WebFetchTool
 import com.aicode.feature.agent.domain.tool.search.WebSearchTool
 import com.aicode.feature.agent.domain.workflow.ContextCompactor
 import com.aicode.feature.agent.domain.workflow.StatefulAgentWorkflow
-import com.aicode.feature.credentials.data.local.dao.GitCredentialDao
 import com.aicode.feature.settings.data.repository.CompactionModelSettingsRepository
 import com.aicode.feature.settings.data.repository.DefaultModelSettingsRepository
 import com.aicode.feature.settings.data.repository.TitleModelSettingsRepository
@@ -140,12 +139,6 @@ object AgentModule {
     @Singleton
     fun provideTodoItemDao(database: AgentDatabase): TodoItemDao {
         return database.todoItemDao()
-    }
-
-    @Provides
-    @Singleton
-    fun provideGitCredentialDao(database: AgentDatabase): GitCredentialDao {
-        return database.gitCredentialDao()
     }
 
     @Provides

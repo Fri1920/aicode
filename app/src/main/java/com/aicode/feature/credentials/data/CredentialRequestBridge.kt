@@ -5,7 +5,6 @@ import android.os.FileObserver
 import com.aicode.core.util.FileLogger
 import com.aicode.feature.agent.domain.container.LinuxContainerEngine
 import com.aicode.feature.credentials.domain.model.GitCredential
-import com.aicode.feature.credentials.domain.model.newCredentialId
 import com.aicode.feature.credentials.domain.repository.CredentialRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
@@ -47,7 +46,6 @@ import javax.inject.Singleton
 class CredentialRequestBridge @Inject constructor(
     @param:ApplicationContext private val context: Context,
     private val credentialRepository: CredentialRepository,
-    private val fileSync: GitCredentialsFileSync,
     private val containerEngine: LinuxContainerEngine
 ) {
     private companion object {
@@ -141,7 +139,7 @@ class CredentialRequestBridge @Inject constructor(
     }
 
     /**
-     * 用户填完凭据确认：写响应明文 KV + 存 Room（默认条）+ syncAll 落 store（后续免填）+ dec 在途 + 清 [request]。
+     * 用户填完凭据确认：写响应明文 KV + 存凭据文件（每主机一条，后续免填）+ dec 在途 + 清 [request]。
      * [host] 取自 [CredentialRequest]（Git 进程在收到 resp 前不会删 req，但 host 已在请求里，直接传更稳）。
      */
     fun respond(requestId: String, host: String, username: String, token: String) {
@@ -149,15 +147,10 @@ class CredentialRequestBridge @Inject constructor(
         scope.launch {
             writeRespAtomically(dir, requestId, "username=$username\npassword=$token\n")
             runCatching {
-                val cred = GitCredential(
-                    id = newCredentialId(),
-                    host = host.trim().lowercase(),
-                    username = username.trim(),
-                    token = token,
-                    isDefault = true
+                val h = host.trim().lowercase()
+                credentialRepository.save(
+                    GitCredential(id = h, host = h, username = username.trim(), token = token)
                 )
-                credentialRepository.save(cred)
-                fileSync.syncAll()
             }.onFailure { FileLogger.e(TAG, "保存回填凭据失败", it) }
             containerEngine.decPromptInFlight()
             clearIfCurrent(requestId)
@@ -180,7 +173,7 @@ class CredentialRequestBridge @Inject constructor(
         if (_request.value?.requestId == requestId) _request.value = null
     }
 
-    /** 先写 .tmp 再 rename 原子写，避免 helper 轮询读到半截文件。仿 [GitCredentialsFileSync] 的写法。 */
+    /** 先写 .tmp 再 rename 原子写，避免 helper 轮询读到半截文件。 */
     private fun writeRespAtomically(dir: File, requestId: String, content: String) {
         val target = File(dir, RESP_PREFIX + requestId)
         val tmp = File(dir, "$RESP_PREFIX${requestId}.tmp")

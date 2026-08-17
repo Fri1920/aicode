@@ -2,6 +2,7 @@ package com.aicode.feature.agent.domain.container
 
 import com.aicode.core.util.FileLogger
 import com.aicode.feature.workspace.domain.remote.RemoteAuth
+import com.aicode.feature.credentials.domain.model.GitCredential
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -261,6 +262,86 @@ class RemoteSshConnection @Inject constructor(
             }.onFailure { FileLogger.w(TAG, "同步文档到远程失败", it) }
         }
     }
+
+    /**
+     * 把 App 的 git 凭据注入远程服务器（仅当用户开启「自动注入」时调用）：
+     * 写 `~/.aicode/git-credentials`（store 格式）+ `~/.aicode/gitconfig` + `~/.aicode/gitconfig.credential`。
+     *
+     * 生效机制：[RemoteSshEngine] 执行命令时注入 `GIT_CONFIG_GLOBAL=$HOME/.aicode/gitconfig`，其中
+     * `[include] path=~/.gitconfig` 保留服务器用户自己的全局配置（署名等），`[includeIf "gitdir:<工作区根>/"]`
+     * 限定只有工作区根目录下的仓库才加载 store helper——不影响用户在服务器上手动 git，也不影响其它目录的仓库。
+     *
+     * @param credentials 要注入的凭据列表（每 host 一条）。
+     * @param workspaceRoot 远程工作区根路径（AI 的 ~/workspace 映射目录），限定注入范围。
+     */
+    suspend fun uploadGitCredentialConfig(credentials: List<GitCredential>, workspaceRoot: String) {
+        val client = sshClient ?: return
+        val home = remoteHome ?: return
+        val aicodeDir = home.trimEnd('/') + "/.aicode"
+        val wsRoot = workspaceRoot.trimEnd('/').ifEmpty { return }
+        withContext(Dispatchers.IO) {
+            runCatching {
+                val mkdirSession = client.startSession()
+                mkdirSession.exec("mkdir -p '$aicodeDir'").join()
+                mkdirSession.close()
+
+                val creds = credentials.joinToString("\n") { c ->
+                    "https://${enc(c.username)}:${enc(c.token)}@${c.host}"
+                }.let { if (it.isNotEmpty()) "$it\n" else "" }
+                writeRemoteFile(client, "$aicodeDir/git-credentials", creds)
+
+                val gitconfig = buildString {
+                    append("[include]\n")
+                    append("    path = ~/.gitconfig\n")
+                    append("[includeIf \"gitdir:$wsRoot/\"]\n")
+                    append("    path = ~/.aicode/gitconfig.credential\n")
+                }
+                writeRemoteFile(client, "$aicodeDir/gitconfig", gitconfig)
+
+                val credentialConfig = buildString {
+                    append("[credential]\n")
+                    append("    helper = store --file=$aicodeDir/git-credentials\n")
+                }
+                writeRemoteFile(client, "$aicodeDir/gitconfig.credential", credentialConfig)
+                FileLogger.i(TAG, "已注入 git 凭据到远程 $aicodeDir（限定 $wsRoot/）")
+            }.onFailure { FileLogger.w(TAG, "注入 git 凭据到远程失败", it) }
+        }
+    }
+
+    /**
+     * 撤销远程注入：删除 App 管理的三个配置/凭据文件。
+     * `GIT_CONFIG_GLOBAL` 指向不存在的文件时 git 静默跳过，注入即失效，服务器用户配置不受影响。
+     */
+    suspend fun removeGitCredentialConfig() {
+        val client = sshClient ?: return
+        val home = remoteHome ?: return
+        val aicodeDir = home.trimEnd('/') + "/.aicode"
+        withContext(Dispatchers.IO) {
+            runCatching {
+                val session = client.startSession()
+                session.exec("rm -f '$aicodeDir/gitconfig' '$aicodeDir/gitconfig.credential' '$aicodeDir/git-credentials' 2>/dev/null; echo done").join()
+                session.close()
+                FileLogger.i(TAG, "已撤销远程 git 凭据注入")
+            }.onFailure { FileLogger.w(TAG, "撤销远程 git 凭据注入失败", it) }
+        }
+    }
+
+    /** exec + printf 写一个文本文件到远程（content 为原文，内部转义单引号/反斜杠）。 */
+    private suspend fun writeRemoteFile(client: SSHClient, dest: String, content: String) {
+        if (content.isEmpty()) {
+            // 空内容直接 truncate，避免 printf %s '' 的引号歧义
+            val session = client.startSession()
+            session.exec("printf '' > '$dest'").join()
+            session.close()
+            return
+        }
+        val escaped = content.replace("\\", "\\\\").replace("'", "'\\\"'\"'")
+        val session = client.startSession()
+        session.exec("printf %s '$escaped' > '$dest'").join()
+        session.close()
+    }
+
+    private fun enc(part: String): String = java.net.URLEncoder.encode(part, "UTF-8")
 }
 
 /** 远程 SSH 连接状态，供 UI 指示器与工作区初始化时序判断。 */

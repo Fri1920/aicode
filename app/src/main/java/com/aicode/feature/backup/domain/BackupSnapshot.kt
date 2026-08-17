@@ -17,7 +17,6 @@ data class BackupSnapshot(
     val appVersion: String = "",
     val createdAt: Long,
     val providers: List<ProviderDto> = emptyList(),
-    val gitCredentials: List<GitCredentialDto> = emptyList(),
     val remoteConnections: List<RemoteConnectionDto> = emptyList(),
     val remoteMounts: List<RemoteMountDto> = emptyList(),
     val chatSessions: List<ChatSessionDto> = emptyList(),
@@ -46,7 +45,6 @@ data class BackupMetadata(
     val appVersion: String = "",
     val createdAt: Long,
     val providers: List<ProviderDto> = emptyList(),
-    val gitCredentials: List<GitCredentialDto> = emptyList(),
     val remoteConnections: List<RemoteConnectionDto> = emptyList(),
     val remoteMounts: List<RemoteMountDto> = emptyList(),
     val mcpServers: List<McpServerConfig> = emptyList(),
@@ -75,7 +73,6 @@ fun BackupSnapshot.toMetadata() = BackupMetadata(
     appVersion = appVersion,
     createdAt = createdAt,
     providers = providers,
-    gitCredentials = gitCredentials,
     remoteConnections = remoteConnections,
     remoteMounts = remoteMounts,
     mcpServers = mcpServers,
@@ -107,18 +104,6 @@ data class ProviderDto(
     /** 提供商级缓存开关；null 表示旧备份无此字段，导入时回退默认值。 */
     val anthropicCacheBreakpoints: Boolean? = null,
     val openaiChatCacheKey: Boolean? = null
-)
-
-@Serializable
-data class GitCredentialDto(
-    val id: String,
-    val host: String,
-    val username: String,
-    val token: String,
-    val label: String = "",
-    val isDefault: Boolean = false,
-    val createdAt: Long = 0,
-    val updatedAt: Long = 0
 )
 
 @Serializable

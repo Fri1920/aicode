@@ -204,10 +204,20 @@ EOF
 git_config() {
     # git 未安装（手动安装/退出路径）时跳过凭据配置
     command -v git >/dev/null 2>&1 || return 0
-    # git credential helper：store（命中已有凭据秒过）+ aicode 自定义 helper（未命中时经文件 IPC 弹窗回填）。
-    # credential.helper 是 multi-valued，先 --replace-all 清旧值再 --add，保证顺序幂等（store 在前、aicode 在后）。
-    git config --global --replace-all credential.helper 'store --file=/root/.aicode/git-credentials'
-    git config --global --add credential.helper '/root/.aicode/git-credential-aicode'
+    # 凭据注入最小化：只对工作区根目录（$HOME/workspace/）下的仓库生效——
+    # credential.helper 写进 gitconfig.credential，经 includeIf 按目录条件加载，
+    # 容器内其它目录的 git 仓库不会被注入（store 命中已有凭据秒过 + aicode 自定义 helper 未命中时经文件 IPC 弹窗回填）。
+    # 用 $HOME 而非写死 /root：容器 home 由环境决定，保持一致（App 侧 GIT_CONFIG_GLOBAL 同指向 $HOME/.aicode/.gitconfig）。
+    AICODE_DIR="$HOME/.aicode"
+    mkdir -p "$AICODE_DIR"
+    cat > "$AICODE_DIR/gitconfig.credential" <<EOF
+[credential]
+    helper = store --file=$AICODE_DIR/git-credentials
+    helper = $AICODE_DIR/git-credential-aicode
+EOF
+    # 先清旧的 includeIf 段（幂等），再写限定工作区根的 includeIf
+    git config --global --remove-section includeIf 2>/dev/null || true
+    git config --global --add includeIf."gitdir:$HOME/workspace/".path "$AICODE_DIR/gitconfig.credential"
 }
 
 # ── 交互初始化菜单（所有容器统一，在终端 PTY 上运行，用户自主选择安装方式）──

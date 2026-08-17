@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -18,13 +19,16 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -55,6 +59,7 @@ import com.aicode.feature.credentials.presentation.CredentialViewModel
 import com.aicode.feature.git.presentation.component.SectionHeader
 import com.aicode.feature.settings.presentation.component.SettingsDivider
 import com.aicode.feature.settings.presentation.component.SettingsGroup
+import com.aicode.feature.settings.presentation.component.SettingsRow
 import com.aicode.feature.settings.presentation.component.SwipeToDeleteRow
 import com.aicode.feature.settings.presentation.component.settingsLightMode
 import com.aicode.feature.settings.presentation.component.settingsPageBackground
@@ -146,6 +151,22 @@ fun CredentialScreen(
                             globalHint = state.globalUserName,
                             onSave = viewModel::saveUserIdentity
                         )
+                        if (state.isRemote) {
+                            Spacer(Modifier.height(Spacing.md))
+                            SettingsGroup {
+                                SettingsRow(
+                                    icon = FeatherIcons.Key,
+                                    title = stringResource(R.string.credential_auto_inject_title),
+                                    subtitle = stringResource(R.string.credential_auto_inject_hint),
+                                    trailing = {
+                                        Switch(
+                                            checked = state.autoInjectEnabled,
+                                            onCheckedChange = viewModel::setAutoInject
+                                        )
+                                    }
+                                )
+                            }
+                        }
                     }
                     1 -> if (state.credentials.isEmpty()) {
                         Box(
@@ -218,6 +239,25 @@ fun CredentialScreen(
             onSave = { viewModel.saveCredential(it); isAddingCredential = false }
         )
     }
+
+    // 远程模式下首次进入该服务器：询问是否需要 aicode 自动注入凭证
+    if (state.showAutoInjectPrompt) {
+        AlertDialog(
+            onDismissRequest = { viewModel.dismissAutoInjectPrompt(false) },
+            title = { Text(stringResource(R.string.credential_auto_inject_prompt_title)) },
+            text = { Text(stringResource(R.string.credential_auto_inject_prompt_body)) },
+            confirmButton = {
+                TextButton(onClick = { viewModel.dismissAutoInjectPrompt(true) }) {
+                    Text(stringResource(R.string.credential_auto_inject_enable))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { viewModel.dismissAutoInjectPrompt(false) }) {
+                    Text(stringResource(R.string.common_cancel))
+                }
+            }
+        )
+    }
 }
 
 @Composable
@@ -253,7 +293,7 @@ private fun CredentialItem(
             Column(modifier = Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        text = credential.label.ifBlank { stringResource(R.string.credential_new) },
+                        text = credential.host,
                         style = MaterialTheme.typography.bodyLarge,
                         fontWeight = FontWeight.Normal,
                         color = if (settingsLightMode()) Color(0xFF0F0F0F) else MaterialTheme.colorScheme.onSurface,

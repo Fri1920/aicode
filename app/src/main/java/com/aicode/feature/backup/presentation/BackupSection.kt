@@ -120,16 +120,6 @@ internal fun BackupSection(viewModel: BackupViewModel) {
             )
             SettingsDivider()
             SettingsRow(
-                title = stringResource(R.string.backup_data_git_credentials),
-                trailing = {
-                    Switch(
-                        checked = exportOptions.gitCredentials,
-                        onCheckedChange = { viewModel.updateExportOptions(exportOptions.copy(gitCredentials = it)) }
-                    )
-                }
-            )
-            SettingsDivider()
-            SettingsRow(
                 title = stringResource(R.string.backup_data_remote),
                 trailing = {
                     Switch(
@@ -456,7 +446,6 @@ private fun ResultDialog(title: String, message: String, onDismiss: () -> Unit) 
 private fun buildImportSummary(context: android.content.Context, stats: com.aicode.feature.backup.domain.RestoreStats): String = buildString {
     appendLine(context.getString(R.string.backup_restored_data))
     if (stats.providers > 0) appendLine(context.getString(R.string.backup_stat_providers, stats.providers))
-    if (stats.gitCredentials > 0) appendLine(context.getString(R.string.backup_stat_git_credentials, stats.gitCredentials))
     if (stats.remoteConnections > 0) appendLine(context.getString(R.string.backup_stat_remote_connections, stats.remoteConnections))
     if (stats.remoteMounts > 0) appendLine(context.getString(R.string.backup_stat_remote_mounts, stats.remoteMounts))
     if (stats.chatSessions > 0) appendLine(context.getString(R.string.backup_stat_chat_sessions, stats.chatSessions))

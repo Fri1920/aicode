@@ -40,7 +40,6 @@ import androidx.compose.ui.unit.dp
 import com.aicode.R
 import com.aicode.core.theme.Spacing
 import com.aicode.feature.credentials.domain.model.GitCredential
-import com.aicode.feature.credentials.domain.model.newCredentialId
 import compose.icons.FeatherIcons
 import compose.icons.feathericons.Check
 import compose.icons.feathericons.Eye
@@ -60,23 +59,18 @@ internal fun CredentialEditorSheet(
     var host by remember(initial) { mutableStateOf(initial?.host ?: "") }
     var username by remember(initial) { mutableStateOf(initial?.username ?: "") }
     var token by remember(initial) { mutableStateOf(initial?.token ?: "") }
-    var label by remember(initial) { mutableStateOf(initial?.label ?: "") }
-    var isDefault by remember(initial) { mutableStateOf(initial?.isDefault ?: false) }
     var tokenVisible by remember { mutableStateOf(false) }
 
     val canSave = host.trim().isNotBlank() && username.trim().isNotBlank() && token.isNotBlank()
 
     fun current(): GitCredential? {
         if (!canSave) return null
+        val h = host.trim()
         return GitCredential(
-            id = initial?.id ?: newCredentialId(),
-            host = host.trim(),
+            id = h.lowercase(),
+            host = h,
             username = username.trim(),
-            token = token,
-            label = label.trim(),
-            isDefault = isDefault,
-            createdAt = initial?.createdAt ?: 0L,
-            updatedAt = initial?.updatedAt ?: 0L
+            token = token
         )
     }
 
@@ -125,26 +119,6 @@ internal fun CredentialEditorSheet(
                     }
                 }
             )
-            CredentialField(
-                value = label,
-                onValueChange = { label = it },
-                label = stringResource(R.string.credential_alias)
-            )
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(stringResource(R.string.credential_set_default), style = MaterialTheme.typography.bodyMedium)
-                    Text(
-                        stringResource(R.string.credential_default_hint),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                Switch(checked = isDefault, onCheckedChange = { isDefault = it })
-            }
 
             Button(
                 onClick = {

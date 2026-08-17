@@ -13,8 +13,6 @@ import com.aicode.feature.agent.data.local.entity.CheckpointEntity
 import com.aicode.feature.agent.data.local.entity.CheckpointFileSnapshotEntity
 import com.aicode.feature.agent.data.local.entity.LlmCallRecordEntity
 import com.aicode.feature.agent.data.local.entity.TodoItemEntity
-import com.aicode.feature.credentials.data.local.dao.GitCredentialDao
-import com.aicode.feature.credentials.data.local.entity.GitCredentialEntity
 import com.aicode.feature.settings.data.local.dao.AIProviderDao
 import com.aicode.feature.settings.data.local.entity.AIProviderEntity
 import com.aicode.feature.workspace.data.local.dao.RemoteConnectionDao
@@ -22,7 +20,7 @@ import com.aicode.feature.workspace.data.local.entity.RemoteConnectionEntity
 import com.aicode.feature.workspace.data.local.entity.RemoteMountEntity
 
 @Database(
-    entities = [AgentMessageEntity::class, ChatSessionEntity::class, AIProviderEntity::class, RemoteConnectionEntity::class, RemoteMountEntity::class, TodoItemEntity::class, GitCredentialEntity::class, CheckpointEntity::class, CheckpointFileSnapshotEntity::class, LlmCallRecordEntity::class],
+    entities = [AgentMessageEntity::class, ChatSessionEntity::class, AIProviderEntity::class, RemoteConnectionEntity::class, RemoteMountEntity::class, TodoItemEntity::class, CheckpointEntity::class, CheckpointFileSnapshotEntity::class, LlmCallRecordEntity::class],
     version = AgentDatabase.SCHEMA_VERSION,
     exportSchema = false
 )
@@ -32,11 +30,10 @@ abstract class AgentDatabase : RoomDatabase() {
     abstract fun aiProviderDao(): AIProviderDao
     abstract fun remoteConnectionDao(): RemoteConnectionDao
     abstract fun todoItemDao(): TodoItemDao
-    abstract fun gitCredentialDao(): GitCredentialDao
     abstract fun checkpointDao(): CheckpointDao
     abstract fun llmCallRecordDao(): LlmCallRecordDao
 
     companion object {
-        const val SCHEMA_VERSION = 34
+        const val SCHEMA_VERSION = 35
     }
 }

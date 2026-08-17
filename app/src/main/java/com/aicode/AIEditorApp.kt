@@ -12,7 +12,6 @@ import com.aicode.core.util.AILogger
 import com.aicode.core.util.FileLogger
 import net.schmizz.sshj.common.SecurityUtils
 import com.aicode.feature.agent.domain.container.ContainerInstaller
-import com.aicode.feature.credentials.data.GitCredentialsFileSync
 import com.aicode.feature.agent.domain.mcp.McpManager
 import com.aicode.feature.settings.data.repository.KeepaliveSettingsRepository
 import com.aicode.feature.settings.data.repository.LanguageSettingsRepository
@@ -100,10 +99,9 @@ class AIEditorApp : Application(), Configuration.Provider {
     @Inject
     lateinit var skillConfigRepository: com.aicode.feature.agent.domain.skill.SkillConfigRepository
 
-    /** git 凭据/署名落盘同步器：启动即把 Room 凭据 + DataStore 署名写到容器持久挂载目录，
-     *  供终端/AI/UI 三端 git 经 credential.helper=store 共用，兜底 rootfs 升级或文件被删。 */
+    /** 旧 Room git 凭据一次性迁移器：启动即把旧表数据写入 git-credentials 文件后删表（真源已迁到文件）。 */
     @Inject
-    lateinit var gitCredentialsFileSync: GitCredentialsFileSync
+    lateinit var legacyCredentialMigrator: com.aicode.feature.credentials.data.LegacyCredentialMigrator
 
     /** 三端 git 缺凭据的统一弹窗桥：监听容器内 credential helper 经文件 IPC 发来的未登录请求，
      *  暴露 StateFlow 供全局弹窗回填后回喂 git。必须在主线程启动（FileObserver 绑定主 Looper）。 */
@@ -157,10 +155,9 @@ class AIEditorApp : Application(), Configuration.Provider {
         appScope.launch {
             ContainerInstaller.extractPrompts(this@AIEditorApp)
         }
-        // 启动即把 Room 凭据 + DataStore 署名落盘到容器持久挂载（/root/.aicode），
-        // 让终端裸 git / AI 工具 / UI 三端共用同一份凭据与署名配置。
+        // 启动即把旧 Room git 凭据一次性迁移到 git-credentials 文件（真源已迁到文件，删表由迁移器完成）。
         appScope.launch {
-            gitCredentialsFileSync.syncAll()
+            legacyCredentialMigrator.migrateIfNeeded()
         }
         // 启动即异步刷新 models.dev 模型元数据（24h 缓存；失败静默，resolve 兜底内置 assets 数据）。
         appScope.launch {

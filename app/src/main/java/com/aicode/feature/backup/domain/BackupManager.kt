@@ -55,7 +55,6 @@ data class ImportPreview(
 /** 导出数据范围选项；未勾选的段在快照中保持空值，导入时跳过。 */
 data class BackupOptions(
     val providers: Boolean = true,
-    val gitCredentials: Boolean = true,
     val remoteConnections: Boolean = true,
     val chatHistory: Boolean = true,
     val mcpServers: Boolean = true,
@@ -66,7 +65,6 @@ data class BackupOptions(
 
 data class RestoreStats(
     val providers: Int = 0,
-    val gitCredentials: Int = 0,
     val remoteConnections: Int = 0,
     val remoteMounts: Int = 0,
     val chatSessions: Int = 0,
@@ -78,7 +76,6 @@ data class RestoreStats(
 ) {
     operator fun plus(other: RestoreStats) = RestoreStats(
         providers = providers + other.providers,
-        gitCredentials = gitCredentials + other.gitCredentials,
         remoteConnections = remoteConnections + other.remoteConnections,
         remoteMounts = remoteMounts + other.remoteMounts,
         chatSessions = chatSessions + other.chatSessions,
