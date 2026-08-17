@@ -9,6 +9,7 @@ import com.aicode.feature.agent.domain.tool.ToolParameter
 import com.aicode.feature.agent.domain.tool.ToolPermissionPolicy
 import com.aicode.feature.agent.domain.tool.ToolResult
 import com.aicode.feature.workspace.data.repository.WorkspaceRepository
+import com.aicode.feature.workspace.domain.PathHomeResolver
 import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -23,7 +24,8 @@ import javax.inject.Inject
  */
 class SearchCodeTool @Inject constructor(
     private val commandEngine: CommandEngine,
-    private val workspaceRepository: WorkspaceRepository
+    private val workspaceRepository: WorkspaceRepository,
+    private val pathHomeResolver: PathHomeResolver
 ) : AgentTool() {
 
     private companion object {
@@ -54,7 +56,7 @@ class SearchCodeTool @Inject constructor(
                 ?: return ToolResult.Error("args 中存在未闭合的引号", "INVALID_ARGS")
             if (tokens.isEmpty()) return ToolResult.Error("缺少搜索参数 args", "MISSING_ARGS")
 
-            val command = buildSearchCommand(tokens)
+            val command = buildSearchCommand(tokens, pathHomeResolver.home())
                 ?: return ToolResult.Error("search 仅支持 | head [-n N] 截断输出，不支持其它管道命令", "INVALID_PIPE")
 
             val startedAt = System.currentTimeMillis()
@@ -64,7 +66,10 @@ class SearchCodeTool @Inject constructor(
                 timeoutMs = SEARCH_TIMEOUT_MS
             ) ?: return ToolResult.Error("容器未就绪，无法执行 rg", "CONTAINER_NOT_READY")
 
-            if (isRgMissing(result.output)) return ToolResult.Error("容器内未安装 rg", "RG_MISSING")
+            // 127 = shell 找不到命令；合并 stderr 后通常也能看到 command not found，双保险
+            if (isRgMissing(result.output) || result.exitCode == 127) {
+                return ToolResult.Error("容器内未安装 rg", "RG_MISSING")
+            }
             if (result.exitCode != null && result.exitCode > 1) {
                 return ToolResult.Error(result.output.ifBlank { "rg 执行失败" }, "RG_ERROR")
             }

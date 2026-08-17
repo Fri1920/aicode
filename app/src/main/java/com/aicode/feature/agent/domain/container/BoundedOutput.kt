@@ -7,7 +7,7 @@ package com.aicode.feature.agent.domain.container
  * 为何 head+tail 都留：开头通常含命令意图与起始信息，结尾通常含错误与最终结果，二者对模型
  * 与用户最有价值；中间的海量重复输出可安全省略，并在省略处标注被丢弃的字符数。
  *
- * 非线程安全：仅供单一读取循环顺序 append 使用。
+ * 线程安全：append 会从并发读取 stdout/stderr 的协程调用，故方法级同步。
  */
 class BoundedOutput(
     private val headLimit: Int = DEFAULT_HEAD,
@@ -19,11 +19,14 @@ class BoundedOutput(
     private var total = 0L
 
     /** 已接收的原始字符总数（截断之前）。 */
-    val totalChars: Long get() = total
+    val totalChars: Long
+        @Synchronized get() = total
 
     /** 是否发生了中间截断（接收量超过 head+tail 容量）。 */
-    val truncated: Boolean get() = total > head.length.toLong() + tail.length.toLong()
+    val truncated: Boolean
+        @Synchronized get() = total > head.length.toLong() + tail.length.toLong()
 
+    @Synchronized
     fun append(text: String) {
         if (text.isEmpty()) return
         total += text.length
@@ -47,6 +50,7 @@ class BoundedOutput(
     }
 
     /** 组装最终文本：未截断时即完整输出；截断时为 head + 省略提示 + tail。 */
+    @Synchronized
     fun build(): String {
         if (!truncated) return head.toString() + tail.toString()
         val omitted = total - head.length - tail.length

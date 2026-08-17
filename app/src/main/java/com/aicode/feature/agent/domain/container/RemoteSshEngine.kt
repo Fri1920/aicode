@@ -187,11 +187,28 @@ class RemoteSshEngine @Inject constructor(
                         output.append(line!!)
                         output.append("\n")
                     }
-                    exitCode = session.exitStatus
                 } finally {
                     watchdog.cancel()
                     runCatching { reader.close() }
                 }
+                // 并发读 stderr 合并进 output：本地引擎 redirectErrorStream(true) 是合并语义，
+                // 远程若不合并，命令报错（如 rg 未安装时的 command not found）只写 stderr 会被静默丢弃。
+                val stderrJob = launch {
+                    val errReader = BufferedReader(InputStreamReader(session.errorStream))
+                    try {
+                        var errLine: String?
+                        while (errReader.readLine().also { errLine = it } != null) {
+                            output.append(errLine!!)
+                            output.append("\n")
+                        }
+                    } finally {
+                        runCatching { errReader.close() }
+                    }
+                }
+                stderrJob.join()
+                // sshj 的 exitStatus 在流 EOF 后未必就绪，close 后才保证有值（同 RemoteSftpFileAccess.execSync）
+                runCatching { session.close() }
+                exitCode = session.exitStatus
             }
         } finally {
             runCatching { session.close() }
@@ -225,9 +242,13 @@ class RemoteSshEngine @Inject constructor(
 
     /** 拼接 cd 到 projectPath 再执行 command 的完整命令；projectPath 为 null 则直接执行。
      *  优先 cd 到 ~/workspace（符号链接），让 AI 执行 pwd 时看到 ~/workspace 而非真实路径。
-     *  ~/workspace 不存在（符号链接未建成）时 fallback 到 projectPath。 */
+     *  ~/workspace 不存在（符号链接未建成）时 fallback 到 projectPath。
+     *  注入 GIT_CONFIG_GLOBAL 指向 App 管理的 ~/.aicode/gitconfig：
+     *  仅当用户开启「自动注入」时该文件存在（含 include 用户全局配置 + includeIf 限定工作区根），
+     *  文件不存在时 git 静默跳过——不影响用户在服务器上手动 git。 */
     private fun buildCdCommand(command: String, projectPath: String?): String {
-        if (projectPath == null) return command
-        return "cd ~/workspace 2>/dev/null || cd '$projectPath' 2>/dev/null; $command"
+        val prefix = "export GIT_CONFIG_GLOBAL=\"\$HOME/.aicode/gitconfig\"; "
+        if (projectPath == null) return prefix + command
+        return prefix + "cd ~/workspace 2>/dev/null || cd '$projectPath' 2>/dev/null; $command"
     }
 }

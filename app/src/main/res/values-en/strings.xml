@@ -145,13 +145,17 @@
     <string name="common_model">Model</string>
     <string name="common_add">Add</string>
     <string name="credential_add">Add Credential</string>
-    <string name="credential_new">New credential</string>
     <string name="common_username">Username</string>
     <string name="common_got_it">Got it</string>
     <string name="common_edit">Edit</string>
     <string name="common_enabled">Enabled</string>
     <string name="common_disabled">Disabled</string>
     <string name="credential_token">Access Token / PAT</string>
+    <string name="credential_auto_inject_title">Auto-inject credentials</string>
+    <string name="credential_auto_inject_hint">Sync git credentials saved in the app to this remote server, effective only for repositories under the current workspace root. Does not affect your manual git usage on the server.</string>
+    <string name="credential_auto_inject_prompt_title">Auto-inject git credentials?</string>
+    <string name="credential_auto_inject_prompt_body">Allow aicode to sync git credentials saved in the app to this remote server? It only applies to repositories under the current workspace root and will not modify the server\'s global git config.</string>
+    <string name="credential_auto_inject_enable">Enable</string>
     <string name="common_rename">Rename</string>
     <string name="common_hide">Hide</string>
 
@@ -265,7 +269,6 @@
     <string name="backup_operation_failed">Operation failed</string>
     <string name="backup_import_done">Import complete</string>    <string name="backup_actions">Actions</string>
     <string name="backup_select_data">Select export data</string>
-    <string name="backup_data_git_credentials">Git Credentials</string>
     <string name="backup_data_remote">Connections &amp; Sync</string>
     <string name="backup_data_chat_history">Chat History</string>
     <string name="backup_data_mcp">MCP Servers</string>
@@ -278,7 +281,6 @@
     <string name="backup_processing_data">Processing data…</string>
     <string name="backup_restored_data">Restored data:</string>
     <string name="backup_stat_providers">· AI Providers: %1$s</string>
-    <string name="backup_stat_git_credentials">· Git Credentials: %1$s</string>
     <string name="backup_stat_remote_connections">· Remote Connections: %1$s</string>
     <string name="backup_stat_remote_mounts">· Remote Mounts: %1$s</string>
     <string name="backup_stat_chat_sessions">· Chat Sessions: %1$s</string>
@@ -435,9 +437,6 @@
     <!-- Credential Editor -->
     <string name="credential_edit">Edit Credential</string>
     <string name="credential_host">Remote Host</string>
-    <string name="credential_alias">Alias (optional)</string>
-    <string name="credential_set_default">Set as default credential for this host</string>
-    <string name="credential_default_hint">For multiple accounts on the same host, the default one is injected first</string>
     <!-- Credential Toast -->
     <string name="credential_toast_saved">Credential saved</string>
     <string name="credential_toast_save_failed">Save failed: %1$s</string>
@@ -864,6 +863,8 @@
     <string name="workspace_new_workspace">New Workspace</string>
     <string name="workspace_name_hint">e.g. my-project</string>
     <string name="workspace_name_exists">A workspace with this name already exists</string>
+    <string name="workspace_remote_root_create_failed">Failed to create the remote workspace directory. Check the path and server permissions.</string>
+    <string name="workspace_remote_default_create_failed">Failed to create the default remote workspace. Check server permissions and disk space.</string>
 
     <!-- Helper Strings -->
     <string name="container_channel_deleted">Channel deleted</string>

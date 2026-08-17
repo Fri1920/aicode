@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.aicode.R
 import com.aicode.core.util.FileLogger
 import com.aicode.feature.agent.domain.container.ConnectionState
 import com.aicode.feature.agent.domain.container.RemoteSshConnection
@@ -64,17 +65,31 @@ class WorkspaceRepository @Inject constructor(
     private val _current = MutableStateFlow<Workspace?>(null)
     val current: StateFlow<Workspace?> = _current.asStateFlow()
 
+    /** 远程工作区初始化失败（根路径/默认工作区创建失败）的提示文案；UI 消费后置 null。 */
+    private val _initError = MutableStateFlow<String?>(null)
+    val initError: StateFlow<String?> = _initError.asStateFlow()
+
+    /** UI 消费错误提示后调用，清除待展示的文案。 */
+    fun consumeInitError() {
+        _initError.value = null
+    }
+
     /** 扫描并恢复上次选中的工作区；首次启动本地模式会创建默认工作区。应在 App/ViewModel 启动时调用一次。 */
     suspend fun initialize() = withContext(Dispatchers.IO) {
         // 远程模式：等 SSH 连接就绪后再列工作区，避免启动时序竞争
         if (!isLocal()) {
             waitForConnection()
+            ensureRemoteWorkspaceRoot()
         }
         refreshWorkspaces()
 
-        if (isLocal() && _workspaces.value.isEmpty()) {
-            createWorkspace(DEFAULT_WORKSPACE)
+        // 一个工作区都没有时创建默认工作区（本地/远程一致），保证 AI 始终有可用目录
+        if (_workspaces.value.isEmpty()) {
+            val created = createWorkspace(DEFAULT_WORKSPACE)
             refreshWorkspaces()
+            if (!isLocal() && created == null && remoteSshConnection.isConnected()) {
+                _initError.value = context.getString(R.string.workspace_remote_default_create_failed)
+            }
         }
 
         val savedName = context.workspaceDataStore.data.first()[currentNameKey]
@@ -103,6 +118,32 @@ class WorkspaceRepository @Inject constructor(
         }
     }
 
+    /** 远程模式：确保 remoteWorkspacePath 存在（用户填写的路径可能尚不存在），不存在则 mkdir -p 创建。
+     *  @return 是否成功；连接不可用时不提示直接返回 false。 */
+    private suspend fun ensureRemoteWorkspaceRoot(): Boolean {
+        val cfg = remoteSshConnection.config ?: return false
+        if (!remoteSshConnection.isConnected()) return false
+        val wsRoot = expandHome(cfg.remoteWorkspacePath.trimEnd('/'))
+        if (wsRoot.isEmpty()) return false
+        val exit = execRemoteExit("mkdir -p ${shellQuote(wsRoot)}")
+        if (exit != 0) {
+            FileLogger.w(TAG, "创建远程工作区根目录失败: $wsRoot (exit=$exit)")
+            _initError.value = context.getString(R.string.workspace_remote_root_create_failed)
+            return false
+        }
+        return true
+    }
+
+    /** 展开远程路径的 ~ 前缀为远程 home（连接成功后缓存）；非 ~ 开头原样返回。 */
+    private fun expandHome(path: String): String {
+        val home = remoteSshConnection.remoteHome ?: return path
+        return when {
+            path == "~" -> home
+            path.startsWith("~/") -> home.trimEnd('/') + path.removePrefix("~")
+            else -> path
+        }
+    }
+
     /** 重新读取工作区目录列表。本地扫 projectsRoot，远程 exec ls remoteWorkspacePath。 */
     private suspend fun refreshWorkspaces() {
         _workspaces.value = if (isLocal()) refreshLocalWorkspaces() else refreshRemoteWorkspaces()
@@ -121,7 +162,7 @@ class WorkspaceRepository @Inject constructor(
             FileLogger.w(TAG, "远程工作区列表失败：SSH 未配置")
             return emptyList()
         }
-        val wsRoot = cfg.remoteWorkspacePath.trimEnd('/')
+        val wsRoot = expandHome(cfg.remoteWorkspacePath.trimEnd('/'))
         return runCatching {
             // ls -d */ 列出子目录，取基名
             val output = execRemote("ls -d ${wsRoot}/*/ 2>/dev/null | xargs -n1 basename 2>/dev/null")
@@ -201,7 +242,7 @@ class WorkspaceRepository @Inject constructor(
             Workspace(name = name, path = dir.absolutePath)
         } else {
             val cfg = remoteSshConnection.config ?: return@withContext null
-            val wsRoot = cfg.remoteWorkspacePath.trimEnd('/')
+            val wsRoot = expandHome(cfg.remoteWorkspacePath.trimEnd('/'))
             val remotePath = "$wsRoot/$name"
             runCatching {
                 if (execRemoteExit("test -d ${shellQuote(remotePath)}") == 0) {

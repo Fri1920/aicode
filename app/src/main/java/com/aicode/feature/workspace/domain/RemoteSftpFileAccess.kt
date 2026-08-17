@@ -171,8 +171,10 @@ class RemoteSftpFileAccess @Inject constructor(
         return runCatching {
             // 用 stat 一次性输出 name|type|size|mtime|perms，避免多次 exec
             // %n=文件名 %F=类型 %s=大小 %Y=mtime %A=权限
+            // 同时 stat * 与 .*：shell glob 默认不匹配点开头的文件（POSIX 行为），
+            // .git/.hidden 等隐藏项要靠 .* 才列得出；. 与 .. 也会被 .* 匹配，由 parseStatEntryLine 过滤
             val output = execSync(
-                "stat -c '%n|%F|%s|%Y|%A' ${shellQuote(remote)}/* 2>/dev/null"
+                "stat -c '%n|%F|%s|%Y|%A' ${shellQuote(remote)}/* ${shellQuote(remote)}/.* 2>/dev/null"
             )
             if (output.isBlank()) return emptyList()
             output.lines().mapNotNull { parseStatEntryLine(it) }
@@ -263,12 +265,12 @@ internal fun displayPathFor(remotePath: String, workspaceRoot: String): String {
 /** 单引号转义：路径含单引号时用 `'\''` 绕过，保证 shell 命令安全。 */
 internal fun shellQuote(s: String): String = "'" + s.replace("'", "'\\''") + "'"
 
-/** 解析 `stat -c '%n|%F|%s|%Y|%A'` 输出行；字段不足或名称为空返回 null。 */
+/** 解析 `stat -c '%n|%F|%s|%Y|%A'` 输出行；字段不足、名称为空或为 . / .. 返回 null。 */
 internal fun parseStatEntryLine(line: String): FileEntry? {
     val parts = line.split("|")
     if (parts.size < 5) return null
     val name = parts[0].substringAfterLast('/')
-    if (name.isBlank()) return null
+    if (name.isBlank() || name == "." || name == "..") return null
     return FileEntry(
         name = name,
         isDirectory = parts[1].contains("directory", ignoreCase = true),

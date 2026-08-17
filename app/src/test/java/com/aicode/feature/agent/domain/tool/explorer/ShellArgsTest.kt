@@ -129,6 +129,24 @@ class ShellArgsTest {
     }
 
     @Test
+    fun buildSearchCommand_customHome_expandsTilde() {
+        // 传入执行环境（本地容器 / 远程服务器）的真实 home，~/ 按该 home 展开而非硬编码 /root
+        val command = buildSearchCommand(
+            parseShellWords("-n \"fun main\" ~/workspace/app")!!,
+            home = "/home/alice"
+        )!!
+        assertEquals(
+            "rg --line-number --no-heading --with-filename --color never '-n' 'fun main' '/home/alice/workspace/app'",
+            command
+        )
+        // 裸 ~ 也展开为 home
+        assertEquals(
+            "rg --line-number --no-heading --with-filename --color never '-n' 'x' '/home/alice'",
+            buildSearchCommand(parseShellWords("-n x ~")!!, home = "/home/alice")
+        )
+    }
+
+    @Test
     fun buildSearchCommand_escapedPipeWithHead_appendsWhitelistedPipe() {
         val command = buildSearchCommand(
             parseShellWords("-n \"挂载\\|mount\" ~/workspace/app/src/main/res/values/strings.xml | head -30")!!

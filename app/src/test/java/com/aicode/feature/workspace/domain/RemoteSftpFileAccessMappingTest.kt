@@ -110,6 +110,15 @@ class RemoteSftpFileAccessMappingTest {
     }
 
     @Test
+    fun parse_stat_filters_dot_entries_keeps_hidden() {
+        // .* glob 会带上 . 与 ..，应过滤；隐藏项（.git）保留
+        assertNull(parseStatEntryLine("$wsRoot/.|directory|4096|1700000000|drwxr-xr-x"))
+        assertNull(parseStatEntryLine("$wsRoot/..|directory|4096|1700000000|drwxr-xr-x"))
+        val hidden = parseStatEntryLine("$wsRoot/.git|directory|4096|1700000000|drwxr-xr-x")
+        assertEquals(".git", hidden?.name)
+    }
+
+    @Test
     fun parse_stat_tolerates_bad_numbers() {
         val entry = parseStatEntryLine("$wsRoot/f.txt|regular file|abc|notatime|---------")
         assertEquals(0L, entry?.size)

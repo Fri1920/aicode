@@ -34,11 +34,9 @@ import javax.inject.Singleton
 class WorkspacePathMapper @Inject constructor(
     private val workspaceRepository: WorkspaceRepository,
     private val containerInstaller: ContainerInstaller,
-    private val containerSettingsRepository: ContainerSettingsRepository
+    private val containerSettingsRepository: ContainerSettingsRepository,
+    private val pathHomeResolver: PathHomeResolver
 ) {
-    /** 容器内真实 home 路径（容器就绪后查 $HOME 缓存），供展开 ~。未就绪前回退 /root。 */
-    @Volatile
-    var containerHome: String? = null
     companion object {
         /** AI 看到的工作区根路径。用 `~` 形式让提示词/工具描述更自然，内部用 [resolvedContainerRoot] 展开后匹配。 */
         const val CONTAINER_ROOT = "~/workspace"
@@ -73,9 +71,9 @@ class WorkspacePathMapper @Inject constructor(
     /** 当前工作区在宿主上的根目录。 */
     private fun hostRoot(): File = File(workspaceRepository.currentPath())
 
-    /** [CONTAINER_ROOT] 展开后的绝对路径（`$HOME/workspace`），供路径匹配使用。`containerHome` 未就绪时回退 `/root`。 */
+    /** [CONTAINER_ROOT] 展开后的绝对路径（`$HOME/workspace`），供路径匹配使用。home 未就绪时回退 `/root`。 */
     private fun resolvedContainerRoot(): String =
-        (containerHome ?: "/root").trimEnd('/') + "/workspace"
+        pathHomeResolver.home().trimEnd('/') + "/workspace"
 
     /** 容器 rootfs 在宿主上的根目录（容器内 `/` 即此目录，随当前 profile 变化）。 */
     private fun rootfsRoot(): File = containerInstaller.rootfsDirFor(currentProfile)
@@ -95,12 +93,7 @@ class WorkspacePathMapper @Inject constructor(
     fun toHostFile(path: String): File {
         val root = hostRoot()
         val wsRoot = resolvedContainerRoot()
-        val p = path.trim().let {
-            if (it.startsWith("~/")) {
-                val home = containerHome
-                if (home != null) home.trimEnd('/') + "/" + it.removePrefix("~/") else "/root/" + it.removePrefix("~/")
-            } else it
-        }
+        val p = pathHomeResolver.expandHome(path.trim())
         val file = when {
             p == wsRoot || p == "$wsRoot/" || p == CONTAINER_ROOT || p == "$CONTAINER_ROOT/" -> root
             p.startsWith("$wsRoot/") -> File(root, p.removePrefix("$wsRoot/"))

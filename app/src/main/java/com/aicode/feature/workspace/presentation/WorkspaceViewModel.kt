@@ -21,6 +21,14 @@ class WorkspaceViewModel @Inject constructor(
     val workspaces: StateFlow<List<Workspace>> = repository.workspaces
     val current: StateFlow<Workspace?> = repository.current
 
+    /** 远程工作区初始化失败提示（根路径/默认工作区创建失败）。 */
+    val initError: StateFlow<String?> = repository.initError
+
+    /** 消费初始化错误提示，避免重复弹 Toast。 */
+    fun consumeInitError() {
+        repository.consumeInitError()
+    }
+
     init {
         viewModelScope.launch { runCatching { repository.initialize() } }
         // 模式切换后重新加载工作区列表（本地 File.listFiles ↔ 远程 SFTP ls）。

@@ -111,10 +111,13 @@ fun headLinesOf(seg: List<String>): Int? = when {
 }
 
 /**
- * 组装传给容器的 rg 搜索命令：基础参数 + 全部参数 token（单引号转义、`~/` 展开为 `/root/`），
+ * 组装传给容器的 rg 搜索命令：基础参数 + 全部参数 token（单引号转义、`~/` 展开为 [home]），
  * 若带管道则原样追加白名单校验过的 `| head ...` 段。管道段含非 head 命令/非法参数时返回 null。
+ *
+ * [home] 为命令执行环境的 home（本地 PRoot 容器为 /root，远程 SSH 为远程用户 home），
+ * 用于展开 `~/` 参数——quote 后 shell 不会自动展开 `~`，故在构造命令时显式展开。
  */
-fun buildSearchCommand(tokens: List<String>): String? {
+fun buildSearchCommand(tokens: List<String>, home: String = "/root"): String? {
     val (rgTokens, pipeSegments) = splitPipes(tokens) ?: return null
     val args = mutableListOf(
         "rg",
@@ -124,7 +127,7 @@ fun buildSearchCommand(tokens: List<String>): String? {
         "--color",
         "never"
     )
-    args.addAll(rgTokens.map { shellQuote(expandTilde(it)) })
+    args.addAll(rgTokens.map { shellQuote(expandTilde(it, home)) })
     var command = args.joinToString(" ")
     for (seg in pipeSegments) {
         if (headLinesOf(seg) == null) return null
@@ -133,9 +136,13 @@ fun buildSearchCommand(tokens: List<String>): String? {
     return command
 }
 
-/** 把 `~/` 开头的路径参数展开为 `/root/`，避免被单引号包裹后 shell 不展开 `~`。 */
-fun expandTilde(arg: String): String =
-    if (arg.startsWith("~/")) "/root/" + arg.removePrefix("~/") else arg
+/** 把 `~`/`~/` 开头的路径参数展开为 [home] 路径，避免被单引号包裹后 shell 不展开 `~`。 */
+fun expandTilde(arg: String, home: String = "/root"): String =
+    when {
+        arg == "~" -> home
+        arg.startsWith("~/") -> home.trimEnd('/') + arg.removePrefix("~")
+        else -> arg
+    }
 
 /** 单引号包裹，shell 命令安全。 */
 fun shellQuote(value: String): String {

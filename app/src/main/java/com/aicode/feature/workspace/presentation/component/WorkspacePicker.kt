@@ -27,6 +27,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -35,6 +36,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.graphics.Color
@@ -51,6 +53,7 @@ import compose.icons.feathericons.MoreHorizontal
 import compose.icons.feathericons.Plus
 import compose.icons.feathericons.Trash2
 import androidx.compose.ui.res.stringResource
+import android.widget.Toast
 import com.aicode.R
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -164,6 +167,16 @@ fun WorkspaceIconButton(
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.size(iconSize)
         )
+    }
+
+    // 远程工作区路径/默认工作区创建失败提示：消费后清除，避免重复弹 Toast
+    val initError by viewModel.initError.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    LaunchedEffect(initError) {
+        if (initError != null) {
+            Toast.makeText(context, initError, Toast.LENGTH_LONG).show()
+            viewModel.consumeInitError()
+        }
     }
 
     if (showSheet) {
