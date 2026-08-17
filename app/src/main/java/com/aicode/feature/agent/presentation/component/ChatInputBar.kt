@@ -1,6 +1,8 @@
 package com.aicode.feature.agent.presentation.component
 
 import android.content.ClipData
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -47,6 +49,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.LocalClipboard
@@ -115,6 +118,8 @@ internal fun ChatInputBar(
     queuedRequests: List<QueuedRequest> = emptyList(),
     onRemoveQueued: (String) -> Unit = {},
     tokenProgress: Float = 0f,
+    /** 消息列表正在滚动时内容区淡出到 40%，停止滚动恢复；用于长列表阅读时降低底部干扰（同 git 页 tab 栏）。 */
+    isScrolling: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     val canSend = (value.isNotBlank() || pendingAttachments.isNotEmpty()) && !isBusy
@@ -131,6 +136,12 @@ internal fun ChatInputBar(
         modifier = modifier.fillMaxWidth()
     ) {
         val imeInset = rememberImeBottomInset()
+        // 滚动弱化：内容区（slash 菜单/排队面板/输入框本体）整体淡出，蒙版渐变保持不透明（同 git 页 tab 栏）。
+        val contentAlpha by animateFloatAsState(
+            targetValue = if (isScrolling) 0.4f else 1f,
+            animationSpec = tween(200),
+            label = "inputbar-content-alpha"
+        )
         // 渐变终点固定在蒙版可视高度内：若跟随整个 Box（含 imeInset 被键盘拉长的部分），
         // 键盘弹起时可见区域只占渐变前段，alpha 被摊薄到几乎透明——看起来像没有蒙版。
         val maskGradientEndY = with(LocalDensity.current) { INPUT_BAR_MASK_HEIGHT.toPx() }
@@ -160,6 +171,7 @@ internal fun ChatInputBar(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .graphicsLayer { alpha = contentAlpha }
                     .padding(horizontal = Spacing.lg)
                     .padding(bottom = Spacing.md)
                     .padding(bottom = imeInset)

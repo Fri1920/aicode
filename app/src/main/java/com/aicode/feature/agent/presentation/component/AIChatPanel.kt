@@ -643,6 +643,7 @@ fun AIChatPanel(
                         sessionLastInputTokens.toFloat() / contextLimit
                     } else 0f
                 },
+                isScrolling = listState.isScrollInProgress,
                 modifier = Modifier.fillMaxWidth()
             )
             } // 悬浮层结束
