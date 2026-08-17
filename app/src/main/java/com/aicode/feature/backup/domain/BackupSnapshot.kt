@@ -103,7 +103,11 @@ data class ProviderDto(
     val useResponseApi: Boolean = false,
     /** 提供商级缓存开关；null 表示旧备份无此字段，导入时回退默认值。 */
     val anthropicCacheBreakpoints: Boolean? = null,
-    val openaiChatCacheKey: Boolean? = null
+    val openaiChatCacheKey: Boolean? = null,
+    /** 套餐余量脚本路径；null 表示旧备份无此字段，导入时回退默认值 ""。 */
+    val balanceScriptPath: String? = null,
+    /** 套餐余量刷新间隔（分钟）；null 表示旧备份无此字段，导入时回退默认值 5。 */
+    val balanceRefreshInterval: Int? = null
 )
 
 @Serializable

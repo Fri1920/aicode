@@ -58,6 +58,10 @@ import com.aicode.feature.workspace.domain.model.RemoteConnection
 import com.aicode.feature.workspace.domain.repository.RemoteRepository
 import com.aicode.feature.settings.domain.model.AIProviderConfig
 import com.aicode.feature.settings.domain.model.ModelMetadata
+import com.aicode.feature.settings.domain.model.ProviderBalanceItem
+import com.aicode.feature.settings.domain.model.ProviderBalanceResult
+import com.aicode.feature.settings.domain.model.ProviderBalanceState
+import com.aicode.feature.settings.domain.service.ProviderBalanceRunner
 import com.aicode.feature.settings.domain.model.ProviderType
 import com.aicode.R
 import com.aicode.feature.settings.domain.repository.AIProviderRepository
@@ -226,7 +230,8 @@ class SettingsViewModel @Inject constructor(
     private val remoteRepository: RemoteRepository,
     private val llmCallRecordDao: LlmCallRecordDao,
     private val updateCheckSettingsRepository: UpdateCheckSettingsRepository,
-    private val updateCheckService: UpdateCheckService
+    private val updateCheckService: UpdateCheckService,
+    private val providerBalanceRunner: ProviderBalanceRunner
 ) : ViewModel() {
     private companion object {
         const val MAX_LOG_LINES = 1200
@@ -323,6 +328,12 @@ class SettingsViewModel @Inject constructor(
 
     private val _testing = MutableStateFlow<Set<String>>(emptySet())
     val testing: StateFlow<Set<String>> = _testing.asStateFlow()
+
+    private val _balanceTestState = MutableStateFlow<ProviderBalanceState>(ProviderBalanceState.Idle)
+    val balanceTestState: StateFlow<ProviderBalanceState> = _balanceTestState.asStateFlow()
+
+    private val _providerBalances = MutableStateFlow<Map<String, ProviderBalanceState>>(emptyMap())
+    val providerBalances: StateFlow<Map<String, ProviderBalanceState>> = _providerBalances.asStateFlow()
 
     private val _globalRules = MutableStateFlow<List<PermissionRule>>(emptyList())
     val globalRules: StateFlow<List<PermissionRule>> = _globalRules.asStateFlow()
@@ -1283,6 +1294,45 @@ class SettingsViewModel @Inject constructor(
     fun clearTestResults() {
         _testResults.value = emptyMap()
         _testing.value = emptySet()
+    }
+
+    fun listAvailableBalanceScripts(): List<String> {
+        return providerBalanceRunner.listAvailableScripts()
+    }
+
+    fun testBalanceScript(provider: AIProviderConfig, scriptPath: String) {
+        viewModelScope.launch {
+            _balanceTestState.value = ProviderBalanceState.Loading
+            providerBalanceRunner.runScript(provider, scriptPath)
+                .onSuccess { result ->
+                    _balanceTestState.value = ProviderBalanceState.Success(result)
+                }
+                .onFailure { error ->
+                    _balanceTestState.value = ProviderBalanceState.Error(error.message ?: "执行失败", error.localizedMessage ?: "")
+                }
+        }
+    }
+
+    fun clearBalanceTestState() {
+        _balanceTestState.value = ProviderBalanceState.Idle
+    }
+
+    fun refreshProviderBalance(provider: AIProviderConfig, force: Boolean = false) {
+        if (provider.balanceScriptPath.isBlank()) return
+        val current = _providerBalances.value[provider.id]
+        if (!force && current is ProviderBalanceState.Success) return
+        if (current is ProviderBalanceState.Loading) return
+
+        viewModelScope.launch {
+            _providerBalances.update { it + (provider.id to ProviderBalanceState.Loading) }
+            providerBalanceRunner.runScript(provider)
+                .onSuccess { result ->
+                    _providerBalances.update { it + (provider.id to ProviderBalanceState.Success(result)) }
+                }
+                .onFailure { error ->
+                    _providerBalances.update { it + (provider.id to ProviderBalanceState.Error(error.message ?: "查询失败")) }
+                }
+        }
     }
 
     fun selectModel(providerId: String, model: String) {

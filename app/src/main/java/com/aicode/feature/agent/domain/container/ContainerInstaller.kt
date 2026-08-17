@@ -85,6 +85,29 @@ class ContainerInstaller @Inject constructor(
         }
 
         /**
+         * 从 assets 提取内置脚本（如套餐余量 demo_balance.py）到 ~/.aicode/scripts/。
+         * 若文件已存在则不覆盖，以保留用户的修改。
+         */
+        fun extractScripts(context: Context) {
+            val destDir = File(File(context.filesDir, "aicode"), "scripts")
+            destDir.mkdirs()
+            runCatching {
+                val entries = context.assets.list("aicode/scripts") ?: return@runCatching
+                for (entry in entries) {
+                    val destFile = File(destDir, entry)
+                    if (!destFile.exists()) {
+                        context.assets.open("aicode/scripts/$entry").use { input ->
+                            destFile.outputStream().use { output -> input.copyTo(output) }
+                        }
+                        destFile.setExecutable(true, false)
+                    }
+                }
+            }.onFailure {
+                FileLogger.w(TAG, "提取内置脚本失败: ${it.message}", it)
+            }
+        }
+
+        /**
          * 从 assets 提取自定义 git credential helper 到 ~/.aicode/git-credential-aicode 并赋可执行位。
          *
          * 经 [LinuxContainerEngine] 的 -b 绑定即容器内 /root/.aicode/git-credential-aicode，

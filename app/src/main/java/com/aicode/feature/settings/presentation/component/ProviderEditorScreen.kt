@@ -41,6 +41,8 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -113,8 +115,15 @@ import compose.icons.feathericons.Cpu
 import compose.icons.feathericons.DownloadCloud
 import compose.icons.feathericons.Eye
 import compose.icons.feathericons.EyeOff
+import compose.icons.feathericons.FileText
+import compose.icons.feathericons.Folder
+import compose.icons.feathericons.Play
 import compose.icons.feathericons.Plus
+import compose.icons.feathericons.RefreshCw
 import compose.icons.feathericons.Sliders
+import com.aicode.feature.settings.domain.model.ProviderBalanceItem
+import com.aicode.feature.settings.domain.model.ProviderBalanceResult
+import com.aicode.feature.settings.domain.model.ProviderBalanceState
 import androidx.compose.ui.res.stringResource
 import com.aicode.R
 
@@ -136,6 +145,8 @@ fun ProviderEditorScreen(
     var useResponseApi by remember { mutableStateOf(initialProvider?.useResponseApi ?: false) }
     var anthropicCacheBreakpoints by remember { mutableStateOf(initialProvider?.anthropicCacheBreakpoints ?: true) }
     var openaiChatCacheKey by remember { mutableStateOf(initialProvider?.openaiChatCacheKey ?: false) }
+    var balanceScriptPath by remember { mutableStateOf(initialProvider?.balanceScriptPath ?: "") }
+    var balanceRefreshInterval by remember { mutableIntStateOf(initialProvider?.balanceRefreshInterval ?: 5) }
     var isEnabled by remember { mutableStateOf(initialProvider?.isEnabled ?: true) }
     var type by remember { mutableStateOf(initialProvider?.type ?: ProviderType.OPENAI) }
     val providerId = remember { initialProvider?.id ?: System.currentTimeMillis().toString() }
@@ -148,9 +159,11 @@ fun ProviderEditorScreen(
     var showTypeSheet by remember { mutableStateOf(false) }
     var showAddModelSheet by remember { mutableStateOf(false) }
     var showFetchDialog by remember { mutableStateOf(false) }
+    var showScriptPickerSheet by remember { mutableStateOf(false) }
+    var showIntervalSheet by remember { mutableStateOf(false) }
     var fetchDialogKey by remember { mutableIntStateOf(0) }
 
-    // 两个 tab 的滚动状态提升到页面层，聚合出「是否正在滚动」供底部 tab 栏滚动弱化（同 Git 页面）。
+    // 两个 tab 的滚动状态提升到页面层，聚合出「是否正在滚动」供底部 tab栏滚动弱化（同 Git 页面）。
     val configScrollState = rememberScrollState()
     val modelsScrollState = rememberScrollState()
     val tabsScrolling by remember {
@@ -162,15 +175,18 @@ fun ProviderEditorScreen(
     val fetchState by viewModel.fetchState.collectAsStateWithLifecycle()
     val testResults by viewModel.testResults.collectAsStateWithLifecycle()
     val testing by viewModel.testing.collectAsStateWithLifecycle()
+    val balanceTestState by viewModel.balanceTestState.collectAsStateWithLifecycle()
     val modelMetadata by viewModel.modelMetadata.collectAsStateWithLifecycle()
     val modelSnapshot = models.toList()
 
     DisposableEffect(Unit) {
         viewModel.resetFetchState()
         viewModel.clearTestResults()
+        viewModel.clearBalanceTestState()
         onDispose {
             viewModel.resetFetchState()
             viewModel.clearTestResults()
+            viewModel.clearBalanceTestState()
         }
     }
 
@@ -195,7 +211,9 @@ fun ProviderEditorScreen(
         selectedModel = initialProvider?.selectedModel ?: "",
         useResponseApi = useResponseApi,
         anthropicCacheBreakpoints = anthropicCacheBreakpoints,
-        openaiChatCacheKey = openaiChatCacheKey
+        openaiChatCacheKey = openaiChatCacheKey,
+        balanceScriptPath = balanceScriptPath,
+        balanceRefreshInterval = balanceRefreshInterval
     )
 
     // 新建场景下判断用户是否填写了实质内容：名称、API Key、Base URL 任一非空白，或已添加模型。
@@ -205,6 +223,7 @@ fun ProviderEditorScreen(
             name.isNotBlank() ||
             apiKey.isNotBlank() ||
             baseUrl.isNotBlank() ||
+            balanceScriptPath.isNotBlank() ||
             models.isNotEmpty()
 
     fun saveCurrent() {
@@ -358,6 +377,93 @@ fun ProviderEditorScreen(
                             )
                         }
                     }
+
+                    // ── 套餐余量 ──
+                    SettingsGroupHeader(text = stringResource(R.string.provider_section_balance))
+                    SettingsGroup {
+                        ProviderTextFieldRow(
+                            label = stringResource(R.string.provider_balance_script),
+                            value = balanceScriptPath,
+                            onValueChange = { balanceScriptPath = it },
+                            placeholder = stringResource(R.string.provider_balance_script_placeholder),
+                            trailing = {
+                                IconButton(
+                                    onClick = { showScriptPickerSheet = true },
+                                    modifier = Modifier.size(36.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = FeatherIcons.Folder,
+                                        contentDescription = stringResource(R.string.provider_balance_select_script),
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                            }
+                        )
+                        SettingsDivider()
+                        SettingsRow(
+                            icon = null,
+                            title = stringResource(R.string.provider_balance_interval_title),
+                            onClick = { showIntervalSheet = true },
+                            trailing = {
+                                Text(
+                                    text = formatIntervalLabel(balanceRefreshInterval),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = if (MaterialTheme.colorScheme.background.luminance() > 0.5f) {
+                                        Color(0xFF8E9094)
+                                    } else {
+                                        MaterialTheme.colorScheme.onSurfaceVariant
+                                    }
+                                )
+                            }
+                        )
+                        SettingsDivider()
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = Spacing.md, vertical = Spacing.sm),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = stringResource(R.string.provider_balance_test_btn),
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Text(
+                                    text = stringResource(R.string.provider_balance_script_desc),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            Spacer(Modifier.width(Spacing.sm))
+                            FilledTonalButton(
+                                onClick = {
+                                    viewModel.testBalanceScript(currentConfig(), balanceScriptPath)
+                                },
+                                enabled = balanceScriptPath.isNotBlank() && balanceTestState !is ProviderBalanceState.Loading,
+                                shape = RoundedCornerShape(Radius.sm),
+                                contentPadding = PaddingValues(horizontal = Spacing.md, vertical = Spacing.xs)
+                            ) {
+                                if (balanceTestState is ProviderBalanceState.Loading) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(16.dp),
+                                        strokeWidth = 2.dp,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                } else {
+                                    Icon(FeatherIcons.Play, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    Spacer(Modifier.width(Spacing.xs))
+                                    Text(stringResource(R.string.provider_balance_run_test))
+                                }
+                            }
+                        }
+                        if (balanceTestState !is ProviderBalanceState.Idle) {
+                            SettingsDivider()
+                            BalanceTestResultBox(state = balanceTestState)
+                        }
+                    }
                 }
             } else {
                 Column(
@@ -473,6 +579,28 @@ fun ProviderEditorScreen(
             selected = type,
             onSelected = { type = it },
             onDismiss = { showTypeSheet = false }
+        )
+    }
+
+    if (showScriptPickerSheet) {
+        ScriptPickerBottomSheet(
+            scripts = viewModel.listAvailableBalanceScripts(),
+            onSelect = { selectedScript ->
+                balanceScriptPath = selectedScript
+                showScriptPickerSheet = false
+            },
+            onDismiss = { showScriptPickerSheet = false }
+        )
+    }
+
+    if (showIntervalSheet) {
+        IntervalSelectionSheet(
+            selected = balanceRefreshInterval,
+            onSelected = {
+                balanceRefreshInterval = it
+                showIntervalSheet = false
+            },
+            onDismiss = { showIntervalSheet = false }
         )
     }
 
@@ -1005,6 +1133,7 @@ private fun ProviderTextFieldRow(
     label: String,
     value: String,
     onValueChange: (String) -> Unit,
+    placeholder: String = "",
     visualTransformation: VisualTransformation = VisualTransformation.None,
     trailing: (@Composable () -> Unit)? = null
 ) {
@@ -1012,6 +1141,7 @@ private fun ProviderTextFieldRow(
         value = value,
         onValueChange = onValueChange,
         label = { Text(label) },
+        placeholder = if (placeholder.isNotBlank()) { { Text(placeholder) } } else null,
         singleLine = true,
         visualTransformation = visualTransformation,
         trailingIcon = { trailing?.invoke() },
@@ -1135,4 +1265,290 @@ internal fun providerTypeLabel(type: ProviderType): String = when (type) {
     ProviderType.OPENAI -> "OpenAI"
     ProviderType.ANTHROPIC -> "Anthropic"
     ProviderType.GEMINI -> "Gemini"
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ScriptPickerBottomSheet(
+    scripts: List<String>,
+    onSelect: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(),
+        containerColor = MaterialTheme.colorScheme.surface
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = Spacing.xl)
+        ) {
+            Text(
+                text = stringResource(R.string.provider_balance_select_title),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier
+                    .padding(horizontal = Spacing.lg)
+                    .padding(bottom = Spacing.sm)
+            )
+            Text(
+                text = stringResource(R.string.provider_balance_script_desc),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier
+                    .padding(horizontal = Spacing.lg)
+                    .padding(bottom = Spacing.md)
+            )
+
+            if (scripts.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(Spacing.xl),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = stringResource(R.string.provider_balance_no_scripts),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            } else {
+                scripts.forEach { scriptName ->
+                    Surface(
+                        onClick = { onSelect(scriptName) },
+                        color = Color.Transparent
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = Spacing.lg, vertical = Spacing.md),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = FeatherIcons.FileText,
+                                contentDescription = null,
+                                modifier = Modifier.size(20.dp),
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                            Spacer(Modifier.width(Spacing.md))
+                            Text(
+                                text = scriptName,
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun BalanceTestResultBox(state: ProviderBalanceState) {
+    var showRawOutput by remember { mutableStateOf(false) }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(Spacing.md),
+        verticalArrangement = Arrangement.spacedBy(Spacing.sm)
+    ) {
+        when (state) {
+            is ProviderBalanceState.Loading -> {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.sm)
+                ) {
+                    CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                    Text(
+                        text = stringResource(R.string.provider_balance_loading),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+            is ProviderBalanceState.Error -> {
+                Surface(
+                    color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f),
+                    shape = RoundedCornerShape(Radius.sm),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(Spacing.sm)) {
+                        Text(
+                            text = stringResource(R.string.provider_balance_test_failed),
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                        Text(
+                            text = state.message,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onErrorContainer
+                        )
+                    }
+                }
+            }
+            is ProviderBalanceState.Success -> {
+                val items = state.result.items
+                Surface(
+                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f),
+                    shape = RoundedCornerShape(Radius.sm),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier.padding(Spacing.sm),
+                        verticalArrangement = Arrangement.spacedBy(Spacing.xs)
+                    ) {
+                        Text(
+                            text = stringResource(R.string.provider_balance_test_success, items.size),
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        items.forEach { item ->
+                            val color = item.colorHex?.let {
+                                runCatching { Color(android.graphics.Color.parseColor(it)) }.getOrNull()
+                            } ?: MaterialTheme.colorScheme.primary
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(
+                                        text = "${item.label} ${item.suffix}".trim(),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                    val sub = item.displaySubText
+                                    if (sub.isNotBlank()) {
+                                        Text(
+                                            text = " ($sub)",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+                                Text(
+                                    text = item.displayValue,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = color
+                                )
+                            }
+                        }
+                    }
+                }
+
+                if (state.result.rawOutput.isNotBlank()) {
+                    Text(
+                        text = if (showRawOutput) "隐藏原始输出" else "查看原始输出",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.clickable { showRawOutput = !showRawOutput }
+                    )
+                    if (showRawOutput) {
+                        Surface(
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                            shape = RoundedCornerShape(Radius.xs),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                text = state.result.rawOutput,
+                                style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace, fontSize = 11.sp),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(Spacing.sm)
+                            )
+                        }
+                    }
+                }
+            }
+            ProviderBalanceState.Idle -> Unit
+        }
+    }
+}
+
+private val INTERVAL_OPTIONS = listOf(0, 1, 3, 5, 10, 15, 30)
+
+@Composable
+private fun formatIntervalLabel(minutes: Int): String = when (minutes) {
+    0 -> stringResource(R.string.provider_balance_interval_manual)
+    1 -> stringResource(R.string.provider_balance_interval_1m)
+    3 -> stringResource(R.string.provider_balance_interval_3m)
+    5 -> stringResource(R.string.provider_balance_interval_5m)
+    10 -> stringResource(R.string.provider_balance_interval_10m)
+    15 -> stringResource(R.string.provider_balance_interval_15m)
+    30 -> stringResource(R.string.provider_balance_interval_30m)
+    else -> "$minutes 分钟"
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun IntervalSelectionSheet(
+    selected: Int,
+    onSelected: (Int) -> Unit,
+    onDismiss: () -> Unit
+) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(),
+        containerColor = MaterialTheme.colorScheme.surface
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = Spacing.xl)
+        ) {
+            Text(
+                text = stringResource(R.string.provider_balance_interval_title),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier
+                    .padding(horizontal = Spacing.lg)
+                    .padding(bottom = Spacing.md)
+            )
+
+            INTERVAL_OPTIONS.forEach { interval ->
+                val isSelected = interval == selected
+                Surface(
+                    onClick = {
+                        onSelected(interval)
+                        onDismiss()
+                    },
+                    color = Color.Transparent
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = Spacing.lg, vertical = Spacing.md),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = formatIntervalLabel(interval),
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                            fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
+                            modifier = Modifier.weight(1f)
+                        )
+                        if (isSelected) {
+                            Icon(
+                                imageVector = FeatherIcons.Check,
+                                contentDescription = null,
+                                modifier = Modifier.size(20.dp),
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
 }

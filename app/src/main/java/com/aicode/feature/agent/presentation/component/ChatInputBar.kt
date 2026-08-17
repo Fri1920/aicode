@@ -73,6 +73,7 @@ import com.aicode.feature.agent.presentation.AgentUIState
 import com.aicode.feature.agent.presentation.QueuedRequest
 import com.aicode.feature.settings.domain.model.AIProviderConfig
 import com.aicode.feature.settings.domain.model.ModelMetadata
+import com.aicode.feature.settings.domain.model.ProviderBalanceState
 import com.aicode.feature.workspace.presentation.WorkspaceViewModel
 import com.aicode.feature.workspace.presentation.component.WorkspaceIconButton
 import compose.icons.FeatherIcons
@@ -118,6 +119,8 @@ internal fun ChatInputBar(
     queuedRequests: List<QueuedRequest> = emptyList(),
     onRemoveQueued: (String) -> Unit = {},
     tokenProgress: Float = 0f,
+    balanceState: ProviderBalanceState = ProviderBalanceState.Idle,
+    onRefreshBalance: () -> Unit = {},
     /** 消息列表正在滚动时内容区淡出到 40%，停止滚动恢复；用于长列表阅读时降低底部干扰（同 git 页 tab 栏）。 */
     isScrolling: Boolean = false,
     modifier: Modifier = Modifier
@@ -125,6 +128,7 @@ internal fun ChatInputBar(
     val canSend = (value.isNotBlank() || pendingAttachments.isNotEmpty()) && !isBusy
     val hasContent = value.isNotBlank() || pendingAttachments.isNotEmpty()
     var showAttachmentSheet by remember { mutableStateOf(false) }
+    var showModelSheetFromBalance by remember { mutableStateOf(false) }
     val showSlashMenu = !isBusy && slashCommands.isNotEmpty() &&
         value.startsWith("/") && !value.contains("\n")
     val filteredCommands = if (showSlashMenu) {
@@ -227,6 +231,14 @@ internal fun ChatInputBar(
                 QueuedRequestPanel(
                     queuedRequests = queuedRequests,
                     onRemoveQueued = onRemoveQueued
+                )
+            }
+
+            if (activeProvider != null && activeProvider.balanceScriptPath.isNotBlank()) {
+                ProviderBalanceBar(
+                    provider = activeProvider,
+                    state = balanceState,
+                    onRefresh = onRefreshBalance
                 )
             }
 
@@ -379,6 +391,20 @@ internal fun ChatInputBar(
                 onTakePhoto()
             },
             onDismiss = { showAttachmentSheet = false }
+        )
+    }
+
+    if (showModelSheetFromBalance) {
+        ModelSheet(
+            providers = providers,
+            currentProviderId = activeProvider?.id ?: "",
+            currentModel = activeProvider?.effectiveModel ?: "",
+            modelMetadata = modelMetadata,
+            onSelect = { pId, model ->
+                onSelectModel(pId, model)
+                showModelSheetFromBalance = false
+            },
+            onDismiss = { showModelSheetFromBalance = false }
         )
     }
 }

@@ -22,5 +22,9 @@ data class AIProviderEntity(
     /** Anthropic 显式缓存断点（cache_control）。仅 ANTHROPIC 类型使用，默认开启。 */
     val anthropicCacheBreakpoints: Boolean = true,
     /** Chat Completion 路径发送 prompt_cache_key（shard 路由）。仅 OPENAI 类型使用，默认关闭（官方 API 不接受该字段）。 */
-    val openaiChatCacheKey: Boolean = false
+    val openaiChatCacheKey: Boolean = false,
+    /** 套餐余量脚本路径。 */
+    val balanceScriptPath: String = "",
+    /** 套餐余量自动刷新间隔（分钟）。默认 5 分钟。 */
+    val balanceRefreshInterval: Int = 5
 )

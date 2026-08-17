@@ -70,7 +70,9 @@ class AIProviderRepositoryImpl @Inject constructor(
             useFullUrl = useFullUrl,
             useResponseApi = useResponseApi,
             anthropicCacheBreakpoints = anthropicCacheBreakpoints,
-            openaiChatCacheKey = openaiChatCacheKey
+            openaiChatCacheKey = openaiChatCacheKey,
+            balanceScriptPath = balanceScriptPath,
+            balanceRefreshInterval = balanceRefreshInterval
         )
     }
 
@@ -88,7 +90,9 @@ class AIProviderRepositoryImpl @Inject constructor(
             isEnabled = isEnabled,
             useResponseApi = useResponseApi,
             anthropicCacheBreakpoints = anthropicCacheBreakpoints,
-            openaiChatCacheKey = openaiChatCacheKey
+            openaiChatCacheKey = openaiChatCacheKey,
+            balanceScriptPath = balanceScriptPath,
+            balanceRefreshInterval = balanceRefreshInterval
         )
     }
 }

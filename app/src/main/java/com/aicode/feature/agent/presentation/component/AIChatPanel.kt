@@ -67,6 +67,7 @@ import com.aicode.feature.agent.presentation.AIAgentViewModel
 import com.aicode.feature.agent.presentation.MessageRole
 import com.aicode.feature.agent.presentation.hasVisibleContent
 import com.aicode.feature.settings.presentation.SettingsViewModel
+import com.aicode.feature.settings.domain.model.ProviderBalanceState
 import com.aicode.feature.workspace.presentation.WorkspaceViewModel
 import compose.icons.FeatherIcons
 import compose.icons.feathericons.ArrowDown
@@ -222,6 +223,26 @@ fun AIChatPanel(
     val canUploadFiles = projectRoot.isNotBlank() && activeModelMetadata?.supportsTools == true
     val canUploadImages = projectRoot.isNotBlank()
     val reasoningEffort by viewModel.currentSessionReasoningEffort.collectAsStateWithLifecycle()
+
+    val providerBalances by (settingsViewModel?.providerBalances?.collectAsStateWithLifecycle() ?: remember { mutableStateOf(emptyMap()) })
+    val currentBalanceState = activeProvider?.let { providerBalances[it.id] } ?: ProviderBalanceState.Idle
+
+    LaunchedEffect(activeProvider?.id, activeProvider?.balanceScriptPath, activeProvider?.balanceRefreshInterval) {
+        val provider = activeProvider ?: return@LaunchedEffect
+        if (provider.balanceScriptPath.isBlank()) return@LaunchedEffect
+
+        // 首次或切换提供商时拉取一次
+        settingsViewModel?.refreshProviderBalance(provider, force = false)
+
+        val intervalMinutes = provider.balanceRefreshInterval
+        if (intervalMinutes > 0) {
+            val intervalMs = intervalMinutes * 60_000L
+            while (true) {
+                delay(intervalMs)
+                settingsViewModel?.refreshProviderBalance(provider, force = true)
+            }
+        }
+    }
 
     LaunchedEffect(activeProvider?.type, activeModel) {
         val provider = activeProvider ?: return@LaunchedEffect
@@ -714,6 +735,10 @@ fun AIChatPanel(
                 slashCommands = viewModel.slashCommands,
                 queuedRequests = queuedRequests,
                 onRemoveQueued = { viewModel.removeQueuedRequest(it) },
+                balanceState = currentBalanceState,
+                onRefreshBalance = {
+                    activeProvider?.let { settingsViewModel?.refreshProviderBalance(it, force = true) }
+                },
                 tokenProgress = run {
                     val contextLimit = activeModelMetadata?.contextTokens ?: 0
                     if (contextLimit > 0) {
