@@ -16,6 +16,8 @@ data class ModelMetadata(
     val modelType: ModelType = ModelType.CHAT,
     val supportsImageOutput: Boolean = false,
     val source: Source = Source.INFERRED,
+    /** models.dev 思考强度档位（reasoning_options 中 effort 类型的 values，如 ["low","medium","high"]）；null/空 = 无档位（不显示思考强度选择）。 */
+    val reasoningEffortOptions: List<String>? = null,
     /** models.dev cost：输入单价（USD/1M tokens）。 */
     val inputCostUsdPerM: Double? = null,
     /** models.dev cost：输出单价（USD/1M tokens）。 */

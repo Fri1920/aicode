@@ -5,6 +5,7 @@ import com.aicode.feature.agent.data.remote.anthropic.AnthropicMessageRequest
 import com.aicode.feature.agent.data.remote.anthropic.AnthropicMessage
 import com.aicode.feature.agent.data.remote.anthropic.AnthropicContentBlock
 import com.aicode.feature.agent.data.remote.anthropic.AnthropicThinkingConfig
+import com.aicode.feature.agent.data.remote.anthropic.AnthropicOutputConfig
 import com.aicode.feature.agent.data.remote.anthropic.AnthropicToolDefinition
 import com.aicode.core.util.AILogger
 import com.aicode.feature.agent.domain.model.AgentImage
@@ -64,13 +65,14 @@ class AnthropicAdapter @Inject constructor(
         }
 
         val url = if (useFullUrl) baseUrl else joinUrl(baseUrl, defaultProviderApiPath(ProviderType.ANTHROPIC))
-        val thinking = buildThinkingConfig(reasoningEffort)
+        val (thinking, outputConfig) = buildThinkingConfig(reasoningEffort)
         val request = AnthropicMessageRequest(
             model = model,
             messages = anthropicMessages,
             system = buildSystemPayload(systemPrompt),
             temperature = if (thinking != null) null else 0.7f,
             thinking = thinking,
+            output_config = outputConfig,
             tools = toolDefs,
             stream = false
         )
@@ -134,13 +136,14 @@ class AnthropicAdapter @Inject constructor(
         }
 
         val url = if (useFullUrl) baseUrl else joinUrl(baseUrl, defaultProviderApiPath(ProviderType.ANTHROPIC))
-        val thinking = buildThinkingConfig(reasoningEffort)
+        val (thinking, outputConfig) = buildThinkingConfig(reasoningEffort)
         val request = AnthropicMessageRequest(
             model = model,
             messages = anthropicMessages,
             system = buildSystemPayload(systemPrompt),
             temperature = if (thinking != null) null else 0.7f,
             thinking = thinking,
+            output_config = outputConfig,
             tools = toolDefs,
             stream = true
         )
@@ -295,16 +298,35 @@ class AnthropicAdapter @Inject constructor(
         val args = StringBuilder()
     }
 
-    /** 思考强度 → Anthropic thinking 预算。budget_tokens 最小 1024，且须小于 max_tokens(16384)。 */
-    private fun buildThinkingConfig(reasoningEffort: String?): AnthropicThinkingConfig? {
-        if (reasoningEffort == null) return null
+    /**
+     * 思考强度 → Anthropic thinking 配置。
+     * - 新模型（4.6+/5 系，支持 adaptive）：effort 档位直传 output_config，thinking 用 adaptive+summarized；
+     *   "none" 关闭思考用 disabled。
+     * - 旧模型（4.5 及更早，仅 budget_tokens）：low/medium/high 映射 1024/4096/8192（须小于 max_tokens）。
+     */
+    private fun buildThinkingConfig(reasoningEffort: String?): Pair<AnthropicThinkingConfig?, AnthropicOutputConfig?> {
+        if (reasoningEffort == null) return null to null
+        if (supportsAdaptiveThinking()) {
+            if (reasoningEffort == "none") {
+                return AnthropicThinkingConfig(type = "disabled") to null
+            }
+            return AnthropicThinkingConfig(type = "adaptive", display = "summarized") to AnthropicOutputConfig(effort = reasoningEffort)
+        }
         val budget = when (reasoningEffort) {
             "low" -> 1024
             "medium" -> 4096
             "high" -> 8192
-            else -> return null
+            else -> return null to null
         }
-        return AnthropicThinkingConfig(budget_tokens = budget)
+        return AnthropicThinkingConfig(type = "enabled", budget_tokens = budget) to null
+    }
+
+    /** 是否支持 adaptive thinking：4.6+ 及 5 系（claude-<family>-4-6/4-7/4-8 或主版本 5）。 */
+    private fun supportsAdaptiveThinking(): Boolean {
+        val m = Regex("claude-(?:opus|sonnet|haiku|fable|mythos)-(\\d+)(?:-(\\d+))?").find(model)
+        val major = m?.groupValues?.get(1)?.toIntOrNull() ?: return false
+        val minor = m?.groupValues?.get(2)?.toIntOrNull()
+        return major >= 5 || (major == 4 && (minor ?: 0) >= 6)
     }
 
     /** 把累积的工具入参 JSON 字符串解析为 JsonObject；为空或非法时回退为空对象。 */

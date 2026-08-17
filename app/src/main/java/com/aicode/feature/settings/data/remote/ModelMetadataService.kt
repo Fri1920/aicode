@@ -12,6 +12,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.intOrNull
@@ -241,10 +242,33 @@ class ModelMetadataService @Inject constructor(
             ProviderType.GEMINI -> listOf("google", "google-vertex")
         }
 
-        for (provider in preferredProviders) {
-            catalog[provider]?.get(normalized)?.let { return it }
+        // 先精确匹配，失败后依次尝试剥离常见后缀的变体（如 gpt-5-high -> gpt-5）
+        for (candidate in strippedCandidates(normalized)) {
+            for (provider in preferredProviders) {
+                catalog[provider]?.get(candidate)?.let { return it }
+            }
+            catalog.values.firstNotNullOfOrNull { models -> models[candidate] }?.let { return it }
         }
-        return catalog.values.firstNotNullOfOrNull { models -> models[normalized] }
+        return null
+    }
+
+    /** 生成匹配候选：原始 id 在前，随后迭代剥离常见后缀（-thinking/-preview/-high/-low 及括号形式），可连续剥离多层。 */
+    private fun strippedCandidates(modelId: String): List<String> {
+        val candidates = mutableListOf(modelId)
+        var current = modelId
+        var changed: Boolean
+        do {
+            changed = false
+            for (suffix in MODEL_SUFFIXES) {
+                if (current.length > suffix.length && current.endsWith(suffix)) {
+                    current = current.dropLast(suffix.length)
+                    candidates.add(current)
+                    changed = true
+                    break
+                }
+            }
+        } while (changed)
+        return candidates
     }
 
     private fun parseCatalog(root: JsonElement): Map<String, Map<String, ModelMetadata>> {
@@ -258,6 +282,7 @@ class ModelMetadataService @Inject constructor(
                     ?.mapNotNull { it.jsonPrimitive.content }
                     .orEmpty()
                 val cost = model["cost"]?.jsonObject
+                val reasoningOptions = parseReasoningOptions(model["reasoning_options"])
                 ModelMetadata(
                     id = model["id"]?.jsonPrimitive?.content ?: "",
                     providerId = providerId,
@@ -268,6 +293,7 @@ class ModelMetadataService @Inject constructor(
                     supportsTools = model["tool_call"]?.jsonPrimitive?.booleanOrNull == true,
                     supportsVision = "image" in inputModalities || "video" in inputModalities || "pdf" in inputModalities,
                     supportsReasoning = model["reasoning"]?.jsonPrimitive?.booleanOrNull == true,
+                    reasoningEffortOptions = reasoningOptions.takeIf { it.isNotEmpty() },
                     inputCostUsdPerM = cost?.get("input")?.jsonPrimitive?.doubleOrNull,
                     outputCostUsdPerM = cost?.get("output")?.jsonPrimitive?.doubleOrNull,
                     cacheReadCostUsdPerM = cost?.get("cache_read")?.jsonPrimitive?.doubleOrNull,
@@ -282,7 +308,16 @@ class ModelMetadataService @Inject constructor(
         val catalog: Map<String, Map<String, ModelMetadata>>
     )
 
-    private companion object {
+    companion object {
+        /** 从 models.dev 的 reasoning_options 数组中提取 effort 类型的档位 values；无 effort 档位时返回空列表。 */
+        fun parseReasoningOptions(reasoningOptions: JsonElement?): List<String> =
+            reasoningOptions?.takeIf { it !is JsonNull }?.jsonArray
+                ?.mapNotNull { it.jsonObject }
+                ?.firstOrNull { it["type"]?.jsonPrimitive?.content == "effort" }
+                ?.get("values")?.jsonArray
+                ?.mapNotNull { it.jsonPrimitive.content }
+                .orEmpty()
+
         const val TAG = "ModelMetadataService"
         private const val PREFS_NAME = "model_metadata_prefs"
         private const val KEY_LAST_SOURCE = "last_success_source"
@@ -291,6 +326,12 @@ class ModelMetadataService @Inject constructor(
         const val CACHE_MAX_AGE_MS = 24 * 60 * 60 * 1000L
         const val DEFAULT_CONTEXT_TOKENS = 128_000
         const val DEFAULT_OUTPUT_TOKENS = 64_000
+
+        /** 兜底模糊匹配：依次尝试剥离的模型 id 后缀。 */
+        private val MODEL_SUFFIXES = listOf(
+            "-thinking", "-preview", "-high", "-low",
+            "(thinking)", "(xhigh)", "(high)", "(low)"
+        )
 
         private data class Source(val id: String, val url: String)
 

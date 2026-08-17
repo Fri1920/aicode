@@ -47,6 +47,7 @@
     <string name="settings_token_stats_calls_suffix">calls</string>
     <string name="settings_token_stats_calls_suffix2">%1$d calls</string>
     <string name="settings_token_stats_col_model">Model</string>
+    <string name="settings_token_stats_col_reasoning_effort">Effort</string>
     <string name="settings_token_stats_col_provider">Provider</string>
     <string name="settings_token_stats_col_input">Input</string>
     <string name="settings_token_stats_col_output">Output</string>
@@ -197,9 +198,13 @@
     <string name="chat_add_attachment">Add attachment</string>
     <string name="chat_take_photo">Take photo</string>
     <string name="chat_reasoning_effort">Reasoning effort</string>
+    <string name="chat_reasoning_effort_none">None</string>
+    <string name="chat_reasoning_effort_minimal">Minimal</string>
     <string name="chat_reasoning_effort_low">Low</string>
     <string name="chat_reasoning_effort_medium">Medium</string>
     <string name="chat_reasoning_effort_high">High</string>
+    <string name="chat_reasoning_effort_xhigh">Extra high</string>
+    <string name="chat_reasoning_effort_max">Max</string>
     <string name="chat_open_file_failed">File not found or inaccessible</string>
     <string name="chat_open_file_no_app">No app available to open this file</string>
     <string name="chat_open_apk_permission">Installing apps requires permission. Allow installs from this source in the settings that just opened</string>

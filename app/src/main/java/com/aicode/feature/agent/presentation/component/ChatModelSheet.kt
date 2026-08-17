@@ -73,12 +73,14 @@ internal fun ModelIconButton(
 }
 
 /**
- * 思考强度选择器：独立图标按钮，点击弹出底部三档选择（低/中/高）。
+ * 思考强度选择器：独立图标按钮，点击弹出底部档位选择（按当前模型元数据动态生成）。
+ * [availableEfforts] 为空时调用方应隐藏本按钮。
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun ReasoningEffortSelector(
     effort: ReasoningEffort,
+    availableEfforts: List<ReasoningEffort>,
     onChange: (ReasoningEffort) -> Unit,
     enabled: Boolean
 ) {
@@ -118,7 +120,7 @@ internal fun ReasoningEffortSelector(
                     color = MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier.padding(bottom = Spacing.sm)
                 )
-                ReasoningEffort.entries.forEach { e ->
+                availableEfforts.forEach { e ->
                     val selected = e == effort
                     Row(
                         modifier = Modifier
@@ -162,9 +164,13 @@ internal fun ReasoningEffortSelector(
 }
 
 private fun ReasoningEffort.labelRes(): Int = when (this) {
+    ReasoningEffort.NONE -> com.aicode.R.string.chat_reasoning_effort_none
+    ReasoningEffort.MINIMAL -> com.aicode.R.string.chat_reasoning_effort_minimal
     ReasoningEffort.LOW -> com.aicode.R.string.chat_reasoning_effort_low
     ReasoningEffort.MEDIUM -> com.aicode.R.string.chat_reasoning_effort_medium
     ReasoningEffort.HIGH -> com.aicode.R.string.chat_reasoning_effort_high
+    ReasoningEffort.XHIGH -> com.aicode.R.string.chat_reasoning_effort_xhigh
+    ReasoningEffort.MAX -> com.aicode.R.string.chat_reasoning_effort_max
 }
 
 /**

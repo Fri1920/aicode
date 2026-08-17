@@ -23,6 +23,7 @@ import com.aicode.feature.agent.domain.container.LinuxContainerEngine
 import com.aicode.feature.settings.domain.repository.AIProviderRepository
 import com.aicode.feature.settings.data.repository.AgentSoundSettingsRepository
 import com.aicode.feature.settings.data.repository.DefaultModelSettingsRepository
+import com.aicode.feature.settings.data.repository.ModelReasoningEffortRepository
 import com.aicode.feature.agent.domain.model.AgentContext
 import com.aicode.feature.agent.domain.model.AgentImage
 import com.aicode.feature.agent.domain.model.AgentMessage
@@ -85,6 +86,7 @@ class AIAgentViewModel @Inject constructor(
     private val chatSessionDao: ChatSessionDao,
     private val aiProviderRepository: AIProviderRepository,
     private val defaultModelSettingsRepository: DefaultModelSettingsRepository,
+    private val modelReasoningEffortRepository: ModelReasoningEffortRepository,
     private val toolPermissionManager: ToolPermissionManager,
     private val askUserQuestionManager: AskUserQuestionManager,
     private val containerEngine: LinuxContainerEngine,
@@ -968,6 +970,13 @@ class AIAgentViewModel @Inject constructor(
         val sid = _currentSessionId.value ?: return
         viewModelScope.launch {
             sessionUseCase.updateReasoningEffort(sid, effort.name)
+            // 同步记忆到模型级默认档位，供后续新建会话沿用
+            val s = sessionUseCase.getSessionById(sid)?.toDomain()
+            val pid = s?.providerId
+            val model = s?.model
+            if (!pid.isNullOrBlank() && !model.isNullOrBlank()) {
+                modelReasoningEffortRepository.set(pid, model, effort.name)
+            }
         }
     }
 
@@ -1210,6 +1219,10 @@ class AIAgentViewModel @Inject constructor(
         val model = defaultModelSettingsRepository.getDefaultModel()
         if (providerId.isNotBlank() && model.isNotBlank()) {
             sessionUseCase.updateProviderModel(s.id, providerId, model)
+            // 沿用该模型上次记忆的思考强度（模型级默认档位）
+            modelReasoningEffortRepository.get(providerId, model)?.let { effort ->
+                sessionUseCase.updateReasoningEffort(s.id, effort)
+            }
         }
         return s
     }

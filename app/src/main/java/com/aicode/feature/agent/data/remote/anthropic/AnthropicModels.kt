@@ -9,14 +9,28 @@ data class AnthropicMessageRequest(
     // 开启 extended thinking 时不能携带 temperature（官方要求），置 null 由 Gson 跳过该字段。
     val temperature: Float? = null,
     val thinking: AnthropicThinkingConfig? = null,
+    // adaptive thinking 的 effort 档位（新模型，如 opus-4.7+/sonnet-5）。
+    val output_config: AnthropicOutputConfig? = null,
     val tools: List<AnthropicToolDefinition>? = null,
     val stream: Boolean = false
 )
 
-/** Anthropic extended thinking 配置：type="enabled" + budget_tokens（思考 token 预算）。 */
+/**
+ * Anthropic thinking 配置：
+ * - 旧模型（4.5 及更早）：type="enabled" + budget_tokens（思考 token 预算）
+ * - 新模型（4.6+/5 系）：type="adaptive" + display（思考展示方式），effort 走 [AnthropicOutputConfig]
+ * - 关闭思考：type="disabled"
+ * 未用到的字段置 null 由 Gson 跳过。
+ */
 data class AnthropicThinkingConfig(
     val type: String = "enabled",
-    val budget_tokens: Int
+    val budget_tokens: Int? = null,
+    val display: String? = null
+)
+
+/** adaptive thinking 的 effort 档位（low/medium/high/xhigh/max）。 */
+data class AnthropicOutputConfig(
+    val effort: String? = null
 )
 
 data class AnthropicMessage(

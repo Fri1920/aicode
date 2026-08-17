@@ -47,6 +47,7 @@
     <string name="settings_token_stats_calls_suffix">次调用</string>
     <string name="settings_token_stats_calls_suffix2">%1$d 次调用</string>
     <string name="settings_token_stats_col_model">模型</string>
+    <string name="settings_token_stats_col_reasoning_effort">思考强度</string>
     <string name="settings_token_stats_col_provider">渠道</string>
     <string name="settings_token_stats_col_input">输入</string>
     <string name="settings_token_stats_col_output">输出</string>
@@ -197,9 +198,13 @@
     <string name="chat_add_attachment">添加附件</string>
     <string name="chat_take_photo">拍照</string>
     <string name="chat_reasoning_effort">思考强度</string>
+    <string name="chat_reasoning_effort_none">关闭</string>
+    <string name="chat_reasoning_effort_minimal">极低</string>
     <string name="chat_reasoning_effort_low">低</string>
     <string name="chat_reasoning_effort_medium">中</string>
     <string name="chat_reasoning_effort_high">高</string>
+    <string name="chat_reasoning_effort_xhigh">极高</string>
+    <string name="chat_reasoning_effort_max">最高</string>
     <string name="chat_open_file_failed">文件不存在或无法访问</string>
     <string name="chat_open_file_no_app">没有可打开该文件的应用</string>
     <string name="chat_open_apk_permission">安装应用需要授权，请在跳转的设置中允许来自此来源的应用</string>

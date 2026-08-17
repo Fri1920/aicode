@@ -334,11 +334,20 @@ internal fun ChatInputBar(
                             )
                         }
 
-                        ReasoningEffortSelector(
-                            effort = reasoningEffort,
-                            onChange = onReasoningEffortChange,
-                            enabled = !isBusy
-                        )
+                        val availableEfforts = remember(activeProvider, modelMetadata) {
+                            activeProvider?.let { provider ->
+                                modelMetadata[provider.effectiveModel]?.reasoningEffortOptions
+                                    ?.let { ReasoningEffort.fromValues(it) }
+                            }.orEmpty()
+                        }
+                        if (availableEfforts.isNotEmpty()) {
+                            ReasoningEffortSelector(
+                                effort = reasoningEffort,
+                                availableEfforts = availableEfforts,
+                                onChange = onReasoningEffortChange,
+                                enabled = !isBusy
+                            )
+                        }
                     }
                     UploadIconButton(
                         enabled = !isBusy,
