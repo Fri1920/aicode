@@ -314,6 +314,16 @@ class LinuxContainerEngine @Inject constructor(
         return CommandResult(result.output, result.exitCode)
     }
 
+    override suspend fun runCommandSyncUnbounded(
+        command: String,
+        projectPath: String?,
+        timeoutMs: Long
+    ): CommandResult = withContext(Dispatchers.IO) {
+        notReadyHint()?.let { return@withContext CommandResult(it, null) }
+        val r = execCaptured(command, projectPath, timeoutMs, unbounded = true)
+        CommandResult(r.output, r.exitCode)
+    }
+
     /**
      * 在容器内同步执行命令并捕获输出。**假定 rootfs 已安装**（不做懒安装/配置），
      * 供 [runCommandSync]（先 [ensureInstalled]）与初始化脚本执行（先 [installRootfsIfNeed]）复用，
@@ -325,7 +335,8 @@ class LinuxContainerEngine @Inject constructor(
     private suspend fun execCaptured(
         command: String,
         projectPath: String?,
-        timeoutMs: Long
+        timeoutMs: Long,
+        unbounded: Boolean = false
     ): ExecResult = withContext(Dispatchers.IO) {
         try {
             val effectiveTimeout = timeoutMs.coerceIn(1L, MAX_TIMEOUT_MS)
@@ -341,7 +352,8 @@ class LinuxContainerEngine @Inject constructor(
             }
 
             // 限幅累积：超大输出只保留开头+结尾，避免撑爆内存与模型上下文。
-            val output = BoundedOutput()
+            // 不限幅模式（unbounded）供需要完整输出的调用方使用（如 git diff），由上层自行兜底。
+            val output = if (unbounded) BoundedOutput(Int.MAX_VALUE, Int.MAX_VALUE) else BoundedOutput()
             // 看门狗与读循环并发：超时则 destroy 进程，使阻塞的 readLine 立即返回 null 退出循环。
             var exitCode: Int? = null
             try {

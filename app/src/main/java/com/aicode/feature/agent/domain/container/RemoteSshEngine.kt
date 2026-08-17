@@ -151,15 +151,25 @@ class RemoteSshEngine @Inject constructor(
             }
     }
 
-    private suspend fun execCaptured(
+    override suspend fun runCommandSyncUnbounded(
         command: String,
         projectPath: String?,
         timeoutMs: Long
     ): CommandResult = withContext(Dispatchers.IO) {
+        ensureInstalled()
+        execCaptured(command, projectPath, timeoutMs, unbounded = true)
+    }
+
+    private suspend fun execCaptured(
+        command: String,
+        projectPath: String?,
+        timeoutMs: Long,
+        unbounded: Boolean = false
+    ): CommandResult = withContext(Dispatchers.IO) {
         val effectiveTimeout = timeoutMs.coerceIn(1L, CommandEngine.MAX_TIMEOUT_MS)
         FileLogger.d(TAG, "执行命令(远程同步) cwd=$projectPath timeout=${effectiveTimeout}ms: $command")
         val session = connection.startExecSession(buildCdCommand(command, projectPath))
-        val output = BoundedOutput()
+        val output = if (unbounded) BoundedOutput(Int.MAX_VALUE, Int.MAX_VALUE) else BoundedOutput()
         var exitCode: Int? = null
         try {
             coroutineScope {

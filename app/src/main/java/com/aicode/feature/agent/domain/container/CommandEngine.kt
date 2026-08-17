@@ -68,6 +68,19 @@ interface CommandEngine {
     ): CommandResult
 
     /**
+     * 同 [runCommandSyncWithExit]，但输出**不做限幅截断**（返回完整输出）。
+     * 供需要完整文本的调用方使用（如 git diff 页读取 diff/文件内容）：
+     * AI 工具链路的默认限幅（[BoundedOutput] 头尾各 2 万字符）会把截断占位符
+     * 混入 diff 数据流，导致 UI 渲染出伪 diff 行。调用方须自行对超大输出兜底
+     * （如 diff 页的 2000 行/行长保护）。
+     */
+    suspend fun runCommandSyncUnbounded(
+        command: String,
+        projectPath: String? = null,
+        timeoutMs: Long = DEFAULT_TIMEOUT_MS
+    ): CommandResult
+
+    /**
      * 仅在后端已就绪时执行命令；不会触发初始化（不解压 rootfs / 不建 SSH 连接）。
      * 未就绪时返回 null，让调用方走 fallback。供只读工具做性能增强使用（如 search 优先用 rg）。
      */

@@ -59,7 +59,9 @@ class GitRepository @Inject constructor(
             append("git")
             args.forEach { append(' '); append(shellQuote(it)) }
         }
-        val result = engine.runCommandSyncWithExit(cmd, workspaceRepository.currentPath())
+        // 用不限幅执行：diff 内容/文件内容可能远超 AI 工具链路的 4 万字符限幅，
+        // 截断占位符会混入 diff 数据流被 UI 渲染成伪 diff 行。
+        val result = engine.runCommandSyncUnbounded(cmd, workspaceRepository.currentPath())
         if (result.exitCode == 0) return result.output
         throw GitCommandFailureException(result.output.ifBlank { "git 退出码 ${result.exitCode}" })
     }
@@ -70,7 +72,7 @@ class GitRepository @Inject constructor(
             append("git")
             args.forEach { append(' '); append(shellQuote(it)) }
         }
-        return engine.runCommandSync(cmd, workspaceRepository.currentPath())
+        return engine.runCommandSyncUnbounded(cmd, workspaceRepository.currentPath()).output
     }
 
     /** 当前工作区是否处于一个 git 工作树内。SSH 未连接等异常时返回 false 而非抛出，避免 UI 崩溃。 */

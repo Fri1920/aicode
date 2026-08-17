@@ -46,6 +46,12 @@ class DelegatingCommandEngine @Inject constructor(
         timeoutMs: Long
     ): CommandResult = delegate().runCommandSyncWithExit(command, projectPath, timeoutMs)
 
+    override suspend fun runCommandSyncUnbounded(
+        command: String,
+        projectPath: String?,
+        timeoutMs: Long
+    ): CommandResult = delegate().runCommandSyncUnbounded(command, projectPath, timeoutMs)
+
     override suspend fun runCommandSyncIfReady(
         command: String,
         projectPath: String?,
