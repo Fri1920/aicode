@@ -243,7 +243,10 @@ fun RemoteServerScreen(
     if (showHostKeysScreen) {
         HostKeysScreen(
             hostKeys = uiState.hostKeys,
-            onRemove = { host, port -> viewModel.removeHostKey(host, port) },
+            loginKeys = uiState.loginKeys,
+            onAddLoginKey = { uri -> viewModel.addLoginKey(uri) },
+            onRemoveHostKey = { host, port -> viewModel.removeHostKey(host, port) },
+            onRemoveLoginKey = { id -> viewModel.removeLoginKey(id) },
             onNavigateBack = { showHostKeysScreen = false }
         )
         return
@@ -262,21 +265,22 @@ fun RemoteServerScreen(
     if (showAddConnectionDialog) {
         AddRemoteConnectionDialog(
             initialConnection = connectionToEdit,
+            loginKeys = uiState.loginKeys,
             pendingHostKey = uiState.pendingHostKey,
             onConfirmHostKey = { viewModel.confirmHostKey() },
             onRejectHostKey = { viewModel.rejectHostKey() },
             onDismiss = { showAddConnectionDialog = false },
-            onAdd = { name, host, port, username, password, protocol ->
+            onAdd = { name, host, port, username, auth, protocol ->
                 val editing = connectionToEdit
                 if (editing != null) {
-                    viewModel.updateConnection(editing.id, name, host, port, username, password, protocol)
+                    viewModel.updateConnection(editing.id, name, host, port, username, auth, protocol)
                 } else {
-                    viewModel.addConnection(name, host, port, username, password, protocol)
+                    viewModel.addConnection(name, host, port, username, auth, protocol)
                 }
                 showAddConnectionDialog = false
             },
-            onTestConnection = { host, port, username, password, protocol, onResult ->
-                viewModel.testConnection(host, port, username, password, protocol, onResult)
+            onTestConnection = { host, port, username, auth, protocol, onResult ->
+                viewModel.testConnection(host, port, username, auth, protocol, onResult)
             }
         )
     }
@@ -300,6 +304,7 @@ fun RemoteServerScreen(
                 initialMount = mountToEdit,
                 connections = uiState.connections,
                 workspaces = uiState.workspaces,
+                mounts = uiState.mounts,
                 onDismiss = { showAddMountDialog = false },
                 onAdd = { connectionId, remotePath, localWorkspacePath, autoConnect ->
                     val editing = mountToEdit

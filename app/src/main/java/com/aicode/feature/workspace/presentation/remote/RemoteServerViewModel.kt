@@ -1,6 +1,8 @@
 package com.aicode.feature.workspace.presentation.remote
 
 import android.content.Context
+import android.net.Uri
+import android.provider.OpenableColumns
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.aicode.feature.workspace.domain.model.RemoteConnection
@@ -8,16 +10,22 @@ import com.aicode.feature.workspace.domain.model.RemoteMount
 import com.aicode.feature.workspace.domain.model.RemoteProtocol
 import com.aicode.feature.workspace.domain.remote.RemoteAuth
 import com.aicode.feature.agent.domain.container.RemoteSshConnection
+import com.aicode.feature.agent.domain.container.SshLoginKey
+import com.aicode.feature.agent.domain.container.SshLoginKeyStore
+import com.aicode.feature.agent.domain.container.sshLoginKeyFingerprint
 import com.aicode.feature.workspace.domain.repository.RemoteRepository
 import com.aicode.feature.workspace.domain.repository.HostKeyConfirmationRequiredException
 import dagger.hilt.android.lifecycle.HiltViewModel
 import com.aicode.R
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.io.File
 import java.util.UUID
 import javax.inject.Inject
 
@@ -33,11 +41,15 @@ class RemoteServerViewModel @Inject constructor(
     private val workspaceRepository: WorkspaceRepository,
     private val syncSettingsRepository: SyncSettingsRepository,
     private val remoteSshConnection: RemoteSshConnection,
+    private val loginKeyStore: SshLoginKeyStore,
     val ftpServerManager: FtpServerManager
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(
-        RemoteServerUiState(hostKeys = remoteSshConnection.savedHostKeys())
+        RemoteServerUiState(
+            hostKeys = remoteSshConnection.savedHostKeys(),
+            loginKeys = loginKeyStore.entries()
+        )
     )
     val uiState: StateFlow<RemoteServerUiState> = _uiState.asStateFlow()
 
@@ -138,13 +150,56 @@ class RemoteServerViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(hostKeys = remoteSshConnection.savedHostKeys())
     }
 
+    /** 添加登录密钥：读取所选私钥文件复制到应用私有目录，解析公钥指纹后入库。 */
+    fun addLoginKey(uri: Uri) {
+        viewModelScope.launch {
+            val bytes = runCatching {
+                context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+            }.getOrNull() ?: return@launch
+            if (bytes.isEmpty()) return@launch
+            val displayName = runCatching {
+                context.contentResolver.query(uri, null, null, null, null)?.use { c ->
+                    if (c.moveToFirst()) {
+                        val idx = c.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                        if (idx >= 0) c.getString(idx) else null
+                    } else null
+                }
+            }.getOrNull() ?: "ssh_key"
+            val dir = File(context.filesDir, "ssh_keys").apply { mkdirs() }
+            var target = File(dir, displayName)
+            var n = 1
+            while (target.exists()) {
+                val dot = displayName.lastIndexOf('.')
+                val base = if (dot > 0) displayName.substring(0, dot) else displayName
+                val ext = if (dot > 0) displayName.substring(dot) else ""
+                target = File(dir, "${base}_$n$ext")
+                n++
+            }
+            runCatching { target.writeBytes(bytes) }.getOrElse { return@launch }
+            val fingerprint = withContext(Dispatchers.IO) { sshLoginKeyFingerprint(target.absolutePath) }
+            loginKeyStore.add(
+                SshLoginKey(
+                    id = UUID.randomUUID().toString(),
+                    name = target.name,
+                    path = target.absolutePath,
+                    fingerprint = fingerprint
+                )
+            )
+            _uiState.value = _uiState.value.copy(loginKeys = loginKeyStore.entries())
+        }
+    }
+
+    fun removeLoginKey(id: String) {
+        loginKeyStore.remove(id)
+        _uiState.value = _uiState.value.copy(loginKeys = loginKeyStore.entries())
+    }
 
     fun addConnection(
         name: String,
         host: String,
         port: String,
         username: String,
-        password: String, 
+        auth: RemoteAuth,
         protocol: RemoteProtocol
     ) {
         viewModelScope.launch {
@@ -157,7 +212,7 @@ class RemoteServerViewModel @Inject constructor(
                 port = p,
                 username = username.ifBlank { "local" }
             )
-            repository.addConnection(conn, RemoteAuth.Password(password))
+            repository.addConnection(conn, auth)
         }
     }
 
@@ -167,7 +222,7 @@ class RemoteServerViewModel @Inject constructor(
         host: String,
         port: String,
         username: String,
-        password: String,
+        auth: RemoteAuth,
         protocol: RemoteProtocol
     ) {
         viewModelScope.launch {
@@ -180,7 +235,7 @@ class RemoteServerViewModel @Inject constructor(
                 port = p,
                 username = username.ifBlank { "local" }
             )
-            repository.updateConnection(conn, RemoteAuth.Password(password))
+            repository.updateConnection(conn, auth)
         }
     }
 
@@ -222,14 +277,14 @@ class RemoteServerViewModel @Inject constructor(
         host: String,
         port: String,
         username: String,
-        password: String,
+        auth: RemoteAuth,
         protocol: RemoteProtocol,
         onResult: (Boolean, String) -> Unit
     ) {
         viewModelScope.launch {
             val p = port.toIntOrNull() ?: defaultPort(protocol)
             try {
-                val result = repository.testConnection(host, p, username, RemoteAuth.Password(password), protocol)
+                val result = repository.testConnection(host, p, username, auth, protocol)
                 if (result.isSuccess) {
                     onResult(true, context.getString(R.string.remote_connect_success))
                 } else {
@@ -251,7 +306,10 @@ class RemoteServerViewModel @Inject constructor(
     fun confirmHostKey() {
         val pending = _uiState.value.pendingHostKey ?: return
         repository.confirmHostKey(pending.host, pending.port, pending.fingerprint)
-        _uiState.value = _uiState.value.copy(pendingHostKey = null)
+        _uiState.value = _uiState.value.copy(
+            pendingHostKey = null,
+            hostKeys = remoteSshConnection.savedHostKeys()
+        )
     }
 
     /** 拒绝主机密钥：清除确认状态，不保存指纹。 */
@@ -309,6 +367,7 @@ data class RemoteServerUiState(
     val isLoading: Boolean = false,
     val error: String? = null,
     val hostKeys: Map<String, String> = emptyMap(),
+    val loginKeys: List<SshLoginKey> = emptyList(),
     val pendingHostKey: PendingHostKeyConfirmation? = null
 )
 

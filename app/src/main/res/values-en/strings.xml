@@ -710,6 +710,12 @@
     <string name="remote_select_dir">Select Directory</string>
     <string name="remote_port">Port</string>
     <string name="remote_password">Password</string>
+    <string name="remote_auth_password">Password</string>
+    <string name="remote_auth_key">Key</string>
+    <string name="remote_login_key">Login key</string>
+    <string name="remote_select_key">Select key</string>
+    <string name="remote_no_keys_hint">No keys yet, add one in the SSH Keys page</string>
+    <string name="remote_key_passphrase">Passphrase (optional)</string>
     <string name="remote_toggle_password">Toggle password visibility</string>
     <string name="remote_test_dir">Test Directory</string>
     <string name="remote_test_connection">Test Connection</string>
@@ -722,6 +728,7 @@
     <string name="remote_browse_dir">Browse Directory</string>
     <string name="remote_local_channel_subdir_desc">The local channel\'s image root comes from the connection config; fill in a subdirectory under the root, usually just /.</string>
     <string name="remote_select_local_workspace">Select Local Workspace</string>
+    <string name="remote_mount_already_exists">This mount already exists: same channel, remote directory and workspace combination</string>
     <string name="remote_map_to_local">Map to Local Workspace</string>
     <string name="remote_no_local_workspace">No local workspaces, please create one in the sidebar first.</string>
     <string name="remote_auto_connect_on_start">Auto-connect on app start</string>
@@ -776,6 +783,12 @@
     <string name="remote_connect_failed">Connection failed: %1$s</string>
     <string name="remote_unknown_error">Unknown error</string>
     <string name="ssh_host_key_settings_title">SSH Host Keys</string>
+    <string name="ssh_host_key_tab_keys">Keys</string>
+    <string name="ssh_host_key_tab_fingerprints">Fingerprints</string>
+    <string name="ssh_login_key_add">Add key</string>
+    <string name="ssh_login_key_empty">No saved login keys</string>
+    <string name="ssh_login_key_fingerprint_value">Public key fingerprint: %1$s</string>
+    <string name="ssh_login_key_encrypted">Encrypted (passphrase required)</string>
     <string name="ssh_host_key_confirm_title">Confirm SSH Host Key</string>
     <string name="ssh_host_key_changed_title">SSH Host Key Changed</string>
     <string name="ssh_host_key_trust">Trust and connect</string>

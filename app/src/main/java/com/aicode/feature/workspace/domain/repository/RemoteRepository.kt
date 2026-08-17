@@ -3,6 +3,7 @@ package com.aicode.feature.workspace.domain.repository
 import com.aicode.core.util.FileLogger
 import com.aicode.feature.agent.domain.container.SshHostKeyStore
 import com.aicode.feature.agent.domain.container.SshHostKeyVerifier
+import com.aicode.feature.agent.domain.container.friendlySshError
 import com.aicode.feature.workspace.data.local.dao.RemoteConnectionDao
 import com.aicode.feature.workspace.data.local.entity.RemoteConnectionEntity
 import com.aicode.feature.workspace.data.local.entity.RemoteMountEntity
@@ -231,7 +232,7 @@ class RemoteRepository @Inject constructor(
             if (pending != null) {
                 Result.failure(Exception("主机密钥未确认，请先在「连接配置」页测试连通性完成确认"))
             } else {
-                Result.failure(e)
+                Result.failure(Exception(friendlySshError(e), e))
             }
         }
     }
@@ -293,7 +294,7 @@ class RemoteRepository @Inject constructor(
                     pending.host, pending.port, pending.keyType, pending.fingerprint, pending.changed
                 )
             }
-            Result.failure(e)
+            Result.failure(Exception(friendlySshError(e), e))
         }
     }
 
@@ -329,7 +330,10 @@ class RemoteRepository @Inject constructor(
         host = host,
         port = port,
         username = username,
-        password = if (authType == "PASSWORD") authData else ""
+        password = if (authType == "PASSWORD") authData else "",
+        authType = if (authType == "PRIVATE_KEY") "key" else "password",
+        authData = authData,
+        passphrase = passphrase
     )
 
     private fun RemoteMountEntity.toDomainModel(conn: RemoteConnection?) = RemoteMount(

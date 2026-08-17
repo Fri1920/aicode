@@ -710,6 +710,12 @@
     <string name="remote_select_dir">选择目录</string>
     <string name="remote_port">端口</string>
     <string name="remote_password">密码</string>
+    <string name="remote_auth_password">密码</string>
+    <string name="remote_auth_key">密钥</string>
+    <string name="remote_login_key">登录密钥</string>
+    <string name="remote_select_key">选择密钥</string>
+    <string name="remote_no_keys_hint">暂无密钥，请先到「SSH 密钥」页添加</string>
+    <string name="remote_key_passphrase">口令（可选）</string>
     <string name="remote_toggle_password">切换密码可见性</string>
     <string name="remote_test_dir">测试目录</string>
     <string name="remote_test_connection">测试连通性</string>
@@ -722,6 +728,7 @@
     <string name="remote_browse_dir">浏览目录</string>
     <string name="remote_local_channel_subdir_desc">本地通道的镜像根目录来自连接配置；这里填写根目录下的子目录，通常保持 / 即可。</string>
     <string name="remote_select_local_workspace">选择本地工作区</string>
+    <string name="remote_mount_already_exists">该挂载已存在：相同的通道、远程目录与工作区组合</string>
     <string name="remote_map_to_local">映射到本地工作区</string>
     <string name="remote_no_local_workspace">暂无本地工作区，请先在侧边栏创建一个。</string>
     <string name="remote_auto_connect_on_start">应用启动时自动连接</string>
@@ -776,6 +783,12 @@
     <string name="remote_connect_failed">连接失败: %1$s</string>
     <string name="remote_unknown_error">未知错误</string>
     <string name="ssh_host_key_settings_title">SSH 主机密钥</string>
+    <string name="ssh_host_key_tab_keys">密钥</string>
+    <string name="ssh_host_key_tab_fingerprints">指纹</string>
+    <string name="ssh_login_key_add">添加密钥</string>
+    <string name="ssh_login_key_empty">暂无已保存的登录密钥</string>
+    <string name="ssh_login_key_fingerprint_value">公钥指纹：%1$s</string>
+    <string name="ssh_login_key_encrypted">加密密钥（需口令）</string>
     <string name="ssh_host_key_confirm_title">确认 SSH 主机密钥</string>
     <string name="ssh_host_key_changed_title">SSH 主机密钥已变化</string>
     <string name="ssh_host_key_trust">信任并连接</string>

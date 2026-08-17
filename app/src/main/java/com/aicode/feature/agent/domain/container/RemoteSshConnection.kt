@@ -19,6 +19,8 @@ import net.schmizz.sshj.SSHClient
 import net.schmizz.sshj.connection.channel.direct.Session
 import net.schmizz.sshj.sftp.SFTPClient
 import net.schmizz.sshj.transport.DisconnectListener
+import net.schmizz.sshj.userauth.UserAuthException
+import com.hierynomus.sshj.common.KeyDecryptionFailedException
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -273,6 +275,10 @@ enum class ConnectionState {
 fun friendlySshError(e: Throwable): String {
     val msg = e.message.orEmpty()
     return when {
+        e is KeyDecryptionFailedException ->
+            "SSH 认证失败：私钥口令不正确或私钥格式不受支持（$msg）"
+        e is UserAuthException ->
+            "SSH 认证失败：用户名、密码或密钥未被服务器接受（$msg）"
         "ECONNREFUSED" in msg || "Connection refused" in msg ->
             "无法连接到 SSH 服务器（连接被拒绝），请确认远程服务器已启动且端口正确"
         "UnknownHost" in msg || "unknown host" in msg ->

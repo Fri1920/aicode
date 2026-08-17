@@ -22,7 +22,9 @@ import com.aicode.feature.agent.domain.container.LinuxContainerEngine
 import com.aicode.feature.agent.domain.container.RemoteSshConnection
 import com.aicode.feature.agent.domain.container.RemoteSshEngine
 import com.aicode.feature.agent.domain.container.SharedPrefsSshHostKeyStore
+import com.aicode.feature.agent.domain.container.SharedPrefsSshLoginKeyStore
 import com.aicode.feature.agent.domain.container.SshHostKeyStore
+import com.aicode.feature.agent.domain.container.SshLoginKeyStore
 import com.aicode.feature.settings.data.repository.ExecutionMode
 import com.aicode.feature.settings.data.repository.ExecutionModeHolder
 import com.aicode.feature.agent.domain.tool.file.ReadFileTool
@@ -239,6 +241,10 @@ object AgentModule {
     @Provides
     @Singleton
     fun provideSshHostKeyStore(impl: SharedPrefsSshHostKeyStore): SshHostKeyStore = impl
+
+    @Provides
+    @Singleton
+    fun provideSshLoginKeyStore(impl: SharedPrefsSshLoginKeyStore): SshLoginKeyStore = impl
 
     @Provides
     @Singleton
