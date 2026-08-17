@@ -4,6 +4,7 @@ import com.aicode.core.util.FileLogger
 import com.aicode.feature.agent.data.local.dao.AgentMessageDao
 import com.aicode.feature.agent.data.local.dao.ChatSessionDao
 import com.aicode.feature.agent.data.local.entity.ChatSessionEntity
+import com.aicode.feature.agent.domain.model.ReasoningEffort
 import com.aicode.feature.agent.presentation.MessageRole
 import java.util.UUID
 import javax.inject.Inject
@@ -40,14 +41,22 @@ class SessionUseCase @Inject constructor(
         }.onFailure { FileLogger.e(TAG, "回收残留执行中工具行失败", it) }
     }
 
-    fun newSessionEntity(workspacePath: String): ChatSessionEntity {
+    fun newSessionEntity(
+        workspacePath: String,
+        providerId: String? = null,
+        model: String? = null,
+        reasoningEffort: String = ReasoningEffort.MEDIUM.name
+    ): ChatSessionEntity {
         val now = System.currentTimeMillis()
         return ChatSessionEntity(
             id = UUID.randomUUID().toString(),
             title = "新会话",
             workspacePath = workspacePath,
             createdAt = now,
-            updatedAt = now
+            updatedAt = now,
+            providerId = providerId,
+            model = model,
+            reasoningEffort = reasoningEffort
         )
     }
 

@@ -601,6 +601,16 @@ class AIAgentViewModel @Inject constructor(
             runSlashCommand(command, request, sessionId)
             return@launch
         }
+        // 兼容历史会话：若会话尚未持久化绑定 providerId/model，发消息时将其固化，避免后续默认模型变动影响已有会话
+        val currentSession = sessionUseCase.getSessionById(sessionId)
+        if (currentSession != null && (currentSession.providerId.isNullOrBlank() || currentSession.model.isNullOrBlank())) {
+            val defaultProviderId = defaultModelSettingsRepository.getDefaultProviderId().takeIf { it.isNotBlank() }
+            val defaultModel = defaultModelSettingsRepository.getDefaultModel().takeIf { it.isNotBlank() }
+            if (defaultProviderId != null && defaultModel != null) {
+                sessionUseCase.updateProviderModel(sessionId, defaultProviderId, defaultModel)
+            }
+        }
+
         coroutineContext[Job]?.let { sessionJobs[sessionId] = it }
         FileLogger.d(TAG, "stream start: sid=$sessionId prevState=${_agentStates.value[sessionId]} isAutoTrigger=$isAutoTrigger")
         setAgentState(sessionId, AgentUIState.Streaming)
@@ -949,9 +959,8 @@ class AIAgentViewModel @Inject constructor(
         // 新会话时异步重连未连接的 MCP server，让 manageMcp 新增的配置真正生效；
         // 不阻塞会话创建——MCP 环境未就绪/超时时不能卡住「新建会话」。
         mcpManager.reconnectUnconnectedAsync()
-        val s = createSession(_currentWorkspace.value)
-        sessionUseCase.upsertSession(s)
-        _currentSessionId.value = s.id
+        val sid = createAndUpsertSession(_currentWorkspace.value)
+        _currentSessionId.value = sid
     }
 
     fun setCurrentSessionId(id: String) {
@@ -1118,9 +1127,7 @@ class AIAgentViewModel @Inject constructor(
                 if (remaining != null) {
                     _currentSessionId.value = remaining.id
                 } else {
-                    val s = createSession(ws)
-                    sessionUseCase.upsertSession(s)
-                    _currentSessionId.value = s.id
+                    _currentSessionId.value = createAndUpsertSession(ws)
                 }
             }
         }
@@ -1214,17 +1221,19 @@ class AIAgentViewModel @Inject constructor(
      * 所有新建会话的入口（冷启动、新建、删除兜底、ensureSession）都走这里。
      */
     private suspend fun createSession(workspacePath: String): ChatSessionEntity {
-        val s = sessionUseCase.newSessionEntity(workspacePath)
-        val providerId = defaultModelSettingsRepository.getDefaultProviderId()
-        val model = defaultModelSettingsRepository.getDefaultModel()
-        if (providerId.isNotBlank() && model.isNotBlank()) {
-            sessionUseCase.updateProviderModel(s.id, providerId, model)
-            // 沿用该模型上次记忆的思考强度（模型级默认档位）
-            modelReasoningEffortRepository.get(providerId, model)?.let { effort ->
-                sessionUseCase.updateReasoningEffort(s.id, effort)
-            }
+        val providerId = defaultModelSettingsRepository.getDefaultProviderId().takeIf { it.isNotBlank() }
+        val model = defaultModelSettingsRepository.getDefaultModel().takeIf { it.isNotBlank() }
+        val effort = if (providerId != null && model != null) {
+            modelReasoningEffortRepository.get(providerId, model) ?: ReasoningEffort.MEDIUM.name
+        } else {
+            ReasoningEffort.MEDIUM.name
         }
-        return s
+        return sessionUseCase.newSessionEntity(
+            workspacePath = workspacePath,
+            providerId = providerId,
+            model = model,
+            reasoningEffort = effort
+        )
     }
 
     // endregion
