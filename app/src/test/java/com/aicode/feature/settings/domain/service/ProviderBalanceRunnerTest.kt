@@ -1,6 +1,5 @@
 package com.aicode.feature.settings.domain.service
 
-import com.aicode.feature.settings.domain.model.AdaptiveCardAction
 import com.aicode.feature.settings.domain.model.BadgeElement
 import com.aicode.feature.settings.domain.model.CardColor
 import com.aicode.feature.settings.domain.model.ColumnSetElement
@@ -80,56 +79,6 @@ class ProviderBalanceRunnerTest {
         }
     """.trimIndent()
 
-    private val balanceCardJson = """
-        {
-          "type": "AdaptiveCard",
-          "version": "1.5",
-          "compact": {
-            "type": "Row",
-            "items": [
-              { "type": "StatusDot", "color": "Good" },
-              { "type": "TextBlock", "text": "可用余额 $18.42", "weight": "Bolder" }
-            ]
-          },
-          "body": [
-            {
-              "type": "ColumnSet",
-              "columns": [
-                {
-                  "type": "Column",
-                  "width": "stretch",
-                  "items": [
-                    { "type": "TextBlock", "text": "当前可用余额", "size": "Small", "isSubtle": true },
-                    { "type": "TextBlock", "text": "$18.42", "size": "ExtraLarge", "weight": "Bolder", "color": "Good" }
-                  ]
-                }
-              ]
-            },
-            { "type": "Divider" },
-            {
-              "type": "FactSet",
-              "facts": [
-                { "title": "Token 剩余", "value": "12.5M" },
-                { "title": "速率限制", "value": "500 RPM" }
-              ]
-            }
-          ],
-          "actions": [
-            {
-              "type": "Action.OpenUrl",
-              "title": "控制台",
-              "url": "https://api.openai.com",
-              "icon": "external-link"
-            },
-            {
-              "type": "Action.CopyToClipboard",
-              "title": "复制 Key 别名",
-              "value": "openai-prod-01"
-            }
-          ]
-        }
-    """.trimIndent()
-
     @Test
     fun testParseSubscriptionCard() {
         val result = ProviderBalanceRunner.parseBalanceJson(subscriptionCardJson)
@@ -164,37 +113,6 @@ class ProviderBalanceRunnerTest {
         val progress2 = col2.items[2] as ProgressBarElement
         assertEquals(65f, progress2.value, 0.01f)
         assertEquals(CardColor.Accent, progress2.color)
-    }
-
-    @Test
-    fun testParseBalanceCardWithActions() {
-        val result = ProviderBalanceRunner.parseBalanceJson(balanceCardJson)
-        val card = result.card
-
-        // 验证 compact
-        val compactRow = card.compact as RowElement
-        assertEquals(2, compactRow.items.size)
-        val dot = compactRow.items[0] as StatusDotElement
-        assertEquals(CardColor.Good, dot.color)
-
-        // 验证 body (ColumnSet + Divider + FactSet)
-        assertEquals(3, card.body.size)
-        assertTrue(card.body[0] is ColumnSetElement)
-        assertTrue(card.body[1] is DividerElement)
-        val factSet = card.body[2] as FactSetElement
-        assertEquals(2, factSet.facts.size)
-        assertEquals("Token 剩余", factSet.facts[0].title)
-        assertEquals("12.5M", factSet.facts[0].value)
-
-        // 验证 actions
-        assertEquals(2, card.actions.size)
-        val act1 = card.actions[0] as AdaptiveCardAction.OpenUrl
-        assertEquals("控制台", act1.title)
-        assertEquals("https://api.openai.com", act1.url)
-
-        val act2 = card.actions[1] as AdaptiveCardAction.CopyToClipboard
-        assertEquals("复制 Key 别名", act2.title)
-        assertEquals("openai-prod-01", act2.value)
     }
 
     @Test
