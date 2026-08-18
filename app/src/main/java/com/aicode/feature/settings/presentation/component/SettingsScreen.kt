@@ -1,5 +1,7 @@
 package com.aicode.feature.settings.presentation.component
 
+import android.content.Intent
+import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.annotation.StringRes
 import androidx.compose.foundation.clickable
@@ -47,6 +49,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
@@ -70,6 +73,7 @@ import compose.icons.FeatherIcons
 import compose.icons.feathericons.ArrowLeft
 import compose.icons.feathericons.BarChart2
 import compose.icons.feathericons.Book
+import compose.icons.feathericons.BookOpen
 import compose.icons.feathericons.Box
 import compose.icons.feathericons.Cloud
 import compose.icons.feathericons.Cpu
@@ -87,6 +91,9 @@ import compose.icons.feathericons.Save
 import compose.icons.feathericons.Server
 import compose.icons.feathericons.Shield
 import compose.icons.feathericons.Trash2
+
+/** 使用手册 Wiki 地址。 */
+private const val USER_GUIDE_WIKI_URL = "https://github.com/jieapi/aicode/wiki"
 
 /** 设置页内部二级菜单分区。Menu 为首页菜单，其余为各自的二级页。 */
 internal enum class SettingsSection(@param:StringRes val titleRes: Int) {
@@ -155,6 +162,7 @@ fun SettingsScreen(
     val downloadedImages by viewModel.downloadedImages.collectAsStateWithLifecycle()
     val sourceUnavailableIds by viewModel.sourceUnavailableIds.collectAsStateWithLifecycle()
 
+    val context = LocalContext.current
     val currentLanguageDisplayName = if (languageTag.isNullOrBlank()) {
         stringResource(R.string.language_follow_system)
     } else {
@@ -352,6 +360,11 @@ fun SettingsScreen(
                     onOpenThemeSheet = { showThemeSheet = true },
                     onOpenBackgroundSheet = { showBackgroundSheet = true },
                     onOpenLanguageSheet = { showLanguageSheet = true },
+                    onOpenManual = {
+                        context.startActivity(
+                            Intent(Intent.ACTION_VIEW, Uri.parse(USER_GUIDE_WIKI_URL))
+                        )
+                    },
                     onOpen = {
                         if (it == SettingsSection.Log) {
                             logReturnSection = SettingsSection.Menu
@@ -658,6 +671,7 @@ internal fun SettingsMenu(
     onOpenThemeSheet: () -> Unit,
     onOpenBackgroundSheet: () -> Unit,
     onOpenLanguageSheet: () -> Unit,
+    onOpenManual: () -> Unit,
     onOpen: (SettingsSection) -> Unit
 ) {
     Column(
@@ -803,6 +817,12 @@ internal fun SettingsMenu(
                 icon = FeatherIcons.Save,
                 title = stringResource(SettingsSection.Backup.titleRes),
                 onClick = { onOpen(SettingsSection.Backup) }
+            )
+            SettingsDivider()
+            SettingsRow(
+                icon = FeatherIcons.BookOpen,
+                title = stringResource(R.string.settings_user_guide),
+                onClick = onOpenManual
             )
             SettingsDivider()
             SettingsRow(

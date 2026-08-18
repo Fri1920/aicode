@@ -143,6 +143,7 @@
     <string name="settings_category_system">System</string>
     <string name="settings_category_background">Background</string>
     <string name="settings_category_system_permissions">System permissions</string>
+    <string name="settings_user_guide">User Guide</string>
 
     <!-- i18n: UI strings -->
     <!-- Common -->
