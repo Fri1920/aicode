@@ -265,7 +265,7 @@ jobs:
             TAG="$TAG" python3 -c 'import sys,json,os; data=json.load(sys.stdin); print(next((r["id"] for r in data if r.get("tag_name")==os.environ["TAG"]), ""))')
           if [[ -z "$release_id" ]]; then
             echo "创建 Gitee Release ${TAG}"
-            payload=$(python3 -c 'import json,os; print(json.dumps({"access_token": os.environ["GITEE_TOKEN"], "tag_name": os.environ["TAG"], "name": os.environ["RELEASE_NAME"], "body": os.environ["RELEASE_BODY"], "prerelease": os.environ["PRERELEASE"].lower()=="true"}, ensure_ascii=False))')
+            payload=$(python3 -c 'import json,os; print(json.dumps({"access_token": os.environ["GITEE_TOKEN"], "tag_name": os.environ["TAG"], "name": os.environ["RELEASE_NAME"], "body": os.environ["RELEASE_BODY"], "prerelease": os.environ["PRERELEASE"].lower()=="true", "target_commitish": "main"}, ensure_ascii=False))')
             release_id=$(curl -fsS -X POST -H "Content-Type: application/json" \
               -d "$payload" "${api}/releases" | \
               python3 -c 'import sys, json; print(json.load(sys.stdin).get("id", ""))')
