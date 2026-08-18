@@ -6,7 +6,7 @@
 # 修改包清单/安装逻辑/镜像源后，需同步在 LinuxContainerEngine.PROVISION_VERSION 上 +1 触发存量设备重跑。
 # 注意：apk 源分支 v3.21 需与 assets 内 alpine-rootfs 版本（ContainerInstaller.INSTALL_VERSION）保持一致。
 
-PROVISION_VERSION="provision-script-v6"
+PROVISION_VERSION="provision-script-v7"
 PROVISION_SKIPPED="provision-script-skipped"
 MARKER="/.provisioned"
 MIRROR="mirrors.aliyun.com"
