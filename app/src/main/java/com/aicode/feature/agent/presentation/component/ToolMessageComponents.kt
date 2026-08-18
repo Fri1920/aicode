@@ -121,8 +121,8 @@ internal fun ToolMessageBody(
             || (todoData != null && todoData.items.isNotEmpty()) || webSearchData != null))
     var expanded by remember(message.id) { mutableStateOf(edit != null || todoData != null) }
     var userToggled by remember(message.id) { mutableStateOf(false) }
-    // 执行中默认展开实时输出；落库后按内容类型决定（edit/todo 默认展开，其余折叠）；用户手动 toggle 后以用户选择为准
-    val effectiveExpanded = if (userToggled) expanded else (streaming || edit != null || todoData != null)
+    // 执行中默认收起（可手动展开看实时输出与指令）；落库后按内容类型决定（edit/todo 默认展开，其余折叠）；用户手动 toggle 后以用户选择为准
+    val effectiveExpanded = if (userToggled) expanded else (edit != null || todoData != null)
 
     val toolLabel = message.toolName ?: stringResource(R.string.common_tool)
     // 文件相关工具：从结构化 diff 或工具参数里取路径，统一按「工具名 + 路径 + 文件名」展示
