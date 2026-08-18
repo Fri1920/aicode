@@ -49,6 +49,7 @@ AiCode is an AI-powered coding assistant that runs natively on Android. It integ
 | Icon | Description |
 |------|-------------|
 | <img src="https://opencode.ai/favicon-96x96-v3.png" width="24" alt="OpenCode" /> | **[OpenCode Go](https://opencode.ai/go?ref=8Q5GA5B1NY)** — Low-cost subscription with generous limits and reliable access to the most capable open-source models |
+| <img src="https://www.rainyun.com/favicon.ico" width="24" alt="RainYun" /> | **[RainYun](https://www.rainyun.com/logins_)** — Cost-effective cloud servers, new user discounts |
 
 ## Features
 
