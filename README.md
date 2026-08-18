@@ -21,11 +21,19 @@
   <table>
     <tr>
       <td align="center"><img src="docs/screenshots/home.png" alt="AiCode 主页 - AI 对话界面，支持代码生成与 Markdown 渲染" width="270"/></td>
-      <td align="center"><img src="docs/screenshots/terminal.png" alt="AiCode 终端 - 内置 Alpine Linux 容器，完整命令行环境" width="270"/></td>
+      <td align="center"><img src="docs/screenshots/git.png" alt="AiCode Git 集成 - 可视化提交记录与分支管理" width="270"/></td>
     </tr>
     <tr>
       <td align="center">主页 · AI 对话</td>
-      <td align="center">终端 · Alpine Linux</td>
+      <td align="center">Git · 提交历史</td>
+    </tr>
+    <tr>
+      <td align="center"><img src="docs/screenshots/container.png" alt="AiCode 容器设置 - 容器镜像管理" width="270"/></td>
+      <td align="center"><img src="docs/screenshots/models.png" alt="AiCode 模型列表 - 多提供商模型管理" width="270"/></td>
+    </tr>
+    <tr>
+      <td align="center">容器 · 镜像管理</td>
+      <td align="center">模型 · 列表配置</td>
     </tr>
   </table>
 </p>
