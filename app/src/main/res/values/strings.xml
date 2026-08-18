@@ -800,9 +800,9 @@
     <string name="remote_tab_ftp">内置FTP</string>
     <string name="remote_tab_sync">同步设置</string>
     <string name="remote_no_connections">暂无连接配置</string>
-    <string name="remote_no_connections_desc">添加 SFTP / FTP 或本地通道，把手机工作区与远程或本地目录连接起来。</string>
+    <string name="remote_no_connections_desc">添加 SFTP / FTP / 本地通道</string>
     <string name="remote_no_workspaces">暂无挂载目录</string>
-    <string name="remote_no_workspaces_desc">将远程目录映射到本地工作区，自动同步</string>
+    <string name="remote_no_workspaces_desc">本地改动自动同步到远程，远程文件可手动下载</string>
     <string name="remote_hint_title">提示</string>
     <string name="remote_add_channel_first">请先在「连接配置」中添加一个远程通道。</string>
     <string name="remote_go_add">去添加</string>

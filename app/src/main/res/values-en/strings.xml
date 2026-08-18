@@ -800,9 +800,9 @@
     <string name="remote_tab_ftp">Built-in FTP</string>
     <string name="remote_tab_sync">Sync Settings</string>
     <string name="remote_no_connections">No connections yet</string>
-    <string name="remote_no_connections_desc">Add an SFTP, FTP or local channel to link your phone workspace with a remote or local directory.</string>
+    <string name="remote_no_connections_desc">Add an SFTP / FTP / local channel</string>
     <string name="remote_no_workspaces">No mounted directories yet</string>
-    <string name="remote_no_workspaces_desc">Map a remote directory to the local workspace with auto sync</string>
+    <string name="remote_no_workspaces_desc">Local changes auto-sync to the remote; remote files can be downloaded manually</string>
     <string name="remote_hint_title">Hint</string>
     <string name="remote_add_channel_first">Please add a remote channel in "Connections" first.</string>
     <string name="remote_go_add">Go Add</string>
