@@ -19,6 +19,18 @@ sealed class AgentUIState {
 }
 
 /**
+ * 单次 LLM 请求完成事件（含当次消耗的 Token）。
+ */
+@Immutable
+data class LlmCallEvent(
+    val sessionId: String,
+    val inputTokens: Int,
+    val outputTokens: Int,
+    val cachedTokens: Int = 0,
+    val timestamp: Long = System.currentTimeMillis()
+)
+
+/**
  * 网络请求重试状态（仅用于 UI 实时展示「正在重试 (N/M)...」提示）。
  * [error] 为触发重试的错误摘要，UI 据此展示具体原因（如 429/500/网络断开）。
  * 与 [AgentUIState] 解耦：重试是 Streaming 的子状态，不改变顶层 agent 状态机。

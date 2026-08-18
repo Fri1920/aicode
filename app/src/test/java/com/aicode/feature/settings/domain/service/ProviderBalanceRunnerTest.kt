@@ -1,97 +1,342 @@
 package com.aicode.feature.settings.domain.service
 
+import com.aicode.feature.settings.domain.model.AdaptiveCardAction
+import com.aicode.feature.settings.domain.model.BadgeElement
+import com.aicode.feature.settings.domain.model.CardColor
+import com.aicode.feature.settings.domain.model.ColumnSetElement
+import com.aicode.feature.settings.domain.model.ContainerElement
+import com.aicode.feature.settings.domain.model.ContainerStyle
+import com.aicode.feature.settings.domain.model.DividerElement
+import com.aicode.feature.settings.domain.model.FactSetElement
+import com.aicode.feature.settings.domain.model.MetricElement
+import com.aicode.feature.settings.domain.model.ProgressBarElement
+import com.aicode.feature.settings.domain.model.RowElement
+import com.aicode.feature.settings.domain.model.StatusDotElement
+import com.aicode.feature.settings.domain.model.TextBlockElement
+import com.aicode.feature.settings.domain.model.TextSize
+import com.aicode.feature.settings.domain.model.TextWeight
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ProviderBalanceRunnerTest {
 
-    private val subscriptionJson = """
+    private val subscriptionCardJson = """
         {
-          "items": [
+          "type": "AdaptiveCard",
+          "version": "1.5",
+          "refreshInterval": 5,
+          "compact": {
+            "type": "ColumnSet",
+            "spacing": "Medium",
+            "columns": [
+              {
+                "type": "Column",
+                "width": "stretch",
+                "items": [
+                  { "type": "TextBlock", "text": "5h 80%", "size": "Small", "weight": "Bolder", "color": "Good" },
+                  { "type": "ProgressBar", "value": 80, "color": "Good", "height": 3 }
+                ]
+              },
+              {
+                "type": "Column",
+                "width": "stretch",
+                "items": [
+                  { "type": "TextBlock", "text": "7d 65%", "size": "Small", "weight": "Bolder", "color": "Accent" },
+                  { "type": "ProgressBar", "value": 65, "color": "Accent", "height": 3 }
+                ]
+              }
+            ]
+          },
+          "body": [
             {
-              "label": "5h",
-              "suffix": "余量",
-              "percent": 80,
-              "used": 4.0,
-              "total": 5.0,
-              "unit": "小时",
-              "color": "#10B981"
-            },
-            {
-              "label": "7d",
-              "suffix": "余量",
-              "percent": 0.65,
-              "used": 4.6,
-              "total": 7.0,
-              "unit": "天",
-              "color": "#3B82F6"
+              "type": "ColumnSet",
+              "columns": [
+                {
+                  "type": "Column",
+                  "width": "stretch",
+                  "items": [
+                    { "type": "TextBlock", "text": "5h 周期", "size": "Small", "isSubtle": true },
+                    { "type": "TextBlock", "text": "80%", "size": "Medium", "weight": "Bolder", "color": "Good" },
+                    { "type": "ProgressBar", "value": 80, "color": "Good" },
+                    { "type": "TextBlock", "text": "4.0 / 5.0 小时", "size": "Small", "isSubtle": true }
+                  ]
+                },
+                {
+                  "type": "Column",
+                  "width": "stretch",
+                  "separator": true,
+                  "items": [
+                    { "type": "TextBlock", "text": "7d 周期", "size": "Small", "isSubtle": true },
+                    { "type": "TextBlock", "text": "65%", "size": "Medium", "weight": "Bolder", "color": "Accent" },
+                    { "type": "ProgressBar", "value": 65, "color": "Accent" },
+                    { "type": "TextBlock", "text": "4.6 / 7.0 天", "size": "Small", "isSubtle": true }
+                  ]
+                }
+              ]
             }
           ]
         }
     """.trimIndent()
 
-    private val balanceJson = """
+    private val balanceCardJson = """
         {
-          "items": [
+          "type": "AdaptiveCard",
+          "version": "1.5",
+          "compact": {
+            "type": "Row",
+            "items": [
+              { "type": "StatusDot", "color": "Good" },
+              { "type": "TextBlock", "text": "可用余额 $18.42", "weight": "Bolder" }
+            ]
+          },
+          "body": [
             {
-              "label": "当前余额",
-              "value": "$12.45",
-              "subText": "≈ ¥89.32 CNY",
-              "compactText": "余额 $12.45",
-              "color": "#10B981"
+              "type": "ColumnSet",
+              "columns": [
+                {
+                  "type": "Column",
+                  "width": "stretch",
+                  "items": [
+                    { "type": "TextBlock", "text": "当前可用余额", "size": "Small", "isSubtle": true },
+                    { "type": "TextBlock", "text": "$18.42", "size": "ExtraLarge", "weight": "Bolder", "color": "Good" }
+                  ]
+                }
+              ]
+            },
+            { "type": "Divider" },
+            {
+              "type": "FactSet",
+              "facts": [
+                { "title": "Token 剩余", "value": "12.5M" },
+                { "title": "速率限制", "value": "500 RPM" }
+              ]
+            }
+          ],
+          "actions": [
+            {
+              "type": "Action.OpenUrl",
+              "title": "控制台",
+              "url": "https://api.openai.com",
+              "icon": "external-link"
             },
             {
-              "label": "本月消费",
-              "value": "$7.55",
-              "subText": "今日消费 $0.83",
-              "statusDot": true,
-              "color": "#10B981"
+              "type": "Action.CopyToClipboard",
+              "title": "复制 Key 别名",
+              "value": "openai-prod-01"
             }
           ]
         }
     """.trimIndent()
 
     @Test
-    fun testParseSubscriptionJson() {
-        val result = ProviderBalanceRunner.parseBalanceJson(subscriptionJson)
-        assertEquals(2, result.items.size)
+    fun testParseSubscriptionCard() {
+        val result = ProviderBalanceRunner.parseBalanceJson(subscriptionCardJson)
+        val card = result.card
 
-        val item1 = result.items[0]
-        assertEquals("5h", item1.label)
-        assertEquals("余量", item1.suffix)
-        assertEquals(80f, item1.percent ?: 0f, 0.01f)
-        assertEquals(4.0, item1.used ?: 0.0, 0.01)
-        assertEquals(5.0, item1.total ?: 0.0, 0.01)
-        assertEquals("4 / 5 小时", item1.displaySubText)
-        assertTrue(item1.hasProgress)
+        assertEquals("1.5", card.version)
+        assertEquals(5, card.refreshInterval)
 
-        val item2 = result.items[1]
-        assertEquals("7d", item2.label)
-        assertEquals(65f, item2.percent ?: 0f, 0.01f)
-        assertEquals("4.6 / 7 天", item2.displaySubText)
-        assertTrue(item2.hasProgress)
+        // 验证 compact
+        assertNotNull(card.compact)
+        val compactCols = card.compact as ColumnSetElement
+        assertEquals(2, compactCols.columns.size)
+
+        // 验证 body ColumnSet
+        assertEquals(1, card.body.size)
+        val columnSet = card.body[0] as ColumnSetElement
+        assertEquals(2, columnSet.columns.size)
+
+        val col1 = columnSet.columns[0]
+        assertEquals(4, col1.items.size)
+        val text1 = col1.items[0] as TextBlockElement
+        assertEquals("5h 周期", text1.text)
+        assertEquals(TextSize.SMALL, text1.size)
+        assertTrue(text1.isSubtle)
+
+        val progress1 = col1.items[2] as ProgressBarElement
+        assertEquals(80f, progress1.value, 0.01f)
+        assertEquals(CardColor.Good, progress1.color)
+
+        val col2 = columnSet.columns[1]
+        assertTrue(col2.separator)
+        val progress2 = col2.items[2] as ProgressBarElement
+        assertEquals(65f, progress2.value, 0.01f)
+        assertEquals(CardColor.Accent, progress2.color)
     }
 
     @Test
-    fun testParseBalanceJson() {
-        val result = ProviderBalanceRunner.parseBalanceJson(balanceJson)
-        assertEquals(2, result.items.size)
+    fun testParseBalanceCardWithActions() {
+        val result = ProviderBalanceRunner.parseBalanceJson(balanceCardJson)
+        val card = result.card
 
-        val item1 = result.items[0]
-        assertEquals("当前余额", item1.label)
-        assertEquals("$12.45", item1.displayValue)
-        assertEquals("≈ ¥89.32 CNY", item1.displaySubText)
-        assertEquals("余额 $12.45", item1.compactText)
-        assertFalse(item1.hasProgress)
-        assertFalse(item1.statusDot)
+        // 验证 compact
+        val compactRow = card.compact as RowElement
+        assertEquals(2, compactRow.items.size)
+        val dot = compactRow.items[0] as StatusDotElement
+        assertEquals(CardColor.Good, dot.color)
 
-        val item2 = result.items[1]
-        assertEquals("本月消费", item2.label)
-        assertEquals("$7.55", item2.displayValue)
-        assertEquals("今日消费 $0.83", item2.displaySubText)
-        assertTrue(item2.statusDot)
-        assertFalse(item2.hasProgress)
+        // 验证 body (ColumnSet + Divider + FactSet)
+        assertEquals(3, card.body.size)
+        assertTrue(card.body[0] is ColumnSetElement)
+        assertTrue(card.body[1] is DividerElement)
+        val factSet = card.body[2] as FactSetElement
+        assertEquals(2, factSet.facts.size)
+        assertEquals("Token 剩余", factSet.facts[0].title)
+        assertEquals("12.5M", factSet.facts[0].value)
+
+        // 验证 actions
+        assertEquals(2, card.actions.size)
+        val act1 = card.actions[0] as AdaptiveCardAction.OpenUrl
+        assertEquals("控制台", act1.title)
+        assertEquals("https://api.openai.com", act1.url)
+
+        val act2 = card.actions[1] as AdaptiveCardAction.CopyToClipboard
+        assertEquals("复制 Key 别名", act2.title)
+        assertEquals("openai-prod-01", act2.value)
+    }
+
+    @Test
+    fun testParseContainerAndBadge() {
+        val alertJson = """
+            {
+              "type": "AdaptiveCard",
+              "body": [
+                {
+                  "type": "Container",
+                  "style": "Attention",
+                  "items": [
+                    { "type": "Badge", "text": "配额已用尽", "style": "Attention" },
+                    { "type": "TextBlock", "text": "请及时充值", "weight": "Bolder", "color": "Attention" }
+                  ]
+                },
+                {
+                  "type": "Metric",
+                  "label": "当前余额",
+                  "value": "$0.00",
+                  "color": "Attention"
+                }
+              ]
+            }
+        """.trimIndent()
+
+        val result = ProviderBalanceRunner.parseBalanceJson(alertJson)
+        val card = result.card
+        assertEquals(2, card.body.size)
+
+        val container = card.body[0] as ContainerElement
+        assertEquals(ContainerStyle.ATTENTION, container.style)
+        assertEquals(2, container.items.size)
+
+        val badge = container.items[0] as BadgeElement
+        assertEquals("配额已用尽", badge.text)
+        assertEquals(ContainerStyle.ATTENTION, badge.style)
+
+        val metric = card.body[1] as MetricElement
+        assertEquals("当前余额", metric.label)
+        assertEquals("$0.00", metric.value)
+        assertEquals(CardColor.Attention, metric.color)
+    }
+
+    @Test
+    fun testFineGrainedLayoutAndTypography() {
+        val fineGrainedJson = """
+            {
+              "type": "AdaptiveCard",
+              "body": [
+                {
+                  "type": "ColumnSet",
+                  "gap": "10dp",
+                  "padding": [8, 16],
+                  "margin": 4,
+                  "columns": [
+                    {
+                      "width": "80dp",
+                      "minHeight": "60dp",
+                      "verticalAlignment": "Center",
+                      "items": [
+                        {
+                          "type": "TextBlock",
+                          "text": "80%",
+                          "size": 24,
+                          "lineHeight": "28sp",
+                          "align": "center"
+                        }
+                      ]
+                    },
+                    {
+                      "width": "stretch",
+                      "items": [
+                        {
+                          "type": "ProgressBar",
+                          "value": 80,
+                          "cornerRadius": 3,
+                          "showPercent": true,
+                          "text": "已用 80%"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "Container",
+                  "cornerRadius": 8,
+                  "gap": 6,
+                  "padding": { "top": 6, "right": 12, "bottom": 6, "left": 12 },
+                  "items": [
+                    {
+                      "type": "TextBlock",
+                      "text": "自定义内边距与行高说明",
+                      "fontSize": 13.5,
+                      "lineHeight": 18
+                    }
+                  ]
+                }
+              ]
+            }
+        """.trimIndent()
+
+        val result = ProviderBalanceRunner.parseBalanceJson(fineGrainedJson)
+        val card = result.card
+        assertEquals(2, card.body.size)
+
+        // 验证 ColumnSet
+        val columnSet = card.body[0] as ColumnSetElement
+        assertEquals(10, columnSet.gapDp)
+        assertEquals(8, columnSet.padding?.top)
+        assertEquals(16, columnSet.padding?.right)
+        assertEquals(8, columnSet.padding?.bottom)
+        assertEquals(16, columnSet.padding?.left)
+        assertEquals(4, columnSet.margin?.top)
+
+        val col1 = columnSet.columns[0]
+        assertEquals(80, (col1.width as com.aicode.feature.settings.domain.model.ColumnWidth.Fixed).dp)
+        assertEquals(60, col1.minHeightDp)
+        assertEquals("Center", col1.verticalContentAlignment)
+
+        val text1 = col1.items[0] as TextBlockElement
+        assertEquals("80%", text1.text)
+        assertEquals(24f, text1.fontSizeSp)
+        assertEquals(28f, text1.lineHeightSp)
+        assertEquals("center", text1.horizontalAlignment)
+
+        val col2 = columnSet.columns[1]
+        val progress = col2.items[0] as ProgressBarElement
+        assertEquals(80f, progress.value, 0.01f)
+        assertEquals(3, progress.cornerRadiusDp)
+        assertTrue(progress.showPercent)
+        assertEquals("已用 80%", progress.text)
+
+        // 验证 Container
+        val container = card.body[1] as ContainerElement
+        assertEquals(8, container.cornerRadiusDp)
+        assertEquals(6, container.gapDp)
+        assertEquals(6, container.padding?.top)
+        assertEquals(12, container.padding?.right)
+
+        val text2 = container.items[0] as TextBlockElement
+        assertEquals(13.5f, text2.fontSizeSp)
+        assertEquals(18f, text2.lineHeightSp)
     }
 }

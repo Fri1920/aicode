@@ -48,6 +48,9 @@ import com.aicode.feature.agent.domain.tool.question.AskUserQuestionManager
 import com.aicode.feature.agent.domain.tool.question.UserQuestionAnswer
 import com.aicode.feature.agent.domain.session.SessionUseCase
 import com.aicode.feature.agent.domain.session.MessagePersistenceUseCase
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import com.aicode.feature.backup.domain.BackupManager
 import com.aicode.feature.agent.domain.command.SlashCommandContext
 import com.aicode.feature.agent.domain.command.SlashCommandRegistry
@@ -240,6 +243,10 @@ class AIAgentViewModel @Inject constructor(
     }
 
     private val _compactingSessions = MutableStateFlow<Map<String, Boolean>>(emptyMap())
+
+    private val _llmCallEvents = MutableSharedFlow<LlmCallEvent>(extraBufferCapacity = 16)
+    /** 每次单次 LLM 请求返回事件（携带单次 Token 统计）。 */
+    val llmCallEvents: SharedFlow<LlmCallEvent> = _llmCallEvents.asSharedFlow()
     val isCompacting: StateFlow<Boolean> = _currentSessionId
         .flatMapLatest { id ->
             if (id == null) flowOf(false)
@@ -702,6 +709,7 @@ class AIAgentViewModel @Inject constructor(
                             outputTokens = event.outputTokens
                         )
                         if (event.inputTokens > 0 || event.outputTokens > 0) {
+                            _llmCallEvents.tryEmit(LlmCallEvent(sessionId, event.inputTokens, event.outputTokens, event.cachedInputTokens))
                             // 同步写库：工具循环下一轮 CallLlm 前会重读 lastInputTokens 判断压缩，
                             // 异步写库可能读到压缩前的旧大值导致重复触发压缩。
                             runCatching {

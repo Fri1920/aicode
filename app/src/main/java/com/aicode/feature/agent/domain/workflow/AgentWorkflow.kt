@@ -20,7 +20,8 @@ sealed class AgentEvent {
         /** Anthropic extended thinking 的加密签名，随 reasoning 落库，供工具循环回传。其他 provider 为空串。 */
         val signature: String = "",
         val inputTokens: Int = 0,
-        val outputTokens: Int = 0
+        val outputTokens: Int = 0,
+        val cachedInputTokens: Int = 0
     ) : AgentEvent()
 
     /** 流式过程中模型逐字吐出的文字（[accumulated] 为本轮已累积的完整文本，用于 UI 实时渲染，不落库）。 */

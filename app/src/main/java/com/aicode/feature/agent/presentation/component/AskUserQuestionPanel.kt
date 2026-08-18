@@ -73,7 +73,8 @@ private const val OTHER_LABEL = "Other"
 fun AskUserQuestionPanel(
     question: PendingUserQuestion,
     onConfirm: (UserQuestionAnswer) -> Unit,
-    onSkip: () -> Unit
+    onSkip: () -> Unit,
+    forceCollapse: Boolean = false
 ) {
     // 每个问题的已选 label 集合
     val selectedMap = remember(question.id) {
@@ -89,6 +90,8 @@ fun AskUserQuestionPanel(
     }
     // 面板折叠状态：默认展开；多问题时长面板可收起，避免挡住 AI 输出
     var expanded by remember(question.id) { mutableStateOf(true) }
+    // 余额面板展开时同帧收起本面板，避免叠加顶开输入框
+    val effectiveExpanded = expanded && !forceCollapse
 
     Surface(
         modifier = Modifier
@@ -139,7 +142,7 @@ fun AskUserQuestionPanel(
                 )
             }
 
-            if (expanded) {
+            if (effectiveExpanded) {
                 Column(
                     modifier = Modifier
                         .heightIn(max = 480.dp)

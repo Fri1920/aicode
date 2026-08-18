@@ -120,8 +120,10 @@ import compose.icons.feathericons.Folder
 import compose.icons.feathericons.Play
 import compose.icons.feathericons.Plus
 import compose.icons.feathericons.RefreshCw
+import compose.icons.feathericons.Slash
 import compose.icons.feathericons.Sliders
-import com.aicode.feature.settings.domain.model.ProviderBalanceItem
+import compose.icons.feathericons.X
+import com.aicode.feature.agent.presentation.component.AdaptiveCardView
 import com.aicode.feature.settings.domain.model.ProviderBalanceResult
 import com.aicode.feature.settings.domain.model.ProviderBalanceState
 import androidx.compose.ui.res.stringResource
@@ -378,7 +380,7 @@ fun ProviderEditorScreen(
                         }
                     }
 
-                    // ── 套餐余量 ──
+                    // ── 自定义面板 (DIY) ──
                     SettingsGroupHeader(text = stringResource(R.string.provider_section_balance))
                     SettingsGroup {
                         ProviderTextFieldRow(
@@ -387,34 +389,32 @@ fun ProviderEditorScreen(
                             onValueChange = { balanceScriptPath = it },
                             placeholder = stringResource(R.string.provider_balance_script_placeholder),
                             trailing = {
-                                IconButton(
-                                    onClick = { showScriptPickerSheet = true },
-                                    modifier = Modifier.size(36.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = FeatherIcons.Folder,
-                                        contentDescription = stringResource(R.string.provider_balance_select_script),
-                                        tint = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.size(20.dp)
-                                    )
-                                }
-                            }
-                        )
-                        SettingsDivider()
-                        SettingsRow(
-                            icon = null,
-                            title = stringResource(R.string.provider_balance_interval_title),
-                            onClick = { showIntervalSheet = true },
-                            trailing = {
-                                Text(
-                                    text = formatIntervalLabel(balanceRefreshInterval),
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = if (MaterialTheme.colorScheme.background.luminance() > 0.5f) {
-                                        Color(0xFF8E9094)
-                                    } else {
-                                        MaterialTheme.colorScheme.onSurfaceVariant
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    if (balanceScriptPath.isNotBlank()) {
+                                        IconButton(
+                                            onClick = { balanceScriptPath = "" },
+                                            modifier = Modifier.size(32.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = FeatherIcons.X,
+                                                contentDescription = stringResource(R.string.provider_balance_clear_script),
+                                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                        }
                                     }
-                                )
+                                    IconButton(
+                                        onClick = { showScriptPickerSheet = true },
+                                        modifier = Modifier.size(36.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = FeatherIcons.Folder,
+                                            contentDescription = stringResource(R.string.provider_balance_select_script),
+                                            tint = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    }
+                                }
                             }
                         )
                         SettingsDivider()
@@ -1302,6 +1302,33 @@ private fun ScriptPickerBottomSheet(
                     .padding(bottom = Spacing.md)
             )
 
+            // 首项：不使用面板脚本（清空）
+            Surface(
+                onClick = { onSelect("") },
+                color = Color.Transparent
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = Spacing.lg, vertical = Spacing.md),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = FeatherIcons.Slash,
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(Modifier.width(Spacing.md))
+                    Text(
+                        text = stringResource(R.string.provider_balance_clear_script),
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            }
+
             if (scripts.isEmpty()) {
                 Box(
                     modifier = Modifier
@@ -1394,7 +1421,7 @@ private fun BalanceTestResultBox(state: ProviderBalanceState) {
                 }
             }
             is ProviderBalanceState.Success -> {
-                val items = state.result.items
+                val card = state.result.card
                 Surface(
                     color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f),
                     shape = RoundedCornerShape(Radius.sm),
@@ -1405,45 +1432,15 @@ private fun BalanceTestResultBox(state: ProviderBalanceState) {
                         verticalArrangement = Arrangement.spacedBy(Spacing.xs)
                     ) {
                         Text(
-                            text = stringResource(R.string.provider_balance_test_success, items.size),
+                            text = stringResource(R.string.provider_balance_test_success, card.body.size),
                             style = MaterialTheme.typography.labelMedium,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.primary
                         )
-                        items.forEach { item ->
-                            val color = item.colorHex?.let {
-                                runCatching { Color(android.graphics.Color.parseColor(it)) }.getOrNull()
-                            } ?: MaterialTheme.colorScheme.primary
-
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text(
-                                        text = "${item.label} ${item.suffix}".trim(),
-                                        style = MaterialTheme.typography.bodySmall,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = MaterialTheme.colorScheme.onSurface
-                                    )
-                                    val sub = item.displaySubText
-                                    if (sub.isNotBlank()) {
-                                        Text(
-                                            text = " ($sub)",
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                    }
-                                }
-                                Text(
-                                    text = item.displayValue,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    fontWeight = FontWeight.Bold,
-                                    color = color
-                                )
-                            }
-                        }
+                        AdaptiveCardView(
+                            card = card,
+                            isExpanded = true
+                        )
                     }
                 }
 

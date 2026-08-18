@@ -57,8 +57,8 @@ import com.aicode.feature.settings.data.repository.VisionModelSettingsRepository
 import com.aicode.feature.workspace.domain.model.RemoteConnection
 import com.aicode.feature.workspace.domain.repository.RemoteRepository
 import com.aicode.feature.settings.domain.model.AIProviderConfig
+import com.aicode.feature.settings.domain.model.DashboardContext
 import com.aicode.feature.settings.domain.model.ModelMetadata
-import com.aicode.feature.settings.domain.model.ProviderBalanceItem
 import com.aicode.feature.settings.domain.model.ProviderBalanceResult
 import com.aicode.feature.settings.domain.model.ProviderBalanceState
 import com.aicode.feature.settings.domain.service.ProviderBalanceRunner
@@ -1221,6 +1221,8 @@ class SettingsViewModel @Inject constructor(
     fun saveProvider(provider: AIProviderConfig) {
         viewModelScope.launch {
             repository.saveProvider(provider)
+            // 保存后重置该提供商在内存中的面板状态，以便主页即时以最新脚本与配置重新加载
+            _providerBalances.update { it - provider.id }
         }
     }
 
@@ -1317,15 +1319,26 @@ class SettingsViewModel @Inject constructor(
         _balanceTestState.value = ProviderBalanceState.Idle
     }
 
-    fun refreshProviderBalance(provider: AIProviderConfig, force: Boolean = false) {
-        if (provider.balanceScriptPath.isBlank()) return
+    fun refreshProviderBalance(
+        provider: AIProviderConfig,
+        context: DashboardContext? = null,
+        force: Boolean = false
+    ) {
+        if (provider.balanceScriptPath.isBlank()) {
+            _providerBalances.update { it - provider.id }
+            return
+        }
         val current = _providerBalances.value[provider.id]
         if (!force && current is ProviderBalanceState.Success) return
         if (current is ProviderBalanceState.Loading) return
 
+        // 已有 Success 时不切 Loading，避免 UI 高度塌缩再恢复（收起→展开闪烁）
+        val showLoading = current !is ProviderBalanceState.Success
         viewModelScope.launch {
-            _providerBalances.update { it + (provider.id to ProviderBalanceState.Loading) }
-            providerBalanceRunner.runScript(provider)
+            if (showLoading) {
+                _providerBalances.update { it + (provider.id to ProviderBalanceState.Loading) }
+            }
+            providerBalanceRunner.runScript(provider, context = context)
                 .onSuccess { result ->
                     _providerBalances.update { it + (provider.id to ProviderBalanceState.Success(result)) }
                 }

@@ -11,8 +11,7 @@
 *   **Base URL**：文本框。填 API 根域名，placeholder 随类型变化（OpenAI→`https://api.openai.com/`，Anthropic→`https://api.anthropic.com/`，Gemini→`https://generativelanguage.googleapis.com/`）。留空时按类型回填默认值。不要带尾部的 `/v1` 或具体的 path。
 *   **API 地址**：文本框。紧跟 Base URL 后的请求路径，默认 `/chat/completions`。
 *   **Response API (新版)**：开关，仅当类型为 `OpenAI` 时显示。默认**关闭**。
-*   **套餐余量脚本**：文本框与选择器。配置执行查询当前提供商套餐余量/余额的脚本文件（存放于 `~/.aicode/scripts/`，如 `demo_balance.py` 或 `demo_subscription.py`），支持 Python/Bash/Node 等。配置后可在编辑页点击「运行测试」实时调试输出；在主聊天界面输入框上方会自动展示该提供商的套餐余量卡片（支持折叠/展开视图与 1~3 项自适应指标）。如需深度自定义排版与卡片布局，可参考 [套餐余量自定义模板与 Adaptive Cards 设计规范指南](provider-balance-cards-guide.md)。
-*   **刷新周期**：可配置套餐余量的自动刷新频率（手动刷新、1 分钟、3 分钟、5 分钟、10 分钟等，默认 5 分钟）。进入聊天界面后会按该周期在后台自动静默刷新。
+*   **自定义面板脚本**：文本框与选择器。配置执行当前提供商自定义面板/余量统计的脚本文件（存放于 `~/.aicode/scripts/`，如 `demo_balance.py` 或 `demo_subscription.py`），支持 Python/Bash/Node 等。配置后可在编辑页点击「运行测试」实时调试输出；在主聊天界面输入框上方会自动展示该提供商的自定义面板卡片（支持折叠/展开视图）。脚本执行时会自动注入当前模型、工作区、会话 ID 及每次请求的 Token 统计等环境变量，每次 Agent 单次 LLM 请求完成时会自动刷新面板。如需深度自定义排版与卡片布局，可参考 [自定义面板 (DIY Dashboard) 与 Adaptive Cards 设计规范指南](provider-dashboard-cards-guide.md)。
 
 ## 2. 模型 Tab
 *   **拉取模型**：点击“拉取模型”按钮，向提供商同步可用模型列表；结果按品牌分组、可折叠，支持名称搜索筛选，每个模型旁标注元数据标签（`Image`(支持图片) / `Tools`(支持工具调用) / `↑<上下文>`(输入) / `↓<最大输出>`(输出)）。

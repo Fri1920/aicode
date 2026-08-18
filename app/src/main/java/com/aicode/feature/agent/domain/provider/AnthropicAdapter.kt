@@ -204,6 +204,8 @@ class AnthropicAdapter @Inject constructor(
                                     val usage = obj.get("message")?.takeIf { it.isJsonObject }?.asJsonObject
                                         ?.get("usage")?.takeIf { it.isJsonObject }?.asJsonObject
                                     streamInputTokens = usage?.get("input_tokens")?.takeIf { !it.isJsonNull }?.asInt ?: 0
+                                    // 缓存命中数在 message_start 的 usage 里返回（message_delta 的 usage 只有 output_tokens）
+                                    streamCachedInputTokens = usage?.get("cache_read_input_tokens")?.takeIf { !it.isJsonNull }?.asInt ?: 0
                                 }
                                 "content_block_start" -> {
                                     val index = obj.get("index")?.asInt ?: continue

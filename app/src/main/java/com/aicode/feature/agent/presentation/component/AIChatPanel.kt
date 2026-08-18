@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -43,6 +44,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameNanos
@@ -67,6 +70,7 @@ import com.aicode.feature.agent.presentation.AIAgentViewModel
 import com.aicode.feature.agent.presentation.MessageRole
 import com.aicode.feature.agent.presentation.hasVisibleContent
 import com.aicode.feature.settings.presentation.SettingsViewModel
+import com.aicode.feature.settings.domain.model.DashboardContext
 import com.aicode.feature.settings.domain.model.ProviderBalanceState
 import com.aicode.feature.workspace.presentation.WorkspaceViewModel
 import compose.icons.FeatherIcons
@@ -227,20 +231,82 @@ fun AIChatPanel(
     val providerBalances by (settingsViewModel?.providerBalances?.collectAsStateWithLifecycle() ?: remember { mutableStateOf(emptyMap()) })
     val currentBalanceState = activeProvider?.let { providerBalances[it.id] } ?: ProviderBalanceState.Idle
 
-    LaunchedEffect(activeProvider?.id, activeProvider?.balanceScriptPath, activeProvider?.balanceRefreshInterval) {
+    // 键盘弹出时收起面板，避免输入框被挤压
+    val imeBottomPx = WindowInsets.ime.getBottom(LocalDensity.current)
+    val imeVisible = imeBottomPx > 0
+
+    // 余额面板展开状态：展开时叠加面板联动折叠，避免输入框被双重顶开
+    var balanceExpanded by rememberSaveable { mutableStateOf(false) }
+
+    fun buildDashboardContext(
+        lastInput: Int = 0,
+        lastOutput: Int = 0,
+        lastCached: Int = 0,
+        refreshReason: String = ""
+    ): DashboardContext {
+        val curSessionId = currentSessionId.orEmpty()
+        val agentStateStr = when (agentState) {
+            is AgentUIState.Idle -> "idle"
+            is AgentUIState.Loading -> "loading"
+            is AgentUIState.Streaming -> "streaming"
+            is AgentUIState.Result -> "result"
+            is AgentUIState.Error -> "error"
+        }
+        return DashboardContext(
+            model = activeModel,
+            workspacePath = projectRoot,
+            workspaceName = if (projectRoot.isNotBlank()) File(projectRoot).name else "",
+            sessionId = curSessionId,
+            lastInputTokens = lastInput,
+            lastOutputTokens = lastOutput,
+            lastCachedTokens = lastCached,
+            totalInputTokens = currentSession?.totalInputTokens ?: 0,
+            totalOutputTokens = currentSession?.totalOutputTokens ?: 0,
+            modelContextTokens = activeModelMetadata?.contextTokens ?: 0,
+            modelMaxInputTokens = activeModelMetadata?.inputTokens ?: 0,
+            modelMaxOutputTokens = activeModelMetadata?.outputTokens ?: 0,
+            modelInputCostUsdPerM = activeModelMetadata?.inputCostUsdPerM ?: 0.0,
+            modelOutputCostUsdPerM = activeModelMetadata?.outputCostUsdPerM ?: 0.0,
+            modelCacheReadCostUsdPerM = activeModelMetadata?.cacheReadCostUsdPerM ?: 0.0,
+            modelSupportsTools = activeModelMetadata?.supportsTools ?: false,
+            modelSupportsVision = activeModelMetadata?.supportsVision ?: false,
+            modelSupportsReasoning = activeModelMetadata?.supportsReasoning ?: false,
+            messageCount = messages.size,
+            agentState = agentStateStr,
+            sessionMode = currentMode.name.lowercase(),
+            reasoningEffort = reasoningEffort.apiValue,
+            refreshReason = refreshReason
+        )
+    }
+
+    // 首次进入、切换提供商、切换脚本路径或切换会话时拉取一次面板
+    LaunchedEffect(activeProvider?.id, activeProvider?.balanceScriptPath, currentSessionId) {
         val provider = activeProvider ?: return@LaunchedEffect
         if (provider.balanceScriptPath.isBlank()) return@LaunchedEffect
+        val context = buildDashboardContext(refreshReason = "session")
+        settingsViewModel?.refreshProviderBalance(provider, context = context, force = true)
+    }
 
-        // 首次或切换提供商时拉取一次
-        settingsViewModel?.refreshProviderBalance(provider, force = false)
-
-        val intervalMinutes = provider.balanceRefreshInterval
-        if (intervalMinutes > 0) {
-            val intervalMs = intervalMinutes * 60_000L
-            while (true) {
-                delay(intervalMs)
-                settingsViewModel?.refreshProviderBalance(provider, force = true)
-            }
+    // 每次单次 LLM 请求返回时，立即带上最新 Token 与上下文实时刷新面板
+    // 注意：LaunchedEffect(Unit) 只启动一次，collect 闭包会捕获首次组合时的变量快照，
+    // 必须用 rememberUpdatedState 取最新值，否则会话累计 Token/消息数等永远停留在旧值。
+    val latestBuildDashboardContext by rememberUpdatedState(
+        { lastInput: Int, lastOutput: Int, lastCached: Int, refreshReason: String ->
+            buildDashboardContext(lastInput, lastOutput, lastCached, refreshReason)
+        }
+    )
+    val latestActiveProvider by rememberUpdatedState(activeProvider)
+    LaunchedEffect(Unit) {
+        viewModel.llmCallEvents.collect { callEvent ->
+            val provider = latestActiveProvider ?: return@collect
+            if (provider.balanceScriptPath.isBlank()) return@collect
+            val context = latestBuildDashboardContext(
+                callEvent.inputTokens,
+                callEvent.outputTokens,
+                callEvent.cachedTokens,
+                "llm"
+            )
+            settingsViewModel?.refreshProviderBalance(provider, context = context, force = true)
         }
     }
 
@@ -668,7 +734,8 @@ fun AIChatPanel(
                 pendingPermission?.let { request ->
                     ToolPermissionPanel(
                         request = request,
-                        onChoice = { choice -> viewModel.resolveToolPermission(request.id, choice) }
+                        onChoice = { choice -> viewModel.resolveToolPermission(request.id, choice) },
+                        forceCollapse = balanceExpanded
                     )
                 }
             }
@@ -682,7 +749,8 @@ fun AIChatPanel(
                     AskUserQuestionPanel(
                         question = question,
                         onConfirm = { answer -> viewModel.resolveUserQuestion(question.id, answer) },
-                        onSkip = { viewModel.resolveUserQuestion(question.id, UserQuestionAnswer(emptyList())) }
+                        onSkip = { viewModel.resolveUserQuestion(question.id, UserQuestionAnswer(emptyList())) },
+                        forceCollapse = balanceExpanded
                     )
                 }
             }
@@ -697,7 +765,8 @@ fun AIChatPanel(
                     PlanApprovalPanel(
                         state = state,
                         onApprove = { viewModel.approvePlanAndBuild() },
-                        onRefine = { viewModel.refinePlan() }
+                        onRefine = { viewModel.refinePlan() },
+                        forceCollapse = balanceExpanded
                     )
                 }
             }
@@ -736,8 +805,19 @@ fun AIChatPanel(
                 queuedRequests = queuedRequests,
                 onRemoveQueued = { viewModel.removeQueuedRequest(it) },
                 balanceState = currentBalanceState,
+                forceCollapseBalance = pendingPermission != null || pendingQuestion != null || planApproval != null || imeVisible,
+                onBalanceExpandedChange = { balanceExpanded = it },
                 onRefreshBalance = {
-                    activeProvider?.let { settingsViewModel?.refreshProviderBalance(it, force = true) }
+                    activeProvider?.let {
+                        val context = buildDashboardContext(refreshReason = "manual")
+                        settingsViewModel?.refreshProviderBalance(it, context = context, force = true)
+                    }
+                },
+                onRefreshBalanceByButton = {
+                    activeProvider?.let {
+                        val context = buildDashboardContext(refreshReason = "button")
+                        settingsViewModel?.refreshProviderBalance(it, context = context, force = true)
+                    }
                 },
                 tokenProgress = run {
                     val contextLimit = activeModelMetadata?.contextTokens ?: 0

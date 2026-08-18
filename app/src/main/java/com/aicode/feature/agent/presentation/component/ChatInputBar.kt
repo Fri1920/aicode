@@ -121,6 +121,9 @@ internal fun ChatInputBar(
     tokenProgress: Float = 0f,
     balanceState: ProviderBalanceState = ProviderBalanceState.Idle,
     onRefreshBalance: () -> Unit = {},
+    onRefreshBalanceByButton: () -> Unit = {},
+    onBalanceExpandedChange: (Boolean) -> Unit = {},
+    forceCollapseBalance: Boolean = false,
     /** 消息列表正在滚动时内容区淡出到 40%，停止滚动恢复；用于长列表阅读时降低底部干扰（同 git 页 tab 栏）。 */
     isScrolling: Boolean = false,
     modifier: Modifier = Modifier
@@ -238,7 +241,10 @@ internal fun ChatInputBar(
                 ProviderBalanceBar(
                     provider = activeProvider,
                     state = balanceState,
-                    onRefresh = onRefreshBalance
+                    onRefresh = onRefreshBalance,
+                    onRefreshByButton = onRefreshBalanceByButton,
+                    onExpandedChange = onBalanceExpandedChange,
+                    forceCollapse = forceCollapseBalance
                 )
             }
 
@@ -503,8 +509,13 @@ internal fun SendButton(
 @Composable
 internal fun ToolPermissionPanel(
     request: PendingToolPermission,
-    onChoice: (PermissionChoice) -> Unit
+    onChoice: (PermissionChoice) -> Unit,
+    forceCollapse: Boolean = false
 ) {
+    var expanded by remember { mutableStateOf(true) }
+    // 余额面板展开时同帧收起本面板，避免叠加顶开输入框
+    val effectiveExpanded = expanded && !forceCollapse
+
     Surface(
         modifier = Modifier
             .fillMaxWidth()
@@ -514,7 +525,13 @@ internal fun ToolPermissionPanel(
         border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
     ) {
         Column(modifier = Modifier.padding(Spacing.md)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(Radius.sm))
+                    .clickable { expanded = !expanded },
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 Box(
                     modifier = Modifier
                         .size(8.dp)
@@ -536,65 +553,73 @@ internal fun ToolPermissionPanel(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
+                Icon(
+                    imageVector = if (effectiveExpanded) FeatherIcons.ChevronUp else FeatherIcons.ChevronDown,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(18.dp)
+                )
             }
 
-            Spacer(Modifier.height(Spacing.sm))
-            SelectionContainer {
-                Column(
-                    modifier = Modifier.heightIn(max = 160.dp).verticalScroll(rememberScrollState())
-                ) {
-                    Text(
-                        text = request.summary,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    if (request.details.isNotBlank()) {
-                        Spacer(Modifier.height(Spacing.xs))
+            if (effectiveExpanded) {
+                Spacer(Modifier.height(Spacing.sm))
+                SelectionContainer {
+                    Column(
+                        modifier = Modifier.heightIn(max = 160.dp).verticalScroll(rememberScrollState())
+                    ) {
                         Text(
-                            text = request.details,
-                            style = MaterialTheme.typography.bodySmall.copy(
-                                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
-                            ),
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            text = request.summary,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurface
                         )
+                        if (request.details.isNotBlank()) {
+                            Spacer(Modifier.height(Spacing.xs))
+                            Text(
+                                text = request.details,
+                                style = MaterialTheme.typography.bodySmall.copy(
+                                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                                ),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
                 }
-            }
 
-            val canRemember = request.rememberablePatterns.isNotEmpty()
-            val rememberLabel = when {
-                !canRemember -> request.rememberDisabledReason ?: stringResource(R.string.chat_perm_single_use_desc)
-                request.rememberablePatterns == listOf("*") -> stringResource(R.string.chat_perm_always_tool_desc)
-                else -> stringResource(R.string.chat_perm_always_prefix) + request.rememberablePatterns.joinToString("、")
-            }
-            Spacer(Modifier.height(Spacing.sm))
-            Text(
-                text = rememberLabel,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+                val canRemember = request.rememberablePatterns.isNotEmpty()
+                val rememberLabel = when {
+                    !canRemember -> request.rememberDisabledReason ?: stringResource(R.string.chat_perm_single_use_desc)
+                    request.rememberablePatterns == listOf("*") -> stringResource(R.string.chat_perm_always_tool_desc)
+                    else -> stringResource(R.string.chat_perm_always_prefix) + request.rememberablePatterns.joinToString("、")
+                }
+                Spacer(Modifier.height(Spacing.sm))
+                Text(
+                    text = rememberLabel,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
 
-            Spacer(Modifier.height(Spacing.sm))
-            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                AgentActionButton(
-                    text = stringResource(R.string.chat_perm_deny),
-                    onClick = { onChoice(PermissionChoice.REJECT) },
-                    modifier = Modifier.weight(1f),
-                    tone = AgentActionTone.Danger
-                )
-                AgentActionButton(
-                    text = stringResource(R.string.chat_perm_always_allow),
-                    onClick = { onChoice(PermissionChoice.ALWAYS) },
-                    modifier = Modifier.weight(1f),
-                    enabled = canRemember,
-                    tone = AgentActionTone.Neutral
-                )
-                AgentActionButton(
-                    text = stringResource(R.string.common_allow),
-                    onClick = { onChoice(PermissionChoice.ONCE) },
-                    modifier = Modifier.weight(1f),
-                    tone = AgentActionTone.Success
-                )
+                Spacer(Modifier.height(Spacing.sm))
+                Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                    AgentActionButton(
+                        text = stringResource(R.string.chat_perm_deny),
+                        onClick = { onChoice(PermissionChoice.REJECT) },
+                        modifier = Modifier.weight(1f),
+                        tone = AgentActionTone.Danger
+                    )
+                    AgentActionButton(
+                        text = stringResource(R.string.chat_perm_always_allow),
+                        onClick = { onChoice(PermissionChoice.ALWAYS) },
+                        modifier = Modifier.weight(1f),
+                        enabled = canRemember,
+                        tone = AgentActionTone.Neutral
+                    )
+                    AgentActionButton(
+                        text = stringResource(R.string.common_allow),
+                        onClick = { onChoice(PermissionChoice.ONCE) },
+                        modifier = Modifier.weight(1f),
+                        tone = AgentActionTone.Success
+                    )
+                }
             }
         }
     }
@@ -703,8 +728,13 @@ private fun ErrorBubble(message: String) {
 internal fun PlanApprovalPanel(
     state: PlanApprovalRequest,
     onApprove: () -> Unit,
-    onRefine: () -> Unit
+    onRefine: () -> Unit,
+    forceCollapse: Boolean = false
 ) {
+    var expanded by remember { mutableStateOf(true) }
+    // 余额面板展开时同帧收起本面板，避免叠加顶开输入框
+    val effectiveExpanded = expanded && !forceCollapse
+
     Surface(
         modifier = Modifier
             .fillMaxWidth()
@@ -714,7 +744,13 @@ internal fun PlanApprovalPanel(
         border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
     ) {
         Column(modifier = Modifier.padding(Spacing.md)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(Radius.sm))
+                    .clickable { expanded = !expanded },
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 Box(
                     modifier = Modifier
                         .size(8.dp)
@@ -726,33 +762,42 @@ internal fun PlanApprovalPanel(
                     text = stringResource(R.string.chat_plan_completed),
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.onSurface,
-                    fontWeight = FontWeight.SemiBold
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.weight(1f)
+                )
+                Icon(
+                    imageVector = if (effectiveExpanded) FeatherIcons.ChevronUp else FeatherIcons.ChevronDown,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(18.dp)
                 )
             }
 
-            if (state.reason.isNotBlank()) {
-                Spacer(Modifier.height(Spacing.xs))
-                Text(
-                    text = state.reason,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
+            if (effectiveExpanded) {
+                if (state.reason.isNotBlank()) {
+                    Spacer(Modifier.height(Spacing.xs))
+                    Text(
+                        text = state.reason,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
 
-            Spacer(Modifier.height(Spacing.md))
-            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                AgentActionButton(
-                    text = stringResource(R.string.chat_continue_feedback),
-                    onClick = onRefine,
-                    modifier = Modifier.weight(1f),
-                    tone = AgentActionTone.Neutral
-                )
-                AgentActionButton(
-                    text = stringResource(R.string.chat_approve_and_implement),
-                    onClick = onApprove,
-                    modifier = Modifier.weight(1f),
-                    tone = AgentActionTone.Success
-                )
+                Spacer(Modifier.height(Spacing.md))
+                Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                    AgentActionButton(
+                        text = stringResource(R.string.chat_continue_feedback),
+                        onClick = onRefine,
+                        modifier = Modifier.weight(1f),
+                        tone = AgentActionTone.Neutral
+                    )
+                    AgentActionButton(
+                        text = stringResource(R.string.chat_approve_and_implement),
+                        onClick = onApprove,
+                        modifier = Modifier.weight(1f),
+                        tone = AgentActionTone.Success
+                    )
+                }
             }
         }
     }
