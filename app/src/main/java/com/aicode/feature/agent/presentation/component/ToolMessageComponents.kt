@@ -115,9 +115,14 @@ internal fun ToolMessageBody(
         remember(message.id, message.content) { parseWebSearchResult(message.content) }
     } else null
 
-    val expandable = !running && (edit != null || !resultText.isNullOrBlank() || !argsFull.isNullOrBlank()
-            || (todoData != null && todoData.items.isNotEmpty()) || webSearchData != null)
+    // 执行中也可折叠/展开（如 bash 刷屏时可收起只看标题行），无论当前是否有输出；无输出时折叠态无内容，但保持可点击与箭头一致
+    val hasLiveOutput = !liveOutput.isNullOrBlank()
+    val expandable = streaming || (!running && (edit != null || !resultText.isNullOrBlank() || !argsFull.isNullOrBlank()
+            || (todoData != null && todoData.items.isNotEmpty()) || webSearchData != null))
     var expanded by remember(message.id) { mutableStateOf(edit != null || todoData != null) }
+    var userToggled by remember(message.id) { mutableStateOf(false) }
+    // 执行中默认展开实时输出；落库后按内容类型决定（edit/todo 默认展开，其余折叠）；用户手动 toggle 后以用户选择为准
+    val effectiveExpanded = if (userToggled) expanded else (streaming || edit != null || todoData != null)
 
     val toolLabel = message.toolName ?: stringResource(R.string.common_tool)
     // 文件相关工具：从结构化 diff 或工具参数里取路径，统一按「工具名 + 路径 + 文件名」展示
@@ -133,7 +138,8 @@ internal fun ToolMessageBody(
                 .fillMaxWidth()
                 .then(
                     if (expandable) Modifier.clickable {
-                        expanded = !expanded
+                        userToggled = true
+                        expanded = !effectiveExpanded
                         onToggle?.invoke()
                     } else Modifier
                 ),
@@ -209,33 +215,36 @@ internal fun ToolMessageBody(
                 )
                 Spacer(Modifier.width(Spacing.sm))
             }
-            if (streaming) {
-                TypingDots(color = MaterialTheme.colorScheme.onSurfaceVariant, dotSize = 5.dp)
-            } else if (expandable) {
+            if (expandable) {
                 Icon(
-                    if (expanded) FeatherIcons.ChevronUp else FeatherIcons.ChevronDown,
-                    contentDescription = if (expanded) stringResource(R.string.common_collapse_action) else stringResource(R.string.common_expand),
+                    if (effectiveExpanded) FeatherIcons.ChevronUp else FeatherIcons.ChevronDown,
+                    contentDescription = if (effectiveExpanded) stringResource(R.string.common_collapse_action) else stringResource(R.string.common_expand),
                     tint = Brand.IconGray,
                     modifier = Modifier.size(18.dp)
                 )
             }
         }
         if (streaming) {
-            if (!liveOutput.isNullOrBlank()) {
-                val truncated = remember(liveOutput) { liveOutput.takeLastLines(TOOL_SECTION_LINE_LIMIT) }
-                Spacer(Modifier.height(Spacing.xs))
-                Text(
-                    text = truncated,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    style = MaterialTheme.typography.bodySmall.copy(
-                        fontFamily = FontFamily.Monospace
-                    )
-                )
+            // 展开态与落库卡片同构：先「指令」（工具参数），再「结果」（实时输出尾部），输出进行中指示放结果下方；
+            // 折叠态只保留标题行
+            if (effectiveExpanded) {
+                if (!argsFull.isNullOrBlank()) {
+                    Spacer(Modifier.height(Spacing.sm))
+                    ToolSection(label = stringResource(R.string.tool_instruction), content = argsFull)
+                }
+                if (hasLiveOutput) {
+                    val truncated = remember(liveOutput) { liveOutput.takeLastLines(TOOL_SECTION_LINE_LIMIT) }
+                    Spacer(Modifier.height(Spacing.sm))
+                    ToolSection(label = stringResource(R.string.tool_result), content = truncated)
+                }
+                Spacer(Modifier.height(Spacing.sm))
+                TypingDots(color = MaterialTheme.colorScheme.onSurfaceVariant, dotSize = 5.dp)
             }
-        } else if (expanded) {
+        } else if (effectiveExpanded) {
             Column(
                 modifier = Modifier.pointerInput(message.id) {
                     detectDoubleTapToCollapse {
+                        userToggled = true
                         expanded = false
                         onToggle?.invoke()
                     }
