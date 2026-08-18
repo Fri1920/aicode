@@ -97,11 +97,6 @@ class TerminalViewModel @Inject constructor(
         (if (isRemote()) remoteManager.tabs else localManager.tabs).value.map { it.id }.forEach { closeTab(it) }
     }
 
-    fun reconnectActive() {
-        val id = activeTabId.value ?: return
-        viewModelScope.launch { runCatching { if (isRemote()) remoteManager.reconnect(id) else localManager.reconnect(id) } }
-    }
-
     /** 向当前活动标签写入文本（额外按键行：方向键/Tab 等）。 */
     fun write(text: String) = if (isRemote()) remoteManager.writeToActive(text) else localManager.writeToActive(text)
 

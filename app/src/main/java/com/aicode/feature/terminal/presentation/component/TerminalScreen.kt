@@ -3,6 +3,9 @@ package com.aicode.feature.terminal.presentation.component
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -23,7 +26,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Close
-import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -36,14 +38,26 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import android.content.Context
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.boundsInParent
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -59,11 +73,13 @@ import com.termux.view.TerminalView
 import compose.icons.FeatherIcons
 import compose.icons.feathericons.ArrowLeft
 import compose.icons.feathericons.Plus
-import compose.icons.feathericons.RefreshCw
 import compose.icons.feathericons.X
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import com.aicode.R
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.first
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -92,14 +108,6 @@ fun TerminalScreen(
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(FeatherIcons.ArrowLeft, contentDescription = stringResource(R.string.common_back))
-                    }
-                },
-                actions = {
-                    IconButton(onClick = { viewModel.reconnectActive() }) {
-                        Icon(
-                            FeatherIcons.RefreshCw,
-                            contentDescription = stringResource(R.string.terminal_reconnect_tab),
-                            tint = androidx.compose.ui.graphics.Color(0xFF424242))
                     }
                 }
             )
@@ -162,7 +170,7 @@ fun TerminalScreen(
     }
 }
 
-/** 可横滑的标签栏：每个标签显示状态点 + 标题 + 关闭；末尾「+」新建。 */
+/** 可横滑的标签栏：每个标签显示状态点 + 标题 + 关闭；末尾「+」新建。激活标签变化时自动滚动，让当前标签可见。 */
 @Composable
 private fun TabBar(
     tabs: List<TerminalTab>,
@@ -171,38 +179,67 @@ private fun TabBar(
     onClose: (String) -> Unit,
     onNew: () -> Unit
 ) {
+    val scrollState = rememberScrollState()
+    // 标签 chip 在横滑内容中的位置（内容坐标，与 scrollState 同一坐标系）
+    val tabBounds = remember { mutableStateMapOf<String, Rect>() }
+    var barWidth by remember { mutableIntStateOf(0) }
+
+    // 新增/切换标签时把激活 chip 滚进可视区（在左则左对齐，在右则右对齐），不再需要手动找；
+    // barWidth 作为 key：首次进入时布局未完成（宽度为 0）会提前返回，宽度就绪后重新触发
+    LaunchedEffect(activeTabId, barWidth) {
+        val id = activeTabId ?: return@LaunchedEffect
+        if (barWidth <= 0) return@LaunchedEffect
+        val bounds = snapshotFlow { tabBounds[id] }.filterNotNull().first()
+        val left = bounds.left.toInt()
+        val right = bounds.right.toInt()
+        val visibleStart = scrollState.value
+        val visibleEnd = visibleStart + barWidth
+        val target = when {
+            left < visibleStart -> left
+            right > visibleEnd -> right - barWidth
+            else -> return@LaunchedEffect
+        }
+        scrollState.animateScrollTo(target.coerceAtLeast(0))
+    }
+
     Surface(color = MaterialTheme.colorScheme.surface, modifier = Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .horizontalScroll(rememberScrollState())
+                .onSizeChanged { barWidth = it.width }
                 .padding(horizontal = Spacing.sm, vertical = Spacing.sm),
-            horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            tabs.forEach { tab ->
-                TabChip(
-                    tab = tab,
-                    selected = tab.id == activeTabId,
-                    onClick = { onSelect(tab.id) },
-                    onClose = { onClose(tab.id) }
-                )
-            }
-            Box(
-                modifier = Modifier
-                    .size(36.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(MaterialTheme.colorScheme.surface)
-                    .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(8.dp))
-                    .clickable(onClick = onNew),
-                contentAlignment = Alignment.Center
+            Row(
+                modifier = Modifier.horizontalScroll(scrollState),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(
-                    FeatherIcons.Plus,
-                    contentDescription = stringResource(R.string.common_new_tab),
-                    tint = androidx.compose.ui.graphics.Color(0xFF424242),
-                    modifier = Modifier.size(18.dp)
-                )
+                tabs.forEach { tab ->
+                    TabChip(
+                        tab = tab,
+                        selected = tab.id == activeTabId,
+                        onClick = { onSelect(tab.id) },
+                        onClose = { onClose(tab.id) },
+                        modifier = Modifier.onGloballyPositioned { tabBounds[tab.id] = it.boundsInParent() }
+                    )
+                }
+                Box(
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(MaterialTheme.colorScheme.surface)
+                        .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(8.dp))
+                        .clickable(onClick = onNew),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        FeatherIcons.Plus,
+                        contentDescription = stringResource(R.string.common_new_tab),
+                        tint = androidx.compose.ui.graphics.Color(0xFF424242),
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
             }
         }
     }
@@ -213,7 +250,8 @@ private fun TabChip(
     tab: TerminalTab,
     selected: Boolean,
     onClick: () -> Unit,
-    onClose: () -> Unit
+    onClose: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     val bg = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface
     val fg = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
@@ -226,7 +264,7 @@ private fun TabChip(
         else -> Color(0xFF22C55E)
     }
     Row(
-        modifier = Modifier
+        modifier = modifier
             .height(36.dp)
             .clip(RoundedCornerShape(8.dp))
             .background(bg)
@@ -362,10 +400,10 @@ private fun ExtraKeysRow(viewModel: TerminalViewModel) {
             KeyChip("Ctrl", active = viewModel.modifiers.ctrl) {
                 viewModel.modifiers.ctrl = !viewModel.modifiers.ctrl
             }
-            KeyChip("←") { viewModel.write("[D") }
-            KeyChip("↑") { viewModel.write("[A") }
-            KeyChip("↓") { viewModel.write("[B") }
-            KeyChip("→") { viewModel.write("[C") }
+            KeyChip("←", repeatOnHold = true) { viewModel.write("[D") }
+            KeyChip("↑", repeatOnHold = true) { viewModel.write("[A") }
+            KeyChip("↓", repeatOnHold = true) { viewModel.write("[B") }
+            KeyChip("→", repeatOnHold = true) { viewModel.write("[C") }
             KeyChip("C-c") { viewModel.writeBytes(0x03) }
             KeyChip("C-d") { viewModel.writeBytes(0x04) }
             KeyChip("/") { viewModel.write("/") }
@@ -374,11 +412,34 @@ private fun ExtraKeysRow(viewModel: TerminalViewModel) {
     }
 }
 
+/** 方向键长按重复节奏：按下后延迟多久开始连续发送，以及每次发送的间隔。 */
+private const val KEY_REPEAT_INITIAL_DELAY_MS = 400L
+private const val KEY_REPEAT_INTERVAL_MS = 60L
+
 @Composable
-private fun KeyChip(label: String, active: Boolean = false, onClick: () -> Unit) {
+private fun KeyChip(
+    label: String,
+    active: Boolean = false,
+    repeatOnHold: Boolean = false,
+    onClick: () -> Unit
+) {
     val bg = if (active) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface
     val borderColor = if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant
     val fg = if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+    // 长按连续触发：pressed 期间由 LaunchedEffect 循环发送；短按（未发送过重复）在抬起时补发一次。
+    // 不用 pointerInput 内 launch——新版 Compose 的 PointerInputScope 不再是 CoroutineScope。
+    var pressed by remember { mutableStateOf(false) }
+    var sentRepeated by remember { mutableStateOf(false) }
+    LaunchedEffect(pressed) {
+        if (!pressed) return@LaunchedEffect
+        sentRepeated = false
+        delay(KEY_REPEAT_INITIAL_DELAY_MS)
+        while (pressed) {
+            onClick()
+            sentRepeated = true
+            delay(KEY_REPEAT_INTERVAL_MS)
+        }
+    }
     Box(
         modifier = Modifier
             .height(36.dp)
@@ -386,7 +447,21 @@ private fun KeyChip(label: String, active: Boolean = false, onClick: () -> Unit)
             .clip(RoundedCornerShape(8.dp))
             .background(bg)
             .border(1.dp, borderColor, RoundedCornerShape(8.dp))
-            .clickable(onClick = onClick),
+            .then(
+                if (repeatOnHold) {
+                    Modifier.pointerInput(onClick) {
+                        awaitEachGesture {
+                            awaitFirstDown(requireUnconsumed = false)
+                            pressed = true
+                            waitForUpOrCancellation()
+                            pressed = false
+                            if (!sentRepeated) onClick()
+                        }
+                    }
+                } else {
+                    Modifier.clickable(onClick = onClick)
+                }
+            ),
         contentAlignment = Alignment.Center
     ) {
         Text(

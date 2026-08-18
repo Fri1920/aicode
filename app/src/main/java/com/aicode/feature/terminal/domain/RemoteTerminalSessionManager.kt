@@ -196,28 +196,6 @@ class RemoteTerminalSessionManager @Inject constructor(
         if (_tabs.value.any { it.id == id }) _activeTabId.value = id
     }
 
-    /** 重连：关闭旧会话并重建交互 shell。 */
-    suspend fun reconnect(id: String) {
-        val old = tab(id) ?: return
-        runCatching { old.session.finishIfRunning() }
-        if (!ensureRemote()) return
-        val session = connection.startShellSession().also { it.allocateDefaultPTY() }
-        val shell = session.startShell()
-        val backend = SshShellBackend(shell)
-        val termSession = TerminalSession(TRANSCRIPT_ROWS, AppRemoteSessionClient(), backend)
-        termSession.updateSize(DEFAULT_COLUMNS, DEFAULT_ROWS)
-        val newTab = TerminalTab(
-            id = old.id,
-            title = old.title,
-            session = termSession,
-            isBackground = old.isBackground,
-            command = old.command,
-            runState = RunState.Running
-        )
-        _tabs.value = _tabs.value.map { if (it.id == id) newTab else it }
-        bumpRevision()
-    }
-
     fun rename(id: String, title: String) {
         tab(id)?.let {
             it.title = title

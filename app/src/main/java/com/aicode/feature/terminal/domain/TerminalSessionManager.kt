@@ -254,26 +254,6 @@ class TerminalSessionManager @Inject constructor(
         return true
     }
 
-    /** 重连：重建该标签的交互会话（仅对交互标签有意义）。 */
-    suspend fun reconnect(id: String) {
-        val old = tab(id) ?: return
-        runCatching { old.session.finishIfRunning() }
-        ensureContainer()
-        val session = buildSession("cd ~/workspace 2>/dev/null; export ENV=/etc/profile; " +
-            "[ -f /root/.aicode/provision.sh ] && sh /root/.aicode/provision.sh; " +
-            "exec ${containerEngine.defaultShell()}")
-        val newTab = TerminalTab(
-            id = old.id,
-            title = old.title,
-            session = session,
-            isBackground = old.isBackground,
-            command = old.command,
-            runState = RunState.Running
-        )
-        _tabs.value = _tabs.value.map { if (it.id == id) newTab else it }
-        bumpRevision()
-    }
-
     fun rename(id: String, title: String) {
         tab(id)?.let {
             it.title = title
