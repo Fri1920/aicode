@@ -149,6 +149,7 @@ fun ProviderEditorScreen(
     var openaiChatCacheKey by remember { mutableStateOf(initialProvider?.openaiChatCacheKey ?: false) }
     var balanceScriptPath by remember { mutableStateOf(initialProvider?.balanceScriptPath ?: "") }
     var balanceRefreshInterval by remember { mutableIntStateOf(initialProvider?.balanceRefreshInterval ?: 5) }
+    var userAgent by remember { mutableStateOf(initialProvider?.userAgent ?: "") }
     var isEnabled by remember { mutableStateOf(initialProvider?.isEnabled ?: true) }
     var type by remember { mutableStateOf(initialProvider?.type ?: ProviderType.OPENAI) }
     val providerId = remember { initialProvider?.id ?: System.currentTimeMillis().toString() }
@@ -215,7 +216,8 @@ fun ProviderEditorScreen(
         anthropicCacheBreakpoints = anthropicCacheBreakpoints,
         openaiChatCacheKey = openaiChatCacheKey,
         balanceScriptPath = balanceScriptPath,
-        balanceRefreshInterval = balanceRefreshInterval
+        balanceRefreshInterval = balanceRefreshInterval,
+        userAgent = userAgent
     )
 
     // 新建场景下判断用户是否填写了实质内容：名称、API Key、Base URL 任一非空白，或已添加模型。
@@ -378,6 +380,13 @@ fun ProviderEditorScreen(
                                 onCheckedChange = { anthropicCacheBreakpoints = it }
                             )
                         }
+                        SettingsDivider()
+                        ProviderTextFieldRow(
+                            label = stringResource(R.string.provider_user_agent),
+                            value = userAgent,
+                            onValueChange = { userAgent = it },
+                            placeholder = stringResource(R.string.provider_user_agent_hint)
+                        )
                     }
 
                     // ── 自定义面板 (DIY) ──

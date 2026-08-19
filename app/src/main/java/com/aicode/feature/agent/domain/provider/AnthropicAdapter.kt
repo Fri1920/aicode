@@ -46,6 +46,12 @@ class AnthropicAdapter @Inject constructor(
     /** 是否启用显式缓存断点（cache_control）。默认开启；第三方兼容网关严格校验未知字段时由设置项关闭。 */
     var cacheBreakpointsEnabled: Boolean = true
 
+    /** 自定义请求头 User-Agent；留空使用默认。 */
+    override var userAgent: String = ""
+
+    private fun extraHeaders(): Map<String, String> =
+        if (userAgent.isNotBlank()) mapOf("User-Agent" to userAgent) else emptyMap()
+
     override suspend fun complete(
         systemPrompt: String,
         messages: List<AgentMessage>,
@@ -80,7 +86,7 @@ class AnthropicAdapter @Inject constructor(
 
         val response = try {
             retryStaircase {
-                api.createMessage(url = url, apiKey = apiKey, request = request)
+                api.createMessage(url = url, apiKey = apiKey, extraHeaders = extraHeaders(), request = request)
             }
         } catch (e: CancellationException) {
             throw e
@@ -165,7 +171,7 @@ class AnthropicAdapter @Inject constructor(
             // thinking block 的加密签名（signature_delta 事件携带），随 Final 上抛供工具循环回传。
             var signature: String? = null
 
-            val body = api.streamMessage(url = url, apiKey = apiKey, request = request)
+            val body = api.streamMessage(url = url, apiKey = apiKey, extraHeaders = extraHeaders(), request = request)
 
             body.use { rb ->
                 // 首字节超时 watchdog：60s 内未收到首个内容块则关闭流，触发可重试的 IOException。

@@ -238,6 +238,7 @@ class StatefulAgentWorkflow @Inject constructor(
         provider.useResponseApi = config.useResponseApi
         provider.providerId = config.id
         provider.logSessionId = sessionId
+        provider.userAgent = config.userAgent
         return provider
     }
 

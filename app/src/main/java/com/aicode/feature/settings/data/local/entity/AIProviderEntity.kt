@@ -26,5 +26,7 @@ data class AIProviderEntity(
     /** 套餐余量脚本路径。 */
     val balanceScriptPath: String = "",
     /** 套餐余量自动刷新间隔（分钟）。默认 5 分钟。 */
-    val balanceRefreshInterval: Int = 5
+    val balanceRefreshInterval: Int = 5,
+    /** 自定义请求头 User-Agent；留空使用默认。 */
+    val userAgent: String = ""
 )

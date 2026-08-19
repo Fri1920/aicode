@@ -38,7 +38,8 @@ class ModelApiService @Inject constructor(
     suspend fun fetchModels(
         baseUrl: String,
         apiKey: String,
-        type: ProviderType
+        type: ProviderType,
+        userAgent: String = ""
     ): Result<List<String>> = withContext(Dispatchers.IO) {
         runCatching {
             if (apiKey.isBlank()) error("请先填写 API Key")
@@ -47,6 +48,7 @@ class ModelApiService @Inject constructor(
             val request = Request.Builder()
                 .url(joinUrl(baseUrl, modelsPath))
                 .applyAuth(apiKey, type)
+                .applyUserAgent(userAgent)
                 .get()
                 .build()
 
@@ -80,7 +82,8 @@ class ModelApiService @Inject constructor(
         type: ProviderType,
         useFullUrl: Boolean,
         useResponseApi: Boolean,
-        model: String
+        model: String,
+        userAgent: String = ""
     ): ModelTestResult = withContext(Dispatchers.IO) {
         val start = System.nanoTime()
         try {
@@ -121,6 +124,7 @@ class ModelApiService @Inject constructor(
             val request = Request.Builder()
                 .url(url)
                 .applyAuth(apiKey, type)
+                .applyUserAgent(userAgent)
                 .post(payload.toRequestBody("application/json".toMediaType()))
                 .build()
 
@@ -148,6 +152,9 @@ class ModelApiService @Inject constructor(
                 .header("x-goog-api-key", apiKey)
             else -> this.header("Authorization", "Bearer $apiKey")
         }
+
+    private fun Request.Builder.applyUserAgent(userAgent: String): Request.Builder =
+        if (userAgent.isNotBlank()) this.header("User-Agent", userAgent) else this
 
     /** 转成安全的 JSON 字符串字面量（含引号、正确转义）。 */
     private fun String.jsonStr(): String = JsonPrimitive(this).toString()

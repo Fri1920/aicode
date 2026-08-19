@@ -21,7 +21,9 @@ data class AIProviderConfig(
     /** 套餐余量查询脚本路径（位于 ~/.aicode/scripts/，或绝对路径/自定义命令）。 */
     val balanceScriptPath: String = "",
     /** 套餐余量自动刷新间隔（分钟），0 表示仅进入时/手动刷新，支持 1, 3, 5, 10 等。默认 5 分钟。 */
-    val balanceRefreshInterval: Int = 5
+    val balanceRefreshInterval: Int = 5,
+    /** 自定义请求头 User-Agent；留空使用默认。 */
+    val userAgent: String = ""
 ) {
     /** 实际生效的模型：优先 selectedModel，其次 defaultModel。 */
     val effectiveModel: String

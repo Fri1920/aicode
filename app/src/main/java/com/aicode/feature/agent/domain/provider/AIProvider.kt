@@ -63,6 +63,9 @@ interface AIProvider {
      */
     var logSessionId: String?
 
+    /** 自定义请求头 User-Agent；留空使用默认。 */
+    var userAgent: String
+
     /**
      * 单轮补全。[tools] 会以提供商的 function-calling 格式真正发给模型，
      * 模型若决定调用工具，结果会出现在返回的 [AIResponse.toolCalls] 中。
