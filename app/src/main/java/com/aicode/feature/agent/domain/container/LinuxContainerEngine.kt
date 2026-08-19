@@ -298,17 +298,17 @@ class LinuxContainerEngine @Inject constructor(
     private data class ExecResult(val output: String, val exitCode: Int?)
 
     /**
-     * 仅在容器和基础包已就绪时执行命令；不会触发 rootfs 解压或 apk 装包。
+     * 仅在容器已就绪（rootfs 已安装）时执行命令；不会触发 rootfs 解压。
      *
      * 供只读工具做性能增强使用：例如 search 可优先用 rg，但不能因为一次自动批准的搜索
-     * 隐式初始化容器或联网安装环境。未就绪时返回 null，让调用方走纯宿主 fallback。
+     * 隐式解压容器或联网安装环境。未安装时返回 null。
      */
     override suspend fun runCommandSyncIfReady(
         command: String,
         projectPath: String?,
         timeoutMs: Long
     ): CommandResult? {
-        if (!containerInstaller.isInstalledFor(currentProfile) || !isProvisioned()) return null
+        if (!containerInstaller.isInstalledFor(currentProfile)) return null
         val result = execCaptured(command, projectPath, timeoutMs)
         return CommandResult(result.output, result.exitCode)
     }
