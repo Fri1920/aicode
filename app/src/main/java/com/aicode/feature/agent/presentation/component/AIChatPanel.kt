@@ -478,8 +478,9 @@ fun AIChatPanel(
         val text = inputText.trim()
         if (text.isNotEmpty() || pendingAttachments.isNotEmpty()) {
             val attachments = pendingAttachments
-            val modelRequest = appendAttachmentsToRequest(context, text, attachments)
             val modelSupportsVision = activeModelMetadata?.supportsVision == true
+            val promptAttachments = if (modelSupportsVision) attachments.filterNot { it.isImage } else attachments
+            val modelRequest = appendAttachmentsToRequest(context, text, promptAttachments)
             val images = if (modelSupportsVision) attachments.toAgentImages() else emptyList()
             // 统一走队列：AI 忙时入队（等本轮结束后自动发送下一条），空闲时直接发送。
             // 斜杠命令在 ViewModel 内（agent workflow 之前）分流执行，无需在此区分。
@@ -855,8 +856,9 @@ fun AIChatPanel(
                 RewindOptionsBottomSheet(
                     promptSnippet = targetMsg?.content ?: "",
                     onOptionSelected = { option ->
-                        viewModel.executeRewindOption(targetId, option) { text ->
+                        viewModel.executeRewindOption(targetId, option) { text, attachments ->
                             inputText = text
+                            pendingAttachments = attachments.map { it.toPendingAttachment() }
                         }
                     },
                     onDismissRequest = { viewModel.dismissRewindMenu() }

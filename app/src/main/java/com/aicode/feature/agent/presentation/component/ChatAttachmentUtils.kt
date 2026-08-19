@@ -67,6 +67,34 @@ internal fun UploadedWorkspaceFile.toPendingAttachment(): PendingUploadAttachmen
         image = image
     )
 
+internal fun AgentAttachment.toPendingAttachment(): PendingUploadAttachment {
+    val image = if (isImage && localPath.isNotBlank()) {
+        val file = File(localPath)
+        if (file.exists() && file.isFile && file.length() > 0) {
+            try {
+                val bytes = file.readBytes()
+                val base64 = Base64.getEncoder().encodeToString(bytes)
+                AgentImage(
+                    mimeType = mimeType.ifBlank { "image/jpeg" },
+                    base64Data = base64,
+                    path = containerPath
+                )
+            } catch (e: Exception) {
+                null
+            }
+        } else null
+    } else null
+
+    return PendingUploadAttachment(
+        fileName = fileName,
+        containerPath = containerPath,
+        localPath = localPath,
+        mimeType = mimeType,
+        sizeBytes = sizeBytes,
+        image = image
+    )
+}
+
 private fun PendingUploadAttachment.toAgentAttachment(): AgentAttachment =
     AgentAttachment(
         fileName = fileName,
