@@ -46,7 +46,7 @@ data class AnthropicContentBlock(
     val name: String? = null, // for tool_use
     val input: Map<String, Any>? = null, // for tool_use
     val tool_use_id: String? = null, // for tool_result
-    val content: String? = null, // for tool_result
+    val content: Any? = null, // for tool_result: String or List<AnthropicContentBlock>
     val is_error: Boolean? = null, // for tool_result
     val thinking: String? = null, // for thinking block：思考摘要文本
     val signature: String? = null, // for thinking block：加密签名，多轮/工具循环须原样回传

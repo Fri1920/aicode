@@ -20,6 +20,7 @@ import com.aicode.feature.agent.domain.tool.ParameterType
 import com.aicode.feature.agent.domain.tool.ToolCapability
 import com.aicode.feature.agent.domain.tool.ToolParameter
 import com.aicode.feature.agent.domain.tool.ToolResult
+import com.aicode.feature.settings.data.remote.ModelMetadataService
 import com.aicode.feature.settings.data.repository.DefaultModelSettingsRepository
 import com.aicode.feature.settings.data.repository.VisionModelSettingsRepository
 import com.aicode.feature.settings.domain.model.AIProviderConfig
@@ -51,13 +52,14 @@ class ViewImageTool @Inject constructor(
     private val aiProviderRepository: AIProviderRepository,
     private val defaultModelSettingsRepository: DefaultModelSettingsRepository,
     private val visionModelSettingsRepository: VisionModelSettingsRepository,
+    private val modelMetadataService: ModelMetadataService,
     private val sessionUseCase: SessionUseCase,
     private val openAIApi: OpenAIApi,
     private val anthropicApi: AnthropicApi,
     private val geminiApi: GeminiApi
 ) : AbstractContextualTool() {
     override val name = "viewImage"
-    override val description = "查看本地图片并让识图模型分析。传 images（1~5 张图片路径）可让识图模型一次性对比/分析多张图片，返回分析结果与 vision_id；之后可传 vision_id + prompt 在同一识图会话内继续追问（识图模型记得图片与之前的问答）。prompt 为可选的提问或关注点，为空时识图模型默认描述图片内容。detail 控制图片清晰度：high（默认）小图原样直传、大图压缩到最长边 1536；original 全部原样直传；low 全部压缩到最长边 512 省 token。用户上传的图片会以路径形式附在请求文本中——当前模型不支持图片输入时，应主动调用 viewImage 查看，而非忽略。"
+    override val description = "查看本地图片并让识图模型分析。传 images（1~5 张图片路径）可让识图模型一次性对比/分析多张图片，返回分析结果与 vision_id；之后可传 vision_id + prompt 在同一识图会话内继续追问（识图模型记得图片与之前的问答）。prompt 为可选的提问或关注点，为空时识图模型默认描述图片内容。detail 控制图片清晰度：high（默认）小图原样直传、大图压缩到最长边 1536；original 全部原样直传；low 全部压缩到最长边 512 省 token。"
     override val capabilities = setOf(ToolCapability.READ_WORKSPACE)
     override val parameters = mapOf(
         "images" to ToolParameter(
@@ -107,11 +109,41 @@ class ViewImageTool @Inject constructor(
         if (images.size > MAX_IMAGES) {
             return ToolResult.Error("一次最多传 $MAX_IMAGES 张图片，当前 ${images.size} 张。", "TOO_MANY_IMAGES")
         }
-        return if (images.isNotEmpty()) {
+        val supportsVision = isCurrentChatModelSupportsVision(context.sessionId)
+        return if (supportsVision && images.isNotEmpty()) {
+            loadImagesDirectlyToContext(images, prompt, detail)
+        } else if (images.isNotEmpty()) {
             createSession(images, prompt, detail, context.sessionId)
         } else {
             continueSession(id, prompt, context.sessionId)
         }
+    }
+
+    private fun loadImagesDirectlyToContext(
+        images: List<String>,
+        prompt: String,
+        detail: String
+    ): ToolResult {
+        val encoded = mutableListOf<AgentImage>()
+        for (path in images) {
+            when (val r = encodeImage(path, detail)) {
+                is EncodeOutcome.Ok -> encoded.add(r.image)
+                is EncodeOutcome.Fail -> return ToolResult.Error(r.message, r.code)
+            }
+        }
+        val promptNotice = if (prompt.isNotBlank()) "（关注点/提问：$prompt）" else ""
+        val content = "已将 ${encoded.size} 张图片加载至当前对话上下文$promptNotice，你可以直接查看并分析图片内容。"
+        return ToolResult.Success(
+            data = JsonObject(
+                mapOf(
+                    "status" to JsonPrimitive("loaded_to_context"),
+                    "image_count" to JsonPrimitive(encoded.size),
+                    "content" to JsonPrimitive(content),
+                    "paths" to JsonArray(images.map { JsonPrimitive(it) })
+                )
+            ),
+            images = encoded
+        )
     }
 
     private suspend fun createSession(images: List<String>, prompt: String, detail: String, sessionId: String?): ToolResult {
@@ -187,6 +219,12 @@ class ViewImageTool @Inject constructor(
      * 识图模型解析：配置了「识图模型」用专用模型，否则用当前聊天模型
      * （session 绑定 provider 优先，回退全局默认）。不校验模型的视觉能力。
      */
+    private suspend fun isCurrentChatModelSupportsVision(sessionId: String?): Boolean {
+        val config = resolveCurrentChatConfig(sessionId) ?: return false
+        val metadata = modelMetadataService.resolve(config.id, config.type, config.effectiveModel)
+        return metadata.supportsVision
+    }
+
     private suspend fun resolveVisionProvider(sessionId: String?): AIProvider {
         val visionProviderId = visionModelSettingsRepository.getVisionProviderId().trim()
         val visionModel = visionModelSettingsRepository.getVisionModel().trim()

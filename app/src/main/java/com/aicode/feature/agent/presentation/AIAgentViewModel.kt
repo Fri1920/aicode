@@ -64,6 +64,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -1154,10 +1155,35 @@ class AIAgentViewModel @Inject constructor(
         _targetRewindMessageId.value = null
     }
 
-    fun executeRewindOption(messageId: String, option: RewindOption, onFillPrompt: (String) -> Unit) = viewModelScope.launch {
+    fun executeRewindOption(
+        messageId: String,
+        option: RewindOption,
+        onFillPrompt: (String, List<AgentAttachment>) -> Unit
+    ) = viewModelScope.launch {
         val sessionId = _currentSessionId.value ?: return@launch
+        dismissRewindMenu()
+
+        // 1. 停止当前正在运行的 Agent 任务及后续排队
+        _queuedRequests.value = _queuedRequests.value + (sessionId to emptyList())
+        pendingMergedNotifications.remove(sessionId)
+        val runningJob = sessionJobs[sessionId]
+        if (runningJob != null && runningJob.isActive) {
+            runningJob.cancelAndJoin()
+        }
+        sessionJobs.remove(sessionId)
+
+        // 2. 重置会话运行、流式与检查点状态
+        setAgentState(sessionId, AgentUIState.Idle)
+        _runningTools.value = _runningTools.value - sessionId
+        setStreamingText(sessionId, null)
+        setStreamingReasoning(sessionId, null)
+        setCompacting(sessionId, false)
+        setRetryState(sessionId, null)
+        checkpointManager.setActiveCheckpointId(null)
+
         val checkpoint = checkpointDao.getCheckpointByMessageId(messageId)
         val targetMsgEntity = agentMessageDao.getMessageById(messageId) ?: return@launch
+        val attachments = targetMsgEntity.toUIMessage().attachments
 
         when (option) {
             RewindOption.RESTORE_CODE_AND_CONVERSATION -> {
@@ -1165,19 +1191,16 @@ class AIAgentViewModel @Inject constructor(
                     checkpointManager.restoreCodeToCheckpoint(sessionId, checkpoint.id)
                 }
                 agentMessageDao.deleteMessagesFromTimestamp(sessionId, targetMsgEntity.timestamp)
-                dismissRewindMenu()
-                withContext(Dispatchers.Main) { onFillPrompt(targetMsgEntity.content) }
+                withContext(Dispatchers.Main) { onFillPrompt(targetMsgEntity.content, attachments) }
             }
             RewindOption.RESTORE_CONVERSATION -> {
                 agentMessageDao.deleteMessagesFromTimestamp(sessionId, targetMsgEntity.timestamp)
-                dismissRewindMenu()
-                withContext(Dispatchers.Main) { onFillPrompt(targetMsgEntity.content) }
+                withContext(Dispatchers.Main) { onFillPrompt(targetMsgEntity.content, attachments) }
             }
             RewindOption.RESTORE_CODE -> {
                 if (checkpoint != null) {
                     checkpointManager.restoreCodeToCheckpoint(sessionId, checkpoint.id)
                 }
-                dismissRewindMenu()
             }
         }
     }

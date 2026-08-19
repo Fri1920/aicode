@@ -487,11 +487,31 @@ class OpenAIAdapter @Inject constructor(
                         reasoning_content = reasoningContent
                     )
                 }
-                is AgentMessage.ToolResultMessage -> OpenAIChatMessage(
-                    role = "tool",
-                    content = message.result,
-                    tool_call_id = message.id
-                )
+                is AgentMessage.ToolResultMessage -> {
+                    val content: Any = if (message.images.isNotEmpty()) {
+                        val parts = mutableListOf<Map<String, Any>>()
+                        if (message.result.isNotBlank()) {
+                            parts.add(
+                                if (useResponsesContentParts) {
+                                    mapOf("type" to "input_text", "text" to message.result)
+                                } else {
+                                    mapOf("type" to "text", "text" to message.result)
+                                }
+                            )
+                        }
+                        message.images.forEach { image ->
+                            parts.add(image.toOpenAIImagePart(useResponsesContentParts))
+                        }
+                        parts
+                    } else {
+                        message.result
+                    }
+                    OpenAIChatMessage(
+                        role = "tool",
+                        content = content,
+                        tool_call_id = message.id
+                    )
+                }
             }
         }
 

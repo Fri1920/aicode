@@ -128,8 +128,8 @@ internal fun ChatInputBar(
     isScrolling: Boolean = false,
     modifier: Modifier = Modifier
 ) {
-    val canSend = (value.isNotBlank() || pendingAttachments.isNotEmpty()) && !isBusy
     val hasContent = value.isNotBlank() || pendingAttachments.isNotEmpty()
+    val canSend = hasContent
     var showAttachmentSheet by remember { mutableStateOf(false) }
     var showModelSheetFromBalance by remember { mutableStateOf(false) }
     val showSlashMenu = !isBusy && slashCommands.isNotEmpty() &&

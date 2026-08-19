@@ -392,6 +392,18 @@ class AnthropicAdapter @Inject constructor(
                 is AgentMessage.ToolResultMessage -> {
                     // 防御性清理：跳过没有配对 tool_use 的孤立 tool_result
                     if (!lastAssistantHadToolUse) continue
+                    val content: Any = if (message.images.isNotEmpty()) {
+                        val contentList = mutableListOf<AnthropicContentBlock>()
+                        if (message.result.isNotBlank()) {
+                            contentList.add(AnthropicContentBlock(type = "text", text = message.result))
+                        }
+                        message.images.forEach { img ->
+                            contentList.add(img.toAnthropicImageBlock())
+                        }
+                        contentList
+                    } else {
+                        message.result
+                    }
                     result.add(
                         AnthropicMessage(
                             role = "user",
@@ -399,7 +411,7 @@ class AnthropicAdapter @Inject constructor(
                                 AnthropicContentBlock(
                                     type = "tool_result",
                                     tool_use_id = message.id,
-                                    content = message.result
+                                    content = content
                                 )
                             )
                         )
