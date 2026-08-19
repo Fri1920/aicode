@@ -142,7 +142,8 @@ class StatefulAgentWorkflow @Inject constructor(
         val raw: String,
         val isError: Boolean,
         /** 仅 sendFile 等展示型工具：随结果附带的文件卡片元数据，供 UI 渲染，不回放进模型上下文。 */
-        val attachments: List<com.aicode.feature.agent.presentation.AgentAttachment> = emptyList()
+        val attachments: List<com.aicode.feature.agent.presentation.AgentAttachment> = emptyList(),
+        val images: List<com.aicode.feature.agent.domain.model.AgentImage> = emptyList()
     )
 
     /** 批量工具执行结果：携带 toolCall 元信息，供最后按原始顺序组装 ToolResultMessage。 */
@@ -152,7 +153,8 @@ class StatefulAgentWorkflow @Inject constructor(
         val result: String,
         val isError: Boolean,
         /** 仅 sendFile 等展示型工具：随结果附带的文件卡片元数据，供 UI 渲染，不回放进模型上下文。 */
-        val attachments: List<com.aicode.feature.agent.presentation.AgentAttachment> = emptyList()
+        val attachments: List<com.aicode.feature.agent.presentation.AgentAttachment> = emptyList(),
+        val images: List<com.aicode.feature.agent.domain.model.AgentImage> = emptyList()
     )
 
     /** 需要在外部环境中执行的副作用 (SideEffect) */
@@ -365,7 +367,8 @@ class StatefulAgentWorkflow @Inject constructor(
                         AgentMessage.ToolResultMessage(
                             id = batchResult.id,
                             toolName = batchResult.toolName,
-                            result = batchResult.result
+                            result = batchResult.result,
+                            images = batchResult.images
                         )
                     )
                 }
@@ -619,7 +622,7 @@ class StatefulAgentWorkflow @Inject constructor(
                                     rawResult += buildModeSwitchNotice(newCtx.mode)
                                 }
                             }
-                            batchResults.add(ToolBatchResult(toolCall.id, toolCall.name, rawResult, isError, runResult.attachments))
+                            batchResults.add(ToolBatchResult(toolCall.id, toolCall.name, rawResult, isError, runResult.attachments, runResult.images))
                         }
 
                         // 逐个推送完成事件（保持与 batchToolCalls 一致顺序），并进入收尾。
@@ -644,9 +647,10 @@ class StatefulAgentWorkflow @Inject constructor(
         return try {
             val result = tool.executeWithContext(toolCall.arguments, context)
             val attachments = if (name == "sendFile") extractAttachments(result) else emptyList()
+            val images = if (result is ToolResult.Success) result.images else emptyList()
             val transportResult = if (attachments.isNotEmpty()) stripAttachments(result) else result
             val processed = toolOutputStore.process(name, toolCall.id, transportResult)
-            ToolRunResult(processed.toTransportString(), processed is ToolResult.Error, attachments)
+            ToolRunResult(processed.toTransportString(), processed is ToolResult.Error, attachments, images)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -758,7 +762,8 @@ class StatefulAgentWorkflow @Inject constructor(
             }
             val result = finalResult ?: ToolResult.Error("流式工具未返回结果", "MISSING_STREAM_RESULT")
             val processed = toolOutputStore.process(toolCall.name, toolCall.id, result)
-            return ToolRunResult(processed.toTransportString(), processed is ToolResult.Error)
+            val images = if (result is ToolResult.Success) result.images else emptyList()
+            return ToolRunResult(processed.toTransportString(), processed is ToolResult.Error, images = images)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {

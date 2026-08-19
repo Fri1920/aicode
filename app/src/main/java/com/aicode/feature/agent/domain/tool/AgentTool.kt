@@ -1,5 +1,6 @@
 package com.aicode.feature.agent.domain.tool
 
+import com.aicode.feature.agent.domain.model.AgentImage
 import kotlinx.coroutines.flow.Flow
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -11,7 +12,10 @@ import kotlinx.serialization.json.JsonElement
 sealed class ToolResult {
     @Serializable
     @SerialName("success")
-    data class Success(val data: JsonElement) : ToolResult()
+    data class Success(
+        val data: JsonElement,
+        val images: List<AgentImage> = emptyList()
+    ) : ToolResult()
 
     @Serializable
     @SerialName("error")

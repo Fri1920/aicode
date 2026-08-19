@@ -342,19 +342,24 @@ class GeminiAdapter @Inject constructor(
                 is AgentMessage.ToolResultMessage -> {
                     // 防御性清理：跳过没有配对 functionCall 的孤立 functionResponse
                     if (!lastModelHadFunctionCall) continue
+                    val parts = mutableListOf<Map<String, Any>>()
+                    parts.add(
+                        mapOf(
+                            "functionResponse" to mapOf(
+                                "name" to message.id, // For Gemini, we typically use the name as ID
+                                "response" to mapOf(
+                                    "result" to message.result
+                                )
+                            )
+                        )
+                    )
+                    message.images.forEach { image ->
+                        parts.add(image.toGeminiInlineDataPart())
+                    }
                     result.add(
                         mapOf(
                             "role" to "user",
-                            "parts" to listOf(
-                                mapOf(
-                                    "functionResponse" to mapOf(
-                                        "name" to message.id, // For Gemini, we typically use the name as ID
-                                        "response" to mapOf(
-                                            "result" to message.result
-                                        )
-                                    )
-                                )
-                            )
+                            "parts" to parts
                         )
                     )
                 }
