@@ -48,6 +48,12 @@ class OpenAIAdapter @Inject constructor(
      */
     var chatCacheKeyEnabled: Boolean = false
 
+    /** 自定义请求头 User-Agent；留空使用默认。 */
+    override var userAgent: String = ""
+
+    private fun extraHeaders(): Map<String, String> =
+        if (userAgent.isNotBlank()) mapOf("User-Agent" to userAgent) else emptyMap()
+
     override suspend fun complete(
         systemPrompt: String,
         messages: List<AgentMessage>,
@@ -86,7 +92,7 @@ class OpenAIAdapter @Inject constructor(
 
             val response = try {
                 retryStaircase {
-                    api.createResponses(url = url, authorization = "Bearer $apiKey", request = request)
+                    api.createResponses(url = url, authorization = "Bearer $apiKey", extraHeaders = extraHeaders(), request = request)
                 }
             } catch (e: CancellationException) {
                 throw e
@@ -141,7 +147,7 @@ class OpenAIAdapter @Inject constructor(
 
         val response = try {
             retryStaircase {
-                api.createChatCompletion(url = url, authorization = "Bearer $apiKey", request = request)
+                api.createChatCompletion(url = url, authorization = "Bearer $apiKey", extraHeaders = extraHeaders(), request = request)
             }
         } catch (e: CancellationException) {
             throw e
@@ -210,6 +216,7 @@ class OpenAIAdapter @Inject constructor(
                     val body = api.streamResponses(
                         url = url,
                         authorization = "Bearer $apiKey",
+                        extraHeaders = extraHeaders(),
                         request = request
                     )
 
@@ -332,6 +339,7 @@ class OpenAIAdapter @Inject constructor(
             val body = api.streamChatCompletion(
                 url = url,
                 authorization = "Bearer $apiKey",
+                extraHeaders = extraHeaders(),
                 request = request
             )
 

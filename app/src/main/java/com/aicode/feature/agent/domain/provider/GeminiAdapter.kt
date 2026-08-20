@@ -33,6 +33,12 @@ class GeminiAdapter @Inject constructor(
     override var providerId = ""
     override var logSessionId: String? = null
 
+    /** 自定义请求头 User-Agent；留空使用默认。 */
+    override var userAgent: String = ""
+
+    private fun extraHeaders(): Map<String, String> =
+        if (userAgent.isNotBlank()) mapOf("User-Agent" to userAgent) else emptyMap()
+
     override suspend fun complete(
         systemPrompt: String,
         messages: List<AgentMessage>,
@@ -76,7 +82,7 @@ class GeminiAdapter @Inject constructor(
 
         val response = try {
             retryStaircase {
-                api.generateContent(url = url, apiKey = apiKey, request = request)
+                api.generateContent(url = url, apiKey = apiKey, extraHeaders = extraHeaders(), request = request)
             }
         } catch (e: CancellationException) {
             throw e
@@ -178,7 +184,7 @@ class GeminiAdapter @Inject constructor(
                 var streamOutputTokens = 0
                 var streamCachedInputTokens = 0
 
-                val body = api.streamGenerateContent(url = url, apiKey = apiKey, request = request)
+                val body = api.streamGenerateContent(url = url, apiKey = apiKey, extraHeaders = extraHeaders(), request = request)
 
                 body.use { rb ->
                     // 首字节超时 watchdog：60s 内未收到首个内容块则关闭流，触发可重试的 IOException。

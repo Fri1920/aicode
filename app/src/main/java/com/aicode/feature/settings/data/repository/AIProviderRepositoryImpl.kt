@@ -72,7 +72,8 @@ class AIProviderRepositoryImpl @Inject constructor(
             anthropicCacheBreakpoints = anthropicCacheBreakpoints,
             openaiChatCacheKey = openaiChatCacheKey,
             balanceScriptPath = balanceScriptPath,
-            balanceRefreshInterval = balanceRefreshInterval
+            balanceRefreshInterval = balanceRefreshInterval,
+            userAgent = userAgent
         )
     }
 
@@ -92,7 +93,8 @@ class AIProviderRepositoryImpl @Inject constructor(
             anthropicCacheBreakpoints = anthropicCacheBreakpoints,
             openaiChatCacheKey = openaiChatCacheKey,
             balanceScriptPath = balanceScriptPath,
-            balanceRefreshInterval = balanceRefreshInterval
+            balanceRefreshInterval = balanceRefreshInterval,
+            userAgent = userAgent
         )
     }
 }

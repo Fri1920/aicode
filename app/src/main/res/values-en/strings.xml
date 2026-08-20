@@ -700,6 +700,8 @@
     <string name="provider_config">Config</string>
     <string name="provider_full_url">Full URL</string>
     <string name="provider_full_url_desc">Base URL is the full request address, no default path appended</string>
+    <string name="provider_user_agent">User-Agent</string>
+    <string name="provider_user_agent_hint">Leave blank for default, e.g. MyApp/1.0</string>
     <string name="provider_response_api">Response API (new)</string>
     <string name="provider_models_count">Models (%1$s)</string>
     <string name="provider_models_count_tag">%1$d models</string>

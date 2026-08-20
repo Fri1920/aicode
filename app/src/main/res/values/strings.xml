@@ -700,6 +700,8 @@
     <string name="provider_config">配置</string>
     <string name="provider_full_url">完整 URL</string>
     <string name="provider_full_url_desc">Base URL 即完整请求地址，不自动拼接默认路径</string>
+    <string name="provider_user_agent">User-Agent</string>
+    <string name="provider_user_agent_hint">留空使用默认，如 MyApp/1.0</string>
     <string name="provider_response_api">Response API (新版)</string>
     <string name="provider_models_count">模型（%1$s）</string>
     <string name="provider_models_count_tag">%1$d 个模型</string>

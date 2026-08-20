@@ -1235,7 +1235,7 @@ class SettingsViewModel @Inject constructor(
     fun fetchModels(provider: AIProviderConfig) {
         viewModelScope.launch {
             _fetchState.value = FetchState.Loading
-            modelApiService.fetchModels(provider.baseUrl, provider.apiKey, provider.type)
+            modelApiService.fetchModels(provider.baseUrl, provider.apiKey, provider.type, provider.userAgent)
                 .onSuccess {
                     _fetchState.value = FetchState.Success(it)
                     resolveModelMetadata(provider.id, provider.type, it)
@@ -1287,7 +1287,7 @@ class SettingsViewModel @Inject constructor(
     fun testModel(provider: AIProviderConfig, model: String) {
         viewModelScope.launch {
             _testing.update { it + model }
-            val result = modelApiService.testModel(provider.baseUrl, provider.apiKey, provider.type, provider.useFullUrl, provider.useResponseApi, model)
+            val result = modelApiService.testModel(provider.baseUrl, provider.apiKey, provider.type, provider.useFullUrl, provider.useResponseApi, model, provider.userAgent)
             _testResults.update { it + (model to result) }
             _testing.update { it - model }
         }
