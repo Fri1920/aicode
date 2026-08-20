@@ -39,6 +39,8 @@ import com.aicode.feature.agent.domain.tool.explorer.SearchCodeTool
 import com.aicode.feature.agent.domain.tool.skill.LoadSkillTool
 import com.aicode.feature.agent.domain.tool.question.AskUserQuestionTool
 import com.aicode.feature.agent.domain.tool.todo.TodoTool
+import com.aicode.feature.agent.domain.tool.subagent.TaskTool
+import com.aicode.feature.agent.domain.subagent.SubAgentEventBus
 import com.aicode.feature.agent.domain.prompt.SystemPromptProvider
 import com.aicode.feature.agent.domain.workflow.AgentWorkflow
 import com.aicode.feature.agent.domain.tool.ToolPermissionManager
@@ -258,7 +260,8 @@ object AgentModule {
         webFetchTool: WebFetchTool,
         switchModeTool: SwitchModeTool,
         todoTool: TodoTool,
-        memoryTool: MemoryTool
+        memoryTool: MemoryTool,
+        taskTool: TaskTool
     ): ToolRegistry {
         return ToolRegistry().apply {
             register("readFile", readFileTool)
@@ -278,6 +281,7 @@ object AgentModule {
             register("switchMode", switchModeTool)
             register("todo", todoTool)
             register("memory", memoryTool)
+            register("task", taskTool)
         }
     }
 
