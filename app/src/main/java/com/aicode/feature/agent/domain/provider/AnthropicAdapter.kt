@@ -160,7 +160,7 @@ class AnthropicAdapter @Inject constructor(
         // 流式请求整体可重试；重试前上层会收到 Retrying 事件并清空已展示文本。
         try {
             streamWithStaircaseRetry(
-                attemptOnce = {
+                attemptOnce = { onContent ->
             val textBuilder = StringBuilder()
             // content block index -> 累积中的 tool_use（仅 tool_use 块建条目，保序）。
             val toolBlocks = LinkedHashMap<Int, ToolBlockAcc>()
@@ -231,6 +231,7 @@ class AnthropicAdapter @Inject constructor(
                                             if (t.isNotEmpty()) {
                                                 textBuilder.append(t)
                                                 if (firstByteReceived.compareAndSet(false, true)) watchdog.cancel()
+                                                onContent()
                                                 emit(AIStreamChunk.TextDelta(t))
                                             }
                                         }
@@ -239,6 +240,7 @@ class AnthropicAdapter @Inject constructor(
                                             if (t.isNotEmpty()) {
                                                 // 思考内容不落库、可重试重流出，但收到即说明连接已活，取消首字节超时。
                                                 if (firstByteReceived.compareAndSet(false, true)) watchdog.cancel()
+                                                onContent()
                                                 emit(AIStreamChunk.ReasoningDelta(t))
                                             }
                                         }

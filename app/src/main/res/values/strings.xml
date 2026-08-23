@@ -118,6 +118,8 @@
     <string name="settings_agent_sound_subtitle">退到后台时 Agent 完成弹出通知</string>
     <string name="agent_complete_notification_title">任务完成</string>
     <string name="agent_complete_notification_body">点击返回查看</string>
+    <string name="agent_complete_notification_background_body">后台任务「%1$s」已完成</string>
+    <string name="agent_complete_notification_background_multi_body">%1$d 个后台任务已完成</string>
     <string name="notification_channel_terminal_service">终端服务</string>
     <string name="notification_channel_terminal_service_desc">后台终端任务通知</string>
     <string name="notification_channel_agent_complete">Agent 完成通知</string>
