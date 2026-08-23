@@ -205,7 +205,7 @@ class OpenAIAdapter @Inject constructor(
             AILogger.logRequest(logSessionId, "OpenAI", model, "POST", url, request)
             val rawSse = StringBuilder()
             try {
-                streamWithStaircaseRetry(attemptOnce = {
+                streamWithStaircaseRetry(attemptOnce = { onContent ->
                     val textBuilder = StringBuilder()
                     val toolAccs = LinkedHashMap<Int, OpenAIToolAcc>()
                     var finishReason: String? = null
@@ -251,6 +251,7 @@ class OpenAIAdapter @Inject constructor(
                                         if (delta.isNotEmpty()) {
                                             textBuilder.append(delta)
                                             if (firstByteReceived.compareAndSet(false, true)) watchdog.cancel()
+                                            onContent()
                                             emit(AIStreamChunk.TextDelta(delta))
                                         }
                                     } else if (eventType == "response.completed") {
@@ -327,7 +328,7 @@ class OpenAIAdapter @Inject constructor(
         // 流式请求整体可重试；重试前上层会收到 Retrying 事件并清空已展示文本。
         try {
             streamWithStaircaseRetry(
-                attemptOnce = {
+                attemptOnce = { onContent ->
             val textBuilder = StringBuilder()
             // tool_call index -> 累积中的工具调用（保序）。
             val toolAccs = LinkedHashMap<Int, OpenAIToolAcc>()
@@ -394,6 +395,7 @@ class OpenAIAdapter @Inject constructor(
                                 if (c.isNotEmpty()) {
                                     textBuilder.append(c)
                                     if (firstByteReceived.compareAndSet(false, true)) watchdog.cancel()
+                                    onContent()
                                     emit(AIStreamChunk.TextDelta(c))
                                 }
                             }
@@ -402,6 +404,7 @@ class OpenAIAdapter @Inject constructor(
                             delta.get("reasoning_content")?.takeIf { !it.isJsonNull }?.asString?.let { r ->
                                 if (r.isNotEmpty()) {
                                     if (firstByteReceived.compareAndSet(false, true)) watchdog.cancel()
+                                    onContent()
                                     emit(AIStreamChunk.ReasoningDelta(r))
                                 }
                             }

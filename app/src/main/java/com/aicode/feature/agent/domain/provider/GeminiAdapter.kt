@@ -176,7 +176,7 @@ class GeminiAdapter @Inject constructor(
 
         try {
             streamWithStaircaseRetry(
-                attemptOnce = {
+                attemptOnce = { onContent ->
                 val textBuilder = StringBuilder()
                 val toolCalls = mutableListOf<ToolCall>()
                 var currentFinishReason: String? = null
@@ -226,10 +226,12 @@ class GeminiAdapter @Inject constructor(
                                                 if (isThought) {
                                                     // 思考增量：仅 UI 实时展示，不计入正文、不计入正文（不落库，重试时可安全重新流出）
                                                     if (firstByteReceived.compareAndSet(false, true)) watchdog.cancel()
+                                                    onContent()
                                                     emit(AIStreamChunk.ReasoningDelta(text))
                                                 } else {
                                                     textBuilder.append(text)
                                                     if (firstByteReceived.compareAndSet(false, true)) watchdog.cancel()
+                                                    onContent()
                                                     emit(AIStreamChunk.TextDelta(text))
                                                 }
                                             }

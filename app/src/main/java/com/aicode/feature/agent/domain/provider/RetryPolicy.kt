@@ -253,20 +253,26 @@ suspend fun <T> retryStaircase(
  * @param onRetry 重试前回调，参数为 (当前重试次数, 最大重试次数)；用于通知上层"正在重试"。
  *                回调在 delay 之前调用，确保 UI 能立即展示重试状态。声明为 suspend 以便
  *                调用方在其中通过 Flow 的 emit() 推送重试事件。
+ * @param onContent 流式读取中成功收到内容块时调用（通常在 emit TextDelta/ReasoningDelta 处）。
+ *                  一旦收到过内容说明连接已恢复、请求已成功，此后若再断流应重置重试计数，
+ *                  否则同一次请求内多次抖动会显示 1,2,3,4,5… 持续累加而不重新计数。
  */
 suspend fun streamWithStaircaseRetry(
-    attemptOnce: suspend () -> Unit,
+    attemptOnce: suspend (onContent: () -> Unit) -> Unit,
     onRetry: (suspend (attempt: Int, maxRetries: Int, error: RetryErrorInfo) -> Unit)? = null
 ) {
     var attempt = 0
     while (true) {
+        var receivedContent = false
         try {
-            attemptOnce()
+            attemptOnce { receivedContent = true }
             return
         } catch (e: CancellationException) {
             throw e
         } catch (e: Throwable) {
             coroutineContext.ensureActive()
+            // 本次尝试已成功收到过内容：视为新一轮请求，重置重试计数
+            if (receivedContent) attempt = 0
             if (attempt >= MAX_NETWORK_RETRIES || !isRetriableNetworkError(e)) throw e
             val wait = retryDelayMillis(attempt, e)
             FileLogger.w(TAG, "流式请求失败，第 ${attempt + 1}/$MAX_NETWORK_RETRIES 次重试（等待 ${wait}ms）: ${e.javaClass.simpleName} ${e.message}")
