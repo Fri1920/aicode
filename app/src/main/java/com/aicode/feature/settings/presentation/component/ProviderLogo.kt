@@ -19,7 +19,6 @@ import compose.icons.FeatherIcons
 import compose.icons.feathericons.Cloud
 import compose.icons.feathericons.Cpu
 import android.content.Context
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 
 /**
@@ -151,35 +150,6 @@ fun ModelLogoIcon(
         Icon(
             imageVector = FeatherIcons.Cpu,
             contentDescription = stringResource(R.string.provider_model_icon),
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = modifier.size(size)
-        )
-    }
-}
-
-/**
- * 根据品牌 key 渲染品牌 logo 图标；无匹配时显示默认 Cpu 图标。
- * 用于分类 header 等已知品牌 key 的场景。
- */
-@Composable
-fun BrandLogoIcon(
-    brandKey: String,
-    modifier: Modifier = Modifier,
-    size: Dp = 22.dp
-) {
-    val context = LocalContext.current
-    val res = brandLogoRes(brandKey)
-    if (res != null) {
-        Image(
-            painter = painterResource(res),
-            contentDescription = brandDisplayName(context, brandKey),
-            colorFilter = if (shouldTintModelLogo(brandKey)) ColorFilter.tint(modelLogoTint()) else null,
-            modifier = modifier.size(size)
-        )
-    } else {
-        Icon(
-            imageVector = FeatherIcons.Cpu,
-            contentDescription = brandDisplayName(context, brandKey),
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = modifier.size(size)
         )

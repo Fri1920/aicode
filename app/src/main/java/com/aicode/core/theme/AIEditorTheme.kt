@@ -32,9 +32,7 @@ object Radius {
 object Brand {
     val Blue = Color(0xFF2563EB)
     val Sky = Color(0xFF38BDF8)
-    val Ice = Color(0xFFEFF6FF)
     val IconGray = Color(0xFF424242)
-    val PageBg = Color(0xFFFAFAFA)
     val Orange = Color(0xFFF57C00)
 }
 

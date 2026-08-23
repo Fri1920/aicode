@@ -38,9 +38,6 @@ interface TodoItemDao {
     @Query("DELETE FROM todo_items WHERE sessionId = :sessionId")
     suspend fun deleteBySession(sessionId: String)
 
-    @Query("UPDATE todo_items SET status = :status, updatedAt = :updatedAt WHERE id = :id")
-    suspend fun updateStatus(id: String, status: String, updatedAt: Long)
-
     @Query("SELECT MAX(`order`) FROM todo_items WHERE sessionId = :sessionId")
     suspend fun getMaxOrder(sessionId: String): Int?
 }

@@ -61,7 +61,6 @@ class CheckpointManager @Inject constructor(
         filePath: String
     ) = withContext(Dispatchers.IO) {
         val checkpointId = activeCheckpointId ?: return@withContext
-        val targetFile = File(filePath)
 
         // 查重：同一个 checkpointId 内对同一文件只保留最原始的一次快照
         if (checkpointDao.countSnapshot(checkpointId, filePath) > 0) {

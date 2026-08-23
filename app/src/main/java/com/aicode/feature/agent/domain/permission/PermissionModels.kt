@@ -9,7 +9,7 @@ import kotlinx.serialization.Serializable
 enum class PermissionScope { PROJECT, GLOBAL }
 
 /**
- * 规则的判定方向。弹窗的「始终允许」只会产生 [ALLOW]；[DENY] 目前仅由管理界面/未来的手动规则使用，
+ * 规则的判定方向。弹窗的「始终允许」只会产生 [ALLOW]；[DENY] 仅由权限配置文件（deny 列表）提供，
  * 评估时 DENY 跨 scope 优先于 ALLOW（安全优先：全局禁可挡项目允许）。
  */
 enum class PermissionDecision { ALLOW, DENY }

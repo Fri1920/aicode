@@ -111,7 +111,7 @@ class RemoteServerViewModel @Inject constructor(
             if (result.isFailure) {
                 _uiState.value = _uiState.value.copy(error = context.getString(R.string.remote_upload_all_failed, result.exceptionOrNull()?.message))
             } else {
-                _uiState.value = _uiState.value.copy(error = context.getString(R.string.remote_upload_all_success)) // 暂时复用 error 展示成功消息，或稍后单独做 toast
+                _uiState.value = _uiState.value.copy(error = context.getString(R.string.remote_upload_all_success))
             }
         }
     }

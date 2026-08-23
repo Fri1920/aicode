@@ -11,7 +11,7 @@ import javax.inject.Singleton
  * [ExecutionModeHolder.currentMode] 转发到对应实现。
  *
  * 这样 Hilt 注入时机不再影响最终行为——无论 [FileAccessProvider] 在何时被首次注入，
- * 真正读写文件时才读取当前模式。也为后续运行时切换模式（免重启）打下基础。
+ * 真正读写文件时才读取当前模式。
  */
 @Singleton
 class DelegatingFileAccess @Inject constructor(

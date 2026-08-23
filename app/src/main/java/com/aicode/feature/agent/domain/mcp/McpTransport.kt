@@ -5,8 +5,8 @@ import kotlinx.serialization.json.JsonObject
 /**
  * MCP 传输层抽象：把一条 JSON-RPC 请求送达 server 并取回单条响应。
  *
- * 故意做成可插拔接口：当前只实现远程 [StreamableHttpTransport]；
- * 之后接 stdio（在 proot 里跑 npx server）时再加一个实现，[McpClient] 无需改动。
+ * 故意做成可插拔接口：远程走 [StreamableHttpTransport]、容器内子进程走 [StdioTransport]，
+ * [McpClient] 不感知具体传输实现。
  */
 interface McpTransport {
     /**
