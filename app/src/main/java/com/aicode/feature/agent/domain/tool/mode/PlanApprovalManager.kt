@@ -3,6 +3,7 @@ package com.aicode.feature.agent.domain.tool.mode
 import com.aicode.feature.agent.data.local.dao.ChatSessionDao
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -36,6 +37,11 @@ class PlanApprovalManager @Inject constructor(
 
         try {
             return decision.await()
+        } catch (e: CancellationException) {
+            // 用户未批准切换（点「停止」等取消路径）：SwitchModeTool 已把目标模式写入 DB，
+            // 取消意味着未获批准，需回滚，否则模式会未经批准直接切过去。
+            rollbackModeToPlan(sessionId)
+            throw e
         } finally {
             currentDecision = null
             currentSessionId = null
@@ -49,18 +55,21 @@ class PlanApprovalManager @Inject constructor(
 
         // 用户拒绝时，回滚数据库中的模式到 PLAN（SwitchModeTool 已写入 BUILD）
         if (choice == PlanApprovalChoice.REFINE) {
-            val sid = currentSessionId
-            if (sid != null) {
-                scope.launch {
-                    val entity = chatSessionDao.getById(sid)
-                    if (entity != null && entity.mode != "PLAN") {
-                        chatSessionDao.upsert(entity.copy(mode = "PLAN"))
-                    }
-                }
-            }
+            rollbackModeToPlan(currentSessionId)
         }
 
         currentDecision?.complete(choice)
+    }
+
+    /** 回滚会话模式到 PLAN（SwitchModeTool 已提前写入目标模式，未获批准时还原）。 */
+    private fun rollbackModeToPlan(sessionId: String?) {
+        val sid = sessionId ?: return
+        scope.launch {
+            val entity = chatSessionDao.getById(sid)
+            if (entity != null && entity.mode != "PLAN") {
+                chatSessionDao.upsert(entity.copy(mode = "PLAN"))
+            }
+        }
     }
 }
 
