@@ -698,6 +698,10 @@ class AIAgentViewModel @Inject constructor(
                     }
                     is AgentEvent.Retrying -> {
                         setRetryState(sessionId, RetryState(event.attempt, event.maxRetries, event.error))
+                        // 重试会从头重新流式输出：清掉已展示的正文/思维链气泡，
+                        // 否则重连后思维链重新生成而旧正文残留（workflow 已同步清空累积器）。
+                        setStreamingText(sessionId, null)
+                        setStreamingReasoning(sessionId, null)
                     }
                     is AgentEvent.CompactionStarted -> {
                         setRetryState(sessionId, null)
