@@ -1153,7 +1153,7 @@ private fun ProviderTextFieldRow(
         placeholder = if (placeholder.isNotBlank()) { { Text(placeholder) } } else null,
         singleLine = true,
         visualTransformation = visualTransformation,
-        trailingIcon = { trailing?.invoke() },
+        trailingIcon = trailing?.let { { it() } },
         shape = RoundedCornerShape(12.dp),
         colors = OutlinedTextFieldDefaults.colors(
             unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
