@@ -345,9 +345,7 @@ class AIAgentViewModel @Inject constructor(
         val notification = NotificationCompat.Builder(context, AGENT_COMPLETE_CHANNEL)
             .setSmallIcon(android.R.drawable.ic_menu_info_details)
             .setContentTitle(context.getString(R.string.agent_complete_notification_title))
-            .setContentText(
-                userRequest.ifBlank { context.getString(R.string.agent_complete_notification_body) }
-            )
+            .setContentText(agentCompleteNotificationBody(userRequest))
             .setContentIntent(openAppIntent)
             .setAutoCancel(true)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
@@ -357,10 +355,35 @@ class AIAgentViewModel @Inject constructor(
         }.onFailure { FileLogger.e(TAG, "发送 agent 完成通知失败", it) }
     }
 
+    /**
+     * 系统通知正文：普通用户消息直接展示；后台回调触发的轮次不裸露
+     * 「[系统通知 - 非用户输入]…」内部构造文本，改为展示任务标题。
+     */
+    private fun agentCompleteNotificationBody(userRequest: String): String {
+        if (userRequest.startsWith(BACKGROUND_NOTIFICATION_PREFIX)) {
+            val titles = TASK_NOTIFICATION_TITLE_REGEX.findAll(userRequest)
+                .map { it.groupValues[1] }
+                .filter { it.isNotBlank() }
+                .toList()
+            return when {
+                titles.isEmpty() -> context.getString(R.string.agent_complete_notification_body)
+                titles.size == 1 -> context.getString(
+                    R.string.agent_complete_notification_background_body, titles.first()
+                )
+                else -> context.getString(
+                    R.string.agent_complete_notification_background_multi_body, titles.size
+                )
+            }
+        }
+        return userRequest.ifBlank { context.getString(R.string.agent_complete_notification_body) }
+    }
+
     private companion object {
         const val TAG = "AIAgentViewModel"
         const val AGENT_COMPLETE_CHANNEL = "agent_complete"
         const val AGENT_COMPLETE_NOTIFICATION_ID = 100
+        /** 从后台任务通知文本中提取 <title> 内容，供系统通知正文展示。 */
+        val TASK_NOTIFICATION_TITLE_REGEX = Regex("<title>([^<]+)</title>")
     }
 
     init {
