@@ -31,7 +31,7 @@ internal val LocalMarkdownImageTransformer = staticCompositionLocalOf<ImageTrans
 
 private object NoOpImageTransformer : ImageTransformer {
     @Composable
-    override fun transform(url: String): ImageData? = null
+    override fun transform(link: String): ImageData? = null
 }
 
 /**
@@ -48,10 +48,10 @@ internal class MarkdownImageTransformer(
 ) : ImageTransformer {
 
     @Composable
-    override fun transform(url: String): ImageData? {
-        if (!isLocalPath(url)) return null
-        val painter by produceState<Painter?>(initialValue = null, key1 = url) {
-            value = withContext(Dispatchers.IO) { decode(url) }
+    override fun transform(link: String): ImageData? {
+        if (!isLocalPath(link)) return null
+        val painter by produceState<Painter?>(initialValue = null, key1 = link) {
+            value = withContext(Dispatchers.IO) { decode(link) }
         }
         val p = painter ?: return null
         return ImageData(
