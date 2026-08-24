@@ -217,6 +217,7 @@
     <string name="chat_uploaded_to">Uploaded to %1$s</string>
     <string name="chat_select_workspace_first">Please select a workspace first</string>
     <string name="chat_read_file_failed">Cannot read the selected file</string>
+    <string name="chat_camera_file_failed">Cannot create camera file</string>
     <string name="chat_workspace_unavailable">Workspace unavailable</string>
     <string name="chat_upload_failed">Upload failed</string>
     <string name="chat_unsupported_image_type">Unrecognized image type, only jpg/png/gif/webp supported</string>
@@ -650,7 +651,7 @@
     <string name="mcp_connecting">Connecting…</string>
     <string name="mcp_connection_failed">Connection failed</string>
     <string name="mcp_type_stdio">stdio</string>
-    <string name="mcp_tools_count">Tools: %1$s/%2$s</string>
+    <string name="mcp_tools_count">%1$d tools</string>
     <string name="mcp_details">Details</string>
 
     <!-- Skills Settings -->
@@ -937,4 +938,30 @@
     <string name="crash_screen_terminal">Terminal</string>
     <string name="crash_screen_git">Git</string>
     <string name="crash_screen_unknown">Unknown</string>
+
+    <!-- Provider balance bar -->
+    <string name="balance_fetching">Fetching balance…</string>
+    <string name="balance_fetch_failed_retry">Fetch failed, tap to retry</string>
+    <string name="balance_tap_to_query">Tap to check balance</string>
+
+    <!-- Common -->
+    <string name="common_open_link_failed">Cannot open link</string>
+    <string name="common_copied_with_title">Copied: %1$s</string>
+
+    <!-- Provider editor: balance script test -->
+    <string name="provider_balance_show_raw">View raw output</string>
+    <string name="provider_balance_hide_raw">Hide raw output</string>
+    <string name="provider_balance_interval_minutes">%1$d min</string>
+    <string name="balance_exec_failed">Execution failed</string>
+    <string name="balance_query_failed">Query failed</string>
+
+    <!-- Token stats -->
+    <string name="token_stats_hour_suffix">h</string>
+
+    <!-- Git -->
+    <string name="git_create_tag_title">New Tag</string>
+
+    <!-- Remote server delete confirmation -->
+    <string name="remote_delete_connection_confirm">Delete connection “%1$s”? Sync configurations using it will become unavailable.</string>
+    <string name="remote_delete_mount_confirm">Delete workspace mapping “%1$s”? Local and remote files will not be deleted.</string>
 </resources>

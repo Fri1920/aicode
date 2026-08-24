@@ -530,10 +530,10 @@ internal fun DiffExpandToggle(expanded: Boolean, hiddenCount: Int, onToggle: () 
     }
 }
 
-/** edit_file 单处编辑的差异片段。 */
+/** editFile 单处编辑的差异片段。 */
 internal data class EditHunk(val startLine: Int, val diff: String)
 
-/** edit_file 结果中解析出的结构化差异 */
+/** editFile 结果中解析出的结构化差异 */
 internal data class EditDiff(
     val path: String,
     val added: Int,
@@ -542,7 +542,7 @@ internal data class EditDiff(
 )
 
 /**
- * 从持久化的 TOOL 内容中解析 edit_file / write_file 的结构化差异
+ * 从持久化的 TOOL 内容中解析 editFile / writeFile 的结构化差异
  */
 internal fun parseEditDiff(content: String): EditDiff? {
     val dataObj = extractToolDataObject(content)

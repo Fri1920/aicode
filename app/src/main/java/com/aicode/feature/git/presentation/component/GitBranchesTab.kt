@@ -115,7 +115,6 @@ internal fun BranchesTab(
     val currentBranch = branches.firstOrNull { it.current }?.name ?: stringResource(R.string.git_no_checked_out_branch)
     // 无当前分支即 detached HEAD（HEAD 卡片只展示参考信息，此时显示提示而非分支名）。
     val hasCurrentBranch = branches.any { it.current }
-    val isDetached = branches.none { it.current } && branches.any { it.remote } || branches.none { it.current } && tags.isNotEmpty()
     val localBranches = branches.filter { !it.remote }
     val remoteBranches = branches.filter { it.remote }
     val expanded = remember { mutableStateMapOf<String, Boolean>() }
@@ -310,7 +309,7 @@ internal fun BranchesTab(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Text(
-                    text = stringResource(R.string.common_new_tab),
+                    text = stringResource(R.string.git_create_tag_title),
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSurface
                 )

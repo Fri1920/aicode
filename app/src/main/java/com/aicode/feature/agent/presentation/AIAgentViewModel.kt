@@ -1005,10 +1005,6 @@ class AIAgentViewModel @Inject constructor(
         askUserQuestionManager.resolve(id, answer)
     }
 
-    /**
-     * 主动打断正在运行的 agent：取消协程（会一并取消挂起的网络请求与容器命令进程），
-     * 并把「执行中」的工具占位行收尾为「已停止」，避免悬挂的 spinner 与孤儿记录。
-     */
     /** 停止当前工作区所有正在运行的 AI 会话并关闭所有终端标签（切换工作区前调用）。 */
     fun stopAllAndCloseTerminal() {
         stopAllAgents()
@@ -1030,6 +1026,10 @@ class AIAgentViewModel @Inject constructor(
         _retryStates.value = emptyMap()
     }
 
+    /**
+     * 主动打断当前会话正在运行的 agent：取消协程（会一并取消挂起的网络请求与容器命令进程），
+     * 并把「执行中」的工具占位行收尾为「已停止」，避免悬挂的 spinner 与孤儿记录。
+     */
     fun stopAgent() {
         val sessionId = _currentSessionId.value ?: return
         stopAgentSession(sessionId)
@@ -1309,8 +1309,7 @@ class AIAgentViewModel @Inject constructor(
         }
     }
 
-    /** 重命名会话标题。仅更新 title，不改 updatedAt，列表顺序保持不变。 */
-    // Checkpoint Rewind 选中的 Target Message
+    // Checkpoint Rewind 选中的目标消息 id
     private val _targetRewindMessageId = MutableStateFlow<String?>(null)
     val targetRewindMessageId: StateFlow<String?> = _targetRewindMessageId.asStateFlow()
 

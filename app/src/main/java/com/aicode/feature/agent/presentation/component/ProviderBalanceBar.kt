@@ -36,11 +36,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aicode.core.theme.Radius
 import com.aicode.core.theme.Spacing
+import com.aicode.R
 import com.aicode.feature.settings.domain.model.AIProviderConfig
 import com.aicode.feature.settings.domain.model.AdaptiveCardAction
 import com.aicode.feature.settings.domain.model.ProviderBalanceState
@@ -114,7 +116,7 @@ fun ProviderBalanceBar(
                             )
                             Spacer(Modifier.width(Spacing.xs))
                             Text(
-                                text = "正在获取余量...",
+                                text = stringResource(R.string.balance_fetching),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -150,7 +152,7 @@ fun ProviderBalanceBar(
                             )
                             Spacer(Modifier.width(4.dp))
                             Text(
-                                text = "获取失败，点击重试",
+                                text = stringResource(R.string.balance_fetch_failed_retry),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.error
                             )
@@ -168,14 +170,14 @@ fun ProviderBalanceBar(
                                     }
                                     context.startActivity(intent)
                                 }.onFailure {
-                                    Toast.makeText(context, "无法打开链接", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(context, context.getString(R.string.common_open_link_failed), Toast.LENGTH_SHORT).show()
                                 }
                             }
                             is AdaptiveCardAction.CopyToClipboard -> {
                                 val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
                                 val clip = ClipData.newPlainText(action.title, action.value)
                                 clipboard?.setPrimaryClip(clip)
-                                Toast.makeText(context, "已复制: ${action.title}", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, context.getString(R.string.common_copied_with_title, action.title), Toast.LENGTH_SHORT).show()
                             }
                         }
                     }
@@ -209,7 +211,7 @@ fun ProviderBalanceBar(
 
                             Icon(
                                 imageVector = FeatherIcons.ChevronDown,
-                                contentDescription = "展开详情",
+                                contentDescription = stringResource(R.string.common_expand),
                                 modifier = Modifier
                                     .size(18.dp)
                                     .clip(CircleShape)
@@ -241,7 +243,7 @@ fun ProviderBalanceBar(
                                 )
                                 Icon(
                                     imageVector = FeatherIcons.ChevronUp,
-                                    contentDescription = "折叠",
+                                    contentDescription = stringResource(R.string.common_collapse),
                                     modifier = Modifier
                                         .size(18.dp)
                                         .clip(CircleShape)
@@ -276,7 +278,7 @@ fun ProviderBalanceBar(
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
-                            text = "点击查询余量",
+                            text = stringResource(R.string.balance_tap_to_query),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.primary
                         )

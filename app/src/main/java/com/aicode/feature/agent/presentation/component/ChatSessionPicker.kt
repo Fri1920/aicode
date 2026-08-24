@@ -33,7 +33,7 @@ import com.aicode.feature.agent.domain.model.ChatSession
 import compose.icons.FeatherIcons
 
 /**
- * 单条会话行：短按选中，长按弹出功能菜单（置顶/重命名/删除）。供侧边栏历史记录列表复用。
+ * 单条会话行：短按选中，长按弹出功能菜单（置顶/重命名/导出/删除）。供侧边栏历史记录列表复用。
  * 置顶会话显示浅蓝背景（primaryContainer）。
  */
 @OptIn(ExperimentalFoundationApi::class)

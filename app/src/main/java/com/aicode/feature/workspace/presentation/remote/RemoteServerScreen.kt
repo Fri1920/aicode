@@ -86,6 +86,8 @@ fun RemoteServerScreen(
     }
     var connectionToEdit by remember { mutableStateOf<RemoteConnection?>(null) }
     var mountToEdit by remember { mutableStateOf<RemoteMount?>(null) }
+    var pendingDeleteConnection by remember { mutableStateOf<RemoteConnection?>(null) }
+    var pendingDeleteMount by remember { mutableStateOf<RemoteMount?>(null) }
 
     val syncUseGitIgnore by viewModel.syncUseGitIgnore.collectAsStateWithLifecycle()
     val maxSyncBatchSize by viewModel.maxSyncBatchSize.collectAsStateWithLifecycle()
@@ -165,7 +167,7 @@ fun RemoteServerScreen(
                                         connectionToEdit = it
                                         showAddConnectionDialog = true
                                     },
-                                    onDelete = { viewModel.deleteConnection(it.id) }
+                                    onDelete = { pendingDeleteConnection = it }
                                 )
                             }
                         }
@@ -194,7 +196,7 @@ fun RemoteServerScreen(
                                         mountToEdit = it
                                         showAddMountDialog = true
                                     },
-                                    onDelete = { viewModel.deleteMount(it.id) },
+                                    onDelete = { pendingDeleteMount = it },
                                     onUpload = { viewModel.forceUploadMount(it.id) },
                                     onDownload = { viewModel.forceDownloadMount(it.id) },
                                     onConnect = { viewModel.connectMount(it.id) },
@@ -259,6 +261,47 @@ fun RemoteServerScreen(
             onUseGitIgnoreChange = { viewModel.setSyncUseGitIgnore(it) },
             onMaxSyncBatchSizeChange = { viewModel.setMaxSyncBatchSize(it) },
             onDismiss = { showSyncSettingsSheet = false }
+        )
+    }
+
+    pendingDeleteConnection?.let { conn ->
+        AlertDialog(
+            onDismissRequest = { pendingDeleteConnection = null },
+            title = { Text(stringResource(R.string.common_delete)) },
+            text = { Text(stringResource(R.string.remote_delete_connection_confirm, conn.name)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.deleteConnection(conn.id)
+                    pendingDeleteConnection = null
+                }) { Text(stringResource(R.string.common_delete), color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingDeleteConnection = null }) { Text(stringResource(R.string.common_cancel)) }
+            }
+        )
+    }
+
+    pendingDeleteMount?.let { mount ->
+        AlertDialog(
+            onDismissRequest = { pendingDeleteMount = null },
+            title = { Text(stringResource(R.string.common_delete)) },
+            text = {
+                Text(
+                    stringResource(
+                        R.string.remote_delete_mount_confirm,
+                        mount.connection?.name ?: mount.localMountPath
+                    )
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.deleteMount(mount.id)
+                    pendingDeleteMount = null
+                }) { Text(stringResource(R.string.common_delete), color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingDeleteMount = null }) { Text(stringResource(R.string.common_cancel)) }
+            }
         )
     }
 

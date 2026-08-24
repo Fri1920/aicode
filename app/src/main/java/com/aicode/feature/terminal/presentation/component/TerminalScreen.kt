@@ -236,7 +236,7 @@ private fun TabBar(
                     Icon(
                         FeatherIcons.Plus,
                         contentDescription = stringResource(R.string.common_new_tab),
-                        tint = androidx.compose.ui.graphics.Color(0xFF424242),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(18.dp)
                     )
                 }
@@ -296,7 +296,7 @@ private fun TabChip(
             Icon(
                 FeatherIcons.X,
                 contentDescription = stringResource(R.string.terminal_close_tab),
-                tint = androidx.compose.ui.graphics.Color(0xFF424242),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(14.dp)
             )
         }

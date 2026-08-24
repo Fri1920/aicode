@@ -484,7 +484,7 @@ fun McpServerEditDialog(
                     }
                 }
 
-                // ── Bottom Action Row (Save & Delete buttons) ──
+                // ── 底部保存按钮（删除在列表左滑）──
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()

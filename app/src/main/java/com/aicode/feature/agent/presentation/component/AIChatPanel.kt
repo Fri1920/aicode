@@ -192,7 +192,8 @@ fun AIChatPanel(
     var messageForMenu by remember { mutableStateOf<AgentUIMessage?>(null) }
     var editingMessage by remember { mutableStateOf<AgentUIMessage?>(null) }
     val listState = rememberLazyListState()
-    // 滚动方向追踪：仅向下滚动（回底部方向）时显示回底按钮；向上滚/停着不显示。
+    // 滚动方向追踪：记录最近一次滚动方向。向下滚后即使停住也保持显示回底按钮，
+    // 向上滚或已到底时隐藏（可见性条件见底部 ScrollToBottomButton）。
     var scrollingDown by remember { mutableStateOf(false) }
     var lastScrollPos by remember { mutableStateOf(0 to 0) }
     LaunchedEffect(listState) {
@@ -361,13 +362,15 @@ fun AIChatPanel(
                 }
             }
 
+            // 结果提示：全失败展示首个错误；有文件被上限截断或上传失败时用 partial 文案；全成功用 success 文案。
+            val skipped = uris.size - selected.size
             when {
-                successCount > 0 && failures.isEmpty() && uris.size <= remainingAttachmentSlots(pendingAttachments.size - successCount) ->
-                    Toast.makeText(context, uploadSuccessMessage(context, successCount), Toast.LENGTH_SHORT).show()
-                successCount > 0 ->
-                    Toast.makeText(context, partialUploadMessage(context, successCount), Toast.LENGTH_LONG).show()
-                failures.isNotEmpty() ->
+                successCount == 0 && failures.isNotEmpty() ->
                     Toast.makeText(context, failures.first(), Toast.LENGTH_LONG).show()
+                skipped > 0 || failures.isNotEmpty() ->
+                    Toast.makeText(context, partialUploadMessage(context, successCount), Toast.LENGTH_LONG).show()
+                else ->
+                    Toast.makeText(context, uploadSuccessMessage(context, successCount), Toast.LENGTH_SHORT).show()
             }
         }
     }
@@ -398,7 +401,7 @@ fun AIChatPanel(
             )
         }.getOrNull()
         if (uri == null) {
-            Toast.makeText(context, unreadableFileMessage(context), Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, context.getString(R.string.chat_camera_file_failed), Toast.LENGTH_SHORT).show()
             return
         }
         cameraPhotoUri = uri

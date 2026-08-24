@@ -46,6 +46,7 @@ import com.aicode.feature.agent.data.local.dao.RecentCallRecord
 import com.aicode.feature.agent.data.local.entity.LlmCallRecordEntity
 import com.aicode.feature.settings.presentation.TokenStatsPeriod
 import com.aicode.feature.settings.presentation.TokenStatsUiState
+import com.aicode.feature.agent.presentation.component.formatTokenCount
 import com.patrykandpatrick.vico.compose.cartesian.CartesianChartHost
 import com.patrykandpatrick.vico.compose.cartesian.axis.rememberBottom
 import com.patrykandpatrick.vico.compose.cartesian.axis.rememberStart
@@ -125,7 +126,7 @@ internal fun TokenStatsSection(
         ) {
             SummaryCard(
                 label = stringResource(R.string.settings_token_stats_total),
-                value = if (hasData) formatTokenCount(summary.inputTokens + summary.outputTokens) else "-",
+                value = if (hasData) formatTokenCount((summary.inputTokens + summary.outputTokens).toInt()) else "-",
                 modifier = Modifier.weight(1f)
             )
             SummaryCard(
@@ -262,14 +263,15 @@ private fun TokenTrendChart(trend: List<DayCallStats>, isHourly: Boolean) {
     )
     // y 轴：token 数用 k/M 单位展示，避免大数字拥挤
     val yAxisFormatter = remember {
-        CartesianValueFormatter { _, value, _ -> formatTokenCount(value.toLong()) }
+        CartesianValueFormatter { _, value, _ -> formatTokenCount(value.toLong().toInt()) }
     }
     // x 直接用真实 day/hour 序号（padTrend 已保证连续，差恒为 1，xStep 稳定），
     // formatter 对任意值都能格式化出标签，满足 Vico 2.4「formatter 不得返回空字符串」的约束
-    val xAxisFormatter = remember(trend, isHourly) {
+    val hourSuffix = stringResource(R.string.token_stats_hour_suffix)
+    val xAxisFormatter = remember(trend, isHourly, hourSuffix) {
         CartesianValueFormatter { _, value, _ ->
             if (isHourly) {
-                "${value.toLong() % 24}时"
+                "${value.toLong() % 24}$hourSuffix"
             } else {
                 SimpleDateFormat("M/d", Locale.getDefault())
                     .format(Date(value.toLong() * 86_400_000L + tzOffsetNow()))
@@ -382,7 +384,7 @@ private fun ProviderStatsRow(p: ProviderCallStats) {
             )
             Spacer(Modifier.width(Spacing.md))
             Text(
-                text = "↑${formatTokenCount(p.inputTokens)} ↓${formatTokenCount(p.outputTokens)}",
+                text = "↑${formatTokenCount(p.inputTokens.toInt())} ↓${formatTokenCount(p.outputTokens.toInt())}",
                 style = MaterialTheme.typography.bodySmall,
                 color = if (settingsLightMode()) Color(0xFF0F0F0F) else MaterialTheme.colorScheme.onSurface
             )
@@ -427,7 +429,7 @@ private fun ModelStatsRow(m: ModelCallStats) {
                 modifier = Modifier.weight(1f)
             )
             Text(
-                text = "↓${formatTokenCount(m.outputTokens)}",
+                text = "↓${formatTokenCount(m.outputTokens.toInt())}",
                 style = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.SemiBold,
                 color = if (settingsLightMode()) Color(0xFF0F0F0F) else MaterialTheme.colorScheme.onSurface
@@ -553,8 +555,9 @@ private fun TableCell(text: String, color: Color, width: Dp, fontWeight: FontWei
     )
 }
 
+/** 与对话页头部一致的 token 缩写格式（见 MarkdownContent.formatTokenCount）：1234 -> 1.2k。 */
 private fun formatCache(context: android.content.Context, cached: Long): String =
-    if (cached > 0) context.getString(R.string.settings_token_stats_cached, formatTokenCount(cached)) else ""
+    if (cached > 0) context.getString(R.string.settings_token_stats_cached, formatTokenCount(cached.toInt())) else ""
 
 private fun formatCallTime(epochMillis: Long): String =
     SimpleDateFormat("yyyy/M/d HH:mm", Locale.getDefault()).format(Date(epochMillis))
@@ -585,12 +588,4 @@ private fun formatDuration(ms: Double?): String {
     if (ms == null) return "-"
     return if (ms >= 1000) String.format(Locale.getDefault(), "%.1fs", ms / 1000)
     else "${ms.toInt()}ms"
-}
-
-/** 与对话页头部一致的 token 缩写格式：1234 -> 1.2k。 */
-private fun formatTokenCount(tokens: Long): String = when {
-    tokens >= 1_000_000 -> String.format(Locale.getDefault(), "%.1fM", tokens / 1_000_000.0)
-    tokens >= 10_000 -> String.format(Locale.getDefault(), "%.1fk", tokens / 1000.0)
-    tokens >= 1_000 -> String.format(Locale.getDefault(), "%.0fk", tokens / 1000.0)
-    else -> tokens.toString()
 }

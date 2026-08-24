@@ -131,7 +131,6 @@ internal fun ChatInputBar(
     val hasContent = value.isNotBlank() || pendingAttachments.isNotEmpty()
     val canSend = hasContent
     var showAttachmentSheet by remember { mutableStateOf(false) }
-    var showModelSheetFromBalance by remember { mutableStateOf(false) }
     val showSlashMenu = !isBusy && slashCommands.isNotEmpty() &&
         value.startsWith("/") && !value.contains("\n")
     val filteredCommands = if (showSlashMenu) {
@@ -397,20 +396,6 @@ internal fun ChatInputBar(
                 onTakePhoto()
             },
             onDismiss = { showAttachmentSheet = false }
-        )
-    }
-
-    if (showModelSheetFromBalance) {
-        ModelSheet(
-            providers = providers,
-            currentProviderId = activeProvider?.id ?: "",
-            currentModel = activeProvider?.effectiveModel ?: "",
-            modelMetadata = modelMetadata,
-            onSelect = { pId, model ->
-                onSelectModel(pId, model)
-                showModelSheetFromBalance = false
-            },
-            onDismiss = { showModelSheetFromBalance = false }
         )
     }
 }

@@ -178,7 +178,7 @@ internal fun McpServerRow(
 
     val typeText = if (server.isStdio) stringResource(R.string.mcp_type_stdio) else "HTTP"
     val infoText = when {
-        isConnected -> stringResource(R.string.mcp_tools_count, status?.toolCount ?: 0, status?.toolCount ?: 0)
+        isConnected -> stringResource(R.string.mcp_tools_count, status?.toolCount ?: 0)
         server.isStdio -> server.command.orEmpty().ifEmpty { "stdio" }
         else -> server.url.orEmpty().ifEmpty { "HTTP" }
     }

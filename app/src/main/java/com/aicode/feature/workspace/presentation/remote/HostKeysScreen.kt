@@ -1,6 +1,7 @@
 package com.aicode.feature.workspace.presentation.remote
 
 import android.net.Uri
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -69,6 +70,8 @@ fun HostKeysScreen(
     onNavigateBack: () -> Unit
 ) {
     var selectedTab by remember { mutableStateOf(0) }
+    // 系统返回键与顶栏返回箭头一致：回到远程服务器列表，而不是被外层设置页拦截直接跳回首页。
+    BackHandler { onNavigateBack() }
     var detailLoginKey by remember { mutableStateOf<SshLoginKey?>(null) }
     var detailHostAddress by remember { mutableStateOf<String?>(null) }
     val keysScrollState = rememberScrollState()

@@ -323,7 +323,7 @@ internal fun isUpToDate(latest: String, current: String): Boolean {
  * 规则：
  * 1. 优先比较主.次.修（如 1.7.0 > 1.6.9）
  * 2. 主次修相同时，正式版 > 预发布版（1.7.0 > 1.7.0-rc1 > 1.7.0-dev）
- * 3. 均为预发布版时，比较修饰串（rc2 > rc1）
+ * 3. 均为预发布版时，同标识比序号（rc2 > rc1、dev.10 > dev.9），不同标识按字典序
  */
 internal fun compareVersions(v1: String, v2: String): Int {
     if (v1 == v2) return 0
@@ -346,7 +346,22 @@ internal fun compareVersions(v1: String, v2: String): Int {
     if (pre1.isEmpty() && pre2.isNotEmpty()) return 1
     if (pre1.isNotEmpty() && pre2.isEmpty()) return -1
 
-    return pre1.compareTo(pre2)
+    return comparePreRelease(pre1, pre2)
+}
+
+private val PRE_RELEASE_TOKEN = Regex("^(\\D*?)(\\d+)$")
+
+/**
+ * 预发布段比较：「同标识 + 序号」按数字比（rc10 > rc9），避免字典序把 rc10 排在 rc9 前；
+ * 标识不同或不含尾随数字时退回字典序。
+ */
+private fun comparePreRelease(a: String, b: String): Int {
+    val ma = PRE_RELEASE_TOKEN.matchEntire(a)
+    val mb = PRE_RELEASE_TOKEN.matchEntire(b)
+    if (ma != null && mb != null && ma.groupValues[1] == mb.groupValues[1]) {
+        return ma.groupValues[2].toInt().compareTo(mb.groupValues[2].toInt())
+    }
+    return a.compareTo(b)
 }
 
 internal fun splitVersion(v: String): Pair<String, String> {

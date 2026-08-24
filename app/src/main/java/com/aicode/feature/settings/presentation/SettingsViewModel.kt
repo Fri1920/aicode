@@ -1310,7 +1310,10 @@ class SettingsViewModel @Inject constructor(
                     _balanceTestState.value = ProviderBalanceState.Success(result)
                 }
                 .onFailure { error ->
-                    _balanceTestState.value = ProviderBalanceState.Error(error.message ?: "执行失败", error.localizedMessage ?: "")
+                    _balanceTestState.value = ProviderBalanceState.Error(
+                        error.message ?: context.getString(R.string.balance_exec_failed),
+                        error.localizedMessage ?: ""
+                    )
                 }
         }
     }
@@ -1343,7 +1346,9 @@ class SettingsViewModel @Inject constructor(
                     _providerBalances.update { it + (provider.id to ProviderBalanceState.Success(result)) }
                 }
                 .onFailure { error ->
-                    _providerBalances.update { it + (provider.id to ProviderBalanceState.Error(error.message ?: "查询失败")) }
+                    // 函数参数 context: DashboardContext 遮蔽了类的 ApplicationContext；
+                    // 且此处位于 launch{} 内，this 已变为 CoroutineScope，必须用类标签限定
+                    _providerBalances.update { it + (provider.id to ProviderBalanceState.Error(error.message ?: this@SettingsViewModel.context.getString(R.string.balance_query_failed))) }
                 }
         }
     }

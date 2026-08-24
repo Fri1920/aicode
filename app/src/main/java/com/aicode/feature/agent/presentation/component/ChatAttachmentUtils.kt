@@ -130,9 +130,6 @@ internal fun selectedAttachments(
 internal fun hasAttachmentSlots(currentCount: Int): Boolean =
     currentCount < MAX_PENDING_ATTACHMENTS
 
-internal fun remainingAttachmentSlots(currentCount: Int): Int =
-    (MAX_PENDING_ATTACHMENTS - currentCount).coerceAtLeast(0)
-
 private fun imageLimitError(context: Context): String =
     context.getString(R.string.chat_image_too_large, formatBytes(MAX_IMAGE_UPLOAD_BYTES))
 

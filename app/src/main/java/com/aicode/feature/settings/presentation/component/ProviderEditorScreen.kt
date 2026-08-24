@@ -1455,7 +1455,9 @@ private fun BalanceTestResultBox(state: ProviderBalanceState) {
 
                 if (state.result.rawOutput.isNotBlank()) {
                     Text(
-                        text = if (showRawOutput) "隐藏原始输出" else "查看原始输出",
+                        text = stringResource(
+                            if (showRawOutput) R.string.provider_balance_hide_raw else R.string.provider_balance_show_raw
+                        ),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.clickable { showRawOutput = !showRawOutput }
@@ -1492,7 +1494,7 @@ private fun formatIntervalLabel(minutes: Int): String = when (minutes) {
     10 -> stringResource(R.string.provider_balance_interval_10m)
     15 -> stringResource(R.string.provider_balance_interval_15m)
     30 -> stringResource(R.string.provider_balance_interval_30m)
-    else -> "$minutes 分钟"
+    else -> stringResource(R.string.provider_balance_interval_minutes, minutes)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
