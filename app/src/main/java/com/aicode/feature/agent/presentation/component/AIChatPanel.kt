@@ -237,6 +237,12 @@ fun AIChatPanel(
 
     // 余额面板展开状态：展开时叠加面板联动折叠，避免输入框被双重顶开
     var balanceExpanded by rememberSaveable { mutableStateOf(false) }
+    // ProviderBalanceBar 仅在有余额脚本的 provider 下渲染（见 ChatInputBar）。无该栏时
+    // balanceExpanded 可能残留 true：面板曾展开后随 provider 切换/脚本移除而卸载，LaunchedEffect
+    // 上报链路中断无法复位，直接拿它做 forceCollapse 会把授权/询问/计划面板永久压成收起态。
+    // 故叠加可见性，只在余额面板当前可见且展开时才折叠叠加面板。
+    val balanceBarVisible = activeProvider?.balanceScriptPath?.isNotBlank() == true
+    val balanceCollapseActive = balanceExpanded && balanceBarVisible
 
     fun buildDashboardContext(
         lastInput: Int = 0,
@@ -736,7 +742,7 @@ fun AIChatPanel(
                     ToolPermissionPanel(
                         request = request,
                         onChoice = { choice -> viewModel.resolveToolPermission(request.id, choice) },
-                        forceCollapse = balanceExpanded
+                        forceCollapse = balanceCollapseActive
                     )
                 }
             }
@@ -751,7 +757,7 @@ fun AIChatPanel(
                         question = question,
                         onConfirm = { answer -> viewModel.resolveUserQuestion(question.id, answer) },
                         onSkip = { viewModel.resolveUserQuestion(question.id, UserQuestionAnswer(emptyList())) },
-                        forceCollapse = balanceExpanded
+                        forceCollapse = balanceCollapseActive
                     )
                 }
             }
@@ -767,7 +773,7 @@ fun AIChatPanel(
                         state = state,
                         onApprove = { viewModel.approvePlanAndBuild() },
                         onRefine = { viewModel.refinePlan() },
-                        forceCollapse = balanceExpanded
+                        forceCollapse = balanceCollapseActive
                     )
                 }
             }
