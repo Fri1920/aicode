@@ -126,7 +126,11 @@ fun FloatingTabBar(
                 .padding(horizontal = 8.dp, vertical = 3.dp)
                 .pointerInput(items) {
                     detectDragGesturesAfterLongPress(
-                        onDragStart = { start -> dragX = start.x },
+                        onDragStart = { start ->
+                            // 以手指为中心定位椭圆左缘，与 onDrag 的 (x - 半宽) 口径一致，避免起始瞬间跳动
+                            val w = tabBounds.values.firstOrNull()?.width ?: 0f
+                            dragX = start.x - w / 2f
+                        },
                         onDrag = { change, _ ->
                             change.consume()
                             val x = change.position.x

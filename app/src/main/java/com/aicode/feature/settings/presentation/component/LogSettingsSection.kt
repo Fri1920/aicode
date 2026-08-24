@@ -543,7 +543,7 @@ private fun LogLevelSheet(
                 modifier = Modifier.padding(top = Spacing.xs)
             )
             Spacer(Modifier.height(Spacing.sm))
-            LogLevel.values().forEach { level ->
+            LogLevel.entries.forEach { level ->
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()

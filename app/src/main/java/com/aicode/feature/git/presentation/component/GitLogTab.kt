@@ -33,6 +33,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -684,29 +685,20 @@ private fun CommitDetailSheet(
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f)
                 )
-                IconButton(onClick = {
+                // 文本按钮而非两个相同图标：短/完整哈希一眼可辨
+                TextButton(onClick = {
                     scope.launch {
                         clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("commit-short", commit.shortHash)))
                     }
                 }) {
-                    Icon(
-                        FeatherIcons.Copy,
-                        contentDescription = stringResource(R.string.git_copy_short_hash),
-                        modifier = Modifier.size(16.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    Text(stringResource(R.string.git_copy_short_hash), style = MaterialTheme.typography.labelMedium)
                 }
-                IconButton(onClick = {
+                TextButton(onClick = {
                     scope.launch {
                         clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("commit-full", commit.hash)))
                     }
                 }) {
-                    Icon(
-                        FeatherIcons.Copy,
-                        contentDescription = stringResource(R.string.git_copy_full_hash),
-                        modifier = Modifier.size(16.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    Text(stringResource(R.string.git_copy_full_hash), style = MaterialTheme.typography.labelMedium)
                 }
             }
             if (commit.isMerge) {

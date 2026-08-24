@@ -332,7 +332,7 @@ fun ProviderEditorScreen(
                                     text = providerTypeLabel(type),
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = if (MaterialTheme.colorScheme.background.luminance() > 0.5f) {
-                                        Color(0xFF8E9094)
+                                        Color(0xFF8E8E93)
                                     } else {
                                         MaterialTheme.colorScheme.onSurfaceVariant
                                     }

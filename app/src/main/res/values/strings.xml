@@ -164,7 +164,8 @@
     <string name="common_image_preview">图片预览</string>
     <string name="common_expand">展开</string>
     <string name="common_workspace">工作区</string>
-    <string name="common_tool">工具</string>    <string name="common_collapse">折叠</string>
+    <string name="common_tool">工具</string>
+    <string name="common_collapse">折叠</string>
     <string name="common_collapse_action">收起</string>
     <string name="common_reset">重置</string>
     <string name="chat_new_session">新建会话</string>
@@ -508,7 +509,8 @@
     <string name="git_tab_branches">分支</string>
     <string name="git_tab_commits">提交</string>
     <string name="git_computing_diff">正在计算差异...</string>
-    <string name="git_clean_with_changes">工作区干净，无改动</string>
+    <string name="git_status_clean">工作区干净，无改动</string>
+    <string name="git_commit_needs_identity">尚未配置提交署名，请在「凭据与署名」页填写用户名和邮箱</string>
     <string name="git_staged_count">已暂存 (%1$s)</string>
     <string name="git_unstage">取消暂存</string>
     <string name="git_modified_count">已修改 (%1$s)</string>
@@ -891,6 +893,7 @@
     <!-- Web Search Result -->
     <string name="web_search_title">网络搜索</string>
     <string name="web_search_results_count">找到 %1$s 条结果</string>
+    <string name="web_search_warning">警告：%1$s</string>
 
     <!-- Workspace Picker -->
     <string name="workspace_select">选择工作区</string>

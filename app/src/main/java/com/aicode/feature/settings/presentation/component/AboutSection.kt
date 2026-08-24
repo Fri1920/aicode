@@ -108,7 +108,7 @@ internal fun AboutSection(
                     Text(
                         text = "v${appInfo.name}",
                         style = MaterialTheme.typography.bodyMedium,
-                        color = if (settingsLightMode()) Color(0xFF8E9094) else MaterialTheme.colorScheme.onSurfaceVariant
+                        color = if (settingsLightMode()) Color(0xFF8E8E93) else MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             )
@@ -142,7 +142,7 @@ internal fun AboutSection(
                             }
                         ),
                         style = MaterialTheme.typography.bodyMedium,
-                        color = if (settingsLightMode()) Color(0xFF8E9094) else MaterialTheme.colorScheme.onSurfaceVariant
+                        color = if (settingsLightMode()) Color(0xFF8E8E93) else MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             )

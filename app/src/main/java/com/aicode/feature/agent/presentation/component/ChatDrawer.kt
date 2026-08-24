@@ -290,12 +290,17 @@ private fun SessionListTab(
     onLongClick: (ChatSession) -> Unit
 ) {
     if (sessions.isEmpty()) {
-        Text(
-            stringResource(R.string.chat_no_sessions_hint),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(horizontal = Spacing.md, vertical = Spacing.md)
-        )
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                stringResource(R.string.chat_no_sessions_hint),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = Spacing.md)
+            )
+        }
         return
     }
     val groups = remember(sessions) {
@@ -367,6 +372,9 @@ private fun SubAgentListTab(
         items(subSessions, key = { it.id }) { session ->
             val state = agentStates[session.id]
             val isExecuting = state is AgentUIState.Loading || state is AgentUIState.Streaming
+            if (session != subSessions.first()) {
+                SettingsDivider()
+            }
             ChatSessionRow(
                 session = session,
                 selected = session.id == currentSessionId,
@@ -375,7 +383,6 @@ private fun SubAgentListTab(
                 onClick = { onSelect(session) },
                 onLongClick = { onLongClick(session) }
             )
-            SettingsDivider()
         }
     }
 }

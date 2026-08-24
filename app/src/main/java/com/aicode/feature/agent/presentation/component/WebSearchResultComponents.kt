@@ -131,6 +131,16 @@ internal fun WebSearchResultCard(result: ParsedWebSearchResult) {
         verticalArrangement = Arrangement.spacedBy(Spacing.sm)
     ) {
         WebSearchSummary(result)
+        // 搜索工具返回的警告信息（如部分源超时/被限流），不展示会被静默吞掉
+        result.warnings?.let { warning ->
+            Text(
+                text = stringResource(R.string.web_search_warning, warning),
+                color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.bodySmall,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
         result.results.forEachIndexed { index, item ->
             WebSearchResultItem(index = index + 1, item = item)
         }

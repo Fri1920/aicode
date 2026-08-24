@@ -155,6 +155,7 @@ fun SyncSettingsSheet(
                     onUseGitIgnoreChange(editUseGitIgnore)
                     onMaxSyncBatchSizeChange(maxBatchSizeText.toIntOrNull() ?: 50)
                     android.widget.Toast.makeText(context, context.getString(R.string.sync_saved), android.widget.Toast.LENGTH_SHORT).show()
+                    onDismiss()
                 },
                 modifier = Modifier
                     .fillMaxWidth()

@@ -57,8 +57,8 @@ import compose.icons.feathericons.ChevronDown
 import compose.icons.feathericons.ChevronUp
 
 
-/** 「其他」选项的固定 label，不与 AI 传入的选项重复。 */
-private const val OTHER_LABEL = "Other"
+/** 「其他」选项在选中集合内的内部哨兵：用 AI 不可能传出的控制字符前缀，避免与预设选项 label 撞车。 */
+private const val OTHER_SENTINEL = "\u0000__other__"
 
 /**
  * AI 向用户提问的面板：展示 1-4 个结构化问题，每个带 2-4 个预设选项 + 一个「其他」自由输入选项。
@@ -178,10 +178,10 @@ fun AskUserQuestionPanel(
                             onClick = {
                                 val answers = question.questions.mapIndexed { i, q ->
                                     val sel = selectedMap[i] ?: emptyList<String>()
-                                    val custom = customTexts[i]?.takeIf { it.isNotBlank() && OTHER_LABEL in sel }
+                                    val custom = customTexts[i]?.takeIf { it.isNotBlank() && OTHER_SENTINEL in sel }
                                     SingleAnswer(
                                         question = q.question,
-                                        selected = sel.filter { it != OTHER_LABEL },
+                                        selected = sel.filter { it != OTHER_SENTINEL },
                                         customText = custom
                                     )
                                 }
@@ -236,11 +236,11 @@ private fun QuestionCard(
 
         Spacer(Modifier.height(Spacing.sm))
 
-        // 选项列表
-        val allOptions = item.options.map { it.label } + OTHER_LABEL
+        // 选项列表：预设选项 + 追加的「其他」自由输入项（内部用哨兵标识，避免与 AI 传入的同名选项冲突）
+        val allOptions = item.options.map { it.label } + OTHER_SENTINEL
 
         allOptions.forEachIndexed { optIdx, label ->
-            val isOther = label == OTHER_LABEL
+            val isOther = label == OTHER_SENTINEL
             val isSelected = label in selected
             val description = if (!isOther) {
                 item.options.getOrNull(optIdx)?.description ?: ""

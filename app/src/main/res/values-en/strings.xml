@@ -164,7 +164,8 @@
     <string name="common_image_preview">Image Preview</string>
     <string name="common_expand">Expand</string>
     <string name="common_workspace">Workspace</string>
-    <string name="common_tool">Tool</string>    <string name="common_collapse">Collapse</string>
+    <string name="common_tool">Tool</string>
+    <string name="common_collapse">Collapse</string>
     <string name="common_reset">Reset</string>
     <string name="common_collapse_action">Collapse</string>
     <string name="chat_new_session">New Session</string>
@@ -508,7 +509,8 @@
     <string name="git_tab_branches">Branches</string>
     <string name="git_tab_commits">Commits</string>
     <string name="git_computing_diff">Computing diff...</string>
-    <string name="git_clean_with_changes">Working tree clean, no changes</string>
+    <string name="git_status_clean">Working tree clean, no changes</string>
+    <string name="git_commit_needs_identity">No commit identity configured. Set your name and email in “Credentials &amp; Identity”.</string>
     <string name="git_staged_count">Staged (%1$s)</string>
     <string name="git_unstage">Unstage</string>
     <string name="git_modified_count">Modified (%1$s)</string>
@@ -892,6 +894,7 @@
     <!-- Web Search Result -->
     <string name="web_search_title">Web Search</string>
     <string name="web_search_results_count">%1$s results found</string>
+    <string name="web_search_warning">Warning: %1$s</string>
 
     <!-- Workspace Picker -->
     <string name="workspace_select">Select Workspace</string>

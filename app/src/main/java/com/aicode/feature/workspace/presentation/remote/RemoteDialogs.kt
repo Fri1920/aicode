@@ -221,6 +221,7 @@ fun AddRemoteConnectionDialog(
     var username by remember(initialConnection) { mutableStateOf(initialConnection?.username ?: "") }
     var password by remember(initialConnection) { mutableStateOf(initialConnection?.password ?: "") }
     var passwordVisible by remember { mutableStateOf(false) }
+    var passphraseVisible by remember { mutableStateOf(false) }
     var protocol by remember(initialConnection) { mutableStateOf(initialConnection?.protocol ?: RemoteProtocol.SFTP) }
     var isTesting by remember { mutableStateOf(false) }
     var authMethod by remember(initialConnection) { mutableStateOf(if (initialConnection?.authType == "key") 1 else 0) }
@@ -397,10 +398,10 @@ fun AddRemoteConnectionDialog(
                                 onValueChange = { passphrase = it },
                                 label = { Text(stringResource(R.string.remote_key_passphrase)) },
                                 modifier = Modifier.fillMaxWidth(),
-                                visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                                visualTransformation = if (passphraseVisible) VisualTransformation.None else PasswordVisualTransformation(),
                                 trailingIcon = {
-                                    val image = if (passwordVisible) FeatherIcons.Eye else FeatherIcons.EyeOff
-                                    IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                                    val image = if (passphraseVisible) FeatherIcons.Eye else FeatherIcons.EyeOff
+                                    IconButton(onClick = { passphraseVisible = !passphraseVisible }) {
                                         Icon(image, stringResource(R.string.remote_toggle_password), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                                     }
                                 }

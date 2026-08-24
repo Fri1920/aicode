@@ -80,7 +80,7 @@ internal fun BackupSection(viewModel: BackupViewModel) {
                 if (os != null) {
                     viewModel.export(pw, opts, os)
                 } else {
-                    Toast.makeText(context, context.getString(R.string.backup_write_failed, ""), Toast.LENGTH_LONG).show()
+                    Toast.makeText(context, context.getString(R.string.backup_write_failed, uri.toString()), Toast.LENGTH_LONG).show()
                     viewModel.reset()
                 }
             }

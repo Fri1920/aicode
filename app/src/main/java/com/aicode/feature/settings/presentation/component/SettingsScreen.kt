@@ -760,7 +760,7 @@ internal fun SettingsMenu(
                         text = stringResource(themeMode.labelRes),
                         style = MaterialTheme.typography.bodyMedium,
                         color = if (MaterialTheme.colorScheme.background.luminance() > 0.5f) {
-                            Color(0xFF8E9094)
+                            Color(0xFF8E8E93)
                         } else {
                             MaterialTheme.colorScheme.onSurfaceVariant
                         }
@@ -778,7 +778,7 @@ internal fun SettingsMenu(
                         else stringResource(R.string.settings_background_image_none),
                         style = MaterialTheme.typography.bodyMedium,
                         color = if (MaterialTheme.colorScheme.background.luminance() > 0.5f) {
-                            Color(0xFF8E9094)
+                            Color(0xFF8E8E93)
                         } else {
                             MaterialTheme.colorScheme.onSurfaceVariant
                         }
@@ -795,7 +795,7 @@ internal fun SettingsMenu(
                         text = currentLanguageDisplayName,
                         style = MaterialTheme.typography.bodyMedium,
                         color = if (MaterialTheme.colorScheme.background.luminance() > 0.5f) {
-                            Color(0xFF8E9094)
+                            Color(0xFF8E8E93)
                         } else {
                             MaterialTheme.colorScheme.onSurfaceVariant
                         }

@@ -126,45 +126,47 @@ fun McpServerEditDialog(
                 .fillMaxWidth()
                 .heightIn(max = screenHeight * 0.88f)
         ) {
-                // ── Top Bar ──
-                Row(
+                // ── Top Bar：标题绝对居中，右侧按钮浮动，避免按钮数量不同导致标题偏移 ──
+                Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 10.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                        .padding(horizontal = 16.dp, vertical = 10.dp)
                 ) {
-                    Spacer(modifier = Modifier.size(36.dp))
                     Text(
                         text = if (initial == null) stringResource(R.string.mcp_add) else stringResource(R.string.mcp_edit),
                         style = MaterialTheme.typography.titleMedium.copy(
                             fontWeight = FontWeight.Bold,
                             fontSize = 16.sp
                         ),
-                        modifier = Modifier.weight(1f),
-                        textAlign = TextAlign.Center,
+                        modifier = Modifier.align(Alignment.Center),
                         color = MaterialTheme.colorScheme.onSurface
                     )
-                    if (onOpenLogs != null) {
+                    Row(
+                        modifier = Modifier.align(Alignment.CenterEnd),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        if (onOpenLogs != null) {
+                            IconButton(
+                                onClick = onOpenLogs,
+                                modifier = Modifier.size(36.dp)
+                            ) {
+                                Icon(
+                                    FeatherIcons.FileText,
+                                    contentDescription = stringResource(R.string.mcp_view_logs),
+                                    tint = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+                        }
                         IconButton(
-                            onClick = onOpenLogs,
+                            onClick = onRefreshTools,
                             modifier = Modifier.size(36.dp)
                         ) {
                             Icon(
-                                FeatherIcons.FileText,
-                                contentDescription = stringResource(R.string.mcp_view_logs),
+                                FeatherIcons.RefreshCw,
+                                contentDescription = stringResource(R.string.mcp_refresh_tools),
                                 tint = MaterialTheme.colorScheme.onSurface
                             )
                         }
-                    }
-                    IconButton(
-                        onClick = onRefreshTools,
-                        modifier = Modifier.size(36.dp)
-                    ) {
-                        Icon(
-                            FeatherIcons.RefreshCw,
-                            contentDescription = stringResource(R.string.mcp_refresh_tools),
-                            tint = MaterialTheme.colorScheme.onSurface
-                        )
                     }
                 }
 

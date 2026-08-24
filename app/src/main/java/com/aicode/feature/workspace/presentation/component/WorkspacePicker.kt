@@ -64,11 +64,8 @@ fun WorkspaceChip(
     onSwitchConfirmed: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    val workspaces by viewModel.workspaces.collectAsStateWithLifecycle()
     val current by viewModel.current.collectAsStateWithLifecycle()
-
     var showSheet by remember { mutableStateOf(false) }
-    var pendingWorkspaceSelect by remember { mutableStateOf<Workspace?>(null) }
 
     Row(
         modifier = modifier
@@ -100,49 +97,18 @@ fun WorkspaceChip(
         )
     }
 
-    if (showSheet) {
-        WorkspaceSheet(
-            workspaces = workspaces,
-            current = current,
-            onSelect = {
-                if (hasRunningSessions()) {
-                    pendingWorkspaceSelect = it
-                } else {
-                    onSwitchConfirmed()
-                    viewModel.selectWorkspace(it.name)
-                    showSheet = false
-                }
-            },
-            onCreate = { viewModel.createWorkspace(it) },
-            onDelete = { viewModel.deleteWorkspace(it.name) },
-            onDismiss = { showSheet = false }
-        )
-    }
-
-    pendingWorkspaceSelect?.let { ws ->
-        AlertDialog(
-            onDismissRequest = { pendingWorkspaceSelect = null },
-            title = { Text(stringResource(R.string.workspace_switch)) },
-            text = { Text(stringResource(R.string.workspace_switch_confirm)) },
-            confirmButton = {
-                TextButton(onClick = {
-                    onSwitchConfirmed()
-                    viewModel.selectWorkspace(ws.name)
-                    pendingWorkspaceSelect = null
-                    showSheet = false
-                }) { Text(stringResource(R.string.workspace_confirm)) }
-            },
-            dismissButton = {
-                TextButton(onClick = { pendingWorkspaceSelect = null }) { Text(stringResource(R.string.common_cancel)) }
-            }
-        )
-    }
+    WorkspaceSelectionHost(
+        visible = showSheet,
+        onDismiss = { showSheet = false },
+        viewModel = viewModel,
+        hasRunningSessions = hasRunningSessions,
+        onSwitchConfirmed = onSwitchConfirmed
+    )
 }
 
 /**
  * 顶栏的工作区选择图标按钮：点击弹出选择/新建/删除面板。
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun WorkspaceIconButton(
     viewModel: WorkspaceViewModel,
@@ -151,11 +117,7 @@ fun WorkspaceIconButton(
     modifier: Modifier = Modifier,
     iconSize: Dp = 24.dp
 ) {
-    val workspaces by viewModel.workspaces.collectAsStateWithLifecycle()
-    val current by viewModel.current.collectAsStateWithLifecycle()
-
     var showSheet by remember { mutableStateOf(false) }
-    var pendingWorkspaceSelect by remember { mutableStateOf<Workspace?>(null) }
 
     IconButton(
         onClick = { showSheet = true },
@@ -179,22 +141,50 @@ fun WorkspaceIconButton(
         }
     }
 
-    if (showSheet) {
+    WorkspaceSelectionHost(
+        visible = showSheet,
+        onDismiss = { showSheet = false },
+        viewModel = viewModel,
+        hasRunningSessions = hasRunningSessions,
+        onSwitchConfirmed = onSwitchConfirmed
+    )
+}
+
+/**
+ * 工作区选择面板 + 切换确认弹窗的公共宿主：Chip 与 IconButton 两个入口共用，
+ * 有会话运行时切换需先确认（确认回调由调用方执行停止逻辑）。
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun WorkspaceSelectionHost(
+    visible: Boolean,
+    onDismiss: () -> Unit,
+    viewModel: WorkspaceViewModel,
+    hasRunningSessions: () -> Boolean,
+    onSwitchConfirmed: () -> Unit
+) {
+    val workspaces by viewModel.workspaces.collectAsStateWithLifecycle()
+    val current by viewModel.current.collectAsStateWithLifecycle()
+    var pendingWorkspaceSelect by remember { mutableStateOf<Workspace?>(null) }
+
+    fun select(ws: Workspace) {
+        if (hasRunningSessions()) {
+            pendingWorkspaceSelect = ws
+        } else {
+            onSwitchConfirmed()
+            viewModel.selectWorkspace(ws.name)
+            onDismiss()
+        }
+    }
+
+    if (visible) {
         WorkspaceSheet(
             workspaces = workspaces,
             current = current,
-            onSelect = {
-                if (hasRunningSessions()) {
-                    pendingWorkspaceSelect = it
-                } else {
-                    onSwitchConfirmed()
-                    viewModel.selectWorkspace(it.name)
-                    showSheet = false
-                }
-            },
+            onSelect = ::select,
             onCreate = { viewModel.createWorkspace(it) },
             onDelete = { viewModel.deleteWorkspace(it.name) },
-            onDismiss = { showSheet = false }
+            onDismiss = onDismiss
         )
     }
 
@@ -208,7 +198,7 @@ fun WorkspaceIconButton(
                     onSwitchConfirmed()
                     viewModel.selectWorkspace(ws.name)
                     pendingWorkspaceSelect = null
-                    showSheet = false
+                    onDismiss()
                 }) { Text(stringResource(R.string.workspace_confirm)) }
             },
             dismissButton = {

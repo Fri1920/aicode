@@ -109,6 +109,16 @@ internal fun StatusTab(
             Spacer(Modifier.width(Spacing.xs))
             Text(stringResource(R.string.git_commit_changes), maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
+        if (!hasIdentity) {
+            // 禁用原因提示：用户不知道按钮为什么不可点时给出指引
+            Text(
+                text = stringResource(R.string.git_commit_needs_identity),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.fillMaxWidth(),
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+            )
+        }
 
         // 次级操作：暂存全部 / 拉取 / 推送。
         Row(
@@ -139,7 +149,7 @@ internal fun StatusTab(
         }
 
         if (clean) {
-            EmptyState(stringResource(R.string.git_clean_with_changes))
+            EmptyState(stringResource(R.string.git_status_clean))
         } else {
             val ss = s ?: return@Column
             if (ss.staged.isNotEmpty()) {

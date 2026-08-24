@@ -1179,7 +1179,8 @@ class AIAgentViewModel @Inject constructor(
     /** /status —— 以 Markdown 表格作为 AI 气泡输出当前会话状态。 */
     override fun showSessionStatus() {
         val sid = _currentSessionId.value ?: return
-        val session = sessions.value.find { it.id == sid } ?: return
+        // 用 currentSessionState 而非 sessions（仅含根会话）：子代理会话内也能正常输出状态
+        val session = currentSessionState.value?.takeIf { it.id == sid } ?: return
         val msgCount = messagesState.value.messages.size
         val model = session.model ?: sessionProviderModelDisplay(sid)
         val table = buildString {
