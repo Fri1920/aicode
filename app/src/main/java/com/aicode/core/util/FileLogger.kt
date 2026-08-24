@@ -38,6 +38,8 @@ object FileLogger {
     private const val TAG = "FileLogger"
     private const val MAX_AGE_DAYS = 7
     private const val MAX_FILE_BYTES = 5 * 1024 * 1024 // 单个日志文件上限 5MB（VERBOSE 下增长较快）
+    /** 缓冲写盘阈值（字符）：达到后 flush 一次，避免每行日志都打开/关闭文件。ERROR 级恒强制 flush。 */
+    private const val FLUSH_THRESHOLD_CHARS = 16 * 1024
 
     private val ioExecutor = Executors.newSingleThreadExecutor { r ->
         Thread(r, "file-logger").apply { isDaemon = true }
@@ -48,7 +50,12 @@ object FileLogger {
     @Volatile
     private var logDir: File? = null
 
-    /** 当前最低记录等级；低于它的日志一律跳过。默认 VERBOSE（开发期全量）。 */
+    // 以下字段仅由 ioExecutor 单线程访问，无需同步。
+    private var writer: java.io.BufferedWriter? = null
+    private var writerDate: String? = null
+    private var pendingChars = 0
+
+    /** 当前最低记录等级；低于它的日志一律跳过。默认按构建类型：debug=VERBOSE（开发期全量），release=INFO。 */
     @Volatile
     var minLevel: LogLevel = LogLevel.VERBOSE
         private set
@@ -71,6 +78,12 @@ object FileLogger {
         val base = context.getExternalFilesDir(null) ?: context.filesDir
         val dir = File(base, "logs").apply { mkdirs() }
         logDir = dir
+        // 默认等级按构建类型兜底：release 不开全量 VERBOSE（AI 高频工具日志会持续刷盘）。
+        // 仅当从未设置过时生效——用户/持久化设置随后经 setMinLevel 覆盖，永远优先。
+        val debuggable = (context.applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) != 0
+        if (minLevel == LogLevel.VERBOSE) {
+            minLevel = if (debuggable) LogLevel.VERBOSE else LogLevel.INFO
+        }
         ioExecutor.execute { cleanupOldLogs(dir) }
         i(TAG, "FileLogger 初始化完成，日志目录: ${dir.absolutePath}")
     }
@@ -128,16 +141,44 @@ object FileLogger {
         }
         ioExecutor.execute {
             runCatching {
-                val file = File(dir, "log-${fileNameFormat.format(now)}.txt")
-                if (file.length() > MAX_FILE_BYTES) {
-                    // 超过上限则截断重开，避免单文件无限增长
+                val date = fileNameFormat.format(now)
+                val file = File(dir, "log-$date.txt")
+                // 跨天换文件；单文件超上限则重置重开。writer 仅本线程访问。
+                if (writerDate != date) {
+                    writer?.close()
+                    writer = file.bufferedWriter()
+                    writerDate = date
+                    pendingChars = 0
+                } else if (file.length() > MAX_FILE_BYTES) {
+                    writer?.close()
                     file.writeText("--- 日志文件超过 ${MAX_FILE_BYTES / 1024 / 1024}MB 已重置 ---\n")
+                    writer = file.bufferedWriter()
+                    pendingChars = 0
                 }
-                file.appendText(line)
+                writer?.append(line)
+                pendingChars += line.length
+                // 批量 flush：攒够阈值或 ERROR 级（最需要落盘）立即落。
+                if (pendingChars >= FLUSH_THRESHOLD_CHARS || level == "ERROR") {
+                    writer?.flush()
+                    pendingChars = 0
+                }
             }.onFailure {
                 Log.e(TAG, "写入日志失败", it)
             }
         }
+    }
+
+    /**
+     * 同步 flush 缓冲日志（崩溃处理器等紧急路径调用）。
+     * 提交到 ioExecutor 队列尾部执行，保证此前排队的追加都已落盘；调用方线程最多阻塞 2s。
+     */
+    fun flushSync() {
+        val latch = java.util.concurrent.CountDownLatch(1)
+        ioExecutor.execute {
+            runCatching { writer?.flush() }
+            latch.countDown()
+        }
+        runCatching { latch.await(2, java.util.concurrent.TimeUnit.SECONDS) }
     }
 
     private fun stackTraceToString(throwable: Throwable): String {

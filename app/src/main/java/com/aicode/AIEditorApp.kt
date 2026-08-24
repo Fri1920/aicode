@@ -288,6 +288,8 @@ class AIEditorApp : Application(), Configuration.Provider {
         val previous = Thread.getDefaultUncaughtExceptionHandler()
         Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
             FileLogger.e("CRASH", "线程 ${thread.name} 未捕获异常", throwable)
+            // 崩溃前同步 flush 缓冲日志，避免最后一段（含本行错误）留在内存中丢失。
+            FileLogger.flushSync()
             val prefs = getSharedPreferences(CRASH_PREFS, MODE_PRIVATE)
             if (prefs.getBoolean(KEY_CRASH_UI_SHOWING, false)) {
                 // 错误页自身崩溃：交回系统默认处理器，避免无限重启循环
