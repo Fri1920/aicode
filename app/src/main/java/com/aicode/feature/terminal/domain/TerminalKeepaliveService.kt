@@ -165,6 +165,7 @@ class TerminalKeepaliveService : Service() {
         }
 
         /** 判断保活服务当前是否在运行。WorkManager 兜底拉起前先探测，避免反复 startService。 */
+        @Suppress("DEPRECATION")
         fun isRunning(context: Context): Boolean {
             val am = context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
             val serviceName = TerminalKeepaliveService::class.java.name
