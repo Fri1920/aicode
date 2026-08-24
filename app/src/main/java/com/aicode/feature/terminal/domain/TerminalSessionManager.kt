@@ -55,10 +55,11 @@ class TerminalSessionManager @Inject constructor(
         const val DEFAULT_ROWS = 24
         /** 命令打印 `[command exited: N]` 后等待正常 onFinished 回调的缓冲（毫秒）。 */
         const val EXIT_MARKER_GRACE_MS = 1_500L
-        /** 完成兜底监控轮询屏幕缓冲的间隔（毫秒）。 */
-        const val EXIT_MARKER_POLL_MS = 200L
-        /** 匹配命令退出标记 `[command exited: N]`。 */
-        val EXIT_MARKER_REGEX = Regex("\\[command exited: (\\d+)]")
+        /** 完成兜底监控轮询屏幕缓冲的间隔（毫秒）。旧值 200ms 每轮都会构建 2000 行 transcript 字符串，
+         *  长命令（构建/安装）期间持续占 CPU；间隔放宽到 1s 并配合「输出无增长跳过扫描」后开销可忽略。 */
+        const val EXIT_MARKER_POLL_MS = 1_000L
+        /** 匹配命令退出标记 `[command exited: N]` 的定位前缀（配合手工解析退出码，免全量正则扫描）。 */
+        const val EXIT_MARKER_PREFIX = "[command exited: "
     }
 
     private val _tabs = MutableStateFlow<List<TerminalTab>>(emptyList())
@@ -276,21 +277,41 @@ class TerminalSessionManager @Inject constructor(
      * 永不回调、notify=true 的任务不触发通知。bash 在真正退出前必打印 `[command exited: N]`，
      * 以此作为命令结束的可靠信号：监控到后短缓冲（给正常回调留时间），仍 Running 则强制收尾。
      */
+    /** 在输出文本中定位退出标记 `[command exited: N]` 并解析退出码；未找到返回 null。
+     *  相比正则全量扫描，indexOf 定位 + 手写数字解析在长 transcript 上更省。 */
+    private fun extractExitCode(output: String): Int? {
+        val idx = output.indexOf(EXIT_MARKER_PREFIX)
+        if (idx < 0) return null
+        var end = idx + EXIT_MARKER_PREFIX.length
+        if (end >= output.length || !output[end].isDigit()) return null
+        var code = 0
+        while (end < output.length && output[end].isDigit()) {
+            code = code * 10 + (output[end] - '0')
+            end++
+        }
+        return if (end < output.length && output[end] == ']') code else null
+    }
+
     private fun monitorBackgroundExit(tabId: String) {
         monitorScope.launch {
             var seenMarker = false
+            var lastOutputLen = -1
             while (true) {
                 val tab = tab(tabId) ?: return@launch
                 if (tab.runState !is RunState.Running) return@launch
                 val output = getTabOutput(tabId) ?: return@launch
                 if (!seenMarker) {
-                    if (EXIT_MARKER_REGEX.containsMatchIn(output)) seenMarker = true
+                    // 输出无增长时跳过扫描：仅比较长度，省去每轮全量定位退出标记。
+                    if (output.length != lastOutputLen) {
+                        lastOutputLen = output.length
+                        if (extractExitCode(output) != null) seenMarker = true
+                    }
                 } else {
                     delay(EXIT_MARKER_GRACE_MS)
                     // 缓冲后再查：正常 onFinished 回调若已触发，状态不再 Running，此处直接退出。
                     val current = tab(tabId) ?: return@launch
                     if (current.runState is RunState.Running) {
-                        val exitCode = EXIT_MARKER_REGEX.find(getTabOutput(tabId) ?: "")?.groupValues?.get(1)?.toIntOrNull() ?: 0
+                        val exitCode = extractExitCode(getTabOutput(tabId) ?: "") ?: 0
                         current.runState = RunState.Finished(exitCode)
                         bumpRevision()
                         FileLogger.i(TAG, "兜底：标签 $tabId 检测到退出标记，强制收尾 exit=$exitCode")
