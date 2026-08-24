@@ -323,6 +323,15 @@ fun AIChatPanel(
         }
     }
 
+    // 主页模型选择面板复用 ModelSelectionSheet，能力 Tag 依赖全量模型元数据；
+    // 仅 resolve 当前激活模型会导致未选过的模型无 Tag（设置页进入时已全量加载，主页补齐）。
+    // providers 异步加载，首次组合时为空，需等非空后再解析（providers 后续变化也会触发，成本低有缓存）。
+    LaunchedEffect(providers) {
+        if (providers.isNotEmpty()) {
+            settingsViewModel?.loadAllModelMetadata()
+        }
+    }
+
     fun removePendingAttachment(index: Int) {
         pendingAttachments = pendingAttachments.filterIndexed { i, _ -> i != index }
     }
