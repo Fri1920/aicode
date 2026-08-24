@@ -1,12 +1,5 @@
 package com.aicode.feature.workspace.presentation.remote
 
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -15,6 +8,8 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
@@ -35,6 +30,7 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -59,6 +55,7 @@ import compose.icons.feathericons.Plus
 import compose.icons.feathericons.Server
 import compose.icons.feathericons.Settings
 import compose.icons.feathericons.UploadCloud
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -66,8 +63,9 @@ fun RemoteServerScreen(
     viewModel: RemoteServerViewModel = hiltViewModel(),
     onNavigateBack: () -> Unit = {}
 ) {
+    val coroutineScope = rememberCoroutineScope()
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    var selectedTab by remember { mutableStateOf(0) }
+    val pagerState = rememberPagerState(initialPage = 0) { 3 }
     var showAddConnectionDialog by remember { mutableStateOf(false) }
     var showAddMountDialog by remember { mutableStateOf(false) }
     var showHostKeysScreen by remember { mutableStateOf(false) }
@@ -107,7 +105,7 @@ fun RemoteServerScreen(
                     }
                 },
                 actions = {
-                    if (selectedTab == 0) {
+                    if (pagerState.currentPage == 0) {
                         IconButton(onClick = { showHostKeysScreen = true }) {
                             Icon(FeatherIcons.Key, contentDescription = stringResource(R.string.ssh_host_key_settings_title))
                         }
@@ -115,9 +113,9 @@ fun RemoteServerScreen(
                             Icon(FeatherIcons.Settings, contentDescription = stringResource(R.string.sync_settings_title))
                         }
                     }
-                    if (selectedTab == 0 || selectedTab == 1) {
+                    if (pagerState.currentPage == 0 || pagerState.currentPage == 1) {
                         IconButton(onClick = {
-                            if (selectedTab == 0) {
+                            if (pagerState.currentPage == 0) {
                                 connectionToEdit = null
                                 showAddConnectionDialog = true
                             } else {
@@ -133,16 +131,9 @@ fun RemoteServerScreen(
         }
     ) { paddingValues ->
         Box(modifier = Modifier.padding(paddingValues).fillMaxSize()) {
-            AnimatedContent(
-                targetState = selectedTab,
-                transitionSpec = {
-                    val direction = if (targetState > initialState) 1 else -1
-                    (slideInHorizontally(animationSpec = tween(240)) { direction * it } +
-                        fadeIn(animationSpec = tween(240))) togetherWith
-                        (slideOutHorizontally(animationSpec = tween(240)) { -direction * it } +
-                            fadeOut(animationSpec = tween(160)))
-                },
-                label = "remote-tab-content"
+            HorizontalPager(
+                state = pagerState,
+                modifier = Modifier.fillMaxSize()
             ) { tab ->
                 when (tab) {
                 0 -> {
@@ -211,8 +202,7 @@ fun RemoteServerScreen(
             }
 
             FloatingTabBar(
-                selected = selectedTab,
-                onSelect = { selectedTab = it },
+                pagerState = pagerState,
                 items = listOf(
                     FloatingTabItem(FeatherIcons.Server, stringResource(R.string.remote_tab_connections)),
                     FloatingTabItem(FeatherIcons.Folder, stringResource(R.string.remote_tab_mounts)),
@@ -337,7 +327,10 @@ fun RemoteServerScreen(
                 title = { Text(stringResource(R.string.remote_hint_title)) },
                 text = { Text(stringResource(R.string.remote_add_channel_first)) },
                 confirmButton = {
-                    TextButton(onClick = { showAddMountDialog = false; selectedTab = 0 }) {
+                    TextButton(onClick = {
+                        showAddMountDialog = false
+                        coroutineScope.launch { pagerState.animateScrollToPage(0) }
+                    }) {
                         Text(stringResource(R.string.remote_go_add))
                     }
                 }

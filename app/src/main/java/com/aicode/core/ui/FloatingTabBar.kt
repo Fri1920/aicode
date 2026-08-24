@@ -1,12 +1,17 @@
 package com.aicode.core.ui
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,15 +24,19 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -37,8 +46,8 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.boundsInParent
@@ -49,6 +58,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.aicode.core.theme.Radius
 import com.aicode.core.theme.Spacing
+import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
@@ -59,51 +69,101 @@ data class FloatingTabItem(
 )
 
 /**
- * 底部悬浮 tab 栏：一条胶囊玻璃 bar（半透明 + 边框 + 阴影），内部 tab 竖排图标 + 文字，
- * 宽度自适应内容，覆盖在滚动内容之上。底部渐变蒙版（maskColor 渐隐）遮罩穿过 tab 栏的内容。
- *
- * 选中指示器是独立的椭圆：点击切换时滑动吸附到目标 tab；长按后进入拖动模式，
- * 椭圆实时跟随手指左右移动（跟手），滑过哪个 tab 即切换页面（与点击一致），松手吸附回位。
+ * 底部悬浮液态玻璃 Tab 栏（PagerState 联动版）：
+ * - 滑动页面主体时，底栏指示器 100% 毫秒级跟手同步平移；
+ * - 长按底栏左右拖拽时，上方页面 1:1 同步平滑滑动，松手弹簧吸附；
+ * - 点击 Tab 项平滑滚动至对应页面。
  */
 @Composable
 fun FloatingTabBar(
-    selected: Int,
-    onSelect: (Int) -> Unit,
+    pagerState: PagerState,
     items: List<FloatingTabItem>,
     maskColor: Color,
     modifier: Modifier = Modifier,
-    /** 内容正在滚动时整体淡出到 40%，停止滚动恢复；用于长列表阅读时降低底栏干扰。默认关闭。 */
     isScrolling: Boolean = false
 ) {
-    // 滚动弱化：胶囊本体透明度动画（蒙版渐变不参与，保持遮内容能力）。
+    val coroutineScope = rememberCoroutineScope()
+    val isLight = MaterialTheme.colorScheme.background.luminance() > 0.5f
+
     val contentAlpha by animateFloatAsState(
-        targetValue = if (isScrolling) 0.4f else 1f,
-        animationSpec = tween(200),
+        targetValue = if (isScrolling) 0.35f else 1f,
+        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
         label = "tabbar-content-alpha"
     )
-    // 浅色判断与设置页一致：背景 luminance > 0.5 视为浅色模式。
-    val light = MaterialTheme.colorScheme.background.luminance() > 0.5f
-    val glassBg = if (light) Color.White.copy(alpha = 0.85f)
-    else MaterialTheme.colorScheme.surface.copy(alpha = 0.92f)
-    val glassBorder = MaterialTheme.colorScheme.outlineVariant
-    // 各 tab 相对 bar 内容区的 bounds，供椭圆定位与拖动目标判断。
+
+    val colorScheme = MaterialTheme.colorScheme
+    val surfaceColor = colorScheme.surface
+    val surfaceVariantColor = colorScheme.surfaceVariant
+    val outlineVariantColor = colorScheme.outlineVariant
+    val primaryColor = colorScheme.primary
+    val primaryContainerColor = colorScheme.primaryContainer
+
+    // 材质与描边画笔
+    val glassBackgroundBrush = remember(isLight, surfaceColor, surfaceVariantColor) {
+        if (isLight) {
+            Brush.verticalGradient(
+                listOf(Color(0xFFFCFCFD).copy(alpha = 0.94f), Color(0xFFEFF1F4).copy(alpha = 0.90f))
+            )
+        } else {
+            Brush.verticalGradient(
+                listOf(
+                    surfaceVariantColor.copy(alpha = 0.92f),
+                    surfaceColor.copy(alpha = 0.88f)
+                )
+            )
+        }
+    }
+
+    val glassBorderBrush = remember(isLight, outlineVariantColor) {
+        if (isLight) {
+            Brush.verticalGradient(
+                listOf(
+                    Color.Black.copy(alpha = 0.12f),
+                    Color.Black.copy(alpha = 0.06f),
+                    Color.Black.copy(alpha = 0.14f)
+                )
+            )
+        } else {
+            Brush.verticalGradient(
+                listOf(
+                    outlineVariantColor.copy(alpha = 0.55f),
+                    outlineVariantColor.copy(alpha = 0.20f),
+                    Color(0xFF07111F).copy(alpha = 0.60f)
+                )
+            )
+        }
+    }
+
     val tabBounds = remember { mutableStateMapOf<Int, Rect>() }
-    val currentSelected by rememberUpdatedState(selected)
     val density = LocalDensity.current
-    // 拖动中的手指 x（px），Float.NaN 表示非拖动态。
-    var dragX by remember { mutableFloatStateOf(Float.NaN) }
-    // 椭圆左边缘 x：非拖动时吸附到选中 tab（滑动动画），拖动时实时跟手（0ms 动画）。
-    val indicatorTarget = if (dragX.isNaN()) tabBounds[selected]?.left ?: 0f else dragX
-    val indicatorX by animateFloatAsState(
-        targetValue = indicatorTarget,
-        animationSpec = if (dragX.isNaN()) tween(220) else tween(0),
-        label = "indicator-x"
-    )
+
+    // 计算 Pager 连续位置（支持页面滑动与底栏双向插值）
+    val continuousPosition by remember {
+        derivedStateOf {
+            (pagerState.currentPage + pagerState.currentPageOffsetFraction).coerceIn(0f, items.lastIndex.toFloat())
+        }
+    }
+
+    val floorIndex = continuousPosition.toInt().coerceIn(0, items.lastIndex)
+    val ceilIndex = (floorIndex + 1).coerceIn(0, items.lastIndex)
+    val fraction = continuousPosition - floorIndex
+
+    val floorBounds = tabBounds[floorIndex]
+    val ceilBounds = tabBounds[ceilIndex]
+
+    val indicatorX = if (floorBounds != null && ceilBounds != null) {
+        floorBounds.left + (ceilBounds.left - floorBounds.left) * fraction
+    } else {
+        tabBounds[pagerState.currentPage]?.left ?: 0f
+    }
+
+    // 果冻拉伸：在位移时根据 offsetFraction 产生平滑微拉伸
+    val stretchScaleX = 1f + 0.14f * (1f - abs(fraction - 0.5f) * 2f)
 
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .height(64.dp)
+            .height(68.dp)
             .background(
                 Brush.verticalGradient(
                     listOf(maskColor.copy(alpha = 0f), maskColor.copy(alpha = 0.98f))
@@ -113,21 +173,306 @@ fun FloatingTabBar(
     ) {
         Box(
             modifier = Modifier
+                .padding(bottom = 6.dp)
                 .graphicsLayer { alpha = contentAlpha }
                 .shadow(
-                    elevation = 3.dp,
+                    elevation = 8.dp,
                     shape = RoundedCornerShape(Radius.pill),
-                    ambientColor = Color.Black.copy(alpha = 0.08f),
-                    spotColor = Color.Black.copy(alpha = 0.10f)
+                    ambientColor = if (isLight) Color.Black.copy(alpha = 0.08f) else Color(0xFF040A14).copy(alpha = 0.35f),
+                    spotColor = if (isLight) Color.Black.copy(alpha = 0.14f) else Color(0xFF040A14).copy(alpha = 0.50f)
                 )
                 .clip(RoundedCornerShape(Radius.pill))
-                .background(glassBg)
-                .border(1.dp, glassBorder, RoundedCornerShape(Radius.pill))
-                .padding(horizontal = 8.dp, vertical = 3.dp)
+                .background(glassBackgroundBrush)
+                .border(1.dp, glassBorderBrush, RoundedCornerShape(Radius.pill))
+                .padding(horizontal = 6.dp, vertical = 3.dp)
+                .pointerInput(items) {
+                    detectDragGesturesAfterLongPress(
+                        onDragStart = { },
+                        onDrag = { change, _ ->
+                            change.consume()
+                            val x = change.position.x
+                            val tabWidth = tabBounds.values.firstOrNull()?.width ?: 0f
+                            if (tabWidth > 0f && items.size > 1) {
+                                val minX = tabBounds.values.minOfOrNull { it.left } ?: 0f
+                                val maxX = (tabBounds.values.maxOfOrNull { it.right } ?: tabWidth) - tabWidth
+                                val totalDistance = (maxX - minX).coerceAtLeast(1f)
+                                val boundedX = (x - tabWidth / 2f).coerceIn(minX, maxX)
+                                val progress = (boundedX - minX) / totalDistance
+                                val targetPageFloat = (progress * items.lastIndex).coerceIn(0f, items.lastIndex.toFloat())
+
+                                coroutineScope.launch {
+                                    val page = targetPageFloat.roundToInt().coerceIn(0, items.lastIndex)
+                                    val offsetFraction = (targetPageFloat - page).coerceIn(-0.5f, 0.5f)
+                                    pagerState.scrollToPage(page, offsetFraction)
+                                }
+                            }
+                        },
+                        onDragEnd = {
+                            coroutineScope.launch {
+                                val targetPage = (pagerState.currentPage + pagerState.currentPageOffsetFraction).roundToInt()
+                                pagerState.animateScrollToPage(
+                                    page = targetPage.coerceIn(0, items.lastIndex),
+                                    animationSpec = spring(dampingRatio = 0.78f, stiffness = 380f)
+                                )
+                            }
+                        },
+                        onDragCancel = {
+                            coroutineScope.launch {
+                                val targetPage = (pagerState.currentPage + pagerState.currentPageOffsetFraction).roundToInt()
+                                pagerState.animateScrollToPage(
+                                    page = targetPage.coerceIn(0, items.lastIndex),
+                                    animationSpec = spring(dampingRatio = 0.78f, stiffness = 380f)
+                                )
+                            }
+                        }
+                    )
+                }
+        ) {
+            val tabWidth = tabBounds.values.firstOrNull()?.width ?: 0f
+
+            if (tabWidth > 0f) {
+                val indicatorWidthDp = with(density) { tabWidth.toDp() }
+                val primaryColor = MaterialTheme.colorScheme.primaryContainer
+
+                val indicatorBrush = remember(isLight, primaryContainerColor) {
+                    if (isLight) {
+                        Brush.verticalGradient(
+                            listOf(primaryContainerColor.copy(alpha = 0.95f), primaryContainerColor.copy(alpha = 0.85f))
+                        )
+                    } else {
+                        Brush.verticalGradient(
+                            listOf(primaryContainerColor.copy(alpha = 0.90f), primaryContainerColor.copy(alpha = 0.72f))
+                        )
+                    }
+                }
+
+                val indicatorBorderBrush = remember(isLight, primaryColor) {
+                    Brush.verticalGradient(
+                        listOf(
+                            if (isLight) Color.Black.copy(alpha = 0.08f) else primaryColor.copy(alpha = 0.35f),
+                            if (isLight) Color.Black.copy(alpha = 0.02f) else primaryColor.copy(alpha = 0.08f)
+                        )
+                    )
+                }
+
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.CenterStart)
+                        .offset { IntOffset(indicatorX.roundToInt(), 0) }
+                        .graphicsLayer {
+                            scaleX = stretchScaleX
+                            scaleY = (2f - stretchScaleX).coerceIn(0.94f, 1f)
+                        }
+                        .width(indicatorWidthDp)
+                        .height(44.dp)
+                        .shadow(
+                            elevation = 2.dp,
+                            shape = RoundedCornerShape(Radius.pill),
+                            ambientColor = Color.Black.copy(alpha = 0.06f),
+                            spotColor = Color.Black.copy(alpha = 0.08f)
+                        )
+                        .clip(RoundedCornerShape(Radius.pill))
+                        .background(indicatorBrush)
+                        .border(1.dp, indicatorBorderBrush, RoundedCornerShape(Radius.pill))
+                )
+            }
+
+            Row(
+                modifier = Modifier,
+                horizontalArrangement = Arrangement.spacedBy(Spacing.xs)
+            ) {
+                items.forEachIndexed { index, item ->
+                    val isSelected = index == pagerState.currentPage
+                    val interactionSource = remember(index) { MutableInteractionSource() }
+                    val isPressed by interactionSource.collectIsPressedAsState()
+
+                    val tabScale by animateFloatAsState(
+                        targetValue = if (isPressed) 0.94f else 1f,
+                        animationSpec = spring(stiffness = Spring.StiffnessMedium),
+                        label = "tab-press-scale"
+                    )
+
+                    val fgColor by animateColorAsState(
+                        targetValue = if (isSelected) MaterialTheme.colorScheme.primary
+                        else MaterialTheme.colorScheme.onSurfaceVariant,
+                        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+                        label = "tab-fg-color"
+                    )
+
+                    val iconScale by animateFloatAsState(
+                        targetValue = if (isSelected) 1.08f else 1f,
+                        animationSpec = spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessMediumLow),
+                        label = "tab-icon-scale"
+                    )
+
+                    Column(
+                        modifier = Modifier
+                            .onGloballyPositioned { tabBounds[index] = it.boundsInParent() }
+                            .widthIn(min = 84.dp)
+                            .graphicsLayer {
+                                scaleX = tabScale
+                                scaleY = tabScale
+                            }
+                            .clip(RoundedCornerShape(16.dp))
+                            .clickable(
+                                interactionSource = interactionSource,
+                                indication = null,
+                                onClick = {
+                                    coroutineScope.launch {
+                                        pagerState.animateScrollToPage(
+                                            page = index,
+                                            animationSpec = spring(dampingRatio = 0.78f, stiffness = 380f)
+                                        )
+                                    }
+                                }
+                            )
+                            .padding(horizontal = Spacing.md, vertical = 7.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        Icon(
+                            imageVector = item.icon,
+                            contentDescription = null,
+                            modifier = Modifier
+                                .size(20.dp)
+                                .graphicsLayer {
+                                    scaleX = iconScale
+                                    scaleY = iconScale
+                                },
+                            tint = fgColor
+                        )
+                        Spacer(Modifier.height(3.dp))
+                        Text(
+                            text = item.label,
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
+                            color = fgColor,
+                            maxLines = 1
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * 底部悬浮液态玻璃 Tab 栏（基础选中索引版）：
+ * 用于非 Pager 页面的向后兼容。
+ */
+@Composable
+fun FloatingTabBar(
+    selected: Int,
+    onSelect: (Int) -> Unit,
+    items: List<FloatingTabItem>,
+    maskColor: Color,
+    modifier: Modifier = Modifier,
+    isScrolling: Boolean = false
+) {
+    val contentAlpha by animateFloatAsState(
+        targetValue = if (isScrolling) 0.35f else 1f,
+        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+        label = "tabbar-content-alpha"
+    )
+
+    val isLight = MaterialTheme.colorScheme.background.luminance() > 0.5f
+    val colorScheme = MaterialTheme.colorScheme
+    val surfaceColor = colorScheme.surface
+    val surfaceVariantColor = colorScheme.surfaceVariant
+    val outlineVariantColor = colorScheme.outlineVariant
+    val primaryColor = colorScheme.primary
+    val primaryContainerColor = colorScheme.primaryContainer
+
+    val glassBackgroundBrush = remember(isLight, surfaceColor, surfaceVariantColor) {
+        if (isLight) {
+            Brush.verticalGradient(
+                listOf(Color(0xFFFCFCFD).copy(alpha = 0.94f), Color(0xFFEFF1F4).copy(alpha = 0.90f))
+            )
+        } else {
+            Brush.verticalGradient(
+                listOf(
+                    surfaceVariantColor.copy(alpha = 0.92f),
+                    surfaceColor.copy(alpha = 0.88f)
+                )
+            )
+        }
+    }
+
+    val glassBorderBrush = remember(isLight, outlineVariantColor) {
+        if (isLight) {
+            Brush.verticalGradient(
+                listOf(
+                    Color.Black.copy(alpha = 0.12f),
+                    Color.Black.copy(alpha = 0.06f),
+                    Color.Black.copy(alpha = 0.14f)
+                )
+            )
+        } else {
+            Brush.verticalGradient(
+                listOf(
+                    outlineVariantColor.copy(alpha = 0.55f),
+                    outlineVariantColor.copy(alpha = 0.20f),
+                    Color(0xFF07111F).copy(alpha = 0.60f)
+                )
+            )
+        }
+    }
+
+    val tabBounds = remember { mutableStateMapOf<Int, Rect>() }
+    val currentSelected by rememberUpdatedState(selected)
+    val density = LocalDensity.current
+
+    var dragX by remember { mutableFloatStateOf(Float.NaN) }
+    val isDragging = !dragX.isNaN()
+
+    val indicatorTarget = if (isDragging) dragX else tabBounds[selected]?.left ?: 0f
+
+    val indicatorX by animateFloatAsState(
+        targetValue = indicatorTarget,
+        animationSpec = if (isDragging) tween(0) else spring(
+            dampingRatio = 0.76f,
+            stiffness = 380f
+        ),
+        label = "indicator-x"
+    )
+
+    val stretchScale = remember { Animatable(1f) }
+    LaunchedEffect(selected) {
+        stretchScale.snapTo(1.10f)
+        stretchScale.animateTo(
+            targetValue = 1f,
+            animationSpec = spring(dampingRatio = 0.65f, stiffness = Spring.StiffnessMediumLow)
+        )
+    }
+
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(68.dp)
+            .background(
+                Brush.verticalGradient(
+                    listOf(maskColor.copy(alpha = 0f), maskColor.copy(alpha = 0.98f))
+                )
+            ),
+        contentAlignment = Alignment.BottomCenter
+    ) {
+        Box(
+            modifier = Modifier
+                .padding(bottom = 6.dp)
+                .graphicsLayer { alpha = contentAlpha }
+                .shadow(
+                    elevation = 8.dp,
+                    shape = RoundedCornerShape(Radius.pill),
+                    ambientColor = if (isLight) Color.Black.copy(alpha = 0.08f) else Color(0xFF040A14).copy(alpha = 0.35f),
+                    spotColor = if (isLight) Color.Black.copy(alpha = 0.14f) else Color(0xFF040A14).copy(alpha = 0.50f)
+                )
+                .clip(RoundedCornerShape(Radius.pill))
+                .background(glassBackgroundBrush)
+                .border(1.dp, glassBorderBrush, RoundedCornerShape(Radius.pill))
+                .padding(horizontal = 6.dp, vertical = 3.dp)
                 .pointerInput(items) {
                     detectDragGesturesAfterLongPress(
                         onDragStart = { start ->
-                            // 以手指为中心定位椭圆左缘，与 onDrag 的 (x - 半宽) 口径一致，避免起始瞬间跳动
                             val w = tabBounds.values.firstOrNull()?.width ?: 0f
                             dragX = start.x - w / 2f
                         },
@@ -149,51 +494,117 @@ fun FloatingTabBar(
                 }
         ) {
             val tabWidth = tabBounds.values.firstOrNull()?.width ?: 0f
-            // 高亮椭圆：随 indicatorX 移动，纵向居中。
-            Box(
-                modifier = Modifier
-                    .align(Alignment.CenterStart)
-                    .offset { IntOffset(indicatorX.roundToInt(), 0) }
-                    .width(with(density) { tabWidth.toDp() })
-                    .height(44.dp)
-                    .clip(RoundedCornerShape(Radius.pill))
-                    .background(MaterialTheme.colorScheme.primaryContainer)
-            )
+
+            if (tabWidth > 0f) {
+                val indicatorWidthDp = with(density) { tabWidth.toDp() }
+                val primaryColor = MaterialTheme.colorScheme.primaryContainer
+
+                val indicatorBrush = remember(isLight, primaryContainerColor) {
+                    if (isLight) {
+                        Brush.verticalGradient(
+                            listOf(primaryContainerColor.copy(alpha = 0.95f), primaryContainerColor.copy(alpha = 0.85f))
+                        )
+                    } else {
+                        Brush.verticalGradient(
+                            listOf(primaryContainerColor.copy(alpha = 0.90f), primaryContainerColor.copy(alpha = 0.72f))
+                        )
+                    }
+                }
+
+                val indicatorBorderBrush = remember(isLight, primaryColor) {
+                    Brush.verticalGradient(
+                        listOf(
+                            if (isLight) Color.Black.copy(alpha = 0.08f) else primaryColor.copy(alpha = 0.35f),
+                            if (isLight) Color.Black.copy(alpha = 0.02f) else primaryColor.copy(alpha = 0.08f)
+                        )
+                    )
+                }
+
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.CenterStart)
+                        .offset { IntOffset(indicatorX.roundToInt(), 0) }
+                        .graphicsLayer {
+                            scaleX = if (isDragging) 1.05f else stretchScale.value
+                            scaleY = if (isDragging) 0.98f else (2f - stretchScale.value).coerceIn(0.95f, 1f)
+                        }
+                        .width(indicatorWidthDp)
+                        .height(44.dp)
+                        .shadow(
+                            elevation = 2.dp,
+                            shape = RoundedCornerShape(Radius.pill),
+                            ambientColor = Color.Black.copy(alpha = 0.06f),
+                            spotColor = Color.Black.copy(alpha = 0.08f)
+                        )
+                        .clip(RoundedCornerShape(Radius.pill))
+                        .background(indicatorBrush)
+                        .border(1.dp, indicatorBorderBrush, RoundedCornerShape(Radius.pill))
+                )
+            }
+
             Row(
                 modifier = Modifier,
                 horizontalArrangement = Arrangement.spacedBy(Spacing.xs)
             ) {
                 items.forEachIndexed { index, item ->
                     val isSelected = index == selected
-                    val fg = if (isSelected) MaterialTheme.colorScheme.primary
-                    else MaterialTheme.colorScheme.onSurfaceVariant
                     val interactionSource = remember(index) { MutableInteractionSource() }
+                    val isPressed by interactionSource.collectIsPressedAsState()
+
+                    val tabScale by animateFloatAsState(
+                        targetValue = if (isPressed) 0.94f else 1f,
+                        animationSpec = spring(stiffness = Spring.StiffnessMedium),
+                        label = "tab-press-scale"
+                    )
+
+                    val fgColor by animateColorAsState(
+                        targetValue = if (isSelected) MaterialTheme.colorScheme.primary
+                        else MaterialTheme.colorScheme.onSurfaceVariant,
+                        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+                        label = "tab-fg-color"
+                    )
+
+                    val iconScale by animateFloatAsState(
+                        targetValue = if (isSelected) 1.08f else 1f,
+                        animationSpec = spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessMediumLow),
+                        label = "tab-icon-scale"
+                    )
+
                     Column(
                         modifier = Modifier
                             .onGloballyPositioned { tabBounds[index] = it.boundsInParent() }
-                            .widthIn(min = 88.dp)
+                            .widthIn(min = 84.dp)
+                            .graphicsLayer {
+                                scaleX = tabScale
+                                scaleY = tabScale
+                            }
                             .clip(RoundedCornerShape(16.dp))
                             .clickable(
                                 interactionSource = interactionSource,
                                 indication = null,
                                 onClick = { onSelect(index) }
                             )
-                            .padding(horizontal = Spacing.md, vertical = 8.dp),
+                            .padding(horizontal = Spacing.md, vertical = 7.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.Center
                     ) {
                         Icon(
                             imageVector = item.icon,
                             contentDescription = null,
-                            modifier = Modifier.size(20.dp),
-                            tint = fg
+                            modifier = Modifier
+                                .size(20.dp)
+                                .graphicsLayer {
+                                    scaleX = iconScale
+                                    scaleY = iconScale
+                                },
+                            tint = fgColor
                         )
-                        Spacer(Modifier.height(4.dp))
+                        Spacer(Modifier.height(3.dp))
                         Text(
                             text = item.label,
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
-                            color = fg,
+                            color = fgColor,
                             maxLines = 1
                         )
                     }

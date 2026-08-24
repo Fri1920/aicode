@@ -18,6 +18,8 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -47,8 +49,6 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -98,6 +98,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aicode.core.theme.Radius
 import com.aicode.core.theme.Spacing
+import com.aicode.core.ui.AppTextField
 import com.aicode.core.ui.FloatingTabBar
 import com.aicode.core.ui.FloatingTabItem
 import com.aicode.feature.settings.data.local.CustomModelMetadataStore
@@ -158,7 +159,7 @@ fun ProviderEditorScreen(
     val scope = rememberCoroutineScope()
     var customMetadata by remember { mutableStateOf<Map<String, ModelMetadata>>(emptyMap()) }
     var editingModel by remember { mutableStateOf<String?>(null) }
-    var selectedTab by remember { mutableIntStateOf(0) }
+    val pagerState = rememberPagerState(initialPage = 0) { 2 }
     var showTypeSheet by remember { mutableStateOf(false) }
     var showAddModelSheet by remember { mutableStateOf(false) }
     var showFetchDialog by remember { mutableStateOf(false) }
@@ -260,7 +261,7 @@ fun ProviderEditorScreen(
                 },
                 actions = {
                     IconButton(onClick = {
-                        selectedTab = 1
+                        scope.launch { pagerState.animateScrollToPage(1) }
                         showAddModelSheet = true
                     }) {
                         Icon(FeatherIcons.Plus, contentDescription = stringResource(R.string.provider_add_model))
@@ -274,16 +275,19 @@ fun ProviderEditorScreen(
                 .fillMaxSize()
                 .padding(padding)
         ) {
-            Column(modifier = Modifier.fillMaxSize()) {
-            if (selectedTab == 0) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .verticalScroll(configScrollState)
-                        .padding(horizontal = Spacing.lg)
-                        .padding(bottom = 70.dp),
-                    verticalArrangement = Arrangement.spacedBy(Spacing.sm)
-                ) {
+            HorizontalPager(
+                state = pagerState,
+                modifier = Modifier.fillMaxSize()
+            ) { tab ->
+                if (tab == 0) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .verticalScroll(configScrollState)
+                            .padding(horizontal = Spacing.lg)
+                            .padding(bottom = 70.dp),
+                        verticalArrangement = Arrangement.spacedBy(Spacing.sm)
+                    ) {
                     // ── 基本信息 ──
                     SettingsGroupHeader(text = stringResource(R.string.provider_section_basic))
                     SettingsGroup {
@@ -570,8 +574,7 @@ fun ProviderEditorScreen(
             }
 
             FloatingTabBar(
-                selected = selectedTab,
-                onSelect = { selectedTab = it },
+                pagerState = pagerState,
                 items = listOf(
                     FloatingTabItem(FeatherIcons.Sliders, stringResource(R.string.provider_config)),
                     FloatingTabItem(FeatherIcons.Cpu, stringResource(R.string.common_model))
@@ -893,19 +896,12 @@ private fun ModelSheetTextField(
     onValueChange: (String) -> Unit,
     keyboardType: KeyboardType = KeyboardType.Text
 ) {
-    OutlinedTextField(
+    AppTextField(
         value = value,
         onValueChange = onValueChange,
-        label = { Text(label) },
+        label = label,
         singleLine = true,
         keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
-        shape = RoundedCornerShape(12.dp),
-        colors = OutlinedTextFieldDefaults.colors(
-            unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
-            focusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
-            unfocusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f),
-            focusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f)
-        ),
         modifier = Modifier.fillMaxWidth()
     )
 }
@@ -1136,7 +1132,7 @@ internal fun defaultProviderBaseUrl(type: ProviderType): String = when (type) {
     else -> "https://api.openai.com/"
 }
 
-/** 分组内输入行：全宽 OutlinedTextField，可选密文转换与尾随操作。样式与 MCP 编辑页输入框一致。 */
+/** 分组内输入行：全宽 AppTextField，可选密文转换与尾随操作。 */
 @Composable
 private fun ProviderTextFieldRow(
     label: String,
@@ -1146,21 +1142,14 @@ private fun ProviderTextFieldRow(
     visualTransformation: VisualTransformation = VisualTransformation.None,
     trailing: (@Composable () -> Unit)? = null
 ) {
-    OutlinedTextField(
+    AppTextField(
         value = value,
         onValueChange = onValueChange,
-        label = { Text(label) },
-        placeholder = if (placeholder.isNotBlank()) { { Text(placeholder) } } else null,
+        label = label,
+        placeholder = if (placeholder.isNotBlank()) placeholder else null,
         singleLine = true,
         visualTransformation = visualTransformation,
-        trailingIcon = trailing?.let { { it() } },
-        shape = RoundedCornerShape(12.dp),
-        colors = OutlinedTextFieldDefaults.colors(
-            unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
-            focusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
-            unfocusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f),
-            focusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f)
-        ),
+        trailingIcon = trailing,
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = Spacing.lg, vertical = Spacing.xs)

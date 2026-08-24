@@ -29,11 +29,11 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
+import com.aicode.core.ui.AppTextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -198,11 +198,11 @@ fun ChatDrawerContent(
             onDismissRequest = { pendingRename = null },
             title = { Text(stringResource(R.string.chat_rename_session)) },
             text = {
-                OutlinedTextField(
+                AppTextField(
                     value = renameText,
                     onValueChange = { renameText = it },
                     singleLine = true,
-                    label = { Text(stringResource(R.string.chat_session_name)) },
+                    label = stringResource(R.string.chat_session_name),
                     modifier = Modifier.fillMaxWidth()
                 )
             },

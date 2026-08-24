@@ -28,11 +28,10 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import com.aicode.core.ui.AppTextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -133,19 +132,12 @@ fun SyncSettingsSheet(
                         modifier = Modifier.padding(top = 2.dp)
                     )
                     Spacer(modifier = Modifier.height(10.dp))
-                    OutlinedTextField(
+                    AppTextField(
                         value = maxBatchSizeText,
                         onValueChange = { maxBatchSizeText = it.filter { char -> char.isDigit() } },
                         modifier = Modifier.fillMaxWidth(),
-                        label = { Text(stringResource(R.string.sync_max_batch_count)) },
-                        singleLine = true,
-                        shape = RoundedCornerShape(12.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
-                            focusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
-                            unfocusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f),
-                            focusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f)
-                        )
+                        label = stringResource(R.string.sync_max_batch_count),
+                        singleLine = true
                     )
                 }
             }

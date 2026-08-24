@@ -40,13 +40,12 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
+import com.aicode.core.ui.AppTextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -1179,6 +1178,7 @@ private fun queryImageDisplayName(context: Context, uriString: String): String? 
  * 本文件统一的输入框样式：圆角 + 定制 colors + 全宽。
  * 历史上有 19 处整块复制，抽成此组件消除重复；需要 readOnly/placeholder/trailingIcon 的场景也走这里。
  */
+/** 统一使用全局 AppTextField 组件。 */
 @Composable
 private fun ContainerField(
     value: String,
@@ -1190,21 +1190,14 @@ private fun ContainerField(
     readOnly: Boolean = false,
     trailingIcon: (@Composable () -> Unit)? = null
 ) {
-    OutlinedTextField(
+    AppTextField(
         value = value,
         onValueChange = onValueChange,
-        label = { Text(label) },
-        placeholder = placeholder?.let { { Text(it) } },
+        label = label,
+        placeholder = placeholder,
         singleLine = singleLine,
         readOnly = readOnly,
         trailingIcon = trailingIcon,
-        shape = RoundedCornerShape(12.dp),
-        colors = OutlinedTextFieldDefaults.colors(
-            unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
-            focusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
-            unfocusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f),
-            focusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f)
-        ),
         modifier = modifier.fillMaxWidth()
     )
 }

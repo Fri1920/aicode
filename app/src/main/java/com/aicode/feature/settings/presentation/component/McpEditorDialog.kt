@@ -29,10 +29,10 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
+import com.aicode.core.ui.AppTextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -294,13 +294,12 @@ fun McpServerEditDialog(
                             }
 
                             // 名称字段
-                            OutlinedTextField(
+                            AppTextField(
                                 value = name,
                                 onValueChange = { name = it },
-                                label = { Text(stringResource(R.string.common_name)) },
-                                placeholder = { Text(stringResource(R.string.mcp_name_hint)) },
+                                label = stringResource(R.string.common_name),
+                                placeholder = stringResource(R.string.mcp_name_hint),
                                 singleLine = true,
-                                shape = RoundedCornerShape(12.dp),
                                 modifier = Modifier.fillMaxWidth()
                             )
 

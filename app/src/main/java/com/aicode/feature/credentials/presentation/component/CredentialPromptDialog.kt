@@ -9,9 +9,9 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import com.aicode.core.ui.AppTextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -56,25 +56,25 @@ fun CredentialPromptDialog(
         title = { Text(stringResource(R.string.credential_prompt_title, host)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
-                OutlinedTextField(
+                AppTextField(
                     value = host,
                     onValueChange = { /* host 来自 remote，只读 */ },
-                    label = { Text(stringResource(R.string.credential_remote_host)) },
+                    label = stringResource(R.string.credential_remote_host),
                     singleLine = true,
                     readOnly = true,
                     modifier = Modifier.fillMaxWidth()
                 )
-                OutlinedTextField(
+                AppTextField(
                     value = username,
                     onValueChange = { username = it },
-                    label = { Text(stringResource(R.string.common_username)) },
+                    label = stringResource(R.string.common_username),
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
-                OutlinedTextField(
+                AppTextField(
                     value = token,
                     onValueChange = { token = it },
-                    label = { Text(stringResource(R.string.credential_token)) },
+                    label = stringResource(R.string.credential_token),
                     singleLine = true,
                     visualTransformation = if (tokenVisible) VisualTransformation.None else PasswordVisualTransformation(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),

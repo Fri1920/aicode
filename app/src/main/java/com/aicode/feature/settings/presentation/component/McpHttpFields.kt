@@ -16,10 +16,9 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import com.aicode.core.ui.AppTextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Alignment
@@ -41,13 +40,12 @@ internal fun McpHttpFields(
     onUrlChange: (String) -> Unit,
     headers: SnapshotStateList<Pair<String, String>>
 ) {
-    OutlinedTextField(
+    AppTextField(
         value = url,
         onValueChange = onUrlChange,
-        label = { Text(stringResource(R.string.mcp_server_url)) },
-        placeholder = { Text(stringResource(R.string.mcp_server_url_hint)) },
+        label = stringResource(R.string.mcp_server_url),
+        placeholder = stringResource(R.string.mcp_server_url_hint),
         singleLine = true,
-        shape = RoundedCornerShape(12.dp),
         modifier = Modifier.fillMaxWidth()
     )
 
@@ -78,35 +76,21 @@ internal fun McpHttpFields(
                         .padding(12.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    OutlinedTextField(
+                    AppTextField(
                         value = k,
                         onValueChange = { headers[index] = it to v },
-                        label = { Text(stringResource(R.string.mcp_header_name)) },
-                        placeholder = { Text(stringResource(R.string.mcp_header_name_hint)) },
+                        label = stringResource(R.string.mcp_header_name),
+                        placeholder = stringResource(R.string.mcp_header_name_hint),
                         singleLine = true,
-                        shape = RoundedCornerShape(12.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
-                            focusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
-                            unfocusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f),
-                            focusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f)
-                        ),
                         modifier = Modifier.fillMaxWidth()
                     )
 
-                    OutlinedTextField(
+                    AppTextField(
                         value = v,
                         onValueChange = { headers[index] = k to it },
-                        label = { Text(stringResource(R.string.mcp_header_value)) },
-                        placeholder = { Text(stringResource(R.string.mcp_header_value_hint)) },
+                        label = stringResource(R.string.mcp_header_value),
+                        placeholder = stringResource(R.string.mcp_header_value_hint),
                         singleLine = true,
-                        shape = RoundedCornerShape(12.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
-                            focusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
-                            unfocusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f),
-                            focusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f)
-                        ),
                         modifier = Modifier.fillMaxWidth()
                     )
 

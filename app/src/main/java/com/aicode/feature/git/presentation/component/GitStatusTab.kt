@@ -4,6 +4,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -93,21 +94,30 @@ internal fun StatusTab(
         StatusOverview(status = s, clean = clean)
 
         // 主操作：提交。有已暂存改动且已配置署名才可用。
+        val commitEnabled = !busy && (s?.staged?.isNotEmpty() == true) && hasIdentity
         FilledTonalButton(
             onClick = onCommit,
-            enabled = !busy && (s?.staged?.isNotEmpty() == true) && hasIdentity,
+            enabled = commitEnabled,
             modifier = Modifier
                 .fillMaxWidth()
-                .height(48.dp),
-            shape = RoundedCornerShape(Radius.sm),
+                .height(46.dp),
+            shape = RoundedCornerShape(12.dp),
             colors = ButtonDefaults.filledTonalButtonColors(
                 containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary
+                contentColor = MaterialTheme.colorScheme.onPrimary,
+                disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.50f),
+                disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f)
             )
         ) {
             Icon(FeatherIcons.Check, contentDescription = null, modifier = Modifier.size(17.dp))
             Spacer(Modifier.width(Spacing.xs))
-            Text(stringResource(R.string.git_commit_changes), maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(
+                text = stringResource(R.string.git_commit_changes),
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
         }
         if (!hasIdentity) {
             // 禁用原因提示：用户不知道按钮为什么不可点时给出指引
@@ -149,7 +159,18 @@ internal fun StatusTab(
         }
 
         if (clean) {
-            EmptyState(stringResource(R.string.git_status_clean))
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 96.dp, bottom = 32.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = stringResource(R.string.git_status_clean),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         } else {
             val ss = s ?: return@Column
             if (ss.staged.isNotEmpty()) {
@@ -406,7 +427,7 @@ private fun FileRow(
     }
 }
 
-/** 次级操作按钮：icon + 文字的描边按钮。 */
+/** 次级操作按钮：柔和背景微卡片按钮，12dp 圆角。 */
 @Composable
 private fun ActionButton(
     label: String,
@@ -415,23 +436,40 @@ private fun ActionButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    OutlinedButton(
+    val isLight = settingsLightMode()
+    val bgColor = if (isLight) {
+        if (enabled) Color(0xFFF0F2F5) else Color(0xFFF7F8FA)
+    } else {
+        if (enabled) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.70f)
+        else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
+    }
+    val contentColor = if (enabled) {
+        MaterialTheme.colorScheme.onSurface
+    } else {
+        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.40f)
+    }
+
+    FilledTonalButton(
         onClick = onClick,
         enabled = enabled,
-        modifier = modifier.height(44.dp),
-        shape = RoundedCornerShape(Radius.sm),
-        colors = ButtonDefaults.outlinedButtonColors(
-            contentColor = MaterialTheme.colorScheme.onSurface,
-            disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f)
-        ),
-        border = BorderStroke(
-            1.dp,
-            if (enabled) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.outlineVariant
+        modifier = modifier.height(40.dp),
+        shape = RoundedCornerShape(12.dp),
+        colors = ButtonDefaults.filledTonalButtonColors(
+            containerColor = bgColor,
+            contentColor = contentColor,
+            disabledContainerColor = bgColor,
+            disabledContentColor = contentColor
         ),
         contentPadding = PaddingValues(horizontal = Spacing.sm)
     ) {
-        Icon(icon, contentDescription = null, modifier = Modifier.size(16.dp))
+        Icon(icon, contentDescription = null, modifier = Modifier.size(15.dp))
         Spacer(Modifier.width(Spacing.xs))
-        Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.Medium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
     }
 }

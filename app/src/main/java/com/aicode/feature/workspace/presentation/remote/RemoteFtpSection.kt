@@ -18,10 +18,9 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import com.aicode.core.ui.AppTextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -203,51 +202,30 @@ fun WiFiFtpServerSection(
                     .padding(horizontal = Spacing.lg, vertical = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                OutlinedTextField(
+                AppTextField(
                     value = editPort,
                     onValueChange = { editPort = it.filter { char -> char.isDigit() } },
-                    label = { Text(stringResource(R.string.ftp_listen_port)) },
+                    label = stringResource(R.string.ftp_listen_port),
                     modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    shape = RoundedCornerShape(12.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
-                        focusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
-                        unfocusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f),
-                        focusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f)
-                    )
+                    singleLine = true
                 )
 
-                OutlinedTextField(
+                AppTextField(
                     value = editUsername,
                     onValueChange = { editUsername = it },
-                    label = { Text(stringResource(R.string.ftp_login_username)) },
+                    label = stringResource(R.string.ftp_login_username),
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
-                    enabled = !editAnonymous,
-                    shape = RoundedCornerShape(12.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
-                        focusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
-                        unfocusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f),
-                        focusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f)
-                    )
+                    enabled = !editAnonymous
                 )
 
-                OutlinedTextField(
+                AppTextField(
                     value = editPassword,
                     onValueChange = { editPassword = it },
-                    label = { Text(stringResource(R.string.ftp_login_password)) },
+                    label = stringResource(R.string.ftp_login_password),
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
-                    enabled = !editAnonymous,
-                    shape = RoundedCornerShape(12.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
-                        focusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
-                        unfocusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f),
-                        focusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f)
-                    )
+                    enabled = !editAnonymous
                 )
 
                 Row(

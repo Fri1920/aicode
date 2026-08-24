@@ -37,12 +37,11 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import com.aicode.core.ui.AppTextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.LaunchedEffect
@@ -75,7 +74,7 @@ import compose.icons.feathericons.Eye
 import compose.icons.feathericons.EyeOff
 import compose.icons.feathericons.Folder
 
-/** 弹窗内统一输入框：12dp 圆角 + 浅色容器底，样式与容器镜像弹窗一致。 */
+/** 弹窗内统一输入框：使用全局 AppTextField 组件。 */
 @Composable
 private fun SheetOutlinedTextField(
     value: String,
@@ -89,24 +88,17 @@ private fun SheetOutlinedTextField(
     trailingIcon: (@Composable () -> Unit)? = null,
     visualTransformation: VisualTransformation = VisualTransformation.None
 ) {
-    OutlinedTextField(
+    AppTextField(
         value = value,
         onValueChange = onValueChange,
-        label = label,
+        labelComposable = label,
         singleLine = singleLine,
         modifier = modifier,
         enabled = enabled,
         readOnly = readOnly,
-        placeholder = placeholder,
+        placeholderComposable = placeholder,
         trailingIcon = trailingIcon,
-        visualTransformation = visualTransformation,
-        shape = RoundedCornerShape(12.dp),
-        colors = OutlinedTextFieldDefaults.colors(
-            unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
-            focusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
-            unfocusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f),
-            focusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f)
-        )
+        visualTransformation = visualTransformation
     )
 }
 

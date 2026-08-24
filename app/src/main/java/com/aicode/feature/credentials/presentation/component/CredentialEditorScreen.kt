@@ -19,8 +19,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -39,6 +37,7 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import com.aicode.R
 import com.aicode.core.theme.Spacing
+import com.aicode.core.ui.AppTextField
 import com.aicode.feature.credentials.domain.model.GitCredential
 import compose.icons.FeatherIcons
 import compose.icons.feathericons.Check
@@ -144,7 +143,7 @@ internal fun CredentialEditorSheet(
     }
 }
 
-/** 与容器/镜像编辑弹窗一致的输入框：圆角 12dp + 定制边框与底色。 */
+/** 统一使用全局 AppTextField 组件。 */
 @Composable
 private fun CredentialField(
     value: String,
@@ -156,22 +155,15 @@ private fun CredentialField(
     keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
     trailingIcon: (@Composable () -> Unit)? = null
 ) {
-    OutlinedTextField(
+    AppTextField(
         value = value,
         onValueChange = onValueChange,
-        label = { Text(label) },
-        placeholder = placeholder?.let { { Text(it) } },
+        label = label,
+        placeholder = placeholder,
         singleLine = true,
         visualTransformation = visualTransformation,
         keyboardOptions = keyboardOptions,
         trailingIcon = trailingIcon,
-        shape = RoundedCornerShape(12.dp),
-        colors = OutlinedTextFieldDefaults.colors(
-            unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
-            focusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
-            unfocusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f),
-            focusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f)
-        ),
         modifier = modifier.fillMaxWidth()
     )
 }

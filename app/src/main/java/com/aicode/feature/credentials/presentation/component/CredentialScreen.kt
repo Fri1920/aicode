@@ -15,6 +15,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -99,13 +101,13 @@ fun CredentialScreen(
     // 两个标签页的滚动状态提升到页面层，聚合出「是否正在滚动」用于底部 tab 栏滚动弱化。
     val identityScrollState = rememberScrollState()
     val credentialListState = rememberLazyListState()
+    val pagerState = rememberPagerState(initialPage = 0) { 2 }
     val tabsScrolling by remember {
         derivedStateOf {
             identityScrollState.isScrollInProgress || credentialListState.isScrollInProgress
         }
     }
 
-    var selectedTab by remember { mutableIntStateOf(0) }
     // editingCredential != null -> 编辑现有；editingCredential == null && isAddingCredential -> 新增；否则列表态。
     var editingCredential by remember { mutableStateOf<GitCredential?>(null) }
     var isAddingCredential by remember { mutableStateOf(false) }
@@ -134,8 +136,11 @@ fun CredentialScreen(
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { padding ->
         Box(modifier = Modifier.fillMaxSize().padding(padding)) {
-            Column(modifier = Modifier.fillMaxSize()) {
-                when (selectedTab) {
+            HorizontalPager(
+                state = pagerState,
+                modifier = Modifier.fillMaxSize()
+            ) { tab ->
+                when (tab) {
                     0 -> Column(
                         modifier = Modifier
                             .fillMaxSize()
@@ -211,8 +216,7 @@ fun CredentialScreen(
             }
 
             FloatingTabBar(
-                selected = selectedTab,
-                onSelect = { selectedTab = it },
+                pagerState = pagerState,
                 items = listOf(
                     FloatingTabItem(FeatherIcons.User, stringResource(R.string.git_tab_identity)),
                     FloatingTabItem(FeatherIcons.Key, stringResource(R.string.git_tab_credentials))

@@ -33,12 +33,12 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
+import com.aicode.core.ui.AppTextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
@@ -176,10 +176,10 @@ internal fun BranchesTab(
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSurface
                 )
-                OutlinedTextField(
+                AppTextField(
                     value = newName,
                     onValueChange = { newName = it },
-                    label = { Text(stringResource(R.string.git_branch_name)) },
+                    label = stringResource(R.string.git_branch_name),
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -187,11 +187,11 @@ internal fun BranchesTab(
                     expanded = expanded,
                     onExpandedChange = { expanded = !expanded }
                 ) {
-                    OutlinedTextField(
+                    AppTextField(
                         value = startPoint,
                         onValueChange = {},
                         readOnly = true,
-                        label = { Text(stringResource(R.string.git_base_branch)) },
+                        label = stringResource(R.string.git_base_branch),
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
                         modifier = Modifier
                             .fillMaxWidth()
@@ -266,10 +266,10 @@ internal fun BranchesTab(
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(stringResource(R.string.git_rename_to, oldName))
-                    OutlinedTextField(
+                    AppTextField(
                         value = newName,
                         onValueChange = { newName = it },
-                        label = { Text(stringResource(R.string.git_new_branch_name)) },
+                        label = stringResource(R.string.git_new_branch_name),
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
@@ -318,10 +318,10 @@ internal fun BranchesTab(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                OutlinedTextField(
+                AppTextField(
                     value = tagName,
                     onValueChange = { tagName = it },
-                    label = { Text(stringResource(R.string.git_tag_name)) },
+                    label = stringResource(R.string.git_tag_name),
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )

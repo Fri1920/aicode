@@ -1,14 +1,9 @@
 package com.aicode.feature.git.presentation.component
 
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -29,7 +24,6 @@ import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -57,6 +51,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.aicode.R
 import com.aicode.core.theme.Radius
 import com.aicode.core.theme.Spacing
+import com.aicode.core.ui.AppTextField
 import com.aicode.core.ui.FloatingTabBar
 import com.aicode.core.ui.FloatingTabItem
 import com.aicode.feature.settings.presentation.component.settingsLightMode
@@ -97,6 +92,22 @@ fun GitScreen(
     val statusScrollState = rememberScrollState()
     val branchesListState = rememberLazyListState()
     val logListState = rememberLazyListState()
+
+    val pagerState = rememberPagerState(initialPage = state.tab.ordinal) { GitTab.entries.size }
+
+    // 页面滑动结束时同步 ViewModel 状态
+    LaunchedEffect(pagerState.currentPage) {
+        if (state.tab.ordinal != pagerState.currentPage) {
+            viewModel.setTab(GitTab.entries[pagerState.currentPage])
+        }
+    }
+    // 外部主动设置 ViewModel tab 时同步滑动 Pager
+    LaunchedEffect(state.tab) {
+        if (pagerState.currentPage != state.tab.ordinal) {
+            pagerState.animateScrollToPage(state.tab.ordinal)
+        }
+    }
+
     val tabsScrolling by remember {
         derivedStateOf {
             statusScrollState.isScrollInProgress ||
@@ -148,18 +159,11 @@ fun GitScreen(
                     CircularProgressIndicator()
                 }
                 state.notARepo -> NotARepoState(onInit = viewModel::initRepo)
-                else -> AnimatedContent(
-                    targetState = state.tab,
-                    transitionSpec = {
-                        val direction = if (targetState.ordinal > initialState.ordinal) 1 else -1
-                        (slideInHorizontally(animationSpec = tween(240)) { direction * it } +
-                            fadeIn(animationSpec = tween(240))) togetherWith
-                            (slideOutHorizontally(animationSpec = tween(240)) { -direction * it } +
-                                fadeOut(animationSpec = tween(160)))
-                    },
-                    label = "git-tab-content"
-                ) { tab ->
-                    when (tab) {
+                else -> HorizontalPager(
+                    state = pagerState,
+                    modifier = Modifier.fillMaxSize()
+                ) { page ->
+                    when (GitTab.entries[page]) {
                         GitTab.STATUS -> StatusTab(
                             status = state.status,
                             busy = state.busy,
@@ -212,8 +216,7 @@ fun GitScreen(
 
         // 底部渐变蒙版 + 悬浮 tab 组：内容可滚动到屏幕底部穿过 tab 栏，被渐变遮罩（同主页输入框）。
         FloatingTabBar(
-            selected = state.tab.ordinal,
-            onSelect = { viewModel.setTab(GitTab.entries[it]) },
+            pagerState = pagerState,
             items = listOf(
                 FloatingTabItem(FeatherIcons.Activity, stringResource(R.string.git_tab_status)),
                 FloatingTabItem(FeatherIcons.GitBranch, stringResource(R.string.git_tab_branches)),
@@ -374,11 +377,12 @@ private fun CommitDialog(onDismiss: () -> Unit, onConfirm: (String) -> Unit) {
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.git_commit_dialog_title)) },
         text = {
-            OutlinedTextField(
+            AppTextField(
                 value = message,
                 onValueChange = { message = it },
-                label = { Text(stringResource(R.string.git_commit_message)) },
+                label = stringResource(R.string.git_commit_message),
                 modifier = Modifier.fillMaxWidth(),
+                singleLine = false,
                 minLines = 2
             )
         },

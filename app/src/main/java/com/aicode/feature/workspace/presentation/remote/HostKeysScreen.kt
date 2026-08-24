@@ -16,6 +16,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -70,7 +72,7 @@ fun HostKeysScreen(
     onRemoveLoginKey: (String) -> Unit,
     onNavigateBack: () -> Unit
 ) {
-    var selectedTab by remember { mutableStateOf(0) }
+    val pagerState = rememberPagerState(initialPage = 0) { 2 }
     // 系统返回键与顶栏返回箭头一致：回到远程服务器列表，而不是被外层设置页拦截直接跳回首页。
     BackHandler { onNavigateBack() }
     var detailLoginKey by remember { mutableStateOf<SshLoginKey?>(null) }
@@ -104,7 +106,7 @@ fun HostKeysScreen(
                     }
                 },
                 actions = {
-                    if (selectedTab == 0) {
+                    if (pagerState.currentPage == 0) {
                         IconButton(onClick = { keyFilePicker.launch(arrayOf("*/*")) }) {
                             Icon(FeatherIcons.Plus, contentDescription = stringResource(R.string.ssh_login_key_add))
                         }
@@ -114,86 +116,91 @@ fun HostKeysScreen(
         }
     ) { paddingValues ->
         Box(modifier = Modifier.padding(paddingValues).fillMaxSize()) {
-            if (selectedTab == 0) {
-                if (loginKeys.isEmpty()) {
-                    EmptyCenterHint(stringResource(R.string.ssh_login_key_empty))
-                } else {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .verticalScroll(keysScrollState)
-                            .padding(horizontal = Spacing.lg)
-                            .padding(bottom = 70.dp)
-                    ) {
-                        SettingsGroup {
-                            loginKeys.sortedBy { it.name }.forEachIndexed { index, key ->
-                                if (index > 0) {
-                                    SettingsDivider()
+            HorizontalPager(
+                state = pagerState,
+                modifier = Modifier.fillMaxSize()
+            ) { tab ->
+                if (tab == 0) {
+                    if (loginKeys.isEmpty()) {
+                        EmptyCenterHint(stringResource(R.string.ssh_login_key_empty))
+                    } else {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .verticalScroll(keysScrollState)
+                                .padding(horizontal = Spacing.lg)
+                                .padding(bottom = 70.dp)
+                        ) {
+                            SettingsGroup {
+                                loginKeys.sortedBy { it.name }.forEachIndexed { index, key ->
+                                    if (index > 0) {
+                                        SettingsDivider()
+                                    }
+                                    LoginKeyRow(
+                                        key = key,
+                                        onDelete = { onRemoveLoginKey(key.id) },
+                                        onClick = { detailLoginKey = key }
+                                    )
                                 }
-                                LoginKeyRow(
-                                    key = key,
-                                    onDelete = { onRemoveLoginKey(key.id) },
-                                    onClick = { detailLoginKey = key }
-                                )
                             }
                         }
                     }
-                }
-            } else {
-                if (hostKeys.isEmpty()) {
-                    EmptyCenterHint(stringResource(R.string.ssh_host_key_empty))
                 } else {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .verticalScroll(fingerprintsScrollState)
-                            .padding(horizontal = Spacing.lg)
-                            .padding(bottom = 70.dp)
-                    ) {
-                        SettingsGroup {
-                            hostKeys.toSortedMap().entries.toList().forEachIndexed { index, (address, fingerprint) ->
-                                if (index > 0) {
-                                    SettingsDivider()
-                                }
-                                val separator = address.lastIndexOf(':')
-                                val host = address.substring(0, separator.coerceAtLeast(0))
-                                val port = address.substring(separator + 1).toIntOrNull()
-                                SwipeToDeleteRow(
-                                    onDelete = { if (port != null) onRemoveHostKey(host, port) },
-                                    onClick = { detailHostAddress = address }
-                                ) {
-                                    Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(horizontal = Spacing.lg, vertical = 12.dp),
-                                        verticalAlignment = Alignment.CenterVertically
+                    if (hostKeys.isEmpty()) {
+                        EmptyCenterHint(stringResource(R.string.ssh_host_key_empty))
+                    } else {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .verticalScroll(fingerprintsScrollState)
+                                .padding(horizontal = Spacing.lg)
+                                .padding(bottom = 70.dp)
+                        ) {
+                            SettingsGroup {
+                                hostKeys.toSortedMap().entries.toList().forEachIndexed { index, (address, fingerprint) ->
+                                    if (index > 0) {
+                                        SettingsDivider()
+                                    }
+                                    val separator = address.lastIndexOf(':')
+                                    val host = address.substring(0, separator.coerceAtLeast(0))
+                                    val port = address.substring(separator + 1).toIntOrNull()
+                                    SwipeToDeleteRow(
+                                        onDelete = { if (port != null) onRemoveHostKey(host, port) },
+                                        onClick = { detailHostAddress = address }
                                     ) {
-                                        Column(modifier = Modifier.weight(1f)) {
-                                            Text(
-                                                text = address,
-                                                style = MaterialTheme.typography.bodyLarge,
-                                                fontWeight = FontWeight.Normal,
-                                                color = if (settingsLightMode()) Color(0xFF0F0F0F)
-                                                else MaterialTheme.colorScheme.onSurface,
-                                                maxLines = 1
-                                            )
-                                            Text(
-                                                text = fingerprint,
-                                                style = MaterialTheme.typography.bodySmall,
-                                                color = if (settingsLightMode()) Color(0xFF8E8E93)
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(horizontal = Spacing.lg, vertical = 12.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Column(modifier = Modifier.weight(1f)) {
+                                                Text(
+                                                    text = address,
+                                                    style = MaterialTheme.typography.bodyLarge,
+                                                    fontWeight = FontWeight.Normal,
+                                                    color = if (settingsLightMode()) Color(0xFF0F0F0F)
+                                                    else MaterialTheme.colorScheme.onSurface,
+                                                    maxLines = 1
+                                                )
+                                                Text(
+                                                    text = fingerprint,
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = if (settingsLightMode()) Color(0xFF8E8E93)
+                                                    else MaterialTheme.colorScheme.onSurfaceVariant,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis
+                                                )
+                                            }
+                                            Spacer(modifier = Modifier.width(Spacing.xs))
+                                            Icon(
+                                                imageVector = FeatherIcons.ChevronRight,
+                                                contentDescription = null,
+                                                tint = if (settingsLightMode()) Color(0xFFC7C7CC)
                                                 else MaterialTheme.colorScheme.onSurfaceVariant,
-                                                maxLines = 1,
-                                                overflow = TextOverflow.Ellipsis
+                                                modifier = Modifier.width(18.dp)
                                             )
                                         }
-                                        Spacer(modifier = Modifier.width(Spacing.xs))
-                                        Icon(
-                                            imageVector = FeatherIcons.ChevronRight,
-                                            contentDescription = null,
-                                            tint = if (settingsLightMode()) Color(0xFFC7C7CC)
-                                            else MaterialTheme.colorScheme.onSurfaceVariant,
-                                            modifier = Modifier.width(18.dp)
-                                        )
                                     }
                                 }
                             }
@@ -203,8 +210,7 @@ fun HostKeysScreen(
             }
 
             FloatingTabBar(
-                selected = selectedTab,
-                onSelect = { selectedTab = it },
+                pagerState = pagerState,
                 items = listOf(
                     FloatingTabItem(FeatherIcons.Key, stringResource(R.string.ssh_host_key_tab_keys)),
                     FloatingTabItem(FeatherIcons.Shield, stringResource(R.string.ssh_host_key_tab_fingerprints))

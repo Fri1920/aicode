@@ -22,10 +22,10 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
+import com.aicode.core.ui.AppTextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -372,12 +372,12 @@ private fun CreateWorkspaceDialog(
         title = { Text(stringResource(R.string.workspace_new_workspace)) },
         text = {
             Column {
-                OutlinedTextField(
+                AppTextField(
                     value = name,
                     onValueChange = { name = it },
                     singleLine = true,
-                    label = { Text(stringResource(R.string.common_name)) },
-                    placeholder = { Text(stringResource(R.string.workspace_name_hint)) },
+                    label = stringResource(R.string.common_name),
+                    placeholder = stringResource(R.string.workspace_name_hint),
                     isError = duplicate,
                     leadingIcon = {
                         Icon(FeatherIcons.FolderPlus, contentDescription = null)

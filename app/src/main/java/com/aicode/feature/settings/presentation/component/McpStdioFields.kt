@@ -16,10 +16,9 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import com.aicode.core.ui.AppTextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Alignment
@@ -42,13 +41,12 @@ internal fun McpStdioFields(
     args: SnapshotStateList<String>,
     env: SnapshotStateList<Pair<String, String>>
 ) {
-    OutlinedTextField(
+    AppTextField(
         value = command,
         onValueChange = onCommandChange,
-        label = { Text(stringResource(R.string.mcp_command)) },
-        placeholder = { Text(stringResource(R.string.mcp_command_hint)) },
+        label = stringResource(R.string.mcp_command),
+        placeholder = stringResource(R.string.mcp_command_hint),
         singleLine = true,
-        shape = RoundedCornerShape(12.dp),
         modifier = Modifier.fillMaxWidth()
     )
 
@@ -79,19 +77,12 @@ internal fun McpStdioFields(
                         .padding(12.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    OutlinedTextField(
+                    AppTextField(
                         value = value,
                         onValueChange = { args[index] = it },
-                        label = { Text(stringResource(R.string.mcp_arg_value)) },
-                        placeholder = { Text(stringResource(R.string.mcp_arg_hint)) },
+                        label = stringResource(R.string.mcp_arg_value),
+                        placeholder = stringResource(R.string.mcp_arg_hint),
                         singleLine = true,
-                        shape = RoundedCornerShape(12.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
-                            focusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
-                            unfocusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f),
-                            focusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f)
-                        ),
                         modifier = Modifier.fillMaxWidth()
                     )
 
@@ -169,35 +160,21 @@ internal fun McpStdioFields(
                         .padding(12.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    OutlinedTextField(
+                    AppTextField(
                         value = k,
                         onValueChange = { env[index] = it to v },
-                        label = { Text(stringResource(R.string.mcp_env_name)) },
-                        placeholder = { Text(stringResource(R.string.mcp_env_name_hint)) },
+                        label = stringResource(R.string.mcp_env_name),
+                        placeholder = stringResource(R.string.mcp_env_name_hint),
                         singleLine = true,
-                        shape = RoundedCornerShape(12.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
-                            focusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
-                            unfocusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f),
-                            focusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f)
-                        ),
                         modifier = Modifier.fillMaxWidth()
                     )
 
-                    OutlinedTextField(
+                    AppTextField(
                         value = v,
                         onValueChange = { env[index] = k to it },
-                        label = { Text(stringResource(R.string.mcp_env_value)) },
-                        placeholder = { Text(stringResource(R.string.mcp_env_value_hint)) },
+                        label = stringResource(R.string.mcp_env_value),
+                        placeholder = stringResource(R.string.mcp_env_value_hint),
                         singleLine = true,
-                        shape = RoundedCornerShape(12.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
-                            focusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
-                            unfocusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f),
-                            focusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f)
-                        ),
                         modifier = Modifier.fillMaxWidth()
                     )
 
