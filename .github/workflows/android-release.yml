@@ -284,11 +284,23 @@ jobs:
               continue
             fi
             echo "上传 $(basename "$apk")（$(numfmt --to=iec "$size")）..."
-            curl -fsS -X POST \
-              -F "access_token=${GITEE_TOKEN}" \
-              -F "file=@${apk}" \
-              "${api}/releases/${release_id}/attach_files" > /dev/null
-            echo "  ✓ 已上传"
+            # 上传加超时与重试：Gitee API 偶发挂起，无超时会无限卡住整个 job（默认 6h 才超时）。
+            uploaded=false
+            for attempt in 1 2 3; do
+              if curl -fsS --max-time 300 -X POST \
+                -F "access_token=${GITEE_TOKEN}" \
+                -F "file=@${apk}" \
+                "${api}/releases/${release_id}/attach_files" > /dev/null; then
+                echo "  ✓ 已上传"
+                uploaded=true
+                break
+              fi
+              echo "  ⚠ 上传失败（第 ${attempt} 次），10s 后重试..."
+              sleep 10
+            done
+            if [[ "$uploaded" != true ]]; then
+              echo "::warning::$(basename "$apk") 连续 3 次上传失败，跳过（GitHub Release 不受影响）"
+            fi
           done
           echo "完成: https://gitee.com/${owner}/${repo}/releases"
 
