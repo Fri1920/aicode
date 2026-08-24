@@ -32,6 +32,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.aicode.R
 import com.aicode.core.theme.Radius
+import com.aicode.core.ui.SwipeToDeleteRow
 import com.aicode.core.theme.Spacing
 import com.aicode.feature.agent.domain.skill.SkillScope
 import com.aicode.feature.settings.presentation.SkillUiEntry

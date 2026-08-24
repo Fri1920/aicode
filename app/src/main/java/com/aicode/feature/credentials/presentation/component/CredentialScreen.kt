@@ -54,13 +54,14 @@ import com.aicode.core.theme.Radius
 import com.aicode.core.theme.Spacing
 import com.aicode.core.ui.FloatingTabBar
 import com.aicode.core.ui.FloatingTabItem
+import com.aicode.core.ui.SwipeToDeleteRow
 import com.aicode.feature.credentials.domain.model.GitCredential
 import com.aicode.feature.credentials.presentation.CredentialViewModel
 import com.aicode.feature.git.presentation.component.SectionHeader
 import com.aicode.feature.settings.presentation.component.SettingsDivider
 import com.aicode.feature.settings.presentation.component.SettingsGroup
+import com.aicode.feature.settings.presentation.component.SettingsGroup
 import com.aicode.feature.settings.presentation.component.SettingsRow
-import com.aicode.feature.settings.presentation.component.SwipeToDeleteRow
 import com.aicode.feature.settings.presentation.component.settingsLightMode
 import com.aicode.feature.settings.presentation.component.settingsPageBackground
 import compose.icons.FeatherIcons

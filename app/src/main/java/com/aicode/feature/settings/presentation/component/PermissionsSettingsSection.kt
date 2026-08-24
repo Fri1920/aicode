@@ -32,6 +32,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aicode.R
 import com.aicode.core.theme.Spacing
+import com.aicode.core.ui.SwipeToDeleteRow
 import com.aicode.feature.agent.domain.permission.PermissionDecision
 import com.aicode.feature.agent.domain.permission.PermissionRule
 import compose.icons.FeatherIcons

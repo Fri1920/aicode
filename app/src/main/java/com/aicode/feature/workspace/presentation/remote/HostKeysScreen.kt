@@ -45,6 +45,7 @@ import androidx.compose.ui.unit.dp
 import com.aicode.core.theme.Spacing
 import com.aicode.core.ui.FloatingTabBar
 import com.aicode.core.ui.FloatingTabItem
+import com.aicode.core.ui.SwipeToDeleteRow
 import com.aicode.feature.agent.domain.container.SshLoginKey
 import com.aicode.feature.settings.presentation.component.SettingsDivider
 import com.aicode.feature.settings.presentation.component.SettingsGroup
