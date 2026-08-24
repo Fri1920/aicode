@@ -1,6 +1,7 @@
 package com.aicode.feature.agent.domain.session
 
 import com.aicode.feature.agent.data.local.dao.AgentMessageDao
+import com.aicode.feature.agent.data.local.database.AgentDatabase
 import com.aicode.feature.agent.data.local.entity.AgentMessageEntity
 import com.aicode.feature.agent.domain.model.AgentMessage
 import com.aicode.feature.agent.domain.model.CONTEXT_COMPACTION_MARKER
@@ -17,9 +18,54 @@ import javax.inject.Singleton
 
 @Singleton
 class MessagePersistenceUseCase @Inject constructor(
-    private val agentMessageDao: AgentMessageDao
+    private val agentMessageDao: AgentMessageDao,
+    private val agentDatabase: AgentDatabase
 ) {
     private val json = Json { ignoreUnknownKeys = true }
+
+    /** agent_messages 表变更版本号：任何写路径（含 rewind 删除、压缩标记、冷启动清理）触发递增，
+     *  作为 [buildHistory] 缓存的失效信号。InvalidationTracker 监听表级变更，覆盖所有 DAO 写入。 */
+    private val dbVersion = java.util.concurrent.atomic.AtomicLong(0)
+    private val historyCache = HashMap<String, HistoryEntry>()
+
+    private class HistoryEntry(
+        val version: Long,
+        val pendingToolMarker: String,
+        val messages: List<AgentMessage>
+    )
+
+    init {
+        agentDatabase.invalidationTracker.addObserver(
+            object : androidx.room.InvalidationTracker.Observer(arrayOf("agent_messages")) {
+                override fun onInvalidated(tables: Set<String>) {
+                    dbVersion.incrementAndGet()
+                }
+            }
+        )
+    }
+
+    /** 内嵌图片 base64 的 LRU 缓存：key = path:size:lastModified，避免工具循环中
+     *  每轮 LLM 调用都重读文件 + base64 编码。带条目与总字节双重上限。 */
+    private val imageBase64Cache = object : LinkedHashMap<String, String>(16, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, String>?): Boolean =
+            size > MAX_IMAGE_CACHE_ENTRIES
+    }
+    private var imageCacheBytes = 0L
+
+    private fun cachedImageBase64(key: String): String? = synchronized(imageBase64Cache) { imageBase64Cache[key] }
+
+    private fun cacheImageBase64(key: String, value: String) {
+        synchronized(imageBase64Cache) {
+            val old = imageBase64Cache.put(key, value)
+            imageCacheBytes += value.length - (old?.length ?: 0)
+            while (imageCacheBytes > MAX_IMAGE_CACHE_BYTES && imageBase64Cache.isNotEmpty()) {
+                val it = imageBase64Cache.entries.iterator()
+                val eldest = it.next()
+                it.remove()
+                imageCacheBytes -= eldest.value.length
+            }
+        }
+    }
 
     // 单调递增时间戳：保证同毫秒内多次落库的顺序稳定（assistant 永远在其 tool 结果之前）。
     @Volatile
@@ -85,6 +131,10 @@ class MessagePersistenceUseCase @Inject constructor(
         const val MAX_CONTENT_CHARS = 200_000
         const val IMAGE_OMITTED_MARKER = "[图片已省略：内嵌图片数据过大]"
         const val CONTENT_TRUNCATED_MARKER = "…[内容过长，已截断]"
+        /** 图片 base64 缓存条目上限。 */
+        private const val MAX_IMAGE_CACHE_ENTRIES = 12
+        /** 图片 base64 缓存总字节上限（base64 为原始大小的 ~4/3，48MB 约可存 36MB 原始图片）。 */
+        private const val MAX_IMAGE_CACHE_BYTES = 48L * 1024 * 1024
 
         /** 内嵌 base64 图片 data URL（`data:image/...;base64,...`）。 */
         private val INLINE_BASE64_IMAGE = Regex("""data:image/[a-zA-Z0-9.+-]+;base64,[A-Za-z0-9+/=\r\n]+""")
@@ -113,6 +163,25 @@ class MessagePersistenceUseCase @Inject constructor(
      * 已被上下文压缩标记的消息（isCompacted=true）不参与回放。
      */
     suspend fun buildHistory(sessionId: String, pendingToolMarker: String): List<AgentMessage> {
+        // 版本化缓存：agent_messages 表无变更且 marker 相同时直接复用上次重建结果，
+        // 避免工具循环中每轮 LLM 调用都全量读库 + 多次遍历 + JSON 解码。
+        // InvalidationTracker 覆盖所有写路径（含 rewind 删除、压缩标记、冷启动清理），不会漏失效。
+        val version = dbVersion.get()
+        synchronized(historyCache) {
+            historyCache[sessionId]?.let { cached ->
+                if (cached.version == version && cached.pendingToolMarker == pendingToolMarker) {
+                    return cached.messages
+                }
+            }
+        }
+        val messages = buildHistoryUncached(sessionId, pendingToolMarker)
+        synchronized(historyCache) {
+            historyCache[sessionId] = HistoryEntry(version, pendingToolMarker, messages)
+        }
+        return messages
+    }
+
+    private suspend fun buildHistoryUncached(sessionId: String, pendingToolMarker: String): List<AgentMessage> {
         val entities = agentMessageDao.getMessagesBySessionOnce(sessionId)
             .filter { !it.isCompacted }
 
@@ -220,9 +289,19 @@ class MessagePersistenceUseCase @Inject constructor(
         if (!isImage || localPath.isBlank()) return null
         val file = java.io.File(localPath)
         if (!file.exists() || !file.isFile || file.length() <= 0) return null
+        // 按路径+大小+修改时间缓存 base64：文件未变时直接复用，省去每次 LLM 调用的重读+编码。
+        val key = "$localPath:${file.length()}:${file.lastModified()}"
+        cachedImageBase64(key)?.let { cached ->
+            return com.aicode.feature.agent.domain.model.AgentImage(
+                mimeType = mimeType.ifBlank { "image/jpeg" },
+                base64Data = cached,
+                path = containerPath
+            )
+        }
         return try {
             val bytes = file.readBytes()
             val base64 = java.util.Base64.getEncoder().encodeToString(bytes)
+            cacheImageBase64(key, base64)
             com.aicode.feature.agent.domain.model.AgentImage(
                 mimeType = mimeType.ifBlank { "image/jpeg" },
                 base64Data = base64,

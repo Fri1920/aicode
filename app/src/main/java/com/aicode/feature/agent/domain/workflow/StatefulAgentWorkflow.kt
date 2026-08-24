@@ -447,6 +447,26 @@ class StatefulAgentWorkflow @Inject constructor(
                         var callError: String? = null
                         var callCompleted = false
 
+                        // 流式 delta 节流：上游每个 chunk 都携带完整累积文本，逐条 send 会让
+                        // ViewModel 端每秒重建几十次状态、UI 端反复重启打字机协程。按时间窗口合并：
+                        // 窗口内只保留最新累积文本，到窗口边界才发送，把下游事件频率压到 ~16/s。
+                        // 打字机渲染本身有 100ms 节流，少发中间态无感知；collect 结束补发最后 pending。
+                        val DELTA_THROTTLE_MS = 60L
+                        var lastTextDeltaSentAt = 0L
+                        var lastReasoningDeltaSentAt = 0L
+                        var pendingTextDelta: String? = null
+                        var pendingReasoningDelta: String? = null
+                        suspend fun flushPendingTextDelta() {
+                            val text = pendingTextDelta ?: return
+                            pendingTextDelta = null
+                            send(AgentEvent.AssistantDelta(text))
+                        }
+                        suspend fun flushPendingReasoningDelta() {
+                            val text = pendingReasoningDelta ?: return
+                            pendingReasoningDelta = null
+                            send(AgentEvent.ReasoningDelta(text))
+                        }
+
                         try {
                             // 发送前按实际模型的视觉能力处理图片（同 execute 路径）。
                             val supportsVision = activeModelSupportsVision(currentContext.sessionId)
@@ -456,17 +476,31 @@ class StatefulAgentWorkflow @Inject constructor(
                                     is AIStreamChunk.TextDelta -> {
                                         if (ttfbElapsed == null) ttfbElapsed = SystemClock.elapsedRealtime() - callStartElapsed
                                         acc.append(chunk.text)
-                                        send(AgentEvent.AssistantDelta(acc.toString()))
+                                        pendingTextDelta = acc.toString()
+                                        val now = SystemClock.elapsedRealtime()
+                                        if (now - lastTextDeltaSentAt >= DELTA_THROTTLE_MS) {
+                                            flushPendingTextDelta()
+                                            lastTextDeltaSentAt = now
+                                        }
                                     }
                                     is AIStreamChunk.ReasoningDelta -> {
                                         // 思考内容也算首字（推理模型先吐思考再吐正文）
                                         if (ttfbElapsed == null) ttfbElapsed = SystemClock.elapsedRealtime() - callStartElapsed
                                         reasoningAcc.append(chunk.text)
-                                        send(AgentEvent.ReasoningDelta(reasoningAcc.toString()))
+                                        pendingReasoningDelta = reasoningAcc.toString()
+                                        val now = SystemClock.elapsedRealtime()
+                                        if (now - lastReasoningDeltaSentAt >= DELTA_THROTTLE_MS) {
+                                            flushPendingReasoningDelta()
+                                            lastReasoningDeltaSentAt = now
+                                        }
                                     }
                                     is AIStreamChunk.Retrying -> {
                                         acc.setLength(0)
                                         reasoningAcc.setLength(0)
+                                        pendingTextDelta = null
+                                        pendingReasoningDelta = null
+                                        lastTextDeltaSentAt = 0L
+                                        lastReasoningDeltaSentAt = 0L
                                         send(AgentEvent.Retrying(chunk.attempt, chunk.maxRetries, chunk.error))
                                     }
                                     is AIStreamChunk.Final -> {
@@ -476,6 +510,9 @@ class StatefulAgentWorkflow @Inject constructor(
                                     }
                                 }
                             }
+                            // 节流窗口内可能还压着最新累积文本：补发，保证 UI 尾巴拿到完整文本再交接落库。
+                            flushPendingTextDelta()
+                            flushPendingReasoningDelta()
                             val aiResponse = finalResponse ?: AIResponse(content = acc.toString())
                             callCompleted = true
                             // 将本轮 reasoning 附加到 AIResponse，以便 reduce 时存入 AssistantMessage 并在下一轮回传
