@@ -129,8 +129,14 @@ fun AIChatPanel(
     val messageEntryDelays = remember(messages) {
         val now = System.currentTimeMillis()
         val map = mutableMapOf<String, Long>()
+        // 消息按时间升序：先定位窗口起点（从最新往回找首个未超窗消息），
+        // 长历史时每次落库只遍历窗口内尾部，而不是全量扫描旧消息。
+        var start = messages.size - 1
+        while (start >= 0 && now - messages[start].timestamp < MESSAGE_ENTRY_WINDOW_MS) start--
+        start++
         var consecutive = 0
-        for (m in messages) {
+        for (i in start until messages.size) {
+            val m = messages[i]
             if (m.role == MessageRole.TOOL && now - m.timestamp < MESSAGE_ENTRY_WINDOW_MS) {
                 map[m.id] = consecutive * MESSAGE_ENTRY_STAGGER_MS.toLong()
                 consecutive++
