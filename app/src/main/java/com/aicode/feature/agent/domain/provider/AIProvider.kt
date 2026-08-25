@@ -93,10 +93,13 @@ interface AIProvider {
     ): Flow<AIStreamChunk>
 }
 
+private val VERSION_SEGMENT_REGEX = Regex("""^v\d+.*$""", RegexOption.IGNORE_CASE)
+
 /**
  * Builds an absolute request URL from a user-configured base URL and an API path
  * such as "v1/chat/completions". Tolerates trailing slashes and a base URL that
- * already ends with the version segment (e.g. "https://host/v1") so it isn't duplicated.
+ * already ends with a version segment (e.g. "https://host/v1", "https://host/api/v3", "https://host/v1beta")
+ * so it isn't duplicated or conflicted with "v1/".
  */
 fun joinUrl(baseUrl: String, path: String): String {
     val base = baseUrl.trim().trimEnd('/')
@@ -104,9 +107,19 @@ fun joinUrl(baseUrl: String, path: String): String {
     
     val lastSegment = base.substringAfterLast('/', "")
     
-    return if (lastSegment.isNotEmpty() && cleanPath.startsWith("$lastSegment/")) {
-        "$base/${cleanPath.removePrefix("$lastSegment/")}"
-    } else {
-        "$base/$cleanPath"
+    // 1. 如果 base 末尾与 path 开头是完全相同的 segment（如 /v1 与 v1/chat），去重
+    if (lastSegment.isNotEmpty() && cleanPath.startsWith("$lastSegment/", ignoreCase = true)) {
+        return "$base/${cleanPath.substring(lastSegment.length + 1)}"
     }
+    
+    // 2. 如果 base 末尾已经是版本号（如 /v3, /v2, /v1beta 等），且待拼路径也以版本段开头（如 v1/chat, v1/models）
+    if (lastSegment.matches(VERSION_SEGMENT_REGEX)) {
+        val pathFirstSegment = cleanPath.substringBefore('/', "")
+        if (pathFirstSegment.matches(VERSION_SEGMENT_REGEX)) {
+            val remainingPath = cleanPath.substringAfter('/', "")
+            return if (remainingPath.isNotEmpty()) "$base/$remainingPath" else base
+        }
+    }
+    
+    return "$base/$cleanPath"
 }

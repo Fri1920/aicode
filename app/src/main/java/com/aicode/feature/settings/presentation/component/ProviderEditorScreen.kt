@@ -59,7 +59,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.Switch
+import com.aicode.core.ui.AppSwitch
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -91,6 +91,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.foundation.background
+import androidx.compose.ui.draw.alpha
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.unit.Dp
@@ -109,9 +110,17 @@ import com.aicode.feature.settings.domain.model.ProviderType
 import com.aicode.feature.settings.domain.model.mergeModelMetadata
 import com.aicode.feature.settings.presentation.FetchState
 import com.aicode.feature.settings.presentation.SettingsViewModel
+import androidx.compose.ui.platform.LocalFocusManager
 import compose.icons.FeatherIcons
+import compose.icons.feathericons.AlertCircle
 import compose.icons.feathericons.ArrowLeft
 import compose.icons.feathericons.Check
+import compose.icons.feathericons.ChevronDown
+import compose.icons.feathericons.ChevronRight
+import compose.icons.feathericons.ChevronUp
+import android.widget.Toast
+import compose.icons.feathericons.Copy
+import compose.icons.feathericons.Terminal
 import compose.icons.feathericons.Cpu
 import compose.icons.feathericons.DownloadCloud
 import compose.icons.feathericons.Eye
@@ -140,6 +149,7 @@ fun ProviderEditorScreen(
     onSave: (AIProviderConfig) -> Unit
 ) {
     val context = LocalContext.current
+    val focusManager = LocalFocusManager.current
     var name by remember { mutableStateOf(initialProvider?.name ?: "") }
     var apiKey by remember { mutableStateOf(initialProvider?.apiKey ?: "") }
     var apiKeyVisible by remember { mutableStateOf(false) }
@@ -434,7 +444,7 @@ fun ProviderEditorScreen(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = Spacing.md, vertical = Spacing.sm),
+                                .padding(horizontal = Spacing.lg, vertical = 11.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
@@ -442,7 +452,11 @@ fun ProviderEditorScreen(
                                 Text(
                                     text = stringResource(R.string.provider_balance_test_btn),
                                     style = MaterialTheme.typography.bodyLarge,
-                                    color = MaterialTheme.colorScheme.onSurface
+                                    color = if (MaterialTheme.colorScheme.background.luminance() > 0.5f) {
+                                        Color(0xFF0F0F0F)
+                                    } else {
+                                        MaterialTheme.colorScheme.onSurface
+                                    }
                                 )
                                 Text(
                                     text = stringResource(R.string.provider_balance_script_desc),
@@ -451,30 +465,36 @@ fun ProviderEditorScreen(
                                 )
                             }
                             Spacer(Modifier.width(Spacing.sm))
-                            FilledTonalButton(
+                            IconButton(
                                 onClick = {
+                                    focusManager.clearFocus()
                                     viewModel.testBalanceScript(currentConfig(), balanceScriptPath)
                                 },
                                 enabled = balanceScriptPath.isNotBlank() && balanceTestState !is ProviderBalanceState.Loading,
-                                shape = RoundedCornerShape(Radius.sm),
-                                contentPadding = PaddingValues(horizontal = Spacing.md, vertical = Spacing.xs)
+                                modifier = Modifier.size(36.dp)
                             ) {
                                 if (balanceTestState is ProviderBalanceState.Loading) {
                                     CircularProgressIndicator(
-                                        modifier = Modifier.size(16.dp),
+                                        modifier = Modifier.size(18.dp),
                                         strokeWidth = 2.dp,
                                         color = MaterialTheme.colorScheme.primary
                                     )
                                 } else {
-                                    Icon(FeatherIcons.Play, contentDescription = null, modifier = Modifier.size(16.dp))
-                                    Spacer(Modifier.width(Spacing.xs))
-                                    Text(stringResource(R.string.provider_balance_run_test))
+                                    Icon(
+                                        imageVector = FeatherIcons.Play,
+                                        contentDescription = stringResource(R.string.provider_balance_run_test),
+                                        tint = if (balanceScriptPath.isNotBlank()) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                                        modifier = Modifier.size(20.dp)
+                                    )
                                 }
                             }
                         }
                         if (balanceTestState !is ProviderBalanceState.Idle) {
                             SettingsDivider()
-                            BalanceTestResultBox(state = balanceTestState)
+                            BalanceTestResultBox(
+                                state = balanceTestState,
+                                providerName = name.ifBlank { stringResource(R.string.provider_balance_preview_title) }
+                            )
                         }
                     }
                 }
@@ -925,7 +945,7 @@ private fun CapabilitySwitchRow(
             color = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.weight(1f)
         )
-        Switch(
+        AppSwitch(
             checked = checked,
             onCheckedChange = onCheckedChange
         )
@@ -945,13 +965,20 @@ private fun FetchModelsDialog(
     val context = LocalContext.current
     val sheetState = rememberModalBottomSheetState()
     var searchQuery by remember { mutableStateOf("") }
-    
+    var showDebugSheet by remember { mutableStateOf(false) }
+
+    val debugInfo = when (fetchState) {
+        is FetchState.Success -> fetchState.debugInfo
+        is FetchState.Error -> fetchState.debugInfo
+        else -> null
+    }
+
     LaunchedEffect(Unit) {
         // Wait for bottom sheet animation to smooth out before firing network request
         delay(300)
         onFetchModels()
     }
-    
+
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
@@ -966,9 +993,9 @@ private fun FetchModelsDialog(
         ) {
             Text(
                 text = stringResource(R.string.provider_fetch_models),
-                style = MaterialTheme.typography.titleMedium,
+                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                 color = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.md)
+                modifier = Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.sm)
             )
 
             ModelSearchField(
@@ -987,14 +1014,48 @@ private fun FetchModelsDialog(
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .heightIn(min = 360.dp),
+                                .heightIn(min = 320.dp),
                             contentAlignment = Alignment.Center
                         ) {
-                            Text(
-                                stringResource(R.string.provider_fetch_failed, fetchState.message),
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.error
-                            )
+                            val displayMsg = if (debugInfo != null && debugInfo.responseCode > 0) {
+                                "HTTP ${debugInfo.responseCode} · ${debugInfo.latencyMs}ms"
+                            } else {
+                                val codeMatch = Regex("""(?i)(HTTP\s*\d{3}|code[:\s]+[a-zA-Z0-9_]+)""").find(fetchState.message)
+                                if (codeMatch != null) codeMatch.value
+                                else fetchState.message.lines().firstOrNull()?.let { if (it.length > 28) it.take(28) + "..." else it } ?: "Error"
+                            }
+
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .then(
+                                        if (debugInfo != null) Modifier.clickable { showDebugSheet = true } else Modifier
+                                    )
+                                    .padding(horizontal = Spacing.md, vertical = Spacing.sm)
+                            ) {
+                                Icon(
+                                    imageVector = FeatherIcons.AlertCircle,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.error,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(Modifier.width(Spacing.xs))
+                                Text(
+                                    text = displayMsg,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.error
+                                )
+                                if (debugInfo != null) {
+                                    Spacer(Modifier.width(4.dp))
+                                    Icon(
+                                        imageVector = FeatherIcons.ChevronRight,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                }
+                            }
                         }
                     }
                 }
@@ -1058,6 +1119,14 @@ private fun FetchModelsDialog(
                 }
             }
         }
+    }
+
+    if (showDebugSheet && debugInfo != null) {
+        ModelTestDetailBottomSheet(
+            model = stringResource(R.string.provider_fetch_models),
+            result = debugInfo,
+            onDismiss = { showDebugSheet = false }
+        )
     }
 }
 
@@ -1188,7 +1257,7 @@ private fun ProviderSwitchRow(
                 )
             }
         }
-        Switch(
+        AppSwitch(
             checked = checked,
             onCheckedChange = onCheckedChange
         )
@@ -1300,33 +1369,6 @@ private fun ScriptPickerBottomSheet(
                     .padding(bottom = Spacing.md)
             )
 
-            // 首项：不使用面板脚本（清空）
-            Surface(
-                onClick = { onSelect("") },
-                color = Color.Transparent
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = Spacing.lg, vertical = Spacing.md),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = FeatherIcons.Slash,
-                        contentDescription = null,
-                        modifier = Modifier.size(20.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(Modifier.width(Spacing.md))
-                    Text(
-                        text = stringResource(R.string.provider_balance_clear_script),
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-            }
-
             if (scripts.isEmpty()) {
                 Box(
                     modifier = Modifier
@@ -1373,102 +1415,325 @@ private fun ScriptPickerBottomSheet(
     }
 }
 
+/** 脚本原始输出底部弹窗。 */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun BalanceTestResultBox(state: ProviderBalanceState) {
-    var showRawOutput by remember { mutableStateOf(false) }
+private fun RawOutputBottomSheet(
+    rawOutput: String,
+    onDismiss: () -> Unit
+) {
+    val clipboard = LocalClipboard.current
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var copied by remember { mutableStateOf(false) }
+    val light = settingsLightMode()
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        containerColor = if (light) Color.White else MaterialTheme.colorScheme.surface
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .padding(horizontal = Spacing.lg)
+                .padding(bottom = Spacing.xl),
+            verticalArrangement = Arrangement.spacedBy(Spacing.md)
+        ) {
+            // 顶栏：标题 + 复制按钮
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = stringResource(R.string.provider_balance_raw_output),
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                IconButton(
+                    onClick = {
+                        scope.launch {
+                            clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("rawOutput", rawOutput)))
+                        }
+                        copied = true
+                        Toast.makeText(context, context.getString(R.string.common_copy_success), Toast.LENGTH_SHORT).show()
+                    },
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    Icon(
+                        imageVector = if (copied) FeatherIcons.Check else FeatherIcons.Copy,
+                        contentDescription = stringResource(R.string.common_copy),
+                        tint = if (copied) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
+
+            // 原始输出内容容器
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = if (light) Color(0xFFF2F2F7) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 420.dp)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState())
+                        .padding(Spacing.md)
+                ) {
+                    Text(
+                        text = rawOutput,
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 12.sp,
+                            lineHeight = 18.sp
+                        ),
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun BalanceTestResultBox(
+    state: ProviderBalanceState,
+    providerName: String = ""
+) {
+    var lastSuccessResult by remember { mutableStateOf<ProviderBalanceResult?>(null) }
+    var lastError by remember { mutableStateOf<String?>(null) }
+    var lastRawOutput by remember { mutableStateOf("") }
+    var isExpanded by remember { mutableStateOf(false) }
+    var showRawOutputSheet by remember { mutableStateOf(false) }
+    val light = settingsLightMode()
+
+    LaunchedEffect(state) {
+        when (state) {
+            is ProviderBalanceState.Success -> {
+                lastSuccessResult = state.result
+                lastRawOutput = state.result.rawOutput
+                lastError = null
+            }
+            is ProviderBalanceState.Error -> {
+                lastError = state.message
+                lastRawOutput = state.rawOutput
+                lastSuccessResult = null
+            }
+            is ProviderBalanceState.Loading -> {
+                // 保持已有的 lastSuccessResult，不清除，防止高度塌陷
+            }
+            ProviderBalanceState.Idle -> {
+                lastSuccessResult = null
+                lastError = null
+                lastRawOutput = ""
+            }
+        }
+    }
+
+    val isRunning = state is ProviderBalanceState.Loading
 
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(Spacing.md),
-        verticalArrangement = Arrangement.spacedBy(Spacing.sm)
+            .padding(horizontal = Spacing.lg, vertical = Spacing.sm),
+        verticalArrangement = Arrangement.spacedBy(Spacing.xs)
     ) {
-        when (state) {
-            is ProviderBalanceState.Loading -> {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(Spacing.sm)
-                ) {
-                    CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
-                    Text(
-                        text = stringResource(R.string.provider_balance_loading),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-            is ProviderBalanceState.Error -> {
-                Surface(
-                    color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f),
-                    shape = RoundedCornerShape(Radius.sm),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(modifier = Modifier.padding(Spacing.sm)) {
-                        Text(
-                            text = stringResource(R.string.provider_balance_test_failed),
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.error
-                        )
-                        Text(
-                            text = state.message,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onErrorContainer
-                        )
-                    }
-                }
-            }
-            is ProviderBalanceState.Success -> {
-                val card = state.result.card
-                Surface(
-                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f),
-                    shape = RoundedCornerShape(Radius.sm),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(
-                        modifier = Modifier.padding(Spacing.sm),
-                        verticalArrangement = Arrangement.spacedBy(Spacing.xs)
+        if (lastSuccessResult != null) {
+            val card = lastSuccessResult!!.card
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = if (light) Color(0xFFF2F2F7) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .alpha(if (isRunning) 0.6f else 1f)
+            ) {
+                if (!isExpanded) {
+                    // 折叠状态（Compact）
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .clickable { isExpanded = true }
+                            .padding(start = Spacing.md, top = 8.dp, bottom = 8.dp, end = Spacing.xs),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            text = stringResource(R.string.provider_balance_test_success, card.body.size),
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary
-                        )
+                        if (providerName.isNotBlank()) {
+                            Text(
+                                text = providerName,
+                                style = MaterialTheme.typography.titleSmall.copy(fontSize = 14.sp),
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.padding(end = Spacing.md)
+                            )
+                        }
+                        Box(modifier = Modifier.weight(1f)) {
+                            AdaptiveCardView(
+                                card = card,
+                                isExpanded = false
+                            )
+                        }
+                        if (lastRawOutput.isNotBlank()) {
+                            IconButton(
+                                onClick = { showRawOutputSheet = true },
+                                modifier = Modifier.size(32.dp)
+                            ) {
+                                Icon(
+                                    imageVector = FeatherIcons.Terminal,
+                                    contentDescription = stringResource(R.string.provider_balance_raw_output),
+                                    modifier = Modifier.size(16.dp),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                        IconButton(
+                            onClick = { isExpanded = true },
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Icon(
+                                imageVector = FeatherIcons.ChevronDown,
+                                contentDescription = stringResource(R.string.common_expand),
+                                modifier = Modifier.size(18.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                } else {
+                    // 展开状态
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(Spacing.md),
+                        verticalArrangement = Arrangement.spacedBy(Spacing.sm)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = providerName.ifBlank { stringResource(R.string.provider_balance_preview_title) },
+                                style = MaterialTheme.typography.titleSmall.copy(fontSize = 14.sp),
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                if (lastRawOutput.isNotBlank()) {
+                                    IconButton(
+                                        onClick = { showRawOutputSheet = true },
+                                        modifier = Modifier.size(32.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = FeatherIcons.Terminal,
+                                            contentDescription = stringResource(R.string.provider_balance_raw_output),
+                                            modifier = Modifier.size(16.dp),
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+                                IconButton(
+                                    onClick = { isExpanded = false },
+                                    modifier = Modifier.size(32.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = FeatherIcons.ChevronUp,
+                                        contentDescription = stringResource(R.string.common_collapse),
+                                        modifier = Modifier.size(18.dp),
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        }
+
                         AdaptiveCardView(
                             card = card,
                             isExpanded = true
                         )
                     }
                 }
-
-                if (state.result.rawOutput.isNotBlank()) {
-                    Text(
-                        text = stringResource(
-                            if (showRawOutput) R.string.provider_balance_hide_raw else R.string.provider_balance_show_raw
-                        ),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.clickable { showRawOutput = !showRawOutput }
-                    )
-                    if (showRawOutput) {
-                        Surface(
-                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                            shape = RoundedCornerShape(Radius.xs),
-                            modifier = Modifier.fillMaxWidth()
+            }
+        } else if (lastError != null) {
+            Surface(
+                color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.35f),
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(Spacing.md)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.Top,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(
+                            modifier = Modifier.weight(1f),
+                            verticalAlignment = Alignment.Top,
+                            horizontalArrangement = Arrangement.spacedBy(Spacing.sm)
                         ) {
-                            Text(
-                                text = state.result.rawOutput,
-                                style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace, fontSize = 11.sp),
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(Spacing.sm)
+                            Icon(
+                                imageVector = FeatherIcons.AlertCircle,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.size(18.dp)
                             )
+                            Column {
+                                Text(
+                                    text = stringResource(R.string.provider_balance_test_failed),
+                                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                                    color = MaterialTheme.colorScheme.error
+                                )
+                                if (lastError!!.isNotBlank()) {
+                                    Spacer(Modifier.height(2.dp))
+                                    Text(
+                                        text = lastError!!,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onErrorContainer
+                                    )
+                                }
+                            }
+                        }
+                        if (lastRawOutput.isNotBlank()) {
+                            IconButton(
+                                onClick = { showRawOutputSheet = true },
+                                modifier = Modifier.size(32.dp)
+                            ) {
+                                Icon(
+                                    imageVector = FeatherIcons.Terminal,
+                                    contentDescription = stringResource(R.string.provider_balance_raw_output),
+                                    modifier = Modifier.size(16.dp),
+                                    tint = MaterialTheme.colorScheme.error
+                                )
+                            }
                         }
                     }
                 }
             }
-            ProviderBalanceState.Idle -> Unit
+        } else if (isRunning) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = Spacing.xs),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(Spacing.sm)
+            ) {
+                CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                Text(
+                    text = stringResource(R.string.provider_balance_loading),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
+    }
+
+    if (showRawOutputSheet && lastRawOutput.isNotBlank()) {
+        RawOutputBottomSheet(
+            rawOutput = lastRawOutput,
+            onDismiss = { showRawOutputSheet = false }
+        )
     }
 }
 

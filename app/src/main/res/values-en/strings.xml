@@ -87,14 +87,22 @@
     <string name="provider_cache_anthropic_title">Anthropic cache breakpoints</string>
     <string name="provider_cache_anthropic_subtitle">Mark system/tools/messages prefixes with explicit cache breakpoints to cut repeated input cost</string>
     <string name="provider_cache_openai_chat_title">OpenAI-compatible cache key</string>
-    <string name="provider_cache_openai_chat_subtitle">Send prompt_cache_key with Chat Completion requests (third-party compatible services only)</string>
+    <string name="provider_cache_openai_chat_subtitle">Send prompt_cache_key with requests</string>
     <string name="provider_section_balance">DIY Dashboard</string>
     <string name="provider_balance_script">Dashboard Script</string>
     <string name="provider_balance_script_placeholder">e.g. demo_balance.py</string>
     <string name="provider_balance_select_script">Select Script</string>
-    <string name="provider_balance_script_desc">Executes script to render Adaptive Card, auto-refreshes per LLM call</string>
+    <string name="provider_balance_script_desc">Execute and preview card output</string>
     <string name="provider_balance_test_btn">Test Run</string>
     <string name="provider_balance_run_test">Run Test</string>
+    <string name="provider_balance_preview_title">Card Preview</string>
+    <string name="provider_test_detail_title">Test Debug Details</string>
+    <string name="provider_test_req_url">Request URL</string>
+    <string name="provider_test_req_headers">Request Headers</string>
+    <string name="provider_test_req_body">Request Body</string>
+    <string name="provider_test_resp_headers">Response Headers</string>
+    <string name="provider_test_resp_body">Response Body</string>
+    <string name="provider_test_error_detail">Error Stack</string>
     <string name="provider_balance_test_success">Executed successfully, parsed %1$d components</string>
     <string name="provider_balance_test_failed">Execution Failed</string>
     <string name="provider_balance_no_scripts">No scripts found in ~/.aicode/scripts/</string>
@@ -152,6 +160,8 @@
     <!-- Common -->
     <string name="common_ai_providers">AI Providers</string>
     <string name="common_save">Save</string>
+    <string name="common_copy">Copy</string>
+    <string name="common_copy_success">Copied to clipboard</string>
     <string name="common_allow">Allow</string>
     <string name="common_close">Close</string>
     <string name="common_other">Other</string>

@@ -87,14 +87,22 @@
     <string name="provider_cache_anthropic_title">Anthropic 缓存断点</string>
     <string name="provider_cache_anthropic_subtitle">为 system/工具/消息前缀打显式缓存断点，降低重复输入成本</string>
     <string name="provider_cache_openai_chat_title">OpenAI 兼容缓存键</string>
-    <string name="provider_cache_openai_chat_subtitle">为 Chat Completion 请求发送 prompt_cache_key（仅第三方兼容服务支持）</string>
+    <string name="provider_cache_openai_chat_subtitle">为请求携带 prompt_cache_key 缓存键</string>
     <string name="provider_section_balance">自定义面板 (DIY)</string>
     <string name="provider_balance_script">面板脚本</string>
     <string name="provider_balance_script_placeholder">例如 demo_balance.py</string>
     <string name="provider_balance_select_script">选择脚本</string>
-    <string name="provider_balance_script_desc">执行脚本并以 Adaptive Card 渲染面板，每次请求自动刷新</string>
+    <string name="provider_balance_script_desc">执行并预览面板卡片</string>
     <string name="provider_balance_test_btn">测试运行</string>
     <string name="provider_balance_run_test">运行测试</string>
+    <string name="provider_balance_preview_title">卡片预览</string>
+    <string name="provider_test_detail_title">测试调试信息</string>
+    <string name="provider_test_req_url">请求 URL</string>
+    <string name="provider_test_req_headers">请求头</string>
+    <string name="provider_test_req_body">请求体</string>
+    <string name="provider_test_resp_headers">响应头</string>
+    <string name="provider_test_resp_body">响应体</string>
+    <string name="provider_test_error_detail">错误堆栈</string>
     <string name="provider_balance_test_success">执行成功，解析到 %1$d 项组件</string>
     <string name="provider_balance_test_failed">执行失败</string>
     <string name="provider_balance_no_scripts">~/.aicode/scripts 目录下暂无脚本</string>
@@ -152,6 +160,8 @@
     <!-- Common -->
     <string name="common_ai_providers">AI 提供商</string>
     <string name="common_save">保存</string>
+    <string name="common_copy">复制</string>
+    <string name="common_copy_success">已复制到剪贴板</string>
     <string name="common_allow">允许</string>
     <string name="common_close">关闭</string>
     <string name="common_other">其他</string>

@@ -56,6 +56,14 @@ import com.aicode.core.theme.Spacing
 import com.aicode.feature.settings.data.remote.ModelTestResult
 import com.aicode.feature.settings.domain.model.ModelMetadata
 import compose.icons.FeatherIcons
+import android.widget.Toast
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.ui.platform.LocalContext
+import compose.icons.feathericons.ChevronRight
+import compose.icons.feathericons.Terminal
 import compose.icons.feathericons.AlertCircle
 import compose.icons.feathericons.ArrowDown
 import compose.icons.feathericons.ArrowUp
@@ -121,7 +129,6 @@ private fun ModelTag(text: String? = null, icon: androidx.compose.ui.graphics.ve
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun ProviderModelRow(
     model: String,
@@ -132,7 +139,7 @@ internal fun ProviderModelRow(
     onRemove: () -> Unit,
     onEdit: () -> Unit = {}
 ) {
-    var showErrorDetail by remember { mutableStateOf(false) }
+    var showDetail by remember { mutableStateOf(false) }
 
     val light = MaterialTheme.colorScheme.background.luminance() > 0.5f
 
@@ -167,35 +174,41 @@ internal fun ProviderModelRow(
 
                 Spacer(Modifier.width(Spacing.sm))
 
-                // Right Action: 测试
+                // Right Action: 测试 (固定宽高 56dp × 36dp，防止状态切换引起高度塌陷导致 UI 上移)
                 Box(
-                    modifier = Modifier.width(56.dp),
+                    modifier = Modifier
+                        .width(56.dp)
+                        .height(36.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     if (testing) {
                         CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
                     } else {
-                        TextButton(onClick = onTest, contentPadding = PaddingValues(horizontal = Spacing.sm)) {
+                        TextButton(
+                            onClick = onTest,
+                            contentPadding = PaddingValues(horizontal = Spacing.xs, vertical = 0.dp),
+                            modifier = Modifier.height(32.dp)
+                        ) {
                             Text(stringResource(R.string.provider_test), style = MaterialTheme.typography.labelMedium)
                         }
                     }
                 }
             }
 
-            // Test Result
+            // Test Result (无论成功还是失败，均可点击展开详细调试信息)
             result?.let { r ->
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
-                        .padding(top = Spacing.sm, start = 36.dp)
-                        .then(
-                            if (!r.success) Modifier.clickable { showErrorDetail = true } else Modifier
-                        )
+                        .padding(top = Spacing.xs, start = 36.dp)
+                        .clip(RoundedCornerShape(4.dp))
+                        .clickable { showDetail = true }
+                        .padding(horizontal = 4.dp, vertical = 2.dp)
                 ) {
                     Icon(
-                        if (r.success) FeatherIcons.Check else FeatherIcons.AlertCircle,
+                        imageVector = if (r.success) FeatherIcons.Check else FeatherIcons.AlertCircle,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        tint = if (r.success) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.error,
                         modifier = Modifier.size(14.dp)
                     )
                     Spacer(Modifier.width(Spacing.xs))
@@ -213,69 +226,312 @@ internal fun ProviderModelRow(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
+                    Spacer(Modifier.width(4.dp))
+                    Icon(
+                        imageVector = FeatherIcons.ChevronRight,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                        modifier = Modifier.size(12.dp)
+                    )
                 }
             }
         }
     }
 
-    if (showErrorDetail && result != null && !result.success) {
-        val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-        val clipboard = LocalClipboard.current
-        var copied by remember { mutableStateOf(false) }
-        val scope = rememberCoroutineScope()
+    if (showDetail && result != null) {
+        ModelTestDetailBottomSheet(
+            model = model,
+            result = result,
+            onDismiss = { showDetail = false }
+        )
+    }
+}
 
-        LaunchedEffect(copied) {
-            if (copied) {
-                kotlinx.coroutines.delay(1500)
-                copied = false
+/** 模型测试调试详情底部弹窗（展示完整的请求/响应调试信息，支持一键复制）。 */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun ModelTestDetailBottomSheet(
+    model: String,
+    result: ModelTestResult,
+    onDismiss: () -> Unit
+) {
+    val clipboard = LocalClipboard.current
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var copied by remember { mutableStateOf(false) }
+    val light = MaterialTheme.colorScheme.background.luminance() > 0.5f
+    val bgCardColor = if (light) Color(0xFFF2F2F7) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+
+    fun buildFullDebugLog(): String {
+        return buildString {
+            appendLine("=== Model Test Debug Info ===")
+            appendLine("Model: $model")
+            appendLine("Success: ${result.success}")
+            appendLine("Latency: ${result.latencyMs}ms")
+            if (result.responseCode > 0) appendLine("Status Code: ${result.responseCode}")
+            if (result.message.isNotBlank()) appendLine("Message: ${result.message}")
+            appendLine()
+            appendLine("--- Request ---")
+            appendLine("URL: ${result.requestUrl}")
+            if (result.requestHeaders.isNotEmpty()) {
+                appendLine("Headers:")
+                result.requestHeaders.forEach { (k, v) -> appendLine("  $k: $v") }
+            }
+            if (result.requestBody.isNotBlank()) {
+                appendLine("Body:")
+                appendLine(result.requestBody)
+            }
+            appendLine()
+            appendLine("--- Response ---")
+            if (result.responseHeaders.isNotEmpty()) {
+                appendLine("Headers:")
+                result.responseHeaders.forEach { (k, v) -> appendLine("  $k: $v") }
+            }
+            if (result.responseBody.isNotBlank()) {
+                appendLine("Body:")
+                appendLine(result.responseBody)
+            }
+            if (result.errorDetail.isNotBlank() && result.errorDetail != result.responseBody) {
+                appendLine()
+                appendLine("--- Error Detail ---")
+                appendLine(result.errorDetail)
             }
         }
+    }
 
-        ModalBottomSheet(
-            onDismissRequest = { showErrorDetail = false },
-            sheetState = sheetState,
-            containerColor = MaterialTheme.colorScheme.surface
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        containerColor = if (light) Color.White else MaterialTheme.colorScheme.surface
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .padding(horizontal = Spacing.lg)
+                .padding(bottom = Spacing.xl),
+            verticalArrangement = Arrangement.spacedBy(Spacing.md)
         ) {
+            // 顶栏：标题 + 状态/耗时 + 复制按钮
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = stringResource(R.string.provider_test_detail_title),
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Spacer(Modifier.height(2.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = model,
+                            style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(Modifier.width(Spacing.sm))
+                        Surface(
+                            shape = RoundedCornerShape(4.dp),
+                            color = if (result.success) MaterialTheme.colorScheme.tertiary.copy(alpha = 0.15f)
+                            else MaterialTheme.colorScheme.error.copy(alpha = 0.15f)
+                        ) {
+                            Text(
+                                text = if (result.success) "200 OK · ${result.latencyMs}ms" else "${if (result.responseCode > 0) "HTTP ${result.responseCode}" else "Failed"} · ${result.latencyMs}ms",
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    color = if (result.success) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.error,
+                                    fontWeight = FontWeight.SemiBold
+                                ),
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
+                }
+                IconButton(
+                    onClick = {
+                        scope.launch {
+                            clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("debug_log", buildFullDebugLog())))
+                        }
+                        copied = true
+                        Toast.makeText(context, context.getString(R.string.common_copy_success), Toast.LENGTH_SHORT).show()
+                    },
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    Icon(
+                        imageVector = if (copied) FeatherIcons.Check else FeatherIcons.Copy,
+                        contentDescription = stringResource(R.string.common_copy),
+                        tint = if (copied) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
+
+            // 可滚动详细信息内容区
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(Spacing.lg)
+                    .heightIn(max = 480.dp)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(Spacing.md)
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text(
-                        text = "Error Details",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.error
-                    )
-                    IconButton(onClick = {
-                        scope.launch {
-                            clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("error", result.message)))
-                            copied = true
-                        }
-                    }) {
-                        Icon(
-                            if (copied) FeatherIcons.Check else FeatherIcons.Copy,
-                            contentDescription = "Copy Error",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                // 1. 请求 URL 与 Header
+                if (result.requestUrl.isNotBlank()) {
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(
+                            text = stringResource(R.string.provider_test_req_url),
+                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = bgCardColor,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                text = result.requestUrl,
+                                style = MaterialTheme.typography.bodySmall.copy(
+                                    fontFamily = FontFamily.Monospace,
+                                    fontSize = 11.sp
+                                ),
+                                color = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.padding(Spacing.sm)
+                            )
+                        }
                     }
                 }
-                Spacer(Modifier.height(Spacing.sm))
-                Text(
-                    text = result.message,
-                    style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f), RoundedCornerShape(Radius.sm))
-                        .padding(Spacing.sm)
-                )
-                Spacer(Modifier.height(Spacing.xl))
+
+                if (result.requestHeaders.isNotEmpty()) {
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(
+                            text = stringResource(R.string.provider_test_req_headers),
+                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = bgCardColor,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.padding(Spacing.sm), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                result.requestHeaders.forEach { (k, v) ->
+                                    Text(
+                                        text = "$k: $v",
+                                        style = MaterialTheme.typography.bodySmall.copy(
+                                            fontFamily = FontFamily.Monospace,
+                                            fontSize = 11.sp
+                                        ),
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if (result.requestBody.isNotBlank()) {
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(
+                            text = stringResource(R.string.provider_test_req_body),
+                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = bgCardColor,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                text = result.requestBody,
+                                style = MaterialTheme.typography.bodySmall.copy(
+                                    fontFamily = FontFamily.Monospace,
+                                    fontSize = 11.sp
+                                ),
+                                color = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.padding(Spacing.sm)
+                            )
+                        }
+                    }
+                }
+
+                // 2. 响应 Headers 与 Body
+                if (result.responseHeaders.isNotEmpty()) {
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(
+                            text = stringResource(R.string.provider_test_resp_headers),
+                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = bgCardColor,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.padding(Spacing.sm), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                result.responseHeaders.forEach { (k, v) ->
+                                    Text(
+                                        text = "$k: $v",
+                                        style = MaterialTheme.typography.bodySmall.copy(
+                                            fontFamily = FontFamily.Monospace,
+                                            fontSize = 11.sp
+                                        ),
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if (result.responseBody.isNotBlank()) {
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(
+                            text = stringResource(R.string.provider_test_resp_body),
+                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = bgCardColor,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                text = result.responseBody,
+                                style = MaterialTheme.typography.bodySmall.copy(
+                                    fontFamily = FontFamily.Monospace,
+                                    fontSize = 11.sp
+                                ),
+                                color = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.padding(Spacing.sm)
+                            )
+                        }
+                    }
+                }
+
+                if (result.errorDetail.isNotBlank() && result.errorDetail != result.responseBody) {
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(
+                            text = stringResource(R.string.provider_test_error_detail),
+                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                            color = MaterialTheme.colorScheme.error
+                        )
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.35f),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                text = result.errorDetail,
+                                style = MaterialTheme.typography.bodySmall.copy(
+                                    fontFamily = FontFamily.Monospace,
+                                    fontSize = 11.sp
+                                ),
+                                color = MaterialTheme.colorScheme.onErrorContainer,
+                                modifier = Modifier.padding(Spacing.sm)
+                            )
+                        }
+                    }
+                }
             }
         }
     }

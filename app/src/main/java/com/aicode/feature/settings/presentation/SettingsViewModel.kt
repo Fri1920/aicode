@@ -86,8 +86,8 @@ import javax.inject.Inject
 sealed class FetchState {
     object Idle : FetchState()
     object Loading : FetchState()
-    data class Success(val models: List<String>) : FetchState()
-    data class Error(val message: String) : FetchState()
+    data class Success(val models: List<String>, val debugInfo: ModelTestResult? = null) : FetchState()
+    data class Error(val message: String, val debugInfo: ModelTestResult? = null) : FetchState()
 }
 
 /** 镜像下载页的完整 UI 状态：空闲 / 下载中（进度）/ 下载完成（可安装）/ 失败。 */
@@ -1254,12 +1254,18 @@ class SettingsViewModel @Inject constructor(
     fun fetchModels(provider: AIProviderConfig) {
         viewModelScope.launch {
             _fetchState.value = FetchState.Loading
-            modelApiService.fetchModels(provider.baseUrl, provider.apiKey, provider.type, provider.userAgent)
-                .onSuccess {
-                    _fetchState.value = FetchState.Success(it)
-                    resolveModelMetadata(provider.id, provider.type, it)
+            modelApiService.fetchModels(provider.baseUrl, provider.apiKey, provider.type, provider.useFullUrl, provider.userAgent)
+                .onSuccess { result ->
+                    _fetchState.value = FetchState.Success(result.models, result.debugInfo)
+                    resolveModelMetadata(provider.id, provider.type, result.models)
                 }
-                .onFailure { _fetchState.value = FetchState.Error(it.message ?: context.getString(R.string.settings_models_fetch_failed)) }
+                .onFailure { error ->
+                    val debug = (error as? com.aicode.feature.settings.data.remote.FetchModelsException)?.debugInfo
+                    _fetchState.value = FetchState.Error(
+                        error.message ?: context.getString(R.string.settings_models_fetch_failed),
+                        debug
+                    )
+                }
         }
     }
 
