@@ -73,6 +73,8 @@ import compose.icons.feathericons.Copy
 import compose.icons.feathericons.GitBranch
 import compose.icons.feathericons.Tag
 
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.ui.graphics.RectangleShape
 import kotlinx.coroutines.launch
 
 @Composable
@@ -103,14 +105,18 @@ internal fun LogTab(
     val canvasWidth = laneWidth * (graph.maxLane + 1) + Spacing.xs * 2
     // 每行高度，用于计算连线纵向跨度（节点居中）。
     val rowHeight = 72.dp
-    // 滚动到底（或内容不满一屏）且还有更多、不在加载中时触发预拉取下一页。
-    // 白色卡片整体作为单个 item，无索引可判，用 canScrollForward 判断是否已到底。
-    val reachedBottom by remember {
-        derivedStateOf { !listState.canScrollForward }
+    // 预拉取下一页：列表滑动至接近底部（剩余 20 项）且还有更多提交时提前发起后台拉取，消除滑到底部等待停顿。
+    val shouldLoadMore by remember {
+        derivedStateOf {
+            val lastVisible = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
+            val totalItems = listState.layoutInfo.totalItemsCount
+            totalItems > 0 && lastVisible >= totalItems - 20
+        }
     }
-    LaunchedEffect(reachedBottom) {
-        if (reachedBottom && graph.hasMore && !graphLoadingMore) onLoadMore()
+    LaunchedEffect(shouldLoadMore) {
+        if (shouldLoadMore && graph.hasMore && !graphLoadingMore) onLoadMore()
     }
+    val cardColor = if (settingsLightMode()) Color.White else MaterialTheme.colorScheme.surface
     Column(modifier = Modifier.fillMaxSize()) {
         SectionHeader(stringResource(R.string.git_commit_count, commits.size))
         // 滚动容器占满整屏（与状态/分支页一致）：白色卡片是滚动内容的一部分——
@@ -123,39 +129,48 @@ internal fun LogTab(
             state = listState,
             contentPadding = PaddingValues(bottom = 70.dp)
         ) {
-            item(key = "commit-card") {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(
-                            color = if (settingsLightMode()) Color.White else MaterialTheme.colorScheme.surface,
-                            shape = RoundedCornerShape(Radius.lg)
-                        )
+            itemsIndexed(commits, key = { _, c -> c.hash }) { index, c ->
+                val shape = when {
+                    index == 0 && commits.size == 1 && !graph.hasMore -> RoundedCornerShape(Radius.lg)
+                    index == 0 -> RoundedCornerShape(topStart = Radius.lg, topEnd = Radius.lg)
+                    index == commits.lastIndex && !graph.hasMore -> RoundedCornerShape(bottomStart = Radius.lg, bottomEnd = Radius.lg)
+                    else -> RectangleShape
+                }
+                Surface(
+                    color = cardColor,
+                    shape = shape,
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    commits.forEachIndexed { index, c ->
-                        GraphCommitRow(
-                            commit = c,
-                            lane = graph.lanes[c.hash] ?: 0,
-                            edges = edgesByCommit[index].orEmpty(),
-                            activeTopLanes = graph.activeTopLanes[c.hash].orEmpty(),
-                            activeBottomLanes = graph.activeBottomLanes[c.hash].orEmpty(),
-                            laneColors = laneColors,
-                            canvasWidth = canvasWidth,
-                            laneWidth = laneWidth,
-                            rowHeight = rowHeight,
-                            refs = graph.refs[c.hash].orEmpty(),
-                            isTopTerminal = index == 0,
-                            onOpen = { onOpenCommit(c.hash) }
-                        )
-                    }
-                    // 末尾加载指示：还有更多时预拉取提示/转圈；没有更多时显示结束提示。
-                    if (graph.hasMore) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = Spacing.md),
-                            contentAlignment = Alignment.Center
-                        ) {
+                    GraphCommitRow(
+                        commit = c,
+                        lane = graph.lanes[c.hash] ?: 0,
+                        edges = edgesByCommit[index].orEmpty(),
+                        activeTopLanes = graph.activeTopLanes[c.hash].orEmpty(),
+                        activeBottomLanes = graph.activeBottomLanes[c.hash].orEmpty(),
+                        laneColors = laneColors,
+                        canvasWidth = canvasWidth,
+                        laneWidth = laneWidth,
+                        rowHeight = rowHeight,
+                        refs = graph.refs[c.hash].orEmpty(),
+                        isTopTerminal = index == 0,
+                        onOpen = { onOpenCommit(c.hash) }
+                    )
+                }
+            }
+
+            item(key = "footer") {
+                Surface(
+                    color = cardColor,
+                    shape = RoundedCornerShape(bottomStart = Radius.lg, bottomEnd = Radius.lg),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = Spacing.md),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (graph.hasMore) {
                             if (graphLoadingMore) {
                                 CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
                             } else {
@@ -165,14 +180,7 @@ internal fun LogTab(
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
-                        }
-                    } else {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = Spacing.md),
-                            contentAlignment = Alignment.Center
-                        ) {
+                        } else {
                             Text(
                                 stringResource(R.string.git_no_more_commits),
                                 style = MaterialTheme.typography.labelSmall,

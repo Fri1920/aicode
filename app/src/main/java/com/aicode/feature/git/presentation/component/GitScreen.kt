@@ -93,20 +93,7 @@ fun GitScreen(
     val branchesListState = rememberLazyListState()
     val logListState = rememberLazyListState()
 
-    val pagerState = rememberPagerState(initialPage = state.tab.ordinal) { GitTab.entries.size }
-
-    // 页面滑动结束时同步 ViewModel 状态
-    LaunchedEffect(pagerState.currentPage) {
-        if (state.tab.ordinal != pagerState.currentPage) {
-            viewModel.setTab(GitTab.entries[pagerState.currentPage])
-        }
-    }
-    // 外部主动设置 ViewModel tab 时同步滑动 Pager
-    LaunchedEffect(state.tab) {
-        if (pagerState.currentPage != state.tab.ordinal) {
-            pagerState.animateScrollToPage(state.tab.ordinal)
-        }
-    }
+    val pagerState = rememberPagerState { GitTab.entries.size }
 
     val tabsScrolling by remember {
         derivedStateOf {
@@ -189,6 +176,7 @@ fun GitScreen(
                             branchesLoaded = state.branchesLoaded,
                             checkoutLoading = state.checkoutLoading,
                             listState = branchesListState,
+                            onLoadBranches = viewModel::loadBranches,
                             onCheckout = viewModel::checkoutBranch,
                             onCreateBranch = viewModel::createBranch,
                             onDeleteBranch = viewModel::deleteBranch,

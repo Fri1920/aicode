@@ -277,19 +277,21 @@ class TerminalSessionManager @Inject constructor(
      * 永不回调、notify=true 的任务不触发通知。bash 在真正退出前必打印 `[command exited: N]`，
      * 以此作为命令结束的可靠信号：监控到后短缓冲（给正常回调留时间），仍 Running 则强制收尾。
      */
-    /** 在输出文本中定位退出标记 `[command exited: N]` 并解析退出码；未找到返回 null。
-     *  相比正则全量扫描，indexOf 定位 + 手写数字解析在长 transcript 上更省。 */
+    /** 在输出文本的末尾行中定位退出标记 `[command exited: N]` 并解析退出码；未找到返回 null。
+     *  要求退出标记必须作为独立行出现（以换行开头或位于文本起始），且从末尾向后定位，避免 PTY 命令行回显误判。 */
     private fun extractExitCode(output: String): Int? {
-        val idx = output.indexOf(EXIT_MARKER_PREFIX)
+        val tail = output.takeLast(1000)
+        val idx = tail.lastIndexOf(EXIT_MARKER_PREFIX)
         if (idx < 0) return null
+        if (idx > 0 && tail[idx - 1] != '\n' && tail[idx - 1] != '\r') return null
         var end = idx + EXIT_MARKER_PREFIX.length
-        if (end >= output.length || !output[end].isDigit()) return null
+        if (end >= tail.length || !tail[end].isDigit()) return null
         var code = 0
-        while (end < output.length && output[end].isDigit()) {
-            code = code * 10 + (output[end] - '0')
+        while (end < tail.length && tail[end].isDigit()) {
+            code = code * 10 + (tail[end] - '0')
             end++
         }
-        return if (end < output.length && output[end] == ']') code else null
+        return if (end < tail.length && tail[end] == ']') code else null
     }
 
     private fun monitorBackgroundExit(tabId: String) {

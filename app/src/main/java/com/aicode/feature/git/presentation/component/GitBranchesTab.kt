@@ -37,6 +37,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.material3.rememberModalBottomSheetState
 import com.aicode.core.ui.AppTextField
 import androidx.compose.runtime.Composable
@@ -83,6 +84,7 @@ internal fun BranchesTab(
     branchesLoaded: Boolean,
     checkoutLoading: String?,
     listState: LazyListState,
+    onLoadBranches: () -> Unit = {},
     onCheckout: (String, Boolean) -> Unit,
     onCreateBranch: (String, String?, Boolean) -> Unit,
     onDeleteBranch: (String) -> Unit,
@@ -91,6 +93,11 @@ internal fun BranchesTab(
     onCreateTag: (String) -> Unit,
     onDeleteTag: (String) -> Unit
 ) {
+    LaunchedEffect(Unit) {
+        if (!branchesLoaded && !branchesLoading) {
+            onLoadBranches()
+        }
+    }
     if (branchesLoading || (!branchesLoaded && branches.isEmpty() && tags.isEmpty())) {
         Box(
             modifier = Modifier.fillMaxSize(),
