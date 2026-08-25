@@ -38,7 +38,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.rememberModalBottomSheetState
-import androidx.compose.material3.Switch
+import com.aicode.core.ui.AppSwitch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import com.aicode.core.ui.AppTextField
@@ -654,7 +654,7 @@ fun AddRemoteMountDialog(
                             Text(stringResource(R.string.remote_auto_connect_on_start), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
                             Text(stringResource(R.string.remote_auto_connect_and_sync), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
-                        Switch(checked = autoConnect, onCheckedChange = { autoConnect = it })
+                        AppSwitch(checked = autoConnect, onCheckedChange = { autoConnect = it })
                     }
                 }
             }

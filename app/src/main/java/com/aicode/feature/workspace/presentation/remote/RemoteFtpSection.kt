@@ -18,7 +18,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Switch
+import com.aicode.core.ui.AppSwitch
 import androidx.compose.material3.Text
 import com.aicode.core.ui.AppTextField
 import androidx.compose.runtime.Composable
@@ -177,7 +177,7 @@ fun WiFiFtpServerSection(
                         }
                     }
                 }
-                Switch(
+                AppSwitch(
                     checked = isRunning,
                     onCheckedChange = { viewModel.toggleFtpServer() }
                 )
@@ -237,7 +237,7 @@ fun WiFiFtpServerSection(
                         Text(text = stringResource(R.string.ftp_allow_anonymous), style = MaterialTheme.typography.bodyMedium, color = if (settingsLightMode()) Color(0xFF0F0F0F) else MaterialTheme.colorScheme.onSurface)
                         Text(text = stringResource(R.string.ftp_anonymous_desc), style = MaterialTheme.typography.bodySmall, color = if (settingsLightMode()) Color(0xFF8E8E93) else MaterialTheme.colorScheme.onSurfaceVariant)
                     }
-                    Switch(checked = editAnonymous, onCheckedChange = { editAnonymous = it })
+                    AppSwitch(checked = editAnonymous, onCheckedChange = { editAnonymous = it })
                 }
 
                 Row(
@@ -249,7 +249,7 @@ fun WiFiFtpServerSection(
                         Text(text = stringResource(R.string.ftp_auto_start), style = MaterialTheme.typography.bodyMedium, color = if (settingsLightMode()) Color(0xFF0F0F0F) else MaterialTheme.colorScheme.onSurface)
                         Text(text = stringResource(R.string.ftp_auto_start_desc), style = MaterialTheme.typography.bodySmall, color = if (settingsLightMode()) Color(0xFF8E8E93) else MaterialTheme.colorScheme.onSurfaceVariant)
                     }
-                    Switch(checked = editAutoStart, onCheckedChange = { editAutoStart = it })
+                    AppSwitch(checked = editAutoStart, onCheckedChange = { editAutoStart = it })
                 }
 
                 Button(

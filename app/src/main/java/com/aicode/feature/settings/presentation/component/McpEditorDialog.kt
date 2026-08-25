@@ -29,7 +29,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.Switch
+import com.aicode.core.ui.AppSwitch
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import com.aicode.core.ui.AppTextField
@@ -286,7 +286,7 @@ fun McpServerEditDialog(
                                         color = MaterialTheme.colorScheme.onSurface,
                                         modifier = Modifier.weight(1f)
                                     )
-                                    Switch(
+                                    AppSwitch(
                                         checked = enabled,
                                         onCheckedChange = { enabled = it }
                                     )
@@ -423,7 +423,7 @@ fun McpServerEditDialog(
                                                     color = if (isToolEnabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                                                     modifier = Modifier.weight(1f)
                                                 )
-                                                Switch(
+                                                AppSwitch(
                                                     checked = isToolEnabled,
                                                     onCheckedChange = { checked ->
                                                         if (checked) disabledToolsSet.remove(tool.name) else disabledToolsSet.add(tool.name)

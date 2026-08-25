@@ -17,7 +17,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Switch
+import com.aicode.core.ui.AppSwitch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -124,7 +124,7 @@ internal fun AppPermissionsSection(
                 title = stringResource(R.string.settings_keepalive_title),
                 subtitle = stringResource(R.string.settings_keepalive_subtitle),
                 trailing = {
-                    Switch(
+                    AppSwitch(
                         checked = keepaliveEnabled,
                         onCheckedChange = { enabled ->
                             toggleWithNotificationPermission(onToggleKeepalive, enabled)
@@ -138,7 +138,7 @@ internal fun AppPermissionsSection(
                 title = stringResource(R.string.settings_agent_sound_title),
                 subtitle = stringResource(R.string.settings_agent_sound_subtitle),
                 trailing = {
-                    Switch(
+                    AppSwitch(
                         checked = agentSoundEnabled,
                         onCheckedChange = { enabled ->
                             toggleWithNotificationPermission(onToggleAgentSound, enabled)

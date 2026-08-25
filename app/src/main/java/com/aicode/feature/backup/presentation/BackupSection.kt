@@ -21,7 +21,7 @@ import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Switch
+import com.aicode.core.ui.AppSwitch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import com.aicode.core.ui.AppTextField
@@ -112,7 +112,7 @@ internal fun BackupSection(viewModel: BackupViewModel) {
             SettingsRow(
                 title = stringResource(R.string.common_ai_providers),
                 trailing = {
-                    Switch(
+                    AppSwitch(
                         checked = exportOptions.providers,
                         onCheckedChange = { viewModel.updateExportOptions(exportOptions.copy(providers = it)) }
                     )
@@ -122,7 +122,7 @@ internal fun BackupSection(viewModel: BackupViewModel) {
             SettingsRow(
                 title = stringResource(R.string.backup_data_remote),
                 trailing = {
-                    Switch(
+                    AppSwitch(
                         checked = exportOptions.remoteConnections,
                         onCheckedChange = { viewModel.updateExportOptions(exportOptions.copy(remoteConnections = it)) }
                     )
@@ -132,7 +132,7 @@ internal fun BackupSection(viewModel: BackupViewModel) {
             SettingsRow(
                 title = stringResource(R.string.backup_data_chat_history),
                 trailing = {
-                    Switch(
+                    AppSwitch(
                         checked = exportOptions.chatHistory,
                         onCheckedChange = { viewModel.updateExportOptions(exportOptions.copy(chatHistory = it)) }
                     )
@@ -142,7 +142,7 @@ internal fun BackupSection(viewModel: BackupViewModel) {
             SettingsRow(
                 title = stringResource(R.string.backup_data_mcp),
                 trailing = {
-                    Switch(
+                    AppSwitch(
                         checked = exportOptions.mcpServers,
                         onCheckedChange = { viewModel.updateExportOptions(exportOptions.copy(mcpServers = it)) }
                     )
@@ -152,7 +152,7 @@ internal fun BackupSection(viewModel: BackupViewModel) {
             SettingsRow(
                 title = stringResource(R.string.backup_data_permissions),
                 trailing = {
-                    Switch(
+                    AppSwitch(
                         checked = exportOptions.permissionRules,
                         onCheckedChange = { viewModel.updateExportOptions(exportOptions.copy(permissionRules = it)) }
                     )
@@ -162,7 +162,7 @@ internal fun BackupSection(viewModel: BackupViewModel) {
             SettingsRow(
                 title = stringResource(R.string.backup_data_app_settings),
                 trailing = {
-                    Switch(
+                    AppSwitch(
                         checked = exportOptions.appSettings,
                         onCheckedChange = { viewModel.updateExportOptions(exportOptions.copy(appSettings = it)) }
                     )
@@ -172,7 +172,7 @@ internal fun BackupSection(viewModel: BackupViewModel) {
             SettingsRow(
                 title = stringResource(R.string.backup_data_workspace),
                 trailing = {
-                    Switch(
+                    AppSwitch(
                         checked = exportOptions.workspaceFiles,
                         onCheckedChange = { viewModel.updateExportOptions(exportOptions.copy(workspaceFiles = it)) }
                     )

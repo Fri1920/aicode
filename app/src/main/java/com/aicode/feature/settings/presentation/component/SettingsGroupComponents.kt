@@ -51,7 +51,7 @@ import compose.icons.feathericons.Search
  * SettingsGroup {
  *     SettingsRow(icon, title, onClick = { ... })
  *     SettingsDivider()
- *     SettingsRow(icon, title, trailing = { Switch(...) })
+ *     SettingsRow(icon, title, trailing = { AppSwitch(...) })
  * }
  * ```
  */
@@ -129,7 +129,7 @@ internal fun SettingsGroup(
  * 分组内单行：左侧线条图标 + 标题，右侧可选尾随组件（右箭头/开关/值）。
  *
  * @param icon 左侧图标，null 则标题与无图标行对齐。
- * @param trailing 右侧尾随内容（如 [androidx.compose.material3.Switch]、chevron）。
+ * @param trailing 右侧尾随内容（如 [com.aicode.core.ui.AppSwitch]、chevron）。
  * @param onClick null 表示无点击行为（如开关行）；非 null 时行尾自动显示右箭头。
  */
 @Composable

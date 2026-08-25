@@ -29,7 +29,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
+import com.aicode.core.ui.AppSwitch
 import androidx.compose.material3.Text
 import com.aicode.core.ui.AppTextField
 import androidx.compose.runtime.Composable
@@ -113,7 +113,7 @@ fun SyncSettingsSheet(
                             modifier = Modifier.padding(top = 2.dp)
                         )
                     }
-                    Switch(
+                    AppSwitch(
                         checked = editUseGitIgnore,
                         onCheckedChange = { editUseGitIgnore = it }
                     )

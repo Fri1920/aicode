@@ -28,7 +28,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Switch
+import com.aicode.core.ui.AppSwitch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -165,7 +165,7 @@ fun CredentialScreen(
                                     title = stringResource(R.string.credential_auto_inject_title),
                                     subtitle = stringResource(R.string.credential_auto_inject_hint),
                                     trailing = {
-                                        Switch(
+                                        AppSwitch(
                                             checked = state.autoInjectEnabled,
                                             onCheckedChange = viewModel::setAutoInject
                                         )

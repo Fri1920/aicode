@@ -34,7 +34,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
+import com.aicode.core.ui.AppSwitch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.LaunchedEffect
@@ -222,7 +222,7 @@ internal fun BranchesTab(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(stringResource(R.string.git_create_and_switch))
-                    Switch(checked = checkout, onCheckedChange = { checkout = it })
+                    AppSwitch(checked = checkout, onCheckedChange = { checkout = it })
                 }
                 Row(
                     modifier = Modifier.fillMaxWidth(),
