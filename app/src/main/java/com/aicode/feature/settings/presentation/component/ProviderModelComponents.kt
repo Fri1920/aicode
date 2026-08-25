@@ -53,6 +53,7 @@ import com.aicode.R
 import com.aicode.core.theme.Radius
 import com.aicode.core.ui.SwipeToDeleteRow
 import com.aicode.core.theme.Spacing
+import com.aicode.core.theme.semanticColors
 import com.aicode.feature.settings.data.remote.ModelTestResult
 import com.aicode.feature.settings.domain.model.ModelMetadata
 import compose.icons.FeatherIcons
@@ -259,8 +260,7 @@ internal fun ModelTestDetailBottomSheet(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var copied by remember { mutableStateOf(false) }
-    val light = MaterialTheme.colorScheme.background.luminance() > 0.5f
-    val bgCardColor = if (light) Color(0xFFF2F2F7) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+    val bgCardColor = MaterialTheme.semanticColors.mutedSurface
 
     fun buildFullDebugLog(): String {
         return buildString {
@@ -302,7 +302,7 @@ internal fun ModelTestDetailBottomSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-        containerColor = if (light) Color.White else MaterialTheme.colorScheme.surface
+        containerColor = MaterialTheme.semanticColors.cardSurface
     ) {
         Column(
             modifier = Modifier

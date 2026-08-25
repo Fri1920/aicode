@@ -29,6 +29,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.aicode.core.theme.Spacing
+import com.aicode.core.theme.semanticColors
 import com.aicode.feature.agent.domain.model.ChatSession
 import compose.icons.FeatherIcons
 
@@ -70,7 +71,7 @@ fun ChatSessionRow(
                 modifier = Modifier
                     .size(8.dp)
                     .clip(CircleShape)
-                    .background(Color(0xFF22C55E).copy(alpha = alpha))
+                    .background(MaterialTheme.semanticColors.success.copy(alpha = alpha))
             )
             Spacer(Modifier.width(Spacing.md))
         }

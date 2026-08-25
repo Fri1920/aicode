@@ -90,7 +90,7 @@ fun WiFiFtpServerSection(
                 Icon(
                     FeatherIcons.Info,
                     contentDescription = null,
-                    tint = if (settingsLightMode()) Color(0xFF0F0F0F) else MaterialTheme.colorScheme.onSurfaceVariant,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(16.dp).padding(top = 2.dp)
                 )
                 Spacer(modifier = Modifier.width(Spacing.md))
@@ -98,18 +98,18 @@ fun WiFiFtpServerSection(
                     Text(
                         text = "• " + stringResource(R.string.ftp_usage_item_1),
                         style = MaterialTheme.typography.bodySmall,
-                        color = if (settingsLightMode()) Color(0xFF8E8E93) else MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
                         text = "• " + stringResource(R.string.ftp_usage_item_2),
                         style = MaterialTheme.typography.bodySmall,
-                        color = if (settingsLightMode()) Color(0xFF8E8E93) else MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(top = 2.dp)
                     )
                     Text(
                         text = "• " + stringResource(R.string.ftp_usage_item_3),
                         style = MaterialTheme.typography.bodySmall,
-                        color = if (settingsLightMode()) Color(0xFF8E8E93) else MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(top = 2.dp)
                     )
                 }
@@ -129,7 +129,7 @@ fun WiFiFtpServerSection(
                     Icon(
                         FeatherIcons.Share2,
                         contentDescription = null,
-                        tint = if (settingsLightMode()) Color(0xFF0F0F0F) else MaterialTheme.colorScheme.onSurfaceVariant,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(16.dp)
                     )
                     Spacer(modifier = Modifier.width(Spacing.md))
@@ -138,7 +138,7 @@ fun WiFiFtpServerSection(
                             text = stringResource(R.string.remote_tab_ftp),
                             style = MaterialTheme.typography.bodyLarge,
                             fontWeight = FontWeight.Normal,
-                            color = if (settingsLightMode()) Color(0xFF0F0F0F) else MaterialTheme.colorScheme.onSurface
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                         if (isRunning) {
                             Row(
@@ -156,14 +156,14 @@ fun WiFiFtpServerSection(
                                 Text(
                                     text = stringResource(R.string.ftp_running, serverUrl),
                                     style = MaterialTheme.typography.bodySmall,
-                                    color = if (settingsLightMode()) Color(0xFF8E8E93) else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     maxLines = 1
                                 )
                                 Spacer(modifier = Modifier.width(4.dp))
                                 Icon(
                                     FeatherIcons.Copy,
                                     contentDescription = stringResource(R.string.ftp_copy_address),
-                                    tint = if (settingsLightMode()) Color(0xFF8E8E93) else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                     modifier = Modifier.size(12.dp)
                                 )
                             }
@@ -171,7 +171,7 @@ fun WiFiFtpServerSection(
                             Text(
                                 text = stringResource(R.string.ftp_not_running),
                                 style = MaterialTheme.typography.bodySmall,
-                                color = if (settingsLightMode()) Color(0xFF8E8E93) else MaterialTheme.colorScheme.onSurfaceVariant,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.padding(top = 2.dp)
                             )
                         }
@@ -234,8 +234,8 @@ fun WiFiFtpServerSection(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
-                        Text(text = stringResource(R.string.ftp_allow_anonymous), style = MaterialTheme.typography.bodyMedium, color = if (settingsLightMode()) Color(0xFF0F0F0F) else MaterialTheme.colorScheme.onSurface)
-                        Text(text = stringResource(R.string.ftp_anonymous_desc), style = MaterialTheme.typography.bodySmall, color = if (settingsLightMode()) Color(0xFF8E8E93) else MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(text = stringResource(R.string.ftp_allow_anonymous), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
+                        Text(text = stringResource(R.string.ftp_anonymous_desc), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     AppSwitch(checked = editAnonymous, onCheckedChange = { editAnonymous = it })
                 }
@@ -246,8 +246,8 @@ fun WiFiFtpServerSection(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
-                        Text(text = stringResource(R.string.ftp_auto_start), style = MaterialTheme.typography.bodyMedium, color = if (settingsLightMode()) Color(0xFF0F0F0F) else MaterialTheme.colorScheme.onSurface)
-                        Text(text = stringResource(R.string.ftp_auto_start_desc), style = MaterialTheme.typography.bodySmall, color = if (settingsLightMode()) Color(0xFF8E8E93) else MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(text = stringResource(R.string.ftp_auto_start), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
+                        Text(text = stringResource(R.string.ftp_auto_start_desc), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     AppSwitch(checked = editAutoStart, onCheckedChange = { editAutoStart = it })
                 }

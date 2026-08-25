@@ -43,6 +43,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.aicode.core.theme.AIEditorTheme
 import com.aicode.core.theme.Spacing
+import com.aicode.core.theme.semanticColors
 import compose.icons.FeatherIcons
 import compose.icons.feathericons.AlertCircle
 import compose.icons.feathericons.Copy
@@ -153,11 +154,10 @@ private fun CrashScreen(
     onExit: () -> Unit,
 ) {
     // 与设置页一致的 iOS 分组风格：浅色模式浅灰背景 + 白色卡片，深色沿用主题色。
-    val light = MaterialTheme.colorScheme.background.luminance() > 0.5f
-    val pageBg = if (light) Color(0xFFF8F8F8) else MaterialTheme.colorScheme.background
-    val cardBg = if (light) Color.White else MaterialTheme.colorScheme.surface
-    val titleColor = if (light) Color(0xFF0F0F0F) else MaterialTheme.colorScheme.onSurface
-    val secondaryColor = if (light) Color(0xFF8E8E93) else MaterialTheme.colorScheme.onSurfaceVariant
+    val pageBg = MaterialTheme.semanticColors.pageBackground
+    val cardBg = MaterialTheme.semanticColors.cardSurface
+    val titleColor = MaterialTheme.colorScheme.onSurface
+    val secondaryColor = MaterialTheme.colorScheme.onSurfaceVariant
     val logHint = LocalContext.current.getString(R.string.crash_log_hint, logDir)
     // 返回键视为退出应用，避免回到已崩溃的界面
     BackHandler { onExit() }

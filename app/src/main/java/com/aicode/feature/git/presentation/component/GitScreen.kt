@@ -51,6 +51,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.aicode.R
 import com.aicode.core.theme.Radius
 import com.aicode.core.theme.Spacing
+import com.aicode.core.theme.GitStatusColors
+import com.aicode.core.theme.semanticColors
 import com.aicode.core.ui.AppTextField
 import com.aicode.core.ui.FloatingTabBar
 import com.aicode.core.ui.FloatingTabItem
@@ -250,7 +252,7 @@ fun GitScreen(
 @Composable
 internal fun StatusMetric(label: String, count: Int, color: Color, modifier: Modifier = Modifier) {
     Surface(
-        color = if (settingsLightMode()) Color(0xFFF2F2F7) else MaterialTheme.colorScheme.surfaceVariant,
+        color = MaterialTheme.semanticColors.mutedSurface,
         shape = RoundedCornerShape(Radius.md),
         modifier = modifier
     ) {
@@ -282,7 +284,7 @@ internal fun SectionHeader(text: String) {
             text = text,
             style = MaterialTheme.typography.labelLarge.copy(fontSize = 13.sp),
             fontWeight = FontWeight.Normal,
-            color = if (settingsLightMode()) Color(0xFF8E8E93) else MaterialTheme.colorScheme.onSurfaceVariant,
+            color = MaterialTheme.semanticColors.subtleText,
             modifier = Modifier.weight(1f)
         )
     }
@@ -295,14 +297,14 @@ internal fun SectionHeader(text: String) {
  * 冲突=紫红、类型变更=青。仅取首字符判定，porcelain 的 X/Y 两列统一映射。
  */
 private fun statusColor(code: String): Pair<Color, Color> = when (code.firstOrNull()) {
-    'A' -> Color(0xFF16A34A) to Color(0xFFFFFFFF)            // 新增
-    'M' -> Color(0xFFD97706) to Color(0xFFFFFFFF)            // 修改
-    'D' -> Color(0xFFDC2626) to Color(0xFFFFFFFF)            // 删除
-    'R', 'C' -> Color(0xFF2563EB) to Color(0xFFFFFFFF)       // 重命名/复制
-    '?' -> Color(0xFF94A3B8) to Color(0xFFFFFFFF)            // 未跟踪
-    'U' -> Color(0xFF9333EA) to Color(0xFFFFFFFF)            // 冲突
-    'T' -> Color(0xFF0891B2) to Color(0xFFFFFFFF)            // 类型变更
-    else -> Color(0xFF64748B) to Color(0xFFFFFFFF)           // 兜底
+    'A' -> GitStatusColors.Added to Color.White            // 新增
+    'M' -> GitStatusColors.Modified to Color.White         // 修改
+    'D' -> GitStatusColors.Deleted to Color.White          // 删除
+    'R', 'C' -> GitStatusColors.Renamed to Color.White     // 重命名/复制
+    '?' -> GitStatusColors.Untracked to Color.White        // 未跟踪
+    'U' -> GitStatusColors.Conflict to Color.White         // 冲突
+    'T' -> GitStatusColors.TypeChanged to Color.White      // 类型变更
+    else -> GitStatusColors.Default to Color.White         // 兜底
 }
 
 @Composable

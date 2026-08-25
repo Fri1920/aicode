@@ -46,6 +46,7 @@ import androidx.compose.ui.unit.sp
 import com.aicode.R
 import com.aicode.core.theme.Radius
 import com.aicode.core.theme.Spacing
+import com.aicode.core.theme.semanticColors
 import com.aicode.feature.git.domain.model.GitFileChange
 import com.aicode.feature.git.domain.model.GitStatus
 import com.aicode.feature.settings.presentation.component.SettingsDivider
@@ -312,8 +313,8 @@ private fun StatusOverview(status: GitStatus?, clean: Boolean) {
             Spacer(Modifier.height(Spacing.md))
 
             Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                StatusMetric(stringResource(R.string.git_staged_label), staged, MaterialTheme.colorScheme.tertiary, Modifier.weight(1f))
-                StatusMetric(stringResource(R.string.git_modified_label), modified, Color(0xFFD97706), Modifier.weight(1f))
+                StatusMetric(stringResource(R.string.git_staged_label), staged, MaterialTheme.semanticColors.success, Modifier.weight(1f))
+                StatusMetric(stringResource(R.string.git_modified_label), modified, MaterialTheme.semanticColors.warning, Modifier.weight(1f))
                 StatusMetric(stringResource(R.string.git_untracked_label), untracked, MaterialTheme.colorScheme.onSurfaceVariant, Modifier.weight(1f))
             }
         }
@@ -324,7 +325,7 @@ private fun StatusOverview(status: GitStatus?, clean: Boolean) {
 @Composable
 private fun SyncPill(ahead: Int, behind: Int) {
     Surface(
-        color = if (settingsLightMode()) Color(0xFFF2F2F7) else MaterialTheme.colorScheme.surfaceVariant,
+        color = MaterialTheme.semanticColors.mutedSurface,
         shape = RoundedCornerShape(Radius.pill)
     ) {
         Text(
@@ -361,7 +362,7 @@ private fun GroupHeaderWithAction(
             text = title,
             style = MaterialTheme.typography.labelLarge.copy(fontSize = 13.sp),
             fontWeight = FontWeight.Normal,
-            color = if (settingsLightMode()) Color(0xFF8E8E93) else MaterialTheme.colorScheme.onSurfaceVariant,
+            color = MaterialTheme.semanticColors.subtleText,
             modifier = Modifier.weight(1f)
         )
         TextButton(
@@ -436,12 +437,10 @@ private fun ActionButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val isLight = settingsLightMode()
-    val bgColor = if (isLight) {
-        if (enabled) Color(0xFFF0F2F5) else Color(0xFFF7F8FA)
+    val bgColor = if (enabled) {
+        MaterialTheme.semanticColors.buttonMutedBg
     } else {
-        if (enabled) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.70f)
-        else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
+        MaterialTheme.semanticColors.mutedSurface.copy(alpha = 0.5f)
     }
     val contentColor = if (enabled) {
         MaterialTheme.colorScheme.onSurface

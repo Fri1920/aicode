@@ -38,6 +38,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aicode.R
 import com.aicode.core.theme.Spacing
+import com.aicode.core.theme.semanticColors
 import compose.icons.FeatherIcons
 import compose.icons.feathericons.ChevronRight
 import compose.icons.feathericons.Search
@@ -78,13 +79,13 @@ internal fun CollapsibleGroupHeader(
         Text(
             text = text,
             style = MaterialTheme.typography.labelLarge.copy(fontSize = 13.sp),
-            color = if (settingsLightMode()) Color(0xFF8E8E93) else MaterialTheme.colorScheme.onSurfaceVariant,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.weight(1f)
         )
         Icon(
             imageVector = FeatherIcons.ChevronRight,
             contentDescription = null,
-            tint = if (settingsLightMode()) Color(0xFFC7C7CC) else MaterialTheme.colorScheme.onSurfaceVariant,
+            tint = MaterialTheme.semanticColors.subtleText,
             modifier = Modifier
                 .size(16.dp)
                 .rotate(if (expanded) 90f else 0f)
@@ -92,10 +93,10 @@ internal fun CollapsibleGroupHeader(
     }
 }
 
-/** 设置页背景：浅色模式用浅灰 #F8F8F8，深色模式沿用主题背景。 */
+/** 设置页背景：统一使用语义定义的 pageBackground。 */
 @Composable
 internal fun settingsPageBackground(): Color =
-    if (settingsLightMode()) Color(0xFFF8F8F8) else MaterialTheme.colorScheme.background
+    MaterialTheme.semanticColors.pageBackground
 
 /** 分组小标题：卡片上方灰色小字，左对齐。 */
 @Composable
@@ -104,12 +105,12 @@ internal fun SettingsGroupHeader(text: String) {
         text = text,
         style = MaterialTheme.typography.labelLarge.copy(fontSize = 13.sp),
         fontWeight = FontWeight.Normal,
-        color = if (settingsLightMode()) Color(0xFF8E8E93) else MaterialTheme.colorScheme.onSurfaceVariant,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = Modifier.padding(start = Spacing.md, top = Spacing.lg, bottom = Spacing.sm)
     )
 }
 
-/** 白色分组圆角卡片容器：内部按行排布，行间用 [SettingsDivider] 分隔。 */
+/** 白色/深色分组圆角卡片容器：内部按行排布，行间用 [SettingsDivider] 分隔。 */
 @Composable
 internal fun SettingsGroup(
     modifier: Modifier = Modifier,
@@ -118,7 +119,7 @@ internal fun SettingsGroup(
     Surface(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(14.dp),
-        color = if (settingsLightMode()) Color.White else MaterialTheme.colorScheme.surface,
+        color = MaterialTheme.semanticColors.cardSurface,
         shadowElevation = 0.dp
     ) {
         Column(content = content)
@@ -153,7 +154,7 @@ internal fun SettingsRow(
             Icon(
                 imageVector = icon,
                 contentDescription = null,
-                tint = if (settingsLightMode()) Color(0xFF0F0F0F) else MaterialTheme.colorScheme.onSurfaceVariant,
+                tint = MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier.size(16.dp)
             )
             Spacer(Modifier.width(Spacing.md))
@@ -163,13 +164,13 @@ internal fun SettingsRow(
                 text = title,
                 style = MaterialTheme.typography.bodyLarge,
                 fontWeight = FontWeight.Normal,
-                color = if (settingsLightMode()) Color(0xFF0F0F0F) else MaterialTheme.colorScheme.onSurface
+                color = MaterialTheme.colorScheme.onSurface
             )
             if (subtitle != null) {
                 Text(
                     text = subtitle,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = if (settingsLightMode()) Color(0xFF8E8E93) else MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }
@@ -179,7 +180,7 @@ internal fun SettingsRow(
             Icon(
                 imageVector = FeatherIcons.ChevronRight,
                 contentDescription = null,
-                tint = if (settingsLightMode()) Color(0xFFC7C7CC) else MaterialTheme.colorScheme.onSurfaceVariant,
+                tint = MaterialTheme.semanticColors.subtleText,
                 modifier = Modifier.size(18.dp)
             )
         }
@@ -192,7 +193,7 @@ internal fun SettingsDivider() {
     HorizontalDivider(
         modifier = Modifier.padding(horizontal = Spacing.lg),
         thickness = 0.5.dp,
-        color = if (settingsLightMode()) Color(0xFFE5E5EA) else MaterialTheme.colorScheme.outlineVariant
+        color = MaterialTheme.semanticColors.subtleBorder
     )
 }
 
@@ -204,11 +205,11 @@ internal fun ModelSearchField(
     placeholder: String,
     modifier: Modifier = Modifier
 ) {
-    val light = settingsLightMode()
+    val isLight = settingsLightMode()
     Surface(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(50),
-        color = if (light) Color(0xFFE9E9EB) else MaterialTheme.colorScheme.surfaceVariant
+        color = MaterialTheme.semanticColors.capsuleSurface
     ) {
         Row(
             modifier = Modifier.padding(horizontal = Spacing.md, vertical = 10.dp),
@@ -217,7 +218,7 @@ internal fun ModelSearchField(
             Icon(
                 FeatherIcons.Search,
                 contentDescription = null,
-                tint = if (light) Color(0xFF8E8E93) else MaterialTheme.colorScheme.onSurfaceVariant,
+                tint = MaterialTheme.semanticColors.subtleText,
                 modifier = Modifier.size(18.dp)
             )
             Spacer(Modifier.width(Spacing.sm))
@@ -226,7 +227,7 @@ internal fun ModelSearchField(
                     Text(
                         text = placeholder,
                         style = MaterialTheme.typography.bodyMedium,
-                        color = if (light) Color(0xFF8E8E93) else MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = MaterialTheme.semanticColors.subtleText,
                         maxLines = 1
                     )
                 }
@@ -234,7 +235,7 @@ internal fun ModelSearchField(
                     value = query,
                     onValueChange = onQueryChange,
                     textStyle = MaterialTheme.typography.bodyMedium.copy(
-                        color = if (light) Color(0xFF0F0F0F) else MaterialTheme.colorScheme.onSurface
+                        color = MaterialTheme.colorScheme.onSurface
                     ),
                     singleLine = true,
                     cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),

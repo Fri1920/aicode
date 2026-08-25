@@ -54,6 +54,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.aicode.core.theme.Spacing
+import com.aicode.core.theme.semanticColors
 import com.aicode.core.util.LogLevel
 import com.aicode.R
 import com.aicode.feature.agent.domain.mcp.McpServerEntry
@@ -777,11 +778,7 @@ internal fun SettingsMenu(
                     Text(
                         text = stringResource(themeMode.labelRes),
                         style = MaterialTheme.typography.bodyMedium,
-                        color = if (MaterialTheme.colorScheme.background.luminance() > 0.5f) {
-                            Color(0xFF8E8E93)
-                        } else {
-                            MaterialTheme.colorScheme.onSurfaceVariant
-                        }
+                        color = MaterialTheme.semanticColors.subtleText
                     )
                 }
             )
@@ -794,11 +791,7 @@ internal fun SettingsMenu(
                     Text(
                         text = stringResource(terminalSettings.theme.nameRes),
                         style = MaterialTheme.typography.bodyMedium,
-                        color = if (MaterialTheme.colorScheme.background.luminance() > 0.5f) {
-                            Color(0xFF8E8E93)
-                        } else {
-                            MaterialTheme.colorScheme.onSurfaceVariant
-                        }
+                        color = MaterialTheme.semanticColors.subtleText
                     )
                 }
             )
@@ -812,11 +805,7 @@ internal fun SettingsMenu(
                         text = if (backgroundImagePath != null) "${BackgroundSettingsRepository.alphaToSlider(backgroundAlpha).toInt()}%"
                         else stringResource(R.string.settings_background_image_none),
                         style = MaterialTheme.typography.bodyMedium,
-                        color = if (MaterialTheme.colorScheme.background.luminance() > 0.5f) {
-                            Color(0xFF8E8E93)
-                        } else {
-                            MaterialTheme.colorScheme.onSurfaceVariant
-                        }
+                        color = MaterialTheme.semanticColors.subtleText
                     )
                 }
             )
@@ -829,11 +818,7 @@ internal fun SettingsMenu(
                     Text(
                         text = currentLanguageDisplayName,
                         style = MaterialTheme.typography.bodyMedium,
-                        color = if (MaterialTheme.colorScheme.background.luminance() > 0.5f) {
-                            Color(0xFF8E8E93)
-                        } else {
-                            MaterialTheme.colorScheme.onSurfaceVariant
-                        }
+                        color = MaterialTheme.semanticColors.subtleText
                     )
                 }
             )

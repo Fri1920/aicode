@@ -62,6 +62,8 @@ import androidx.compose.ui.unit.sp
 import com.aicode.R
 import com.aicode.core.theme.Radius
 import com.aicode.core.theme.Spacing
+import com.aicode.core.theme.LogLevelColors
+import com.aicode.core.theme.semanticColors
 import com.aicode.core.util.LogLevel
 import com.aicode.feature.settings.presentation.LogViewerUiState
 import compose.icons.FeatherIcons
@@ -482,7 +484,7 @@ private fun CopyLogButton(text: String, enabled: Boolean) {
             copied = false
         }
     }
-    val idleColor = if (settingsLightMode()) Color(0xFFE9E9EB) else MaterialTheme.colorScheme.surfaceVariant
+    val idleColor = MaterialTheme.semanticColors.capsuleSurface
     Surface(
         onClick = {
             if (enabled) {
@@ -721,14 +723,14 @@ private fun LogActionRow(
     }
 }
 
-/** 等级主题色：logcat 风格，深浅色主题下均保持可读。 */
+/** 等级主题色：统一使用 LogLevelColors 调色板。 */
 private fun logLevelColor(level: LogLevel): Color = when (level) {
-    LogLevel.VERBOSE -> Color(0xFF9CA3AF)
-    LogLevel.DEBUG -> Color(0xFF3B82F6)
-    LogLevel.INFO -> Color(0xFF22C55E)
-    LogLevel.WARN -> Color(0xFFF59E0B)
-    LogLevel.ERROR -> Color(0xFFEF4444)
-    LogLevel.NONE -> Color(0xFF6B7280)
+    LogLevel.VERBOSE -> LogLevelColors.Verbose
+    LogLevel.DEBUG -> LogLevelColors.Debug
+    LogLevel.INFO -> LogLevelColors.Info
+    LogLevel.WARN -> LogLevelColors.Warn
+    LogLevel.ERROR -> LogLevelColors.Error
+    LogLevel.NONE -> LogLevelColors.None
 }
 
 /** 解析后的一条日志。level 为 null 表示非标准日志行（堆栈续行、文件头重置标记等）。 */

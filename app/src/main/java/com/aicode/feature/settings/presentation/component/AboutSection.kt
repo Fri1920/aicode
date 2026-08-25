@@ -42,6 +42,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.aicode.R
 import com.aicode.core.theme.Spacing
+import com.aicode.core.theme.semanticColors
 import com.aicode.feature.settings.data.repository.UpdateChannel
 import compose.icons.FeatherIcons
 import compose.icons.feathericons.Book
@@ -107,7 +108,7 @@ internal fun AboutSection(
                     Text(
                         text = "v${appInfo.name}",
                         style = MaterialTheme.typography.bodyMedium,
-                        color = if (settingsLightMode()) Color(0xFF8E8E93) else MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.semanticColors.subtleText
                     )
                 }
             )
@@ -140,7 +141,7 @@ internal fun AboutSection(
                             }
                         ),
                         style = MaterialTheme.typography.bodyMedium,
-                        color = if (settingsLightMode()) Color(0xFF8E8E93) else MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.semanticColors.subtleText
                     )
                 }
             )
@@ -179,7 +180,7 @@ private fun AboutHeaderCard(appName: String, appIcon: androidx.compose.ui.graphi
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(14.dp),
-        color = if (settingsLightMode()) Color.White else MaterialTheme.colorScheme.surface,
+        color = MaterialTheme.semanticColors.cardSurface,
         shadowElevation = 0.dp
     ) {
         Row(

@@ -53,6 +53,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aicode.core.theme.Radius
 import com.aicode.core.theme.Spacing
+import com.aicode.core.theme.semanticColors
 import com.aicode.feature.settings.domain.model.AdaptiveCardAction
 import com.aicode.feature.settings.domain.model.AdaptiveCardElement
 import com.aicode.feature.settings.domain.model.AdaptiveCardRoot
@@ -574,7 +575,7 @@ private fun RenderTrendBadge(trend: String?) {
             text = "▲",
             fontSize = 11.sp,
             fontWeight = FontWeight.Bold,
-            color = Color(0xFF10B981)
+            color = MaterialTheme.semanticColors.success
         )
         "down" -> Text(
             text = "▼",
@@ -592,8 +593,8 @@ private fun RenderBadge(
 ) {
     val (bgColor, borderColor) = resolveContainerColors(element.style)
     val textColor = when (element.style) {
-        ContainerStyle.GOOD -> Color(0xFF10B981)
-        ContainerStyle.WARNING -> Color(0xFFF59E0B)
+        ContainerStyle.GOOD -> MaterialTheme.semanticColors.success
+        ContainerStyle.WARNING -> MaterialTheme.semanticColors.warning
         ContainerStyle.ATTENTION -> MaterialTheme.colorScheme.error
         ContainerStyle.ACCENT -> MaterialTheme.colorScheme.primary
         else -> MaterialTheme.colorScheme.onSurfaceVariant
@@ -1081,8 +1082,8 @@ private fun resolveColor(color: CardColor, isSubtle: Boolean): Color {
         CardColor.Default -> MaterialTheme.colorScheme.onSurface
         CardColor.Subtle -> MaterialTheme.colorScheme.onSurfaceVariant
         CardColor.Accent -> MaterialTheme.colorScheme.primary
-        CardColor.Good -> Color(0xFF10B981)
-        CardColor.Warning -> Color(0xFFF59E0B)
+        CardColor.Good -> MaterialTheme.semanticColors.success
+        CardColor.Warning -> MaterialTheme.semanticColors.warning
         CardColor.Attention -> MaterialTheme.colorScheme.error
         is CardColor.Custom -> parseHexColor(color.hex) ?: MaterialTheme.colorScheme.primary
     }
@@ -1100,12 +1101,12 @@ private fun resolveContainerColors(style: ContainerStyle): Pair<Color, Color> {
             MaterialTheme.colorScheme.outlineVariant
         )
         ContainerStyle.GOOD -> Pair(
-            Color(0xFF10B981).copy(alpha = 0.12f),
-            Color(0xFF10B981).copy(alpha = 0.3f)
+            MaterialTheme.semanticColors.success.copy(alpha = 0.12f),
+            MaterialTheme.semanticColors.success.copy(alpha = 0.3f)
         )
         ContainerStyle.WARNING -> Pair(
-            Color(0xFFF59E0B).copy(alpha = 0.12f),
-            Color(0xFFF59E0B).copy(alpha = 0.3f)
+            MaterialTheme.semanticColors.warning.copy(alpha = 0.12f),
+            MaterialTheme.semanticColors.warning.copy(alpha = 0.3f)
         )
         ContainerStyle.ATTENTION -> Pair(
             MaterialTheme.colorScheme.error.copy(alpha = 0.12f),

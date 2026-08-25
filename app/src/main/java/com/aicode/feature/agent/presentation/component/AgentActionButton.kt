@@ -18,6 +18,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.aicode.core.theme.Radius
 import com.aicode.core.theme.Spacing
+import com.aicode.core.theme.semanticColors
 
 internal enum class AgentActionTone {
     Neutral,
@@ -34,11 +35,11 @@ internal fun AgentActionButton(
     tone: AgentActionTone = AgentActionTone.Neutral
 ) {
     val shape = RoundedCornerShape(Radius.sm)
-    val success = Color(0xFF15803D)
+    val success = MaterialTheme.semanticColors.success
     val (container, content, border) = when (tone) {
         AgentActionTone.Success -> Triple(
             if (enabled) success else MaterialTheme.colorScheme.surfaceVariant,
-            if (enabled) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+            if (enabled) MaterialTheme.semanticColors.onSuccess else MaterialTheme.colorScheme.onSurfaceVariant,
             if (enabled) success else MaterialTheme.colorScheme.outlineVariant
         )
         AgentActionTone.Danger -> Triple(

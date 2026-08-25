@@ -38,6 +38,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aicode.R
 import com.aicode.core.theme.Spacing
+import com.aicode.core.theme.TokenStatsPalette
+import com.aicode.core.theme.semanticColors
 import com.aicode.feature.agent.data.local.dao.CallSummary
 import com.aicode.feature.agent.data.local.dao.DayCallStats
 import com.aicode.feature.agent.data.local.dao.ModelCallStats
@@ -65,11 +67,11 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-private val INPUT_COLOR = Color(0xFF4C8DFF)
-private val OUTPUT_COLOR = Color(0xFFFF9F43)
-private val CACHE_COLOR = Color(0xFF8B5CF6)
-private val ERROR_COLOR = Color(0xFFE5484D)
-private val CANCELLED_COLOR = Color(0xFF8E8E93)
+private val INPUT_COLOR = TokenStatsPalette.Input
+private val OUTPUT_COLOR = TokenStatsPalette.Output
+private val CACHE_COLOR = TokenStatsPalette.Cache
+private val ERROR_COLOR = TokenStatsPalette.Error
+private val CANCELLED_COLOR = TokenStatsPalette.Cancelled
 
 /** Token 统计页：周期切换 + 概览 + 趋势图 + 渠道/模型排行 + 调用明细。 */
 @Composable
@@ -103,13 +105,13 @@ internal fun TokenStatsSection(
                     colors = FilterChipDefaults.filterChipColors(
                         selectedContainerColor = MaterialTheme.colorScheme.primary,
                         selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
-                        containerColor = if (settingsLightMode()) Color.White else MaterialTheme.colorScheme.surface,
-                        labelColor = if (settingsLightMode()) Color(0xFF0F0F0F) else MaterialTheme.colorScheme.onSurface
+                        containerColor = MaterialTheme.semanticColors.cardSurface,
+                        labelColor = MaterialTheme.colorScheme.onSurface
                     ),
                     border = FilterChipDefaults.filterChipBorder(
                         enabled = true,
                         selected = state.period == period,
-                        borderColor = if (settingsLightMode()) Color(0xFFE5E5EA) else MaterialTheme.colorScheme.outlineVariant,
+                        borderColor = MaterialTheme.semanticColors.subtleBorder,
                         selectedBorderColor = Color.Transparent
                     ),
                     modifier = Modifier.weight(1f)
@@ -223,27 +225,27 @@ private fun SummaryCard(label: String, value: String, sub: String? = null, modif
     Surface(
         modifier = modifier,
         shape = RoundedCornerShape(14.dp),
-        color = if (settingsLightMode()) Color.White else MaterialTheme.colorScheme.surface
+        color = MaterialTheme.semanticColors.cardSurface
     ) {
         Column(modifier = Modifier.padding(horizontal = Spacing.md, vertical = 12.dp)) {
             Text(
                 text = label,
                 style = MaterialTheme.typography.bodySmall,
-                color = if (settingsLightMode()) Color(0xFF8E8E93) else MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(Modifier.height(4.dp))
             Text(
                 text = value,
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.SemiBold,
-                color = if (settingsLightMode()) Color(0xFF0F0F0F) else MaterialTheme.colorScheme.onSurface
+                color = MaterialTheme.colorScheme.onSurface
             )
             if (sub != null) {
                 Spacer(Modifier.height(2.dp))
                 Text(
                     text = sub,
                     style = MaterialTheme.typography.bodySmall,
-                    color = if (settingsLightMode()) Color(0xFF8E8E93) else MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1
                 )
             } else {
@@ -258,7 +260,7 @@ private fun SummaryCard(label: String, value: String, sub: String? = null, modif
 private fun TokenTrendChart(trend: List<DayCallStats>, isHourly: Boolean) {
     val modelProducer = remember { CartesianChartModelProducer() }
     val axisLabel = rememberTextComponent(
-        color = if (settingsLightMode()) Color(0xFF8E8E93) else MaterialTheme.colorScheme.onSurfaceVariant,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
         textSize = 10.sp
     )
     // y 轴：token 数用 k/M 单位展示，避免大数字拥挤
@@ -337,7 +339,7 @@ private fun EmptyStatsPlaceholder() {
             .padding(Spacing.md)
             .height(80.dp)
             .background(
-                if (settingsLightMode()) Color(0xFFF2F2F7) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
                 RoundedCornerShape(10.dp)
             ),
         contentAlignment = Alignment.Center
@@ -345,7 +347,7 @@ private fun EmptyStatsPlaceholder() {
         Text(
             text = stringResource(R.string.settings_token_stats_no_data),
             style = MaterialTheme.typography.bodyMedium,
-            color = if (settingsLightMode()) Color(0xFF8E8E93) else MaterialTheme.colorScheme.onSurfaceVariant
+            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
 }
@@ -362,7 +364,7 @@ private fun LegendDot(color: Color, label: String) {
         Text(
             text = label,
             style = MaterialTheme.typography.bodySmall,
-            color = if (settingsLightMode()) Color(0xFF8E8E93) else MaterialTheme.colorScheme.onSurfaceVariant
+            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
 }
@@ -374,19 +376,19 @@ private fun ProviderStatsRow(p: ProviderCallStats) {
             Text(
                 text = p.providerName ?: p.providerId ?: stringResource(R.string.settings_token_stats_unknown),
                 style = MaterialTheme.typography.bodyLarge,
-                color = if (settingsLightMode()) Color(0xFF0F0F0F) else MaterialTheme.colorScheme.onSurface,
+                color = MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier.weight(1f)
             )
             Text(
                 text = "${p.calls} " + stringResource(R.string.settings_token_stats_calls_suffix),
                 style = MaterialTheme.typography.bodySmall,
-                color = if (settingsLightMode()) Color(0xFF8E8E93) else MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(Modifier.width(Spacing.md))
             Text(
                 text = "↑${formatTokenCount(p.inputTokens.toInt())} ↓${formatTokenCount(p.outputTokens.toInt())}",
                 style = MaterialTheme.typography.bodySmall,
-                color = if (settingsLightMode()) Color(0xFF0F0F0F) else MaterialTheme.colorScheme.onSurface
+                color = MaterialTheme.colorScheme.onSurface
             )
         }
         Spacer(Modifier.height(6.dp))
@@ -423,7 +425,7 @@ private fun ModelStatsRow(m: ModelCallStats) {
             Text(
                 text = m.model ?: stringResource(R.string.settings_token_stats_unknown),
                 style = MaterialTheme.typography.bodyLarge,
-                color = if (settingsLightMode()) Color(0xFF0F0F0F) else MaterialTheme.colorScheme.onSurface,
+                color = MaterialTheme.colorScheme.onSurface,
                 maxLines = 1,
                 overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f)
@@ -432,7 +434,7 @@ private fun ModelStatsRow(m: ModelCallStats) {
                 text = "↓${formatTokenCount(m.outputTokens.toInt())}",
                 style = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.SemiBold,
-                color = if (settingsLightMode()) Color(0xFF0F0F0F) else MaterialTheme.colorScheme.onSurface
+                color = MaterialTheme.colorScheme.onSurface
             )
         }
         Spacer(Modifier.height(4.dp))
@@ -448,7 +450,7 @@ private fun StatChip(text: String) {
     Text(
         text = text,
         style = MaterialTheme.typography.bodySmall,
-        color = if (settingsLightMode()) Color(0xFF8E8E93) else MaterialTheme.colorScheme.onSurfaceVariant
+        color = MaterialTheme.colorScheme.onSurfaceVariant
     )
 }
 
@@ -471,8 +473,8 @@ private fun CallRecordsTable(
     total: Int,
     onSelectPage: (Int) -> Unit
 ) {
-    val textColor = if (settingsLightMode()) Color(0xFF0F0F0F) else MaterialTheme.colorScheme.onSurface
-    val mutedColor = if (settingsLightMode()) Color(0xFF8E8E93) else MaterialTheme.colorScheme.onSurfaceVariant
+    val textColor = MaterialTheme.colorScheme.onSurface
+    val mutedColor = MaterialTheme.colorScheme.onSurfaceVariant
     val pageCount = if (total == 0) 1 else (total - 1) / CALLS_PAGE_SIZE + 1
     Column {
         // 表头与数据行共用一个横向滚动容器，滑动时保持列对齐
@@ -524,7 +526,7 @@ private fun CallRecordRow(call: RecentCallRecord, cost: Double?, textColor: Colo
     val statusColor = when (call.record.status) {
         "error" -> ERROR_COLOR
         "cancelled" -> CANCELLED_COLOR
-        else -> Color(0xFF34C759)
+        else -> TokenStatsPalette.Progress
     }
     Row(modifier = Modifier.padding(horizontal = Spacing.md, vertical = 6.dp)) {
         TableCell(formatCallTime(call.record.createdAt), mutedColor, COL_TIME_W)

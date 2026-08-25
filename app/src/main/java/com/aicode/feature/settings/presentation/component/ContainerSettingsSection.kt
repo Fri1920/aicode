@@ -74,6 +74,7 @@ import com.aicode.R
 import com.aicode.core.theme.Radius
 import com.aicode.core.ui.SwipeToDeleteRow
 import com.aicode.core.theme.Spacing
+import com.aicode.core.theme.semanticColors
 import com.aicode.feature.agent.domain.container.ContainerProfile
 import com.aicode.feature.agent.domain.container.RootfsSource
 import com.aicode.feature.settings.data.repository.ExecutionMode
@@ -355,7 +356,7 @@ private fun ContainerRow(
                         text = profile.name,
                         style = MaterialTheme.typography.bodyLarge,
                         fontWeight = FontWeight.Normal,
-                        color = if (light) Color(0xFF0F0F0F) else MaterialTheme.colorScheme.onSurface,
+                        color = MaterialTheme.colorScheme.onSurface,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f, fill = false)
@@ -383,14 +384,14 @@ private fun ContainerRow(
                         Spacer(modifier = Modifier.width(Spacing.xs))
                         SourceBadge(
                             text = stringResource(R.string.container_default_badge),
-                            color = Color(0xFFF59E0B)
+                            color = MaterialTheme.semanticColors.warning
                         )
                     }
                 }
                 Text(
                     text = subtitle,
                     style = MaterialTheme.typography.bodySmall,
-                    color = if (light) Color(0xFF8E8E93) else MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 2.dp)
                 )
             }
@@ -411,7 +412,7 @@ private fun ContainerRow(
                 Icon(
                     imageVector = FeatherIcons.Edit3,
                     contentDescription = stringResource(R.string.common_edit),
-                    tint = if (light) Color(0xFF8E8E93) else MaterialTheme.colorScheme.onSurfaceVariant,
+                    tint = MaterialTheme.semanticColors.subtleText,
                     modifier = Modifier.size(18.dp)
                 )
             }

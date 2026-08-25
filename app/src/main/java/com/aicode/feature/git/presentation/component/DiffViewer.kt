@@ -45,6 +45,7 @@ import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.aicode.core.theme.Spacing
+import com.aicode.core.theme.semanticColors
 import com.aicode.core.util.LineDiff
 import compose.icons.FeatherIcons
 import compose.icons.feathericons.ArrowLeft
@@ -218,7 +219,7 @@ private fun DiffStatsBar(added: Int, removed: Int) {
                 text = "+$added",
                 style = MaterialTheme.typography.labelMedium,
                 fontFamily = FontFamily.Monospace,
-                color = Color(0xFF22C55E),
+                color = MaterialTheme.semanticColors.diffAdd,
                 fontWeight = FontWeight.SemiBold
             )
             Spacer(Modifier.width(Spacing.sm))
@@ -226,7 +227,7 @@ private fun DiffStatsBar(added: Int, removed: Int) {
                 text = "-$removed",
                 style = MaterialTheme.typography.labelMedium,
                 fontFamily = FontFamily.Monospace,
-                color = Color(0xFFEF4444),
+                color = MaterialTheme.semanticColors.diffRemove,
                 fontWeight = FontWeight.SemiBold
             )
         }
@@ -235,9 +236,10 @@ private fun DiffStatsBar(added: Int, removed: Int) {
 
 @Composable
 private fun DiffLineRow(row: DiffRow, gutterWidth: androidx.compose.ui.unit.Dp) {
+    val semantic = MaterialTheme.semanticColors
     val (bgColor, prefix, prefixColor) = when (row.type) {
-        LineDiff.LineType.ADD -> Triple(Color(0x3322C55E), "+", Color(0xFF22C55E))
-        LineDiff.LineType.REMOVE -> Triple(Color(0x33EF4444), "-", Color(0xFFEF4444))
+        LineDiff.LineType.ADD -> Triple(semantic.diffAddBg, "+", semantic.diffAdd)
+        LineDiff.LineType.REMOVE -> Triple(semantic.diffRemoveBg, "-", semantic.diffRemove)
         LineDiff.LineType.CONTEXT -> Triple(Color.Transparent, " ", MaterialTheme.colorScheme.onSurfaceVariant)
     }
     val gutterBg = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)

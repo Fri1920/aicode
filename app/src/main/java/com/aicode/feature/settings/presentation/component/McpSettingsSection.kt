@@ -34,8 +34,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.res.stringResource
 import com.aicode.core.theme.Radius
-import com.aicode.core.ui.SwipeToDeleteRow
 import com.aicode.core.theme.Spacing
+import com.aicode.core.ui.SwipeToDeleteRow
+import com.aicode.core.theme.semanticColors
 import com.aicode.feature.agent.domain.mcp.McpScope
 import com.aicode.feature.agent.domain.mcp.McpServerConfig
 import com.aicode.feature.agent.domain.mcp.McpServerEntry
@@ -248,7 +249,7 @@ internal fun McpServerRow(
             Icon(
                 imageVector = FeatherIcons.ChevronRight,
                 contentDescription = stringResource(R.string.mcp_details),
-                tint = if (light) Color(0xFFC7C7CC) else MaterialTheme.colorScheme.onSurfaceVariant,
+                tint = MaterialTheme.semanticColors.subtleText,
                 modifier = Modifier.size(18.dp)
             )
         }

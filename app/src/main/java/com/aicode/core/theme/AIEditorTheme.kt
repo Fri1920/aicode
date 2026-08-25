@@ -6,6 +6,9 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.ReadOnlyComposable
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -32,8 +35,140 @@ object Radius {
 object Brand {
     val Blue = Color(0xFF2563EB)
     val Sky = Color(0xFF38BDF8)
-    val IconGray = Color(0xFF424242)
+    val IconGray = Color(0xFF64748B)
     val Orange = Color(0xFFF57C00)
+}
+
+/** 全局统一语义色彩，解决业务代码私自 hardcode 颜色问题。 */
+data class AppSemanticColors(
+    val success: Color,
+    val onSuccess: Color,
+    val successContainer: Color,
+    val onSuccessContainer: Color,
+    val warning: Color,
+    val onWarning: Color,
+    val warningContainer: Color,
+    val onWarningContainer: Color,
+    val info: Color,
+    val onInfo: Color,
+    val infoContainer: Color,
+    val onInfoContainer: Color,
+    val diffAdd: Color,
+    val diffAddBg: Color,
+    val diffRemove: Color,
+    val diffRemoveBg: Color,
+    val subtleText: Color,
+    val subtleBorder: Color,
+    val cardSurface: Color,
+    val pageBackground: Color,
+    val mutedSurface: Color,
+    val capsuleSurface: Color,
+    val buttonMutedBg: Color
+)
+
+val LightSemanticColors = AppSemanticColors(
+    success = Color(0xFF22C55E),
+    onSuccess = Color(0xFFFFFFFF),
+    successContainer = Color(0xFFDCFCE7),
+    onSuccessContainer = Color(0xFF15803D),
+    warning = Color(0xFFF59E0B),
+    onWarning = Color(0xFFFFFFFF),
+    warningContainer = Color(0xFFFEF3C7),
+    onWarningContainer = Color(0xFF92400E),
+    info = Color(0xFF0284C7),
+    onInfo = Color(0xFFFFFFFF),
+    infoContainer = Color(0xFFE0F2FE),
+    onInfoContainer = Color(0xFF075985),
+    diffAdd = Color(0xFF22C55E),
+    diffAddBg = Color(0x2622C55E),
+    diffRemove = Color(0xFFEF4444),
+    diffRemoveBg = Color(0x26EF4444),
+    subtleText = Color(0xFF8E8E93),
+    subtleBorder = Color(0xFFE5E5EA),
+    cardSurface = Color(0xFFFFFFFF),
+    pageBackground = Color(0xFFF8F8F8),
+    mutedSurface = Color(0xFFF2F2F7),
+    capsuleSurface = Color(0xFFE9E9EB),
+    buttonMutedBg = Color(0xFFF0F2F5)
+)
+
+val DarkSemanticColors = AppSemanticColors(
+    success = Color(0xFF4ADE80),
+    onSuccess = Color(0xFF052E16),
+    successContainer = Color(0x59052E16),
+    onSuccessContainer = Color(0xFFBBF7D0),
+    warning = Color(0xFFFBBF24),
+    onWarning = Color(0xFF78350F),
+    warningContainer = Color(0x5978350F),
+    onWarningContainer = Color(0xFFFDE68A),
+    info = Color(0xFF38BDF8),
+    onInfo = Color(0xFF0C4A6E),
+    infoContainer = Color(0x590C4A6E),
+    onInfoContainer = Color(0xFFBAE6FD),
+    diffAdd = Color(0xFF4ADE80),
+    diffAddBg = Color(0x334ADE80),
+    diffRemove = Color(0xFFF87171),
+    diffRemoveBg = Color(0x33F87171),
+    subtleText = Color(0xFF94A3B8),
+    subtleBorder = Color(0xFF2A3F56),
+    cardSurface = Color(0xFF0D1B2E),
+    pageBackground = Color(0xFF07111F),
+    mutedSurface = Color(0xFF13273F),
+    capsuleSurface = Color(0xFF1E293B),
+    buttonMutedBg = Color(0xFF1E293B)
+)
+
+val LocalAppSemanticColors = staticCompositionLocalOf { LightSemanticColors }
+
+val MaterialTheme.semanticColors: AppSemanticColors
+    @Composable
+    @ReadOnlyComposable
+    get() = LocalAppSemanticColors.current
+
+/** Git 模块统一 8 色泳道调色板 */
+object GitLanePalette {
+    val colors = listOf(
+        Color(0xFF2563EB), // 1. 经典蓝
+        Color(0xFF16A34A), // 2. 翠绿
+        Color(0xFFF59E0B), // 3. 琥珀
+        Color(0xFF8B5CF6), // 4. 优雅紫
+        Color(0xFF06B6D4), // 5. 青蓝
+        Color(0xFFEF4444), // 6. 珊瑚红
+        Color(0xFFEC4899), // 7. 亮粉
+        Color(0xFFEAB308)  // 8. 柠檬金
+    )
+}
+
+/** Git 状态徽章统一色彩映射 */
+object GitStatusColors {
+    val Added = Color(0xFF16A34A)
+    val Modified = Color(0xFFD97706)
+    val Deleted = Color(0xFFDC2626)
+    val Renamed = Color(0xFF2563EB)
+    val Untracked = Color(0xFF94A3B8)
+    val Conflict = Color(0xFF9333EA)
+    val TypeChanged = Color(0xFF0891B2)
+    val Default = Color(0xFF64748B)
+}
+
+/** 日志级别统一色彩映射 */
+object LogLevelColors {
+    val Verbose = Color(0xFF94A3B8)
+    val Debug = Color(0xFF3B82F6)
+    val Info = Color(0xFF22C55E)
+    val Warn = Color(0xFFF59E0B)
+    val Error = Color(0xFFEF4444)
+    val None = Color(0xFF64748B)
+}
+
+/** Token / 统计图表统一调色板 */
+object TokenStatsPalette {
+    val Input = Color(0xFF3B82F6)
+    val Output = Color(0xFFF59E0B)
+    val Cache = Color(0xFF8B5CF6)
+    val Error = Color(0xFFEF4444)
+    val Cancelled = Color(0xFF94A3B8)
+    val Progress = Color(0xFF22C55E)
 }
 
 private val DarkColorScheme = darkColorScheme(
@@ -74,8 +209,8 @@ private val LightColorScheme = lightColorScheme(
     surfaceVariant = Color(0xFFEAF4FF),
     onSurfaceVariant = Color(0xFF475569),
     surfaceTint = Color.White,
-    outline = Color(0xFFCBD5E1),
-    outlineVariant = Color(0xFFE2E8F0),
+    outline = Color(0xFFD1D1D6),
+    outlineVariant = Color(0xFFE5E5EA),
     error = Color(0xFFDC2626),
 
     onError = Color(0xFFFFFFFF),
@@ -100,10 +235,13 @@ fun AIEditorTheme(
     content: @Composable () -> Unit
 ) {
     val colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme
+    val semanticColors = if (darkTheme) DarkSemanticColors else LightSemanticColors
 
-    MaterialTheme(
-        colorScheme = colorScheme,
-        typography = AppTypography,
-        content = content
-    )
+    CompositionLocalProvider(LocalAppSemanticColors provides semanticColors) {
+        MaterialTheme(
+            colorScheme = colorScheme,
+            typography = AppTypography,
+            content = content
+        )
+    }
 }

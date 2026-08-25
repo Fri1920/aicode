@@ -45,6 +45,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.aicode.core.theme.Spacing
+import com.aicode.core.theme.semanticColors
 import com.aicode.core.ui.FloatingTabBar
 import com.aicode.core.ui.FloatingTabItem
 import com.aicode.core.ui.SwipeToDeleteRow
@@ -179,15 +180,13 @@ fun HostKeysScreen(
                                                     text = address,
                                                     style = MaterialTheme.typography.bodyLarge,
                                                     fontWeight = FontWeight.Normal,
-                                                    color = if (settingsLightMode()) Color(0xFF0F0F0F)
-                                                    else MaterialTheme.colorScheme.onSurface,
+                                                    color = MaterialTheme.colorScheme.onSurface,
                                                     maxLines = 1
                                                 )
                                                 Text(
                                                     text = fingerprint,
                                                     style = MaterialTheme.typography.bodySmall,
-                                                    color = if (settingsLightMode()) Color(0xFF8E8E93)
-                                                    else MaterialTheme.colorScheme.onSurfaceVariant,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                                                     maxLines = 1,
                                                     overflow = TextOverflow.Ellipsis
                                                 )
@@ -196,8 +195,7 @@ fun HostKeysScreen(
                                             Icon(
                                                 imageVector = FeatherIcons.ChevronRight,
                                                 contentDescription = null,
-                                                tint = if (settingsLightMode()) Color(0xFFC7C7CC)
-                                                else MaterialTheme.colorScheme.onSurfaceVariant,
+                                                tint = MaterialTheme.semanticColors.subtleText,
                                                 modifier = Modifier.width(18.dp)
                                             )
                                         }
@@ -332,14 +330,14 @@ private fun LoginKeyRow(
                 Text(
                     text = key.name,
                     style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium),
-                    color = if (light) Color(0xFF0F0F0F) else MaterialTheme.colorScheme.onSurface,
+                    color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
                 Text(
                     text = key.fingerprint ?: stringResource(R.string.ssh_login_key_encrypted),
                     style = MaterialTheme.typography.bodySmall,
-                    color = if (light) Color(0xFF8E8E93) else MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -348,7 +346,7 @@ private fun LoginKeyRow(
             Icon(
                 imageVector = FeatherIcons.ChevronRight,
                 contentDescription = null,
-                tint = if (light) Color(0xFFC7C7CC) else MaterialTheme.colorScheme.onSurfaceVariant,
+                tint = MaterialTheme.semanticColors.subtleText,
                 modifier = Modifier.size(18.dp)
             )
         }

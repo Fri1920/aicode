@@ -60,6 +60,7 @@ import androidx.compose.ui.unit.sp
 import com.aicode.R
 import com.aicode.core.theme.Radius
 import com.aicode.core.theme.Spacing
+import com.aicode.core.theme.semanticColors
 import com.aicode.feature.settings.presentation.component.SettingsDivider
 import com.aicode.feature.settings.presentation.component.SettingsGroup
 import com.aicode.feature.settings.presentation.component.settingsLightMode
@@ -568,14 +569,14 @@ private fun RefSectionHeader(
             imageVector = FeatherIcons.ChevronRight,
             contentDescription = if (isExpanded) stringResource(R.string.common_collapse) else stringResource(R.string.common_expand),
             modifier = Modifier.size(16.dp).rotate(rotation),
-            tint = if (settingsLightMode()) Color(0xFFC7C7CC) else MaterialTheme.colorScheme.onSurfaceVariant
+            tint = MaterialTheme.semanticColors.subtleText
         )
         Spacer(Modifier.width(Spacing.xs))
         Text(
             text = title,
             style = MaterialTheme.typography.labelLarge.copy(fontSize = 13.sp),
             fontWeight = FontWeight.Normal,
-            color = if (settingsLightMode()) Color(0xFF8E8E93) else MaterialTheme.colorScheme.onSurfaceVariant,
+            color = MaterialTheme.semanticColors.subtleText,
             modifier = Modifier.weight(1f)
         )
         if (onAdd != null) {
@@ -584,7 +585,7 @@ private fun RefSectionHeader(
                     FeatherIcons.Plus,
                     contentDescription = stringResource(R.string.git_new),
                     modifier = Modifier.size(16.dp),
-                    tint = if (settingsLightMode()) Color(0xFF0F0F0F) else MaterialTheme.colorScheme.onSurfaceVariant
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }

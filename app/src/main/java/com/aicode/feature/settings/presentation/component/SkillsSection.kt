@@ -34,6 +34,7 @@ import com.aicode.R
 import com.aicode.core.theme.Radius
 import com.aicode.core.ui.SwipeToDeleteRow
 import com.aicode.core.theme.Spacing
+import com.aicode.core.theme.semanticColors
 import com.aicode.feature.agent.domain.skill.SkillScope
 import com.aicode.feature.settings.presentation.SkillUiEntry
 import compose.icons.FeatherIcons
@@ -161,8 +162,7 @@ private fun SkillRow(
     onDelete: () -> Unit,
     onClick: () -> Unit
 ) {
-    val light = settingsLightMode()
-    val rowBackground = if (light) Color.White else MaterialTheme.colorScheme.surface
+    val rowBackground = MaterialTheme.semanticColors.cardSurface
 
     SwipeToDeleteRow(onDelete = onDelete, onClick = onClick) {
         Row(
@@ -199,7 +199,7 @@ private fun SkillRow(
                     Text(
                         text = entry.name,
                         style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium),
-                        color = if (light) Color(0xFF0F0F0F) else MaterialTheme.colorScheme.onSurface,
+                        color = MaterialTheme.colorScheme.onSurface,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f, fill = false)
@@ -213,7 +213,7 @@ private fun SkillRow(
                 Text(
                     text = entry.description.ifBlank { stringResource(R.string.mcp_no_description) },
                     style = MaterialTheme.typography.bodyMedium,
-                    color = if (light) Color(0xFF8E8E93) else MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -224,7 +224,7 @@ private fun SkillRow(
             Icon(
                 imageVector = FeatherIcons.ChevronRight,
                 contentDescription = null,
-                tint = if (light) Color(0xFFC7C7CC) else MaterialTheme.colorScheme.onSurfaceVariant,
+                tint = MaterialTheme.semanticColors.subtleText,
                 modifier = Modifier.size(18.dp)
             )
         }

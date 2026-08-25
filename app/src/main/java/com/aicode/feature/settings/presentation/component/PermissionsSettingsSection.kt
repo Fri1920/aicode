@@ -130,8 +130,7 @@ internal fun RuleRow(
     onPromote: (() -> Unit)?
 ) {
     val allowed = rule.decision == PermissionDecision.ALLOW
-    val light = settingsLightMode()
-    val iconTint = if (light) Color(0xFF0F0F0F) else MaterialTheme.colorScheme.onSurfaceVariant
+    val iconTint = if (allowed) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
     SwipeToDeleteRow(onDelete = onDelete) {
         Row(
             modifier = Modifier
@@ -150,7 +149,7 @@ internal fun RuleRow(
                 Text(
                     text = rule.toolName,
                     style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium),
-                    color = if (light) Color(0xFF0F0F0F) else MaterialTheme.colorScheme.onSurface,
+                    color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -165,7 +164,7 @@ internal fun RuleRow(
                         stringResource(R.string.perm_deny)
                     },
                     style = MaterialTheme.typography.bodyMedium,
-                    color = if (light) Color(0xFF8E8E93) else MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )

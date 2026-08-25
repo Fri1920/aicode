@@ -48,6 +48,7 @@ import androidx.compose.ui.unit.sp
 import com.aicode.core.theme.Radius
 import com.aicode.core.ui.SwipeToDeleteRow
 import com.aicode.core.theme.Spacing
+import com.aicode.core.theme.semanticColors
 import com.aicode.feature.settings.presentation.component.SettingsDivider
 import com.aicode.feature.settings.presentation.component.SettingsGroup
 import com.aicode.feature.settings.presentation.component.settingsLightMode
@@ -104,12 +105,12 @@ fun SyncSettingsSheet(
                         Text(
                             text = stringResource(R.string.sync_follow_gitignore),
                             style = MaterialTheme.typography.bodyLarge,
-                            color = if (settingsLightMode()) Color(0xFF0F0F0F) else MaterialTheme.colorScheme.onSurface
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
                             text = stringResource(R.string.sync_gitignore_desc),
                             style = MaterialTheme.typography.bodySmall,
-                            color = if (settingsLightMode()) Color(0xFF8E8E93) else MaterialTheme.colorScheme.onSurfaceVariant,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(top = 2.dp)
                         )
                     }
@@ -123,12 +124,12 @@ fun SyncSettingsSheet(
                     Text(
                         text = stringResource(R.string.sync_max_batch_size),
                         style = MaterialTheme.typography.bodyLarge,
-                        color = if (settingsLightMode()) Color(0xFF0F0F0F) else MaterialTheme.colorScheme.onSurface
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
                         text = stringResource(R.string.sync_batch_size_desc),
                         style = MaterialTheme.typography.bodySmall,
-                        color = if (settingsLightMode()) Color(0xFF8E8E93) else MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(top = 2.dp)
                     )
                     Spacer(modifier = Modifier.height(10.dp))
@@ -167,7 +168,7 @@ private fun EditRowButton(onEdit: () -> Unit) {
         Icon(
             imageVector = FeatherIcons.ChevronRight,
             contentDescription = stringResource(R.string.common_edit),
-            tint = if (settingsLightMode()) Color(0xFFC7C7CC) else MaterialTheme.colorScheme.onSurfaceVariant,
+            tint = MaterialTheme.semanticColors.subtleText,
             modifier = Modifier.size(18.dp)
         )
     }
@@ -201,7 +202,7 @@ private fun ProtocolBadge(protocol: RemoteProtocol) {
     val color = when (protocol) {
         RemoteProtocol.SFTP -> MaterialTheme.colorScheme.primary
         RemoteProtocol.FTP -> MaterialTheme.colorScheme.tertiary
-        RemoteProtocol.LOCAL -> Color(0xFFF59E0B)
+        RemoteProtocol.LOCAL -> MaterialTheme.semanticColors.warning
     }
     Box(
         modifier = Modifier
@@ -237,7 +238,7 @@ fun RemoteConnectionCard(
                         text = conn.name,
                         style = MaterialTheme.typography.bodyLarge,
                         fontWeight = FontWeight.Normal,
-                        color = if (settingsLightMode()) Color(0xFF0F0F0F) else MaterialTheme.colorScheme.onSurface,
+                        color = MaterialTheme.colorScheme.onSurface,
                         maxLines = 1,
                         modifier = Modifier.weight(1f, fill = false)
                     )
@@ -247,7 +248,7 @@ fun RemoteConnectionCard(
                 Text(
                     text = if (isLocal) conn.host else "${conn.username}@${conn.host}:${conn.port}",
                     style = MaterialTheme.typography.bodySmall,
-                    color = if (settingsLightMode()) Color(0xFF8E8E93) else MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1
                 )
             }
@@ -279,14 +280,14 @@ fun RemoteMountCard(
                         text = mount.connection?.name ?: stringResource(R.string.sync_unknown_connection),
                         style = MaterialTheme.typography.bodyLarge,
                         fontWeight = FontWeight.Normal,
-                        color = if (settingsLightMode()) Color(0xFF0F0F0F) else MaterialTheme.colorScheme.onSurface,
+                        color = MaterialTheme.colorScheme.onSurface,
                         maxLines = 1,
                         modifier = Modifier.weight(1f, fill = false)
                     )
                     val (statusText, statusColor) = when {
-                        mount.isActive -> stringResource(R.string.status_connected) to Color(0xFF22C55E)
+                        mount.isActive -> stringResource(R.string.status_connected) to MaterialTheme.semanticColors.success
                         isFailed -> stringResource(R.string.status_connection_failed) to MaterialTheme.colorScheme.error
-                        else -> stringResource(R.string.status_disconnected) to Color(0xFFF59E0B)
+                        else -> stringResource(R.string.status_disconnected) to MaterialTheme.semanticColors.warning
                     }
                     Spacer(modifier = Modifier.width(Spacing.xs))
                     Surface(
@@ -305,7 +306,7 @@ fun RemoteMountCard(
                 Text(
                     text = stringResource(R.string.sync_path_mapping, mount.localMountPath, mount.remotePath),
                     style = MaterialTheme.typography.bodySmall,
-                    color = if (settingsLightMode()) Color(0xFF8E8E93) else MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1
                 )
             }

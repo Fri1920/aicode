@@ -60,6 +60,8 @@ import androidx.compose.ui.unit.dp
 import com.aicode.R
 import com.aicode.core.theme.Radius
 import com.aicode.core.theme.Spacing
+import com.aicode.core.theme.GitLanePalette
+import com.aicode.core.theme.semanticColors
 import com.aicode.feature.settings.presentation.component.settingsLightMode
 import com.aicode.feature.git.domain.model.GitFileChange
 import com.aicode.feature.git.domain.model.GitGraph
@@ -318,7 +320,7 @@ private fun GraphCommitRow(
             }
         }
         HorizontalDivider(
-            color = if (settingsLightMode()) Color(0xFFE5E5EA) else MaterialTheme.colorScheme.outlineVariant,
+            color = MaterialTheme.semanticColors.subtleBorder,
             thickness = 0.5.dp,
             modifier = Modifier.padding(start = canvasWidth + Spacing.md)
         )
@@ -517,18 +519,7 @@ private fun RefPills(refs: List<GitGraphRef>) {
  */
 @Composable
 private fun rememberLaneColors(count: Int): List<Color> {
-    val palette = remember {
-        listOf(
-            Color(0xFF2563EB), // 蓝
-            Color(0xFF16A34A), // 绿
-            Color(0xFFD97706), // 琥珀
-            Color(0xFF9333EA), // 紫
-            Color(0xFF0891B2), // 青
-            Color(0xFFDC2626), // 红
-            Color(0xFF7C3AED), // 靛
-            Color(0xFFCA8A04)  // 金
-        )
-    }
+    val palette = GitLanePalette.colors
     return remember(count) {
         (0 until count).map { palette[it % palette.size] }
     }
@@ -632,7 +623,7 @@ private fun CommitFileRow(file: GitFileChange, indent: Dp, onClick: () -> Unit =
             }
         }
         HorizontalDivider(
-            color = if (settingsLightMode()) Color(0xFFE5E5EA) else MaterialTheme.colorScheme.outlineVariant,
+            color = MaterialTheme.semanticColors.subtleBorder,
             thickness = 0.5.dp,
             modifier = Modifier.padding(start = indent + 44.dp)
         )

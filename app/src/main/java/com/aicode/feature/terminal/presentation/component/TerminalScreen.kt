@@ -64,6 +64,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.aicode.R
 import com.aicode.core.theme.Spacing
+import com.aicode.core.theme.semanticColors
 import com.aicode.core.ui.rememberImeBottomInset
 import com.aicode.feature.agent.domain.container.ContainerInitState
 import com.aicode.feature.terminal.data.repository.TerminalSettings
@@ -264,7 +265,7 @@ private fun TabChip(
     val running = tab.runState is RunState.Running
     val isLight = MaterialTheme.colorScheme.background.luminance() > 0.5f
     val dot = when {
-        running -> Color(0xFF22C55E) // 鲜明活跃绿
+        running -> MaterialTheme.semanticColors.success // 鲜明活跃绿
         tab.isBackground -> MaterialTheme.colorScheme.tertiary
         else -> MaterialTheme.colorScheme.outline
     }
@@ -272,17 +273,15 @@ private fun TabChip(
     // 选中态高对比度设计：醒目主色描边 + 浅主色填充 + 加粗文字
     val bg = when {
         selected -> MaterialTheme.colorScheme.primary.copy(alpha = if (isLight) 0.14f else 0.22f)
-        isLight -> Color(0xFFE9ECEF)
-        else -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+        else -> MaterialTheme.semanticColors.capsuleSurface
     }
     val borderColor = when {
         selected -> MaterialTheme.colorScheme.primary
-        isLight -> Color(0xFFD0D7DE)
-        else -> MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+        else -> MaterialTheme.semanticColors.subtleBorder
     }
     val fg = when {
         selected -> MaterialTheme.colorScheme.primary
-        isLight -> Color(0xFF1F2328)
+        isLight -> MaterialTheme.colorScheme.onSurface
         else -> MaterialTheme.colorScheme.onSurfaceVariant
     }
 
@@ -544,18 +543,16 @@ private fun KeyChip(
     val isLight = MaterialTheme.colorScheme.background.luminance() > 0.5f
     val bg = when {
         active -> MaterialTheme.colorScheme.primary
-        isLight -> Color(0xFFE9ECEF)
-        else -> Color(0xFF262C36)
+        else -> MaterialTheme.semanticColors.capsuleSurface
     }
     val borderColor = when {
         active -> MaterialTheme.colorScheme.primary
-        isLight -> Color(0xFFD0D7DE)
-        else -> Color(0xFF3B4350)
+        else -> MaterialTheme.semanticColors.subtleBorder
     }
     val fg = when {
         active -> MaterialTheme.colorScheme.onPrimary
-        isLight -> Color(0xFF1F2328)
-        else -> Color(0xFFE6EDF3)
+        isLight -> MaterialTheme.colorScheme.onSurface
+        else -> MaterialTheme.colorScheme.onSurface
     }
 
     var pressed by remember { mutableStateOf(false) }

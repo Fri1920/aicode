@@ -99,6 +99,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aicode.core.theme.Radius
 import com.aicode.core.theme.Spacing
+import com.aicode.core.theme.semanticColors
 import com.aicode.core.ui.AppTextField
 import com.aicode.core.ui.FloatingTabBar
 import com.aicode.core.ui.FloatingTabItem
@@ -345,11 +346,7 @@ fun ProviderEditorScreen(
                                 Text(
                                     text = providerTypeLabel(type),
                                     style = MaterialTheme.typography.bodyMedium,
-                                    color = if (MaterialTheme.colorScheme.background.luminance() > 0.5f) {
-                                        Color(0xFF8E8E93)
-                                    } else {
-                                        MaterialTheme.colorScheme.onSurfaceVariant
-                                    }
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
                         )
@@ -452,11 +449,7 @@ fun ProviderEditorScreen(
                                 Text(
                                     text = stringResource(R.string.provider_balance_test_btn),
                                     style = MaterialTheme.typography.bodyLarge,
-                                    color = if (MaterialTheme.colorScheme.background.luminance() > 0.5f) {
-                                        Color(0xFF0F0F0F)
-                                    } else {
-                                        MaterialTheme.colorScheme.onSurface
-                                    }
+                                    color = MaterialTheme.colorScheme.onSurface
                                 )
                                 Text(
                                     text = stringResource(R.string.provider_balance_script_desc),
@@ -517,11 +510,7 @@ fun ProviderEditorScreen(
                         Text(
                             stringResource(R.string.provider_models_count, models.size),
                             style = MaterialTheme.typography.labelLarge.copy(fontSize = 13.sp),
-                            color = if (MaterialTheme.colorScheme.background.luminance() > 0.5f) {
-                                Color(0xFF8E8E93)
-                            } else {
-                                MaterialTheme.colorScheme.onSurfaceVariant
-                            },
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.weight(1f)
                         )
                         TextButton(
@@ -821,7 +810,7 @@ private fun AddModelSheet(
                     shape = RoundedCornerShape(12.dp),
                     colors = CardDefaults.cardColors(
                         // 中性浅灰，避免 surfaceVariant 在蓝调主题下偏蓝。
-                        containerColor = if (settingsLightMode()) Color(0xFFF2F2F7) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+                        containerColor = MaterialTheme.semanticColors.mutedSurface
                     ),
                     modifier = Modifier.fillMaxWidth()
                 ) {
@@ -903,7 +892,7 @@ private fun SectionLabel(text: String) {
         text = text,
         style = MaterialTheme.typography.labelLarge.copy(fontSize = 13.sp),
         fontWeight = FontWeight.Normal,
-        color = if (MaterialTheme.colorScheme.background.luminance() > 0.5f) Color(0xFF8E8E93) else MaterialTheme.colorScheme.onSurfaceVariant,
+        color = MaterialTheme.semanticColors.subtleText,
         modifier = Modifier.padding(start = Spacing.md, top = Spacing.sm, bottom = Spacing.xs)
     )
 }
@@ -1134,7 +1123,7 @@ private fun FetchModelsDialog(
 @Composable
 private fun FetchModelsSkeleton() {
     val block = if (MaterialTheme.colorScheme.background.luminance() > 0.5f) {
-        Color(0xFFE5E5EA)
+        MaterialTheme.semanticColors.subtleBorder
     } else {
         MaterialTheme.colorScheme.surfaceVariant
     }
@@ -1243,11 +1232,7 @@ private fun ProviderSwitchRow(
             Text(
                 text = title,
                 style = MaterialTheme.typography.bodyLarge,
-                color = if (MaterialTheme.colorScheme.background.luminance() > 0.5f) {
-                    Color(0xFF0F0F0F)
-                } else {
-                    MaterialTheme.colorScheme.onSurface
-                }
+                color = MaterialTheme.colorScheme.onSurface
             )
             if (subtitle != null) {
                 Text(
@@ -1474,7 +1459,7 @@ private fun RawOutputBottomSheet(
             // 原始输出内容容器
             Surface(
                 shape = RoundedCornerShape(12.dp),
-                color = if (light) Color(0xFFF2F2F7) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                color = MaterialTheme.semanticColors.mutedSurface,
                 modifier = Modifier
                     .fillMaxWidth()
                     .heightIn(max = 420.dp)
@@ -1547,7 +1532,7 @@ private fun BalanceTestResultBox(
             val card = lastSuccessResult!!.card
             Surface(
                 shape = RoundedCornerShape(12.dp),
-                color = if (light) Color(0xFFF2F2F7) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                color = MaterialTheme.semanticColors.mutedSurface,
                 modifier = Modifier
                     .fillMaxWidth()
                     .alpha(if (isRunning) 0.6f else 1f)

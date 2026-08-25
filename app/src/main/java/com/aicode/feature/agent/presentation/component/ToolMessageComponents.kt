@@ -73,9 +73,9 @@ import kotlinx.serialization.json.jsonPrimitive
 import androidx.compose.ui.res.stringResource
 import com.aicode.R
 
-internal val DiffAddBg = Color(0x3322C55E)
+internal val DiffAddBg = Color(0x2622C55E)
 internal val DiffAddText = Color(0xFF22C55E)
-internal val DiffRemoveBg = Color(0x33EF4444)
+internal val DiffRemoveBg = Color(0x26EF4444)
 internal val DiffRemoveText = Color(0xFFEF4444)
 
 internal const val DIFF_COLLAPSE_THRESHOLD = 20
