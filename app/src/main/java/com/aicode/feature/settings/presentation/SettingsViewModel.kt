@@ -65,6 +65,8 @@ import com.aicode.feature.settings.domain.service.ProviderBalanceRunner
 import com.aicode.feature.settings.domain.model.ProviderType
 import com.aicode.R
 import com.aicode.feature.settings.domain.repository.AIProviderRepository
+import com.aicode.feature.terminal.data.repository.TerminalSettings
+import com.aicode.feature.terminal.data.repository.TerminalSettingsRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -231,13 +233,30 @@ class SettingsViewModel @Inject constructor(
     private val llmCallRecordDao: LlmCallRecordDao,
     private val updateCheckSettingsRepository: UpdateCheckSettingsRepository,
     private val updateCheckService: UpdateCheckService,
-    private val providerBalanceRunner: ProviderBalanceRunner
+    private val providerBalanceRunner: ProviderBalanceRunner,
+    private val terminalSettingsRepository: TerminalSettingsRepository
 ) : ViewModel() {
     private companion object {
         const val MAX_LOG_LINES = 1200
         const val CALLS_PAGE_SIZE = 10
         /** 缓存读价缺失时按输入价的折扣估算。 */
         const val CACHE_READ_DISCOUNT = 0.1
+    }
+
+    /** 终端个性化配置。 */
+    val terminalSettings: StateFlow<TerminalSettings> = terminalSettingsRepository.settingsFlow
+        .stateIn(viewModelScope, SharingStarted.Eagerly, TerminalSettings())
+
+    fun setTerminalTheme(themeId: String) {
+        viewModelScope.launch { terminalSettingsRepository.setThemeId(themeId) }
+    }
+
+    fun setTerminalFontSize(sizeSp: Int) {
+        viewModelScope.launch { terminalSettingsRepository.setFontSizeSp(sizeSp) }
+    }
+
+    fun setTerminalCursorStyle(style: Int) {
+        viewModelScope.launch { terminalSettingsRepository.setCursorStyle(style) }
     }
 
     private val _providers = MutableStateFlow<List<AIProviderConfig>>(emptyList())

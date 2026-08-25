@@ -14,7 +14,11 @@ import com.aicode.feature.terminal.domain.TerminalSessionManager
 import com.aicode.feature.terminal.presentation.component.TerminalKeyModifiers
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import com.aicode.feature.terminal.data.repository.TerminalSettings
+import com.aicode.feature.terminal.data.repository.TerminalSettingsRepository
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
@@ -33,7 +37,8 @@ class TerminalViewModel @Inject constructor(
     private val localManager: TerminalSessionManager,
     private val remoteManager: RemoteTerminalSessionManager,
     private val modeHolder: ExecutionModeHolder,
-    private val containerEngine: LinuxContainerEngine
+    private val containerEngine: LinuxContainerEngine,
+    private val terminalSettingsRepository: TerminalSettingsRepository
 ) : ViewModel() {
 
     private companion object { const val TAG = "TerminalViewModel" }
@@ -59,6 +64,21 @@ class TerminalViewModel @Inject constructor(
 
     /** 额外按键行驱动的虚拟修饰键，供 TerminalView 读取。 */
     val modifiers = TerminalKeyModifiers()
+
+    val terminalSettings: StateFlow<TerminalSettings> = terminalSettingsRepository.settingsFlow
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), TerminalSettings())
+
+    fun setTheme(themeId: String) {
+        viewModelScope.launch { terminalSettingsRepository.setThemeId(themeId) }
+    }
+
+    fun setFontSize(sizeSp: Int) {
+        viewModelScope.launch { terminalSettingsRepository.setFontSizeSp(sizeSp) }
+    }
+
+    fun setCursorStyle(style: Int) {
+        viewModelScope.launch { terminalSettingsRepository.setCursorStyle(style) }
+    }
 
     init {
         prepare()

@@ -100,13 +100,15 @@ class TerminalSessionManager @Inject constructor(
     suspend fun createInteractiveTab(): String {
         ensureContainer()
         val id = nextId()
-        val session = buildSession(
+        val (session, client) = buildSession(
             // -w 已把 cwd 设为 /root/workspace，cd 仅作兜底；裸 sh/bash 在 tty 上自动进交互模式，
             // 靠 ENV=/etc/profile 加载登录环境；exec 让 shell 取代外层 sh -c 成为前台交互 shell。
             // 首次进入终端时先跑初始化菜单（脚本自行判断已完成/已跳过则秒退），所有容器一致；
             // 用 `;` 分隔保证脚本任何失败都不阻塞进入 shell。
             shellCommand = "cd ~/workspace 2>/dev/null; export ENV=/etc/profile; " +
                 "[ -f /root/.aicode/provision.sh ] && sh /root/.aicode/provision.sh; " +
+                "export PS1='\\[\\033[01;32m\\]\\u@\\h\\[\\033[00m\\]:\\[\\033[01;34m\\]\\w\\[\\033[00m\\]\\$ '; " +
+                "alias ls='ls --color=auto' 2>/dev/null; alias grep='grep --color=auto' 2>/dev/null; alias ll='ls -la --color=auto' 2>/dev/null; " +
                 "exec ${containerEngine.defaultShell()}"
         )
         addTab(
@@ -116,6 +118,7 @@ class TerminalSessionManager @Inject constructor(
                 session = session,
                 isBackground = false,
                 command = null,
+                client = client,
                 runState = RunState.Running
             )
         )
@@ -148,7 +151,7 @@ class TerminalSessionManager @Inject constructor(
         val afterCommand = if (notify) "; exit \$ec" else "; exec ${containerEngine.defaultShell()}"
         val shellCommand = "cd ~/workspace 2>/dev/null; export ENV=/etc/profile; " +
             "$command; ec=\$?; echo \"[command exited: \$ec]\"$afterCommand"
-        val session = buildSession(shellCommand)
+        val (session, client) = buildSession(shellCommand)
         addTab(
             TerminalTab(
                 id = id,
@@ -158,6 +161,7 @@ class TerminalSessionManager @Inject constructor(
                 command = command,
                 notifyOnExit = notify,
                 sourceSessionId = sourceSessionId,
+                client = client,
                 runState = RunState.Running
             )
         )
@@ -357,7 +361,7 @@ class TerminalSessionManager @Inject constructor(
      * client 的 viewProvider/onFinished 都以 session 为键回查 [_tabs]：会话与标签一一对应，
      * 故无需把 tab 引用提前注入 client（避免「构造 client 时 tab 还不存在」的先有鸡先有蛋）。
      */
-    private fun buildSession(shellCommand: String): TerminalSession {
+    private fun buildSession(shellCommand: String): Pair<TerminalSession, AppTerminalSessionClient> {
         val workspace = workspaceRepository.currentPath()
         val invocation = containerEngine.buildProotInvocation(shellCommand, workspace)
         lateinit var session: TerminalSession
@@ -392,13 +396,8 @@ class TerminalSessionManager @Inject constructor(
             TRANSCRIPT_ROWS,
             client
         )
-        // 立刻用默认尺寸初始化 emulator——这一步才会真正 fork 出 proot 子进程并起 I/O 读写线程。
-        // 否则进程只会在 TerminalView 挂载（其 updateSize）时才启动：后台命令（如 npm run dev）
-        // 在用户打开终端页之前永远不会真正运行。视图之后挂载只是按真实尺寸 resize，已累积输出仍保留。
-        // 注意：buildSession 始终在主线程被调用（AI 工具走 Dispatchers.Main、ViewModel 走 viewModelScope），
-        // 故 session 的 MainThreadHandler 绑定到主 Looper，这里同线程调用 updateSize 是安全的。
         session.updateSize(DEFAULT_COLUMNS, DEFAULT_ROWS)
-        return session
+        return session to client
     }
 
     private fun startKeepaliveService() {

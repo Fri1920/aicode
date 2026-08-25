@@ -1,5 +1,6 @@
 package com.aicode.feature.terminal.presentation.component
 
+import android.content.Context
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -12,20 +13,16 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.outlined.Add
-import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -47,36 +44,40 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import android.content.Context
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.boundsInParent
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.aicode.R
 import com.aicode.core.theme.Spacing
 import com.aicode.core.ui.rememberImeBottomInset
 import com.aicode.feature.agent.domain.container.ContainerInitState
+import com.aicode.feature.terminal.data.repository.TerminalSettings
 import com.aicode.feature.terminal.domain.RunState
-import com.aicode.feature.terminal.domain.TerminalSessionManager
 import com.aicode.feature.terminal.domain.TerminalTab
 import com.aicode.feature.terminal.presentation.TerminalViewModel
+import com.termux.terminal.TerminalColors
+import com.termux.terminal.TextStyle
 import com.termux.view.TerminalView
 import compose.icons.FeatherIcons
 import compose.icons.feathericons.ArrowLeft
 import compose.icons.feathericons.Plus
+import compose.icons.feathericons.Settings
 import compose.icons.feathericons.X
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.stringResource
-import com.aicode.R
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
@@ -92,8 +93,9 @@ fun TerminalScreen(
     val containerInit by viewModel.containerInit.collectAsStateWithLifecycle()
     val tabs by viewModel.tabs.collectAsStateWithLifecycle()
     val activeTabId by viewModel.activeTabId.collectAsStateWithLifecycle()
-    // revision 变化时强制重组：标签输出/状态在管理器里就地更新（非 data class 替换），靠它驱动刷新。
     val revision by viewModel.revision.collectAsStateWithLifecycle()
+    val terminalSettings by viewModel.terminalSettings.collectAsStateWithLifecycle()
+    var showSettingsSheet by remember { mutableStateOf(false) }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -108,6 +110,11 @@ fun TerminalScreen(
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(FeatherIcons.ArrowLeft, contentDescription = stringResource(R.string.common_back))
+                    }
+                },
+                actions = {
+                    IconButton(onClick = { showSettingsSheet = true }) {
+                        Icon(FeatherIcons.Settings, contentDescription = stringResource(R.string.terminal_settings_title))
                     }
                 }
             )
@@ -133,7 +140,6 @@ fun TerminalScreen(
                 )
 
                 is TerminalViewModel.PrepareState.Ready -> {
-                    // revision 仅用于触发重组：读一下避免被优化掉。
                     @Suppress("UNUSED_EXPRESSION") revision
 
                     TabBar(
@@ -154,9 +160,12 @@ fun TerminalScreen(
                                 onAction = { viewModel.newTab() }
                             )
                         } else {
-                            // 切换标签时按 id 重建 TerminalView，并把视图回填到该 tab、挂载其会话。
                             key(active.id) {
-                                TerminalSurface(tab = active, viewModel = viewModel)
+                                TerminalSurface(
+                                    tab = active,
+                                    viewModel = viewModel,
+                                    settings = terminalSettings
+                                )
                             }
                         }
                     }
@@ -166,6 +175,16 @@ fun TerminalScreen(
                     }
                 }
             }
+        }
+
+        if (showSettingsSheet) {
+            TerminalSettingsSheet(
+                settings = terminalSettings,
+                onDismiss = { showSettingsSheet = false },
+                onSelectTheme = { viewModel.setTheme(it) },
+                onChangeFontSize = { viewModel.setFontSize(it) },
+                onChangeCursorStyle = { viewModel.setCursorStyle(it) }
+            )
         }
     }
 }
@@ -180,12 +199,9 @@ private fun TabBar(
     onNew: () -> Unit
 ) {
     val scrollState = rememberScrollState()
-    // 标签 chip 在横滑内容中的位置（内容坐标，与 scrollState 同一坐标系）
     val tabBounds = remember { mutableStateMapOf<String, Rect>() }
     var barWidth by remember { mutableIntStateOf(0) }
 
-    // 新增/切换标签时把激活 chip 滚进可视区（在左则左对齐，在右则右对齐），不再需要手动找；
-    // barWidth 作为 key：首次进入时布局未完成（宽度为 0）会提前返回，宽度就绪后重新触发
     LaunchedEffect(activeTabId, barWidth) {
         val id = activeTabId ?: return@LaunchedEffect
         if (barWidth <= 0) return@LaunchedEffect
@@ -202,44 +218,36 @@ private fun TabBar(
         scrollState.animateScrollTo(target.coerceAtLeast(0))
     }
 
-    Surface(color = MaterialTheme.colorScheme.surface, modifier = Modifier.fillMaxWidth()) {
+    Surface(
+        color = MaterialTheme.colorScheme.surface,
+        modifier = Modifier
+            .fillMaxWidth()
+            .onSizeChanged { barWidth = it.width }
+    ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .onSizeChanged { barWidth = it.width }
-                .padding(horizontal = Spacing.sm, vertical = Spacing.sm),
+                .horizontalScroll(scrollState)
+                .padding(horizontal = Spacing.md, vertical = Spacing.xs),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(
-                modifier = Modifier.horizontalScroll(scrollState),
-                horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                tabs.forEach { tab ->
-                    TabChip(
-                        tab = tab,
-                        selected = tab.id == activeTabId,
-                        onClick = { onSelect(tab.id) },
-                        onClose = { onClose(tab.id) },
-                        modifier = Modifier.onGloballyPositioned { tabBounds[tab.id] = it.boundsInParent() }
-                    )
-                }
-                Box(
-                    modifier = Modifier
-                        .size(36.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(MaterialTheme.colorScheme.surface)
-                        .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(8.dp))
-                        .clickable(onClick = onNew),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        FeatherIcons.Plus,
-                        contentDescription = stringResource(R.string.common_new_tab),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
+            tabs.forEach { tab ->
+                TabChip(
+                    tab = tab,
+                    selected = tab.id == activeTabId,
+                    onClick = { onSelect(tab.id) },
+                    onClose = { onClose(tab.id) },
+                    modifier = Modifier.onGloballyPositioned { tabBounds[tab.id] = it.boundsInParent() }
+                )
+            }
+            IconButton(onClick = onNew, modifier = Modifier.size(32.dp)) {
+                Icon(
+                    FeatherIcons.Plus,
+                    contentDescription = stringResource(R.string.common_new_tab),
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(16.dp)
+                )
             }
         }
     }
@@ -253,42 +261,67 @@ private fun TabChip(
     onClose: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val bg = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface
-    val fg = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
-    val borderColor = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant
-    // 状态点：运行中=绿，已结束=灰；后台标签用主题三级色提示。
     val running = tab.runState is RunState.Running
+    val isLight = MaterialTheme.colorScheme.background.luminance() > 0.5f
     val dot = when {
-        !running -> MaterialTheme.colorScheme.outline
+        running -> Color(0xFF22C55E) // 鲜明活跃绿
         tab.isBackground -> MaterialTheme.colorScheme.tertiary
-        else -> Color(0xFF22C55E)
+        else -> MaterialTheme.colorScheme.outline
     }
+
+    // 选中态高对比度设计：醒目主色描边 + 浅主色填充 + 加粗文字
+    val bg = when {
+        selected -> MaterialTheme.colorScheme.primary.copy(alpha = if (isLight) 0.14f else 0.22f)
+        isLight -> Color(0xFFE9ECEF)
+        else -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+    }
+    val borderColor = when {
+        selected -> MaterialTheme.colorScheme.primary
+        isLight -> Color(0xFFD0D7DE)
+        else -> MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+    }
+    val fg = when {
+        selected -> MaterialTheme.colorScheme.primary
+        isLight -> Color(0xFF1F2328)
+        else -> MaterialTheme.colorScheme.onSurfaceVariant
+    }
+
     Row(
         modifier = modifier
             .height(36.dp)
             .clip(RoundedCornerShape(8.dp))
             .background(bg)
-            .border(1.dp, borderColor, RoundedCornerShape(8.dp))
+            .border(
+                width = if (selected) 1.5.dp else 1.dp,
+                color = borderColor,
+                shape = RoundedCornerShape(8.dp)
+            )
             .clickable(onClick = onClick)
-            .padding(horizontal = 10.dp),
+            .padding(start = Spacing.md, end = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp)
+        horizontalArrangement = Arrangement.spacedBy(Spacing.sm)
     ) {
+        // 运行状态指示点（激活且运行时带微发光外圈）
         Box(
             modifier = Modifier
-                .size(8.dp)
+                .size(if (selected && running) 10.dp else 8.dp)
                 .clip(CircleShape)
                 .background(dot)
+                .then(
+                    if (selected && running) Modifier.border(1.5.dp, dot.copy(alpha = 0.4f), CircleShape)
+                    else Modifier
+                )
         )
         Text(
             text = tab.title,
             color = fg,
             fontFamily = FontFamily.Monospace,
-            fontSize = 13.sp
+            fontSize = 13.sp,
+            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium
         )
         Box(
             modifier = Modifier
-                .size(20.dp)
+                .size(22.dp)
                 .clip(CircleShape)
                 .clickable(onClick = onClose),
             contentAlignment = Alignment.Center
@@ -296,8 +329,8 @@ private fun TabChip(
             Icon(
                 FeatherIcons.X,
                 contentDescription = stringResource(R.string.terminal_close_tab),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(14.dp)
+                tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                modifier = Modifier.size(13.dp)
             )
         }
     }
@@ -305,15 +338,23 @@ private fun TabChip(
 
 /** Termux TerminalView 的 Compose 包装：渲染与输入全部由该开源组件负责。 */
 @Composable
-private fun TerminalSurface(tab: TerminalTab, viewModel: TerminalViewModel) {
+private fun TerminalSurface(
+    tab: TerminalTab,
+    viewModel: TerminalViewModel,
+    settings: TerminalSettings
+) {
+    val preset = settings.theme
+    val bgColor = Color(preset.background)
+
     AndroidView(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black),
+            .background(bgColor),
         factory = { ctx ->
             val view = TerminalView(ctx, null)
+            view.setBackgroundColor(preset.background)
             val density = ctx.resources.displayMetrics.density
-            view.setTextSize((11f * density).toInt())
+            view.setTextSize((settings.fontSizeSp * density).toInt())
             view.setTerminalViewClient(
                 AppTerminalViewClient(
                     context = ctx,
@@ -323,16 +364,68 @@ private fun TerminalSurface(tab: TerminalTab, viewModel: TerminalViewModel) {
             )
             view.isFocusable = true
             view.isFocusableInTouchMode = true
-            // 把视图回填到该标签：会话 client 的 viewProvider 据此把输出刷到当前挂载的视图。
             tab.view = view
             view.attachSession(tab.session)
-            // 切回已有标签时立即把累计的屏幕缓冲渲染出来。
+
+            // 同步更新全局默认色彩表与当前会话色彩
+            TerminalColors.COLOR_SCHEME.mDefaultColors[TextStyle.COLOR_INDEX_BACKGROUND] = preset.background
+            TerminalColors.COLOR_SCHEME.mDefaultColors[TextStyle.COLOR_INDEX_FOREGROUND] = preset.foreground
+            TerminalColors.COLOR_SCHEME.mDefaultColors[TextStyle.COLOR_INDEX_CURSOR] = preset.cursor
+            for (i in 0 until minOf(16, preset.ansiColors.size)) {
+                TerminalColors.COLOR_SCHEME.mDefaultColors[i] = preset.ansiColors[i]
+            }
+
+            tab.session.emulator?.mColors?.let { colors ->
+                colors.mCurrentColors[TextStyle.COLOR_INDEX_BACKGROUND] = preset.background
+                colors.mCurrentColors[TextStyle.COLOR_INDEX_FOREGROUND] = preset.foreground
+                colors.mCurrentColors[TextStyle.COLOR_INDEX_CURSOR] = preset.cursor
+                for (i in 0 until minOf(16, preset.ansiColors.size)) {
+                    colors.mCurrentColors[i] = preset.ansiColors[i]
+                }
+            }
+
+            // 同步更新光标样式
+            (tab.client as? AppTerminalSessionClient)?.cursorStyle = settings.cursorStyle
+            tab.session.emulator?.setCursorStyle()
+
             view.onScreenUpdated()
+            view.invalidate()
             view.requestFocus()
             view
         },
+        update = { view ->
+            view.setBackgroundColor(preset.background)
+            val density = view.context.resources.displayMetrics.density
+            val targetTextSize = (settings.fontSizeSp * density).toInt()
+            if (view.tag != targetTextSize) {
+                view.setTextSize(targetTextSize)
+                view.tag = targetTextSize
+            }
+
+            // 同步更新全局默认色彩表与当前会话色彩
+            TerminalColors.COLOR_SCHEME.mDefaultColors[TextStyle.COLOR_INDEX_BACKGROUND] = preset.background
+            TerminalColors.COLOR_SCHEME.mDefaultColors[TextStyle.COLOR_INDEX_FOREGROUND] = preset.foreground
+            TerminalColors.COLOR_SCHEME.mDefaultColors[TextStyle.COLOR_INDEX_CURSOR] = preset.cursor
+            for (i in 0 until minOf(16, preset.ansiColors.size)) {
+                TerminalColors.COLOR_SCHEME.mDefaultColors[i] = preset.ansiColors[i]
+            }
+
+            tab.session.emulator?.mColors?.let { colors ->
+                colors.mCurrentColors[TextStyle.COLOR_INDEX_BACKGROUND] = preset.background
+                colors.mCurrentColors[TextStyle.COLOR_INDEX_FOREGROUND] = preset.foreground
+                colors.mCurrentColors[TextStyle.COLOR_INDEX_CURSOR] = preset.cursor
+                for (i in 0 until minOf(16, preset.ansiColors.size)) {
+                    colors.mCurrentColors[i] = preset.ansiColors[i]
+                }
+            }
+            // 同步更新光标样式
+            (tab.client as? AppTerminalSessionClient)?.cursorStyle = settings.cursorStyle
+            tab.session.emulator?.setCursorStyle()
+
+            view.onScreenUpdated()
+            view.invalidate()
+        },
         onRelease = { view ->
-            // 视图被回收（切走/重建）时解除引用，避免管理器把输出刷到已废弃的视图。
             if (tab.view === view) tab.view = null
         }
     )
@@ -384,37 +477,62 @@ private fun containerInitMessage(context: Context, state: ContainerInitState): S
         context.getString(R.string.terminal_preparing_env_first_run)
 }
 
-/** 手机软键盘缺失的常用按键：Esc / Tab / Ctrl(预置) / 方向键 / Ctrl-C / Ctrl-D。 */
+/** Termius 风格的现代化极客辅助按键栏。 */
 @Composable
 private fun ExtraKeysRow(viewModel: TerminalViewModel) {
-    Surface(color = MaterialTheme.colorScheme.surface, modifier = Modifier.fillMaxWidth()) {
+    Surface(
+        color = MaterialTheme.colorScheme.surface,
+        tonalElevation = 3.dp,
+        modifier = Modifier.fillMaxWidth()
+    ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .horizontalScroll(rememberScrollState())
-                .padding(horizontal = Spacing.md, vertical = Spacing.sm),
-            horizontalArrangement = Arrangement.spacedBy(Spacing.sm)
+                .padding(horizontal = Spacing.sm, vertical = 6.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            KeyChip("Esc") { viewModel.write("") }
-            KeyChip("Tab") { viewModel.write("\t") }
-            KeyChip("Ctrl", active = viewModel.modifiers.ctrl) {
+            // 控制键
+            KeyChip("ESC") { viewModel.write("\u001b") }
+            KeyChip("TAB") { viewModel.write("\t") }
+            KeyChip("CTRL", active = viewModel.modifiers.ctrl) {
                 viewModel.modifiers.ctrl = !viewModel.modifiers.ctrl
             }
-            KeyChip("←", repeatOnHold = true) { viewModel.write("[D") }
-            KeyChip("↑", repeatOnHold = true) { viewModel.write("[A") }
-            KeyChip("↓", repeatOnHold = true) { viewModel.write("[B") }
-            KeyChip("→", repeatOnHold = true) { viewModel.write("[C") }
+            KeyChip("ALT", active = viewModel.modifiers.alt) {
+                viewModel.modifiers.alt = !viewModel.modifiers.alt
+            }
+
+            // 方向键
+            KeyChip("←", repeatOnHold = true) { viewModel.write("\u001b[D") }
+            KeyChip("↑", repeatOnHold = true) { viewModel.write("\u001b[A") }
+            KeyChip("↓", repeatOnHold = true) { viewModel.write("\u001b[B") }
+            KeyChip("→", repeatOnHold = true) { viewModel.write("\u001b[C") }
+
+            // 快捷控制组合
             KeyChip("C-c") { viewModel.writeBytes(0x03) }
             KeyChip("C-d") { viewModel.writeBytes(0x04) }
+            KeyChip("C-z") { viewModel.writeBytes(0x1A) }
+            KeyChip("C-l") { viewModel.writeBytes(0x0C) }
+
+            // 常用编程与 shell 符号
+            KeyChip("|") { viewModel.write("|") }
+            KeyChip("~") { viewModel.write("~") }
             KeyChip("/") { viewModel.write("/") }
             KeyChip("-") { viewModel.write("-") }
+            KeyChip("_") { viewModel.write("_") }
+            KeyChip(">") { viewModel.write(">") }
+            KeyChip(":") { viewModel.write(":") }
+            KeyChip("$") { viewModel.write("$") }
+            KeyChip("\"") { viewModel.write("\"") }
+            KeyChip("'") { viewModel.write("'") }
         }
     }
 }
 
 /** 方向键长按重复节奏：按下后延迟多久开始连续发送，以及每次发送的间隔。 */
-private const val KEY_REPEAT_INITIAL_DELAY_MS = 400L
-private const val KEY_REPEAT_INTERVAL_MS = 60L
+private const val KEY_REPEAT_INITIAL_DELAY_MS = 350L
+private const val KEY_REPEAT_INTERVAL_MS = 50L
 
 @Composable
 private fun KeyChip(
@@ -423,13 +541,26 @@ private fun KeyChip(
     repeatOnHold: Boolean = false,
     onClick: () -> Unit
 ) {
-    val bg = if (active) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface
-    val borderColor = if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant
-    val fg = if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
-    // 长按连续触发：pressed 期间由 LaunchedEffect 循环发送；短按（未发送过重复）在抬起时补发一次。
-    // 不用 pointerInput 内 launch——新版 Compose 的 PointerInputScope 不再是 CoroutineScope。
+    val isLight = MaterialTheme.colorScheme.background.luminance() > 0.5f
+    val bg = when {
+        active -> MaterialTheme.colorScheme.primary
+        isLight -> Color(0xFFE9ECEF)
+        else -> Color(0xFF262C36)
+    }
+    val borderColor = when {
+        active -> MaterialTheme.colorScheme.primary
+        isLight -> Color(0xFFD0D7DE)
+        else -> Color(0xFF3B4350)
+    }
+    val fg = when {
+        active -> MaterialTheme.colorScheme.onPrimary
+        isLight -> Color(0xFF1F2328)
+        else -> Color(0xFFE6EDF3)
+    }
+
     var pressed by remember { mutableStateOf(false) }
     var sentRepeated by remember { mutableStateOf(false) }
+
     LaunchedEffect(pressed) {
         if (!pressed) return@LaunchedEffect
         sentRepeated = false
@@ -440,13 +571,14 @@ private fun KeyChip(
             delay(KEY_REPEAT_INTERVAL_MS)
         }
     }
+
     Box(
         modifier = Modifier
-            .height(36.dp)
+            .height(34.dp)
             .widthChip(label)
-            .clip(RoundedCornerShape(8.dp))
+            .clip(RoundedCornerShape(6.dp))
             .background(bg)
-            .border(1.dp, borderColor, RoundedCornerShape(8.dp))
+            .border(1.dp, borderColor, RoundedCornerShape(6.dp))
             .then(
                 if (repeatOnHold) {
                     Modifier.pointerInput(onClick) {
@@ -468,12 +600,13 @@ private fun KeyChip(
             text = label,
             color = fg,
             fontFamily = FontFamily.Monospace,
-            fontSize = 13.sp,
-            modifier = Modifier.padding(horizontal = 12.dp)
+            fontSize = 12.5.sp,
+            fontWeight = if (active) FontWeight.Bold else FontWeight.Medium,
+            modifier = Modifier.padding(horizontal = 10.dp)
         )
     }
 }
 
 /** 单字符按键给固定宽度，多字符按键自适应。 */
 private fun Modifier.widthChip(label: String): Modifier =
-    if (label.length <= 1) this.width(40.dp) else this
+    if (label.length <= 1) this.width(36.dp) else this

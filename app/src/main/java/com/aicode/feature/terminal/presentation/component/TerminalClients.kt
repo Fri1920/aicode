@@ -46,7 +46,8 @@ class TerminalKeyModifiers {
 class AppTerminalSessionClient(
     private val context: Context,
     private val viewProvider: () -> TerminalView?,
-    private val onFinished: (TerminalSession) -> Unit
+    private val onFinished: (TerminalSession) -> Unit,
+    var cursorStyle: Int = 0
 ) : TerminalSessionClient {
 
     private companion object { const val TAG = "TerminalSession" }
@@ -79,7 +80,7 @@ class AppTerminalSessionClient(
     override fun onBell(session: TerminalSession) { /* 忽略响铃 */ }
     override fun onColorsChanged(session: TerminalSession) { viewProvider()?.onScreenUpdated() }
     override fun onTerminalCursorStateChange(state: Boolean) {}
-    override fun getTerminalCursorStyle(): Int? = null
+    override fun getTerminalCursorStyle(): Int? = cursorStyle
 
     override fun logError(tag: String?, message: String?) { FileLogger.e(tag ?: TAG, message ?: "") }
     override fun logWarn(tag: String?, message: String?) { FileLogger.w(tag ?: TAG, message ?: "") }

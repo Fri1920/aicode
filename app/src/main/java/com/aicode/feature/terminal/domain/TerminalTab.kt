@@ -50,6 +50,7 @@ class TerminalTab(
     val notifyOnExit: Boolean = false,
     /** 发起该后台命令的会话 id；交互标签为 null。回调据此路由回原会话。 */
     val sourceSessionId: String? = null,
+    val client: com.termux.terminal.TerminalSessionClient? = null,
     runState: RunState
 ) {
     var title: String = title

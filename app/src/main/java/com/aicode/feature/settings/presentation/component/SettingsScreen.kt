@@ -89,7 +89,10 @@ import compose.icons.feathericons.RefreshCw
 import compose.icons.feathericons.Save
 import compose.icons.feathericons.Server
 import compose.icons.feathericons.Shield
+import compose.icons.feathericons.Terminal
 import compose.icons.feathericons.Trash2
+import com.aicode.feature.terminal.data.repository.TerminalSettings
+import com.aicode.feature.terminal.presentation.component.TerminalSettingsSheet
 
 /** 使用手册 Wiki 地址。 */
 private const val USER_GUIDE_WIKI_URL = "https://github.com/jieapi/aicode/wiki"
@@ -160,6 +163,8 @@ fun SettingsScreen(
     val selectedImageSource by viewModel.selectedImageSource.collectAsStateWithLifecycle()
     val downloadedImages by viewModel.downloadedImages.collectAsStateWithLifecycle()
     val sourceUnavailableIds by viewModel.sourceUnavailableIds.collectAsStateWithLifecycle()
+    val terminalSettings by viewModel.terminalSettings.collectAsStateWithLifecycle()
+    var showTerminalSettingsSheet by remember { mutableStateOf(false) }
 
     val context = LocalContext.current
     val currentLanguageDisplayName = if (languageTag.isNullOrBlank()) {
@@ -353,10 +358,12 @@ fun SettingsScreen(
             when (section) {
                 SettingsSection.Menu -> SettingsMenu(
                     themeMode = themeMode,
+                    terminalSettings = terminalSettings,
                     currentLanguageDisplayName = currentLanguageDisplayName,
                     backgroundImagePath = backgroundImagePath,
                     backgroundAlpha = backgroundAlpha,
                     onOpenThemeSheet = { showThemeSheet = true },
+                    onOpenTerminalSettingsSheet = { showTerminalSettingsSheet = true },
                     onOpenBackgroundSheet = { showBackgroundSheet = true },
                     onOpenLanguageSheet = { showLanguageSheet = true },
                     onOpenManual = {
@@ -532,6 +539,16 @@ fun SettingsScreen(
         )
     }
 
+    if (showTerminalSettingsSheet) {
+        TerminalSettingsSheet(
+            settings = terminalSettings,
+            onDismiss = { showTerminalSettingsSheet = false },
+            onSelectTheme = { viewModel.setTerminalTheme(it) },
+            onChangeFontSize = { viewModel.setTerminalFontSize(it) },
+            onChangeCursorStyle = { viewModel.setTerminalCursorStyle(it) }
+        )
+    }
+
     if (showBackgroundSheet) {
         BackgroundImageSheet(
             imagePath = backgroundImagePath,
@@ -664,10 +681,12 @@ fun SettingsScreen(
 @Composable
 internal fun SettingsMenu(
     themeMode: AppThemeMode,
+    terminalSettings: TerminalSettings,
     currentLanguageDisplayName: String,
     backgroundImagePath: String?,
     backgroundAlpha: Float,
     onOpenThemeSheet: () -> Unit,
+    onOpenTerminalSettingsSheet: () -> Unit,
     onOpenBackgroundSheet: () -> Unit,
     onOpenLanguageSheet: () -> Unit,
     onOpenManual: () -> Unit,
@@ -757,6 +776,23 @@ internal fun SettingsMenu(
                 trailing = {
                     Text(
                         text = stringResource(themeMode.labelRes),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = if (MaterialTheme.colorScheme.background.luminance() > 0.5f) {
+                            Color(0xFF8E8E93)
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        }
+                    )
+                }
+            )
+            SettingsDivider()
+            SettingsRow(
+                icon = FeatherIcons.Terminal,
+                title = stringResource(R.string.terminal_settings_title),
+                onClick = onOpenTerminalSettingsSheet,
+                trailing = {
+                    Text(
+                        text = stringResource(terminalSettings.theme.nameRes),
                         style = MaterialTheme.typography.bodyMedium,
                         color = if (MaterialTheme.colorScheme.background.luminance() > 0.5f) {
                             Color(0xFF8E8E93)

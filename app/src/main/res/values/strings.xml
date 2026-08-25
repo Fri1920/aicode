@@ -874,6 +874,21 @@
     <string name="terminal_preparing_env_failed">正在准备容器环境…\n%1$s</string>
     <string name="terminal_preparing_env_first_run">正在准备容器环境…\n首次运行会解压容器，请稍候</string>
 
+    <!-- Terminal Settings & Themes -->
+    <string name="terminal_settings_title">终端设置</string>
+    <string name="terminal_theme_title">配色主题</string>
+    <string name="terminal_font_size_title">字体大小</string>
+    <string name="terminal_cursor_style_title">光标样式</string>
+    <string name="terminal_cursor_block">方块</string>
+    <string name="terminal_cursor_underline">下划线</string>
+    <string name="terminal_cursor_bar">竖线</string>
+    <string name="terminal_preview_text">终端预览</string>
+    <string name="terminal_theme_termius_dark">Termius Dark</string>
+    <string name="terminal_theme_dracula">Dracula</string>
+    <string name="terminal_theme_one_dark">One Dark</string>
+    <string name="terminal_theme_monokai">Monokai</string>
+    <string name="terminal_theme_github_dark">GitHub Dark</string>
+
     <!-- Todo Card -->
     <string name="todo_completed">已完成</string>
     <string name="todo_in_progress">进行中</string>
