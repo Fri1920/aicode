@@ -211,86 +211,67 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # 同步 Release 附件到 Gitee（面向访问不了 GitHub 的用户）：
-      # Gitee 官方「仓库镜像」只同步分支/tag/提交，不会同步 GitHub Release 的 APK 附件，
-      # 所以这里在发版后用 Gitee API v5 把三个 APK 传到 Gitee Release，供国内用户直接下载。
+      # 同步 Release 附件到 GitCode（面向访问不了 GitHub 的用户）：
+      # GitCode Release 走官方 API v5：POST 创建（tag 不存在时自动在 main 上创建，
+      # 无需像 Gitee 那样等官方镜像同步 tag）、GET upload_url 拿预签名 OBS 地址后
+      # PUT 二进制上传（响应 headers 参与签名，必须全带）。
       # 前置配置：
-      #   1. Gitee 私人令牌（勾选 projects 权限）→ GitHub Secret: GITEE_TOKEN
-      #   2. （可选）Gitee 用户名/仓库名 → GitHub Variables: GITEE_OWNER / GITEE_REPO，不配则默认与 GitHub 同名
-      - name: Sync release assets to Gitee
+      #   1. GitCode 个人访问令牌 → GitHub Secret: GITCODE_TOKEN
+      #   2. （可选）GitCode 用户名/仓库名 → GitHub Variables: GITCODE_OWNER / GITCODE_REPO，不配则默认与 GitHub 同名
+      - name: Sync release assets to GitCode
         if: startsWith(github.ref, 'refs/tags/v')
         env:
-          GITEE_TOKEN: ${{ secrets.GITEE_TOKEN }}
-          GITEE_OWNER: ${{ vars.GITEE_OWNER }}
-          GITEE_REPO: ${{ vars.GITEE_REPO }}
+          GITCODE_TOKEN: ${{ secrets.GITCODE_TOKEN }}
+          GITCODE_OWNER: ${{ vars.GITCODE_OWNER }}
+          GITCODE_REPO: ${{ vars.GITCODE_REPO }}
           GITHUB_REPO: ${{ github.repository }}
           TAG: ${{ steps.release.outputs.tag }}
           RELEASE_NAME: Release ${{ steps.release.outputs.tag }}
           RELEASE_BODY: ${{ steps.changelog.outputs.body }}
-          PRERELEASE: ${{ steps.prerelease.outputs.is_prerelease }}
         run: |
           set -euo pipefail
-          if [[ -z "$GITEE_TOKEN" ]]; then
-            echo "::warning::未配置 GITEE_TOKEN，跳过 Gitee 同步。请到 Settings→Secrets and variables→Actions 添加（Gitee 私人令牌，需 projects 权限）。"
+          if [[ -z "$GITCODE_TOKEN" ]]; then
+            echo "::warning::未配置 GITCODE_TOKEN，跳过 GitCode 同步。请到 Settings→Secrets and variables→Actions 添加（GitCode 个人访问令牌）。"
             exit 0
           fi
-          owner="${GITEE_OWNER:-${GITHUB_REPO%/*}}"
-          repo="${GITEE_REPO:-${GITHUB_REPO#*/}}"
-          api="https://gitee.com/api/v5/repos/${owner}/${repo}"
-          echo "目标 Gitee 仓库: ${owner}/${repo}"
+          owner="${GITCODE_OWNER:-${GITHUB_REPO%/*}}"
+          repo="${GITCODE_REPO:-${GITHUB_REPO#*/}}"
+          api="https://api.gitcode.com/api/v5/repos/${owner}/${repo}"
+          echo "目标 GitCode 仓库: ${owner}/${repo}"
 
-          # 先验证 token 与仓库可达，避免把鉴权错误误判成镜像延迟
-          if ! curl -fsS "${api}?access_token=${GITEE_TOKEN}" > /dev/null; then
-            echo "::error::无法访问 Gitee 仓库 ${owner}/${repo}，请检查 GITEE_TOKEN 与 GITEE_OWNER/GITEE_REPO"
+          # 先验证 token 与仓库可达，避免把鉴权错误误判成其它问题
+          if ! curl -fsS -H "Authorization: Bearer ${GITCODE_TOKEN}" "${api}" > /dev/null; then
+            echo "::error::无法访问 GitCode 仓库 ${owner}/${repo}，请检查 GITCODE_TOKEN 与 GITCODE_OWNER/GITCODE_REPO"
             exit 1
           fi
 
-          # 等待 Gitee 官方镜像把 tag 同步过来（镜像最短触发间隔 5 分钟），否则创建 Release 会失败。
-          echo "等待 Gitee 镜像同步 tag ${TAG} ..."
-          for i in $(seq 1 40); do
-            if curl -fsS "${api}/tags?access_token=${GITEE_TOKEN}&per_page=100" | \
-               TAG="$TAG" python3 -c 'import sys,json,os; data=json.load(sys.stdin); print("found" if any(t.get("name")==os.environ["TAG"] for t in data) else "missing")' | grep -q found; then
-              echo "  ✓ tag 已同步（等待 $((i*30)) 秒）"
-              break
-            fi
-            if [[ $i -eq 40 ]]; then
-              echo "::error::等待 20 分钟 Gitee 仍未同步 tag ${TAG}，请检查仓库镜像配置后手动重跑"
-              exit 1
-            fi
-            sleep 30
-          done
-
-          # 按 tag 找已有 Release（幂等复用）；没有则创建
-          release_id=$(curl -fsS "${api}/releases?access_token=${GITEE_TOKEN}&per_page=100" | \
-            TAG="$TAG" python3 -c 'import sys,json,os; data=json.load(sys.stdin); print(next((r["id"] for r in data if r.get("tag_name")==os.environ["TAG"]), ""))')
-          if [[ -z "$release_id" ]]; then
-            echo "创建 Gitee Release ${TAG}"
-            payload=$(python3 -c 'import json,os; print(json.dumps({"access_token": os.environ["GITEE_TOKEN"], "tag_name": os.environ["TAG"], "name": os.environ["RELEASE_NAME"], "body": os.environ["RELEASE_BODY"], "prerelease": os.environ["PRERELEASE"].lower()=="true", "target_commitish": "main"}, ensure_ascii=False))')
-            release_id=$(curl -fsS -X POST -H "Content-Type: application/json" \
-              -d "$payload" "${api}/releases" | \
-              python3 -c 'import sys, json; print(json.load(sys.stdin).get("id", ""))')
-            echo "  ✓ 已创建（id=${release_id}）"
+          # 创建或复用 Release：GitCode 在 tag 缺失时会自动于 target_commitish(main) 创建，
+          # 无需等待镜像同步；同 tag 已存在返回 409 视为复用（幂等）。
+          payload=$(python3 -c 'import json,os; print(json.dumps({"tag_name": os.environ["TAG"], "name": os.environ["RELEASE_NAME"], "body": os.environ["RELEASE_BODY"], "target_commitish": "main"}, ensure_ascii=False))')
+          code=$(curl -sS -o /tmp/gc_release.json -w "%{http_code}" -X POST \
+            -H "Authorization: Bearer ${GITCODE_TOKEN}" -H "Content-Type: application/json" \
+            -d "$payload" "${api}/releases")
+          if [[ "$code" == "200" || "$code" == "201" ]]; then
+            echo "✓ Release ${TAG} 已创建"
+          elif [[ "$code" == "409" ]]; then
+            echo "Release ${TAG} 已存在，复用"
           else
-            echo "Release ${TAG} 已存在（id=${release_id}），复用"
+            echo "::error::创建 GitCode Release 失败（HTTP $code）：$(head -c 300 /tmp/gc_release.json)"
+            exit 1
           fi
 
-          # 上传 APK 附件（Gitee 社区版附件单文件上限 100MB，超限跳过并告警）
-          max_bytes=$((100 * 1024 * 1024))
+          # 上传 APK：GET upload_url 取预签名地址，再 PUT 二进制（headers 全带，参与 OBS 签名校验）。
+          # 加超时与重试：GitCode 传输偶发挂起，无超时会无限卡住整个 job。
           for apk in dist/aicode-*.apk; do
             [[ -f "$apk" ]] || continue
-            size=$(stat -c%s "$apk")
-            if (( size > max_bytes )); then
-              echo "::warning::$(basename "$apk") ${size} 字节超过 Gitee 附件 100MB 上限，跳过"
-              continue
-            fi
-            echo "上传 $(basename "$apk")（$(numfmt --to=iec "$size")）..."
-            # 上传加超时与重试：Gitee API 偶发挂起，无超时会无限卡住整个 job（默认 6h 才超时）。
+            fname=$(basename "$apk")
+            echo "上传 ${fname}（$(numfmt --to=iec "$(stat -c%s "$apk")")）..."
             uploaded=false
             for attempt in 1 2 3; do
-              if curl -fsS --max-time 300 -X POST \
-                -F "access_token=${GITEE_TOKEN}" \
-                -F "file=@${apk}" \
-                "${api}/releases/${release_id}/attach_files" > /dev/null; then
+              if curl -fsS --max-time 120 -H "Authorization: Bearer ${GITCODE_TOKEN}" \
+                  "${api}/releases/${TAG}/upload_url?file_name=${fname}" -o /tmp/gc_up.json && \
+                 python3 scripts/gitcode-upload.py "$apk" /tmp/gc_up.json
+              then
                 echo "  ✓ 已上传"
                 uploaded=true
                 break
@@ -299,17 +280,16 @@ jobs:
               sleep 10
             done
             if [[ "$uploaded" != true ]]; then
-              echo "::warning::$(basename "$apk") 连续 3 次上传失败，跳过（GitHub Release 不受影响）"
+              echo "::warning::${fname} 连续 3 次上传失败，跳过（GitHub Release 不受影响）"
             fi
           done
-          echo "完成: https://gitee.com/${owner}/${repo}/releases"
+          echo "完成: https://gitcode.com/${owner}/${repo}/releases"
 
-      # 按保留策略自动清理 Gitee 过期 Release：保留最新 3 个正式版 + 最新正式版之后的全部 RC，
-      # 防止免费版 1GB 附件配额被历史版本占满（正式版转正后其 RC 自动过期）。
-      # 脚本幂等：保留集合内缺失的附件会顺带补齐，已存在的跳过。
-      - name: Prune outdated Gitee releases
+      # 历史 Release 幂等补齐（默认保留最新 3 个正式版，不包含 RC；已同步的跳过）。
+      # GitCode 无公开附件配额限制，且删除 Release 只能删 tag（连带删除，副作用大），
+      # 故不做自动清理，脚本只负责增量补齐缺失附件。
+      - name: Backfill historical releases to GitCode
         if: startsWith(github.ref, 'refs/tags/v')
         env:
-          GITEE_TOKEN: ${{ secrets.GITEE_TOKEN }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: python3 scripts/sync-gitee-releases.py --prune
+          GITCODE_TOKEN: ${{ secrets.GITCODE_TOKEN }}
+        run: python3 scripts/sync-gitcode-releases.py
